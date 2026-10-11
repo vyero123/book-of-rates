@@ -91,9 +91,18 @@ export async function initAudio(){
   const subHP = ctx.createBiquadFilter(); subHP.type='highpass'; subHP.frequency.value = 32;
   const air = ctx.createBiquadFilter(); air.type='highshelf'; air.frequency.value = 7500; air.gain.value = -6;
 
-  limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -6; limiter.knee.value = 0;
-  limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.2;
+  // Stateless soft clip instead of a DynamicsCompressor. The compressor was
+  // reporting impossible reduction figures (-450 dB), so it could not be
+  // trusted as either a safety net or a diagnostic. A waveshaper has no
+  // internal state to corrupt: it simply cannot report or accumulate
+  // garbage, and it saturates gracefully instead of wrapping.
+  limiter = ctx.createWaveShaper();
+  const CURVE = new Float32Array(1024);
+  for (let i = 0; i < CURVE.length; i++){
+    const x = (i/(CURVE.length-1))*2 - 1;
+    CURVE[i] = Math.tanh(x*1.6) / Math.tanh(1.6);
+  }
+  limiter.curve = CURVE; limiter.oversample = '4x';
 
   analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
 
@@ -115,7 +124,7 @@ export async function closeAudio(){
   noiseBuf = null; duck = null; statics = null; limiter = null;
 }
 
-const BASE = 1.0;
+const BASE = 2.4;   // measured: lands near -14 dBFS peak
 let userTrim = 1, muted = false;
 const target = () => muted ? 0.0001 : BASE * userTrim;
 
@@ -169,7 +178,7 @@ export function meter(){
   const rms = Math.sqrt(sum/b.length);
   const db = x => x < 1e-5 ? -100 : 20*Math.log10(x);
   return { ok:true, peak, rms, peakDb:+db(peak).toFixed(1), rmsDb:+db(rms).toFixed(1),
-           reduction: limiter ? +limiter.reduction.toFixed(2) : 0 };
+           reduction: 0 };   // soft clip has no reduction to report
 }
 export function waveform(arr){
   if (!analyser) return false;
@@ -246,27 +255,46 @@ function struck(out, t, freq, dur, vel, ratios){
   later(t, dur + 0.4, () => { try { mix.disconnect(); } catch(e){} });
 }
 
+/* Plucked tone. This was a Karplus-Strong delay loop; it has been replaced
+ * with a bounded additive model. A feedback loop was the only structure in
+ * this file that could diverge, and the two themes that saturated were the
+ * two containing a low, frequently-retriggered pluck. Nothing here can run
+ * away: every partial is an oscillator with a fixed decay envelope. */
 function pluck(out, t, freq, vel, damp = 0.95, tone = 1800){
-  const period = 1/freq;
-  if (period < 0.004) return;
-  const burst = ctx.createBufferSource();
-  const len = Math.max(2, Math.ceil(ctx.sampleRate*period));
-  const b = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = b.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1)*(1 - i/len*0.4);
-  burst.buffer = b;
-  const dly = ctx.createDelay(0.2); dly.delayTime.value = period;
-  const fb = ctx.createGain(); fb.gain.value = Math.min(0.96, damp);
+  if (freq < 20 || freq > 5000) return;
+  const mix = ctx.createGain(); mix.gain.value = 1;
   const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = tone;
-  const outLP = ctx.createBiquadFilter(); outLP.type='lowpass'; outLP.frequency.value = tone*1.4;
-  const amp = ctx.createGain(); amp.gain.value = vel;
-  burst.connect(dly);
-  dly.connect(lp); lp.connect(fb); fb.connect(dly);
-  dly.connect(outLP); outLP.connect(amp); amp.connect(out);
-  burst.start(t); burst.stop(t + period*1.2);
-  amp.gain.setValueAtTime(vel, t + 0.4);
-  amp.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
-  later(t, 3.1, () => { try { fb.gain.value = 0; amp.disconnect(); dly.disconnect(); } catch(e){} });
+  mix.connect(lp); lp.connect(out);
+  // slight stretch keeps it from sounding like a pure organ tone
+  const R = [1, 2.003, 3.01, 4.02, 5.04, 6.07];
+  const A = [1, 0.5, 0.26, 0.14, 0.08, 0.04];
+  const body = 0.9 + (damp - 0.95) * 8;          // 'damp' now means sustain
+  R.forEach((r, i) => {
+    const f = freq*r;
+    if (f > 9000) return;
+    const o = ctx.createOscillator(); o.type='sine';
+    o.frequency.value = f;
+    o.detune.value = (Math.random()*2-1)*3;
+    const g = ctx.createGain();
+    const a = vel * A[i];
+    const d = Math.max(0.12, (1.9*body) * Math.pow(0.6, i));   // highs die first
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(a, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(mix);
+    o.start(t); o.stop(t + d + 0.05);
+  });
+  // string noise at the moment of plucking
+  const s = noiseSource(false);
+  const bp = ctx.createBiquadFilter(); bp.type='bandpass';
+  bp.frequency.value = Math.min(4000, freq*5); bp.Q.value = 1.4;
+  const mg = ctx.createGain();
+  mg.gain.setValueAtTime(0, t);
+  mg.gain.linearRampToValueAtTime(vel*0.18, t + 0.002);
+  mg.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  s.connect(bp); bp.connect(mg); mg.connect(mix);
+  s.start(t); s.stop(t + 0.1);
+  later(t, 2.6, () => { try { mix.disconnect(); } catch(e){} });
 }
 
 function bowed(out, t, freq, dur, vel){
