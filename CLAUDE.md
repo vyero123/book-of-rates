@@ -25,8 +25,11 @@ tabs, animations with sound, background timers, media autoplay.
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an
   askpass helper. Writes to the mounted folder are fine; git operations are not.
 - **`token.txt` is a live PAT at the repo root.** It is in `.gitignore`. Never echo it, never
-  put it on a command line, never commit it. Check `git grep --cached -l 'github_pat_'`
-  before every push. Verified clean: history contains no token blob.
+  put it on a command line, never commit it. Before every push, scan the index for the
+  fine-grained-PAT prefix — build the pattern at runtime rather than writing it literally in
+  a tracked file, e.g. `git grep --cached -lE "github""_pat_"`. Writing the literal prefix
+  into a committed file makes the scan match that file forever and quietly useless.
+  Verified clean: history contains no token blob.
 - **Mobile-first, 375 px.** The user is on an iPhone.
 - **Render it and look at it.** Nothing visual is "done" until it has been screenshotted and
   inspected. No headless browser is available in the sandbox (Chromium download is blocked),
