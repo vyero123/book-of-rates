@@ -8,66 +8,73 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;min-height:100%;background:#14183F;color:#F3EAD7;
     font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:420px;margin:0 auto;padding:26px 18px 60px}
-  h1{font:300 24px/1.2 ui-serif,Georgia,serif;margin:0 0 4px}
+  .wrap{max-width:430px;margin:0 auto;padding:22px 16px 70px}
+  h1{font:300 23px/1.2 ui-serif,Georgia,serif;margin:0 0 3px}
   .sub{font:500 9px/1.5 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
-    color:rgba(243,234,215,.45);margin:0 0 16px}
-  p.i{font:400 12.5px/1.65 ui-sans-serif;color:rgba(243,234,215,.66);margin:0 0 18px}
+    color:rgba(243,234,215,.45);margin:0 0 14px}
+  p.i{font:400 12.5px/1.65 ui-sans-serif;color:rgba(243,234,215,.68);margin:0 0 16px}
+  p.i b{color:#9FF0E2}
 
-  #bar{position:sticky;top:0;z-index:20;background:#14183F;padding:10px 0 12px;
+  #top{position:sticky;top:0;z-index:30;background:#14183F;padding:10px 0 12px;
     border-bottom:1px solid rgba(243,234,215,.12);margin-bottom:14px}
-  #trk{height:4px;background:rgba(243,234,215,.14);border-radius:2px;overflow:hidden}
-  #lv{height:100%;width:0;background:#46D6C8}
-  .r{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;gap:10px}
-  #ph{font:300 16px/1 ui-serif,Georgia,serif;letter-spacing:.18em;text-transform:lowercase}
-  #st{font:500 8.5px/1.45 ui-sans-serif;letter-spacing:.12em;text-transform:uppercase;
+  #stopbig{width:100%;appearance:none;border:0;border-radius:10px;padding:14px 0;
+    background:#E8473C;color:#fff;font:700 12px/1 ui-sans-serif;letter-spacing:.2em}
+  .meta{display:flex;justify-content:space-between;gap:10px;margin-top:9px;align-items:baseline}
+  #ph{font:300 15px/1 ui-serif,Georgia,serif;letter-spacing:.16em;text-transform:lowercase}
+  #st{font:500 8.5px/1.45 ui-sans-serif;letter-spacing:.1em;text-transform:uppercase;
     color:rgba(243,234,215,.45);text-align:right}
-  canvas{display:block;width:100%;height:38px;margin-top:8px;background:rgba(243,234,215,.05);border-radius:5px}
-  .btns{display:flex;gap:8px;margin-top:10px}
-  .btns button{flex:1;appearance:none;border:0;border-radius:999px;padding:11px 0;
-    font:600 10px/1 ui-sans-serif;letter-spacing:.16em;background:rgba(243,234,215,.14);color:#F3EAD7}
-  .btns button.stop{background:#E8473C;color:#fff}
-  .btns button.on{background:#46D6C8;color:#14183F}
+  #trk{height:4px;background:rgba(243,234,215,.14);border-radius:2px;overflow:hidden;margin-top:9px}
+  #lv{height:100%;width:0;background:#46D6C8}
+  #met{margin-top:8px;font:500 9.5px/1.5 ui-monospace,Menlo,monospace;color:rgba(243,234,215,.55)}
+  #met.hot{color:#E8473C}
+  canvas{display:block;width:100%;height:34px;margin-top:7px;background:rgba(243,234,215,.05);border-radius:5px}
 
   h2{font:600 9px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
-    color:rgba(243,234,215,.42);margin:22px 0 9px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .th{border-radius:11px;padding:12px 13px;background:rgba(243,234,215,.05);
+    color:rgba(243,234,215,.42);margin:20px 0 9px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .th{border-radius:11px;padding:11px 12px;background:rgba(243,234,215,.05);
     box-shadow:0 0 0 1px rgba(243,234,215,.12);cursor:pointer}
   .th.on{box-shadow:0 0 0 1.5px #46D6C8;background:rgba(70,214,200,.1)}
-  .th b{display:block;font:400 14px/1.25 ui-serif,Georgia,serif;margin-bottom:3px}
-  .th span{font:400 10px/1.4 ui-sans-serif;color:rgba(243,234,215,.5)}
+  .th b{display:block;font:400 13.5px/1.25 ui-serif,Georgia,serif;margin-bottom:3px}
+  .th span{font:400 9.5px/1.4 ui-sans-serif;color:rgba(243,234,215,.5)}
 
   .sel{display:flex;flex-wrap:wrap;gap:6px}
-  .sel button{appearance:none;border:0;border-radius:999px;padding:9px 13px;
-    font:600 9.5px/1 ui-sans-serif;letter-spacing:.08em;
-    background:rgba(243,234,215,.1);color:rgba(243,234,215,.8)}
+  .sel button{appearance:none;border:0;border-radius:999px;padding:9px 12px;
+    font:600 9.5px/1 ui-sans-serif;background:rgba(243,234,215,.1);color:rgba(243,234,215,.8)}
   .sel button.on{background:#F3EAD7;color:#14183F}
 
-  .fad{display:flex;align-items:center;gap:10px;margin:7px 0}
-  .fad label{flex:0 0 80px;font:500 10px/1 ui-monospace,Menlo,monospace;color:rgba(243,234,215,.68)}
-  .fad input{flex:1;accent-color:#46D6C8}
-  .fad em{flex:0 0 30px;text-align:right;font:400 10px/1 ui-monospace,Menlo,monospace;
-    color:rgba(243,234,215,.4);font-style:normal}
-  footer{margin-top:28px;font:400 10.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.36)}
+  .lay{display:flex;align-items:center;gap:6px;margin:6px 0}
+  .lay .nm{flex:0 0 62px;font:500 10px/1 ui-monospace,Menlo,monospace;color:rgba(243,234,215,.72);
+    overflow:hidden;text-overflow:ellipsis}
+  .lay button{appearance:none;border:0;border-radius:5px;padding:7px 0;flex:0 0 36px;
+    font:700 8.5px/1 ui-sans-serif;background:rgba(243,234,215,.1);color:rgba(243,234,215,.65)}
+  .lay button.on{background:#46D6C8;color:#14183F}
+  .lay button.m.on{background:#E8473C;color:#fff}
+  .lay input{flex:1;min-width:40px;accent-color:#46D6C8}
+
+  .vol{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .vol label{flex:0 0 62px;font:500 10px/1 ui-monospace,Menlo,monospace;color:rgba(243,234,215,.72)}
+  .vol input{flex:1;accent-color:#F3EAD7}
+
+  footer{margin-top:26px;font:400 10.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.36)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Soundscape audition</h1>
   <p class="sub">The Book of Rates · all synthesised, no samples</p>
-  <p class="i">Six soundscapes, each matched to a level's art. Pick a theme, pick a rate —
-  the heartbeat and every ornament re-lock to whatever tempo you choose. Faders are live.
-  Give each one a minute; the point is the fifth repeat, not the first.</p>
+  <p class="i">Rebuilt after the first version clipped. <b>Solo each layer and tell me which
+  one is offensive</b> — that is far more useful than "it sounds bad", because I cannot hear
+  any of this. The meter below shows the real level; if it turns red the mix is still too hot
+  and that is a bug, not a taste question.</p>
 
-  <div id="bar">
+  <div id="top">
+    <button id="stopbig">STOP ALL SOUND</button>
+    <div class="meta"><div id="ph">nothing playing</div><div id="st">pick a soundscape</div></div>
     <div id="trk"><div id="lv"></div></div>
-    <div class="r"><div id="ph">nothing playing</div><div id="st">pick a theme</div></div>
+    <div id="met">meter idle</div>
     <canvas id="sc"></canvas>
-    <div class="btns">
-      <button id="mute">MUTE</button>
-      <button id="stop" class="stop">STOP</button>
-    </div>
+    <div class="vol"><label>volume</label><input id="vol" type="range" min="0" max="150" value="100"></div>
   </div>
 
   <h2>Soundscape</h2>
@@ -76,28 +83,20 @@
   <h2>Rate</h2>
   <div class="sel" id="rates"></div>
 
-  <h2>Layers</h2>
-  <div id="faders"></div>
+  <h2>Layers — solo / mute / level</h2>
+  <div id="layers"></div>
 
   <footer>Rain, wind, surf and fire are shaped noise. Fire crackle and leaf rustle are noise
-  transients. Birds are pitched sweeps. Strings are Karplus–Strong. Nothing here is a
-  recording, and nothing is transcribed from any existing piece.</footer>
+  transients. Birds are pitched sweeps. Strings are Karplus–Strong. Pads are additive sine
+  stacks. Nothing here is a recording, and nothing is transcribed from any existing piece.</footer>
 </div>
 
 <script type="module">
-import { initAudio, closeAudio, Music, THEMES, setMuted, isMuted, fadeIn, fadeOut,
-         audioContext, waveform, fftSize } from './js/audio.js';
+import { initAudio, closeAudio, Music, THEMES, setMuted, setTrim, fadeIn, fadeOut,
+         audioContext, waveform, fftSize, meter } from './js/audio.js';
 import { Transport, buildSession, query } from './js/engine.js';
 import { P } from './js/protocols.js';
 
-const THEME_NOTES = {
-  'desert-dusk': 'The Long Shore — wind, far birds, dorian drone',
-  'night-pool':  'Still water — gong, drops, plucked low strings',
-  'storm':       'Rain and bowed weight. Distress, passing',
-  'temple-noon': 'Hard light, struck metal, thin air',
-  'cliffs-midday':'The Run — heartbeat under everything',
-  'night-river': 'Sleep. Water and a fire on the bank'
-};
 const RATES = [
   ['calm',   P.calm,   '5.5 · 88'],
   ['soothe', P.soothe, '5.0 · 120'],
@@ -107,93 +106,122 @@ const RATES = [
 ];
 
 let tp = null, music = null, session = null;
-let themeId = 'desert-dusk', rateId = 'calm';
+let themeId = null, rateId = 'calm';
+let solo = null, mutes = {};
 
 const $ = id => document.getElementById(id);
-const lv=$('lv'), ph=$('ph'), st=$('st'), sc=$('sc'), sg=sc.getContext('2d');
+const lv=$('lv'), ph=$('ph'), st=$('st'), sc=$('sc'), sg=sc.getContext('2d'), met=$('met');
 
-/* ---- UI build ---- */
-$('themes').innerHTML = Object.keys(THEMES).map(k =>
-  `<div class="th" data-t="${k}"><b>${k.replace(/-/g,' ')}</b><span>${THEME_NOTES[k]||''}</span></div>`).join('');
-$('rates').innerHTML = RATES.map(([id,p,label]) =>
-  `<button data-r="${id}">${label}</button>`).join('');
+$('themes').innerHTML = Object.entries(THEMES).map(([k,v]) =>
+  `<div class="th" data-t="${k}"><b>${k.replace(/-/g,' ')}</b><span>${v.note||''}</span></div>`).join('');
+$('rates').innerHTML = RATES.map(([id,,label]) => `<button data-r="${id}">${label}</button>`).join('');
+const markRate = () => document.querySelectorAll('#rates button')
+  .forEach(e => e.classList.toggle('on', e.dataset.r === rateId));
+markRate();
 
-function markTheme(){ document.querySelectorAll('.th').forEach(e=>e.classList.toggle('on', e.dataset.t===themeId)); }
-function markRate(){ document.querySelectorAll('#rates button').forEach(e=>e.classList.toggle('on', e.dataset.r===rateId)); }
-markTheme(); markRate();
+document.querySelectorAll('.th').forEach(e => e.onclick = () => {
+  themeId = e.dataset.t;
+  document.querySelectorAll('.th').forEach(x => x.classList.toggle('on', x === e));
+  play();
+});
+document.querySelectorAll('#rates button').forEach(e => e.onclick = () => {
+  rateId = e.dataset.r; markRate(); if (themeId) play();
+});
+$('vol').oninput = () => setTrim($('vol').value/100);
+$('stopbig').onclick = () => stopAll();
 
-document.querySelectorAll('.th').forEach(e => e.onclick = () => { themeId = e.dataset.t; markTheme(); play(); });
-document.querySelectorAll('#rates button').forEach(e => e.onclick = () => { rateId = e.dataset.r; markRate(); if (music) play(); });
-
-$('mute').onclick = () => { setMuted(!isMuted()); $('mute').classList.toggle('on', isMuted());
-                            $('mute').textContent = isMuted() ? 'MUTED' : 'MUTE'; };
-$('stop').onclick = () => stop();
-
-/* ---- transport ---- */
 async function play(){
-  stopSound();
+  halt();
   const ctx = await initAudio();
   const proto = RATES.find(r => r[0] === rateId)[1];
-  // a long synthetic session so nothing ends while auditioning
-  session = buildSession({ stages: [{ protocol: proto, cycles: 400 }] }, 400);
+  session = buildSession({ stages: [{ protocol: proto, cycles: 500 }] }, 500);
   music = new Music(themeId);
   music.begin();
-  buildFaders();
-  if (!tp) tp = new Transport(ctx);
+  solo = null; mutes = {};
+  buildLayerUI();
+  if (!tp || tp.ctx !== ctx) tp = new Transport(ctx);
   tp.onBeat = (when, i, info) => music.beat(when, i, info);
   await tp.start(session);
-  fadeIn(2.2);
+  setMuted(false);
+  setTrim($('vol').value/100);
+  fadeIn(1.8);
 }
-function stopSound(){
+function halt(){
   if (tp) tp.stop();
   if (music){ music.end(); music = null; }
-  fadeOut(0.8);
+  fadeOut(0.6);
 }
-function stop(){
-  stopSound();
-  ph.textContent = 'nothing playing'; st.textContent = 'pick a theme';
-  lv.style.width = '0%';
-  $('faders').innerHTML = '';
+async function stopAll(){
+  halt();
+  setMuted(true);
+  ph.textContent = 'nothing playing'; st.textContent = 'pick a soundscape';
+  lv.style.width = '0%'; met.textContent = 'meter idle'; met.classList.remove('hot');
+  $('layers').innerHTML = '';
   document.querySelectorAll('.th').forEach(e => e.classList.remove('on'));
+  themeId = null;
+  setTimeout(() => closeAudio(), 900);
 }
 
-function buildFaders(){
+function applyMix(){
+  const names = music.names();
+  for (const n of names){
+    const inp = document.querySelector(`input[data-l="${n}"]`);
+    const base = inp ? inp.value/100 : 1;
+    const audible = solo ? (n === solo) : !mutes[n];
+    music.setLayer(n, audible ? base : 0);
+  }
+  document.querySelectorAll('.lay button.s').forEach(b =>
+    b.classList.toggle('on', solo === b.dataset.l));
+  document.querySelectorAll('.lay button.m').forEach(b =>
+    b.classList.toggle('on', !!mutes[b.dataset.l]));
+}
+
+function buildLayerUI(){
   const mix = THEMES[themeId].mix || {};
-  $('faders').innerHTML = Object.keys(music.layers).map(k => {
-    const v = Math.round((mix[k] ?? 1) * 100);
-    return `<div class="fad"><label>${k}</label>
-      <input type="range" min="0" max="140" value="${v}" data-l="${k}"><em>${v}</em></div>`;
+  $('layers').innerHTML = music.names().map(n => {
+    const v = Math.round((mix[n] ?? 1)*100);
+    return `<div class="lay"><div class="nm">${n}</div>
+      <button class="s" data-l="${n}">SOLO</button>
+      <button class="m" data-l="${n}">MUTE</button>
+      <input type="range" min="0" max="140" value="${v}" data-l="${n}"></div>`;
   }).join('');
-  $('faders').querySelectorAll('input').forEach(inp => {
-    inp.oninput = () => {
-      music.setLayer(inp.dataset.l, inp.value/100);
-      inp.nextElementSibling.textContent = inp.value;
-    };
+  $('layers').querySelectorAll('input').forEach(i => i.oninput = applyMix);
+  $('layers').querySelectorAll('button.s').forEach(b => b.onclick = () => {
+    solo = (solo === b.dataset.l) ? null : b.dataset.l; applyMix();
   });
+  $('layers').querySelectorAll('button.m').forEach(b => b.onclick = () => {
+    mutes[b.dataset.l] = !mutes[b.dataset.l]; applyMix();
+  });
+  applyMix();
 }
 
-/* ---- readout ---- */
+let wf = null;
 function frame(){
-  const ctx = audioContext();
   if (tp && tp.state === 'running' && session){
     const q = query(session, tp.time);
     lv.style.width = (q.level*100).toFixed(1) + '%';
-    const w = { in:'breathe in', out:'breathe out', hold:'hold', holdout:'hold empty' };
-    ph.textContent = w[q.phase];
+    ph.textContent = { in:'breathe in', out:'breathe out', hold:'hold', holdout:'hold empty' }[q.phase];
     st.innerHTML = `${q.protocol.bpm} BPM · ${q.protocol.bars} bars/breath<br>` +
                    `${q.protocol.breathsPerMin.toFixed(2)} breaths/min · bar ${q.bar} of ${q.protocol.bars}`;
+    const m = meter();
+    if (!m.ok){ met.textContent = 'meter: ' + m.reason; met.classList.remove('hot'); }
+    else {
+      const hot = m.peakDb > -3 || m.reduction < -1.5;
+      met.textContent = `peak ${m.peakDb} dBFS · rms ${m.rmsDb} dBFS · limiter ${m.reduction} dB`
+                        + (hot ? '  ← TOO HOT' : '  ok');
+      met.classList.toggle('hot', hot);
+    }
   }
   const W = sc.clientWidth, H = sc.clientHeight;
-  if (sc.width !== W*2){ sc.width = W*2; sc.height = H*2; sg.scale(2,2); }
+  if (sc.width !== W*2){ sc.width = W*2; sc.height = H*2; sg.setTransform(2,0,0,2,0,0); }
   sg.clearRect(0,0,W,H);
-  if (ctx){
-    if (!window.__wf || window.__wf.length !== fftSize()) window.__wf = new Uint8Array(fftSize());
-    const wf = window.__wf;
+  if (audioContext()){
+    if (!wf || wf.length !== fftSize()) wf = new Uint8Array(fftSize());
     if (waveform(wf)){
       sg.beginPath();
       for (let i = 0; i < wf.length; i++){
         const x = i/wf.length*W, y = H/2 + (wf[i]-128)/128*H*0.46;
-        i ? sg.lineTo(x, y) : sg.moveTo(x, y);
+        i ? sg.lineTo(x,y) : sg.moveTo(x,y);
       }
       sg.strokeStyle = '#46D6C8'; sg.lineWidth = 1.2; sg.stroke();
     }
@@ -202,10 +230,10 @@ function frame(){
 }
 requestAnimationFrame(frame);
 
-/* ---- never leave sound running ---- */
-addEventListener('pagehide', () => { stopSound(); closeAudio(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) stopSound(); });
-window.__bor = { stop, stopSound, closeAudio };
+/* never leave sound running */
+addEventListener('pagehide', () => { halt(); closeAudio(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); });
+window.__bor = { stopAll, halt };
 </script>
 </body>
 </html>
