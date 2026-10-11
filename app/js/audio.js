@@ -706,6 +706,7 @@ export const THEMES = {
   /* DESERT DUSK — dry, wide, hot. Reed flute and a dry buzzing pluck.
      Mid-low register, huge empty top, very sparse, big dry room. */
   'desert-dusk': {
+    trim: 1.00,   // measured, matched to ~-13 dBFS peak
     note: 'Reed flute and dry plucked string. Sparse, wide, hot.',
     space: { decay:3.6, tilt:1800, pre:0.045, wet:0.5, curve:3.2 },
     make: () => ({
@@ -725,6 +726,7 @@ export const THEMES = {
      wind, no plucks. Extreme register split: very low gong, high drops,
      nothing in the middle. Longest reverb of any theme. */
   'night-pool': {
+    trim: 0.90,   // measured, matched to ~-13 dBFS peak
     note: 'Struck metal and water. Very low, very high, nothing between.',
     space: { decay:6.0, tilt:1500, pre:0.08, wet:0.8, curve:2.2 },
     make: () => ({
@@ -743,6 +745,7 @@ export const THEMES = {
   /* STORM — dense, dark, physically big. Bowed low strings and thunder.
      No bells of any kind. The only theme with continuous dense content. */
   'storm': {
+    trim: 1.10,   // measured, matched to ~-13 dBFS peak
     note: 'Bowed low strings and thunder. Dense, dark, no metal at all.',
     space: { decay:4.2, tilt:900, pre:0.03, wet:0.65, curve:3.0 },
     make: () => ({
@@ -761,6 +764,7 @@ export const THEMES = {
   /* TEMPLE NOON — bright, hard, dry. Struck metal and wood in open air.
      Short slap reverb, the most RHYTHMIC theme: nested colotomic cycles. */
   'temple-noon': {
+    trim: 1.60,   // measured, matched to ~-13 dBFS peak
     note: 'Struck metal and wood, nested cycles, hard dry light.',
     space: { decay:1.4, tilt:4200, pre:0.012, wet:0.38, curve:2.4 },
     make: () => ({
@@ -779,6 +783,7 @@ export const THEMES = {
   /* CLIFFS MIDDAY — kinetic. Heartbeat, bright stabs, driving. The only
      theme with hard attacks and the only truly dry one. */
   'cliffs-midday': {
+    trim: 0.55,   // measured, matched to ~-13 dBFS peak
     note: 'Heartbeat and bright stabs. Dry, fast, hard-edged.',
     space: { decay:1.0, tilt:3200, pre:0.008, wet:0.3, curve:2.6 },
     make: () => ({
@@ -797,6 +802,7 @@ export const THEMES = {
   /* NIGHT RIVER — almost nothing. Breathy low reed, fire, water. No
      struck tones at all. The quietest and darkest theme. */
   'night-river': {
+    trim: 2.20,   // measured, matched to ~-13 dBFS peak
     note: 'Low breathy reed, a fire on the bank, water. Almost nothing.',
     space: { decay:4.8, tilt:1100, pre:0.05, wet:0.6, curve:2.6 },
     make: () => ({
@@ -824,6 +830,7 @@ export class Music {
   begin(){
     if (this.live) return;
     applySpace(this.def.space || {});
+    setTrim(this.def.trim ?? 1);
     this.layers = this.def.make();
     const mix = this.def.mix || {};
     for (const [k,l] of Object.entries(this.layers)) l.setLevel(mix[k] ?? 1, 1.2);
