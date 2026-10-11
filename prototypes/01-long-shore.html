@@ -153,9 +153,9 @@ function mix(a,b,t){
 }
 
 /* ---------- geometry ---------- */
-const V = 44;          // px per second the world travels
+const V = 72;          // px per second the world travels
 const TX = 0.26;       // traveller's screen position, as a fraction of width
-const AMP = 0.19;      // dune amplitude, as a fraction of height
+const AMP = 0.115;     // dune amplitude, as a fraction of height
 
 let t0 = performance.now()/1000;
 let running = true, stoppedAt = 0;
@@ -174,19 +174,45 @@ function band(yTop, yBot, fill){
 
 // A flat, unstroked ridge: sample the breath curve across the screen and
 // fill everything beneath it. One path, no outline, hard edge.
-function ridge(t, horizon, amp, speedScale, fill, travX, jag){
+function ridge(t, horizon, amp, speedScale, fill, travX){
   g.beginPath();
   g.moveTo(-4, H+4);
-  const step = 3;
-  for(let x=-4; x<=W+4; x+=step){
+  for(let x=-4; x<=W+4; x+=3){
     const tt = t + (x - travX)/(V*speedScale);
-    let y = horizon - (level(tt) - level(t))*amp;
-    if(jag) y += Math.sin(x*0.21 + tt*0.6)*jag + Math.sin(x*0.071)*jag*1.6;
-    g.lineTo(x, y);
+    g.lineTo(x, horizon - (level(tt) - level(t))*amp);
   }
   g.lineTo(W+4, H+4);
   g.closePath();
   g.fillStyle = fill; g.fill();
+}
+
+// Distant ranges are NOT the breath. They are fixed geology drifting past
+// at parallax speed: angular facets, a hard shadow split, flat fills.
+// Keeping them out of the breath signal stops the frame reading as noise.
+const RNG = (i)=>{ const x=Math.sin(i*127.1)*43758.5453; return x-Math.floor(x); };
+function range(t, baseY, hMax, span, speed, lit, sh, seed){
+  const off = (t*speed) % span;
+  const first = Math.floor((t*speed - W*0.2)/span);
+  for(let i=first-1; i<first+Math.ceil(W/span)+2; i++){
+    const cx = i*span - t*speed + W*0.2;
+    if(cx < -span || cx > W+span) continue;
+    const r1=RNG(i+seed), r2=RNG(i+seed+99);
+    const w = span*(0.56+r1*0.42), h = hMax*(0.48+r2*0.60);
+    g.fillStyle=lit; g.beginPath();
+    g.moveTo(cx-w, baseY);
+    g.lineTo(cx-w*0.34, baseY-h*0.74);
+    g.lineTo(cx-w*0.04, baseY-h);
+    g.lineTo(cx+w*0.46, baseY-h*0.46);
+    g.lineTo(cx+w, baseY);
+    g.closePath(); g.fill();
+    g.fillStyle=sh; g.beginPath();
+    g.moveTo(cx-w*0.04, baseY-h);
+    g.lineTo(cx+w*0.46, baseY-h*0.46);
+    g.lineTo(cx+w, baseY);
+    g.lineTo(cx-w*0.02, baseY);
+    g.closePath(); g.fill();
+  }
+  g.fillStyle=sh; g.fillRect(-2, baseY-1, W+4, 3);
 }
 
 /* ---------- scenery built as flat shapes ---------- */
@@ -234,8 +260,12 @@ function figure(x, y, s, t){
   g.lineTo(x+s*0.12,y-s*1.00); g.lineTo(x-s*0.12,y-s*1.00); g.closePath(); g.fill();
   // head
   g.beginPath(); g.arc(x, y-s*1.12, s*0.13, 0, 6.2832); g.fill();
+  // shoulders, so the silhouette reads as a person rather than a post
+  g.beginPath();
+  g.moveTo(x-s*0.30,y-s*0.94); g.lineTo(x+s*0.30,y-s*0.94);
+  g.lineTo(x+s*0.17,y-s*0.80); g.lineTo(x-s*0.17,y-s*0.80); g.closePath(); g.fill();
   // staff, held still: a vertical anchor against all the horizontals
-  g.fillRect(x+s*0.22, y-s*1.30, s*0.028, s*1.30);
+  g.fillRect(x+s*0.17, y-s*1.26, s*0.035, s*1.26);
 }
 
 /* ---------- the frame ---------- */
@@ -264,15 +294,18 @@ function draw(now){
           `rgba(255,222,186,${0.17+lv*0.1})`);
   }
 
-  // four discrete depth bands, lightening and desaturating with distance.
-  // Flat steps, never a continuous gradient.
-  ridge(t, horizon+H*0.012, amp*0.16, 7.5, PAL.range3, travX, H*0.014);
-  ridge(t, horizon+H*0.055, amp*0.30, 3.4, PAL.range2, travX, H*0.010);
-  ridge(t, horizon+H*0.120, amp*0.58, 1.7, PAL.range1, travX, H*0.006);
+  // base ground colour, so no gap can ever open under the sky
+  g.fillStyle = PAL.range3; g.fillRect(-2, horizon, W+4, H-horizon+4);
+
+  // discrete depth bands, darkening as they near. Flat steps, never a
+  // continuous gradient. The far two are geology; only the near one breathes.
+  range(t, horizon+H*0.030, H*0.085, W*0.62, 5,  PAL.range3, '#5A2543', 3);
+  range(t, horizon+H*0.082, H*0.115, W*0.78, 11, PAL.range2, '#431C3E', 17);
+  ridge(t, horizon+H*0.150, amp*0.52, 1.9, PAL.range1, travX);
 
   // the ground the traveller is actually on
-  const nearHz = H*0.78;
-  ridge(t, nearHz, amp, 1, mix(PAL.sand[0], PAL.sand[1], lv), travX, 0);
+  const nearHz = H*0.74;
+  ridge(t, nearHz, amp, 1, mix(PAL.sand[0], PAL.sand[1], lv), travX);
 
   // hard-edged shadow shape on the lee of each dune: form from value, not line
   g.save();
@@ -283,7 +316,7 @@ function draw(now){
     g.lineTo(x, nearHz - (level(tt)-lv)*amp);
   }
   g.lineTo(W+4,H+4); g.closePath(); g.clip();
-  g.fillStyle = PAL.sandSh;
+  g.fillStyle = 'rgba(74,26,51,0.55)';
   for(let x=-4;x<=W+4;x+=3){
     const tt = t + (x-travX)/V;
     const slope = level(tt+0.12) - level(tt-0.12);
@@ -309,9 +342,9 @@ function draw(now){
   }
 
   // foreground band, cropped by the frame edge
-  ridge(t, H*0.985, amp*1.22, 0.62, PAL.nearLo, travX, 0);
+  ridge(t, H*0.985, amp*1.22, 0.62, PAL.nearLo, travX);
 
-  figure(travX, nearHz+1, H*0.088, t);
+  figure(travX, nearHz+1, H*0.062, t);
 
   // grain over everything, then a vignette to hold the eye centre-frame
   if(grain){ g.save(); g.globalAlpha=0.5; g.fillStyle=grain; g.fillRect(0,0,W,H); g.restore(); }
