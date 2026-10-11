@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Book of Rates — soundscape audition</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;min-height:100%;background:#14183F;color:#F3EAD7;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:420px;margin:0 auto;padding:26px 18px 60px}
+  h1{font:300 24px/1.2 ui-serif,Georgia,serif;margin:0 0 4px}
+  .sub{font:500 9px/1.5 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);margin:0 0 16px}
+  p.i{font:400 12.5px/1.65 ui-sans-serif;color:rgba(243,234,215,.66);margin:0 0 18px}
+
+  #bar{position:sticky;top:0;z-index:20;background:#14183F;padding:10px 0 12px;
+    border-bottom:1px solid rgba(243,234,215,.12);margin-bottom:14px}
+  #trk{height:4px;background:rgba(243,234,215,.14);border-radius:2px;overflow:hidden}
+  #lv{height:100%;width:0;background:#46D6C8}
+  .r{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;gap:10px}
+  #ph{font:300 16px/1 ui-serif,Georgia,serif;letter-spacing:.18em;text-transform:lowercase}
+  #st{font:500 8.5px/1.45 ui-sans-serif;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);text-align:right}
+  canvas{display:block;width:100%;height:38px;margin-top:8px;background:rgba(243,234,215,.05);border-radius:5px}
+  .btns{display:flex;gap:8px;margin-top:10px}
+  .btns button{flex:1;appearance:none;border:0;border-radius:999px;padding:11px 0;
+    font:600 10px/1 ui-sans-serif;letter-spacing:.16em;background:rgba(243,234,215,.14);color:#F3EAD7}
+  .btns button.stop{background:#E8473C;color:#fff}
+  .btns button.on{background:#46D6C8;color:#14183F}
+
+  h2{font:600 9px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.42);margin:22px 0 9px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .th{border-radius:11px;padding:12px 13px;background:rgba(243,234,215,.05);
+    box-shadow:0 0 0 1px rgba(243,234,215,.12);cursor:pointer}
+  .th.on{box-shadow:0 0 0 1.5px #46D6C8;background:rgba(70,214,200,.1)}
+  .th b{display:block;font:400 14px/1.25 ui-serif,Georgia,serif;margin-bottom:3px}
+  .th span{font:400 10px/1.4 ui-sans-serif;color:rgba(243,234,215,.5)}
+
+  .sel{display:flex;flex-wrap:wrap;gap:6px}
+  .sel button{appearance:none;border:0;border-radius:999px;padding:9px 13px;
+    font:600 9.5px/1 ui-sans-serif;letter-spacing:.08em;
+    background:rgba(243,234,215,.1);color:rgba(243,234,215,.8)}
+  .sel button.on{background:#F3EAD7;color:#14183F}
+
+  .fad{display:flex;align-items:center;gap:10px;margin:7px 0}
+  .fad label{flex:0 0 80px;font:500 10px/1 ui-monospace,Menlo,monospace;color:rgba(243,234,215,.68)}
+  .fad input{flex:1;accent-color:#46D6C8}
+  .fad em{flex:0 0 30px;text-align:right;font:400 10px/1 ui-monospace,Menlo,monospace;
+    color:rgba(243,234,215,.4);font-style:normal}
+  footer{margin-top:28px;font:400 10.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.36)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Soundscape audition</h1>
+  <p class="sub">The Book of Rates · all synthesised, no samples</p>
+  <p class="i">Six soundscapes, each matched to a level's art. Pick a theme, pick a rate —
+  the heartbeat and every ornament re-lock to whatever tempo you choose. Faders are live.
+  Give each one a minute; the point is the fifth repeat, not the first.</p>
+
+  <div id="bar">
+    <div id="trk"><div id="lv"></div></div>
+    <div class="r"><div id="ph">nothing playing</div><div id="st">pick a theme</div></div>
+    <canvas id="sc"></canvas>
+    <div class="btns">
+      <button id="mute">MUTE</button>
+      <button id="stop" class="stop">STOP</button>
+    </div>
+  </div>
+
+  <h2>Soundscape</h2>
+  <div class="grid" id="themes"></div>
+
+  <h2>Rate</h2>
+  <div class="sel" id="rates"></div>
+
+  <h2>Layers</h2>
+  <div id="faders"></div>
+
+  <footer>Rain, wind, surf and fire are shaped noise. Fire crackle and leaf rustle are noise
+  transients. Birds are pitched sweeps. Strings are Karplus–Strong. Nothing here is a
+  recording, and nothing is transcribed from any existing piece.</footer>
+</div>
+
+<script type="module">
+import { initAudio, closeAudio, Music, THEMES, setMuted, isMuted, fadeIn, fadeOut,
+         audioContext, waveform, fftSize } from './js/audio.js';
+import { Transport, buildSession, query } from './js/engine.js';
+import { P } from './js/protocols.js';
+
+const THEME_NOTES = {
+  'desert-dusk': 'The Long Shore — wind, far birds, dorian drone',
+  'night-pool':  'Still water — gong, drops, plucked low strings',
+  'storm':       'Rain and bowed weight. Distress, passing',
+  'temple-noon': 'Hard light, struck metal, thin air',
+  'cliffs-midday':'The Run — heartbeat under everything',
+  'night-river': 'Sleep. Water and a fire on the bank'
+};
+const RATES = [
+  ['calm',   P.calm,   '5.5 · 88'],
+  ['soothe', P.soothe, '5.0 · 120'],
+  ['sleepy', P.sleepy, '4.5 · 72'],
+  ['box',    P.box,    '3.75 · 60'],
+  ['alert',  P.alert,  '8.0 · 128']
+];
+
+let tp = null, music = null, session = null;
+let themeId = 'desert-dusk', rateId = 'calm';
+
+const $ = id => document.getElementById(id);
+const lv=$('lv'), ph=$('ph'), st=$('st'), sc=$('sc'), sg=sc.getContext('2d');
+
+/* ---- UI build ---- */
+$('themes').innerHTML = Object.keys(THEMES).map(k =>
+  `<div class="th" data-t="${k}"><b>${k.replace(/-/g,' ')}</b><span>${THEME_NOTES[k]||''}</span></div>`).join('');
+$('rates').innerHTML = RATES.map(([id,p,label]) =>
+  `<button data-r="${id}">${label}</button>`).join('');
+
+function markTheme(){ document.querySelectorAll('.th').forEach(e=>e.classList.toggle('on', e.dataset.t===themeId)); }
+function markRate(){ document.querySelectorAll('#rates button').forEach(e=>e.classList.toggle('on', e.dataset.r===rateId)); }
+markTheme(); markRate();
+
+document.querySelectorAll('.th').forEach(e => e.onclick = () => { themeId = e.dataset.t; markTheme(); play(); });
+document.querySelectorAll('#rates button').forEach(e => e.onclick = () => { rateId = e.dataset.r; markRate(); if (music) play(); });
+
+$('mute').onclick = () => { setMuted(!isMuted()); $('mute').classList.toggle('on', isMuted());
+                            $('mute').textContent = isMuted() ? 'MUTED' : 'MUTE'; };
+$('stop').onclick = () => stop();
+
+/* ---- transport ---- */
+async function play(){
+  stopSound();
+  const ctx = await initAudio();
+  const proto = RATES.find(r => r[0] === rateId)[1];
+  // a long synthetic session so nothing ends while auditioning
+  session = buildSession({ stages: [{ protocol: proto, cycles: 400 }] }, 400);
+  music = new Music(themeId);
+  music.begin();
+  buildFaders();
+  if (!tp) tp = new Transport(ctx);
+  tp.onBeat = (when, i, info) => music.beat(when, i, info);
+  await tp.start(session);
+  fadeIn(2.2);
+}
+function stopSound(){
+  if (tp) tp.stop();
+  if (music){ music.end(); music = null; }
+  fadeOut(0.8);
+}
+function stop(){
+  stopSound();
+  ph.textContent = 'nothing playing'; st.textContent = 'pick a theme';
+  lv.style.width = '0%';
+  $('faders').innerHTML = '';
+  document.querySelectorAll('.th').forEach(e => e.classList.remove('on'));
+}
+
+function buildFaders(){
+  const mix = THEMES[themeId].mix || {};
+  $('faders').innerHTML = Object.keys(music.layers).map(k => {
+    const v = Math.round((mix[k] ?? 1) * 100);
+    return `<div class="fad"><label>${k}</label>
+      <input type="range" min="0" max="140" value="${v}" data-l="${k}"><em>${v}</em></div>`;
+  }).join('');
+  $('faders').querySelectorAll('input').forEach(inp => {
+    inp.oninput = () => {
+      music.setLayer(inp.dataset.l, inp.value/100);
+      inp.nextElementSibling.textContent = inp.value;
+    };
+  });
+}
+
+/* ---- readout ---- */
+function frame(){
+  const ctx = audioContext();
+  if (tp && tp.state === 'running' && session){
+    const q = query(session, tp.time);
+    lv.style.width = (q.level*100).toFixed(1) + '%';
+    const w = { in:'breathe in', out:'breathe out', hold:'hold', holdout:'hold empty' };
+    ph.textContent = w[q.phase];
+    st.innerHTML = `${q.protocol.bpm} BPM · ${q.protocol.bars} bars/breath<br>` +
+                   `${q.protocol.breathsPerMin.toFixed(2)} breaths/min · bar ${q.bar} of ${q.protocol.bars}`;
+  }
+  const W = sc.clientWidth, H = sc.clientHeight;
+  if (sc.width !== W*2){ sc.width = W*2; sc.height = H*2; sg.scale(2,2); }
+  sg.clearRect(0,0,W,H);
+  if (ctx){
+    if (!window.__wf || window.__wf.length !== fftSize()) window.__wf = new Uint8Array(fftSize());
+    const wf = window.__wf;
+    if (waveform(wf)){
+      sg.beginPath();
+      for (let i = 0; i < wf.length; i++){
+        const x = i/wf.length*W, y = H/2 + (wf[i]-128)/128*H*0.46;
+        i ? sg.lineTo(x, y) : sg.moveTo(x, y);
+      }
+      sg.strokeStyle = '#46D6C8'; sg.lineWidth = 1.2; sg.stroke();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---- never leave sound running ---- */
+addEventListener('pagehide', () => { stopSound(); closeAudio(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopSound(); });
+window.__bor = { stop, stopSound, closeAudio };
+</script>
+</body>
+</html>
