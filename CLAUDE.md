@@ -20,6 +20,27 @@ The rule, for any step that makes sound:
 Same logic applies to anything else that keeps running after attention moves on: long-lived
 tabs, animations with sound, background timers, media autoplay.
 
+## I cannot hear the audio, and the meter is not a quality judgement
+
+Two separate lessons from 11 October, both learned the hard way.
+
+1. **A level reading says a signal exists and how big it is. It says nothing
+   about whether it sounds good.** "All four produce sound and match at -7 dBFS"
+   is not evidence of quality. It was treated as such, the result was shipped,
+   and the user said it sounded terrible. Build pages that let the user solo,
+   mute and re-level each layer so they can say *which* element is wrong —
+   that is the only real instrument available here.
+2. **Byte time-domain silence is 128, not 0.** A failed `getByteTimeDomainData`
+   leaves a zero-filled buffer, which computes as full scale and is
+   indistinguishable from clipping. Always sanity-check the mean before
+   trusting a level. Half an hour went into chasing a runaway that was partly
+   this artefact.
+
+Corollaries: measure upstream of the master gain while muted, so diagnosis is
+silent. Prefer structures that cannot diverge (no audio feedback loops) over
+structures that need a limiter to stay safe. And distrust any node that reports
+impossible values rather than building on top of it.
+
 ## Other standing constraints for this project
 
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an
