@@ -179,8 +179,9 @@ function draw(now){
   }
 
   /* --- sea: flat bands, crests always travelling shoreward --- */
-  g.fillStyle=pair(P.seaFar,lv);  g.fillRect(0,horizon,W,H*0.055);
-  g.fillStyle=pair(P.seaNear,lv); g.fillRect(0,horizon+H*0.055,W,H*0.14);
+  g.fillStyle='#1B1C46';          g.fillRect(0,horizon,W,H*0.014);  // the far line
+  g.fillStyle=pair(P.seaFar,lv);  g.fillRect(0,horizon+H*0.014,W,H*0.055);
+  g.fillStyle=pair(P.seaNear,lv); g.fillRect(0,horizon+H*0.069,W,H*0.14);
 
   // The waterline. This is the breath, and it is the only thing that is.
   // yFar = the water's edge at its most distant (fully exhaled).
@@ -196,8 +197,8 @@ function draw(now){
   for(let i=0;i<6;i++){
     const prog=((t*0.15+i/6)%1);
     const y=horizon+H*0.05+prog*(waterline-horizon-H*0.05);
-    const w=W*(0.3+prog*0.7), x=(((i*137)%100)/100)*(W-w*0.4)-w*0.2;
-    g.fillStyle=`rgba(253,241,220,${0.04+prog*0.13})`;
+    const w=W*(0.22+prog*0.5), x=(((i*137)%100)/100)*(W-w*0.4)-w*0.2;
+    g.fillStyle=`rgba(253,241,220,${0.05+prog*0.20})`;
     g.fillRect(x,y,w,Math.max(1.5,H*0.004+prog*H*0.003));
   }
 
@@ -230,12 +231,17 @@ function draw(now){
     const my = yFar + (yNear-yFar)*atLevel;
     // Covered once the tide has climbed past the mark this stone sits at.
     const submerged = lv > atLevel;
-    stone(W*mx, my+H*0.004, H*0.022,
-          submerged ? pair(P.seaNear,lv) : P.dune,
-          submerged ? P.dark : P.deepest);
-    if(submerged){            // a flat ring where the water meets the stone
-      g.fillStyle=`rgba(253,241,220,0.22)`;
-      g.fillRect(W*mx-H*0.026, my+H*0.001, H*0.052, Math.max(1.2,H*0.003));
+    if(submerged){
+      // Under water the stone is only a stain and a flat ripple ring —
+      // a lit, shadowed stone out in the sea reads as a fin, not a rock.
+      g.fillStyle='rgba(16,20,56,0.42)';
+      g.beginPath(); g.ellipse(W*mx, my, H*0.024, H*0.009, 0, 0, 6.2832); g.fill();
+      g.fillStyle='rgba(253,241,220,0.20)';
+      g.beginPath(); g.ellipse(W*mx, my, H*0.030, H*0.012, 0, 0, 6.2832); g.fill();
+      g.fillStyle=pair(P.seaNear,lv);
+      g.beginPath(); g.ellipse(W*mx, my, H*0.026, H*0.0095, 0, 0, 6.2832); g.fill();
+    } else {
+      stone(W*mx, my+H*0.004, H*0.022, P.dune, P.deepest);
     }
   }
 
