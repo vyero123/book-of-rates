@@ -110,7 +110,7 @@ breathing and general calm.
 
 | State | Pattern | Rate | Evidence for the state link | Notes |
 |---|---|---|---|---|
-| **Calm** | 5 / 6 | 5.5/min | **MODERATE** — closest to the resonance literature | The default. Everything else is a variation on it. |
+| **Calm** | 4.77 / 6.14 | 5.5/min | **MODERATE** — closest to the resonance literature | The default. Odd-looking seconds because it is 7 and 9 beats at 88 BPM — see §3.3. |
 | **Grounded** | 5.5 / 5.5 | 5.5/min | **MODERATE** (inherits the resonance evidence) | Equal ratio; "grounded" is our word, not a finding. |
 | **Soothed** | 4 / 8 | 5/min | **WEAK** — mechanism solid, comparative claim unproven | Use it; don't claim superiority over 1:1. |
 | **Sleepy** | 4 / 8 tapering to 4 / 9.3 | 5 → 4.5/min | **WEAK** | Slowing within a session is sensible and untested. |
@@ -207,7 +207,11 @@ the mental model and then hoping it stays in the app.
 - Hold length does not increase as a reward for progress. If it ever becomes adjustable it is
   opt-in, hard-capped, and not tied to completing anything.
 
-**What I actually recommend for v1: ship the pearl diver with no breath-hold at all.**
+**DECIDED (11 Oct): no retention anywhere in v1.** The pearl diver ships as the
+bottom-of-exhale version described below. Retention becomes a future unlockable — the design
+for that lock is §2.4a.
+
+**What I recommended, and what we are doing: ship the pearl diver with no breath-hold at all.**
 
 Make "underwater" the bottom of a long slow exhale rather than a retention. The diver sinks
 through a four-second exhale, drifts along the bottom during a two-second pause at empty —
@@ -221,6 +225,60 @@ I'd also note a second-order point: even a dry-land hold game teaches a habit. T
 enjoys the pearl diver is being trained that holding their breath is pleasant and rewarded.
 Some fraction of them will be in a pool at some point. That's the real reason to keep the
 ceiling low and the framing pointed at surfacing.
+
+### 2.4a Retention as a locked future feature
+
+Decided: retention is **out of v1 and visible as locked**, presented as something offered
+rather than something hidden. Two things have to be true at once — it must read as *not yet*
+rather than as a paywall tease, and the eventual unlock has to carry the safety briefing as
+part of the unlock rather than as a banner someone swipes away.
+
+**Where it lives.** At the end of the ten levels, in the same list, in the same visual
+language — not in a separate "premium" tray and not behind an upsell sheet. It is the
+eleventh entry on a shelf of ten: `THE BREATH HELD · not yet`. One level, one lock.
+
+**How the lock reads.** The difference between "not yet" and "pay up" is entirely in what the
+lock *explains*. A paywall lock says nothing and makes you tap to find out. Ours says the
+reason on the face of the card, before any interaction:
+
+> **The Breath Held** — *not in this edition*
+> Breath retention is the one practice here that has actually hurt people, so we have left it
+> out until we can introduce it properly. When it arrives it will come with a proper
+> explanation of why it is treated differently, and it will never be something you score.
+
+No countdown, no "coming soon — subscribe", no notify-me capture, no blurred preview of
+content. A single secondary link: *why this is locked* → the plain-language version of §2.1
+and §2.4. **The locked state is itself a piece of safety education**, which is the whole
+argument for showing it rather than hiding it: a user who learns here why retention is
+treated differently is better off than one who meets it first on YouTube.
+
+**Icon.** Not a padlock. A padlock is the visual grammar of paywalls and of things being kept
+from you. Use a closed form from the scenery language instead — a shut sluice gate, a stone
+set across a path, a lantern not yet lit — rendered in the same flat idiom as the level art,
+desaturated. It should look like a part of the world that isn't open yet.
+
+**How the unlock works, when it comes.** The unlock *is* the briefing. It cannot be skipped,
+dismissed, or tapped through, and this is the one place in the app where I'd accept friction:
+
+1. **Screening first, not last.** The §2.2 gate runs before any content is shown. A block
+   here is final for this feature and is explained warmly — not as a rejection.
+2. **A short, unskippable briefing**, perhaps ninety seconds, built as a level rather than a
+   legal screen: the water rule, the seated rule, why hyperventilation plus a hold is the
+   lethal combination, what light-headedness and tingling mean, what fainting means. Our own
+   words, clinician-reviewed, not Othership's (§2.6).
+3. **A comprehension check, not a checkbox.** Three or four plain questions — *where must you
+   never do this?* — that must be answered correctly. This is not a legal device; it is the
+   only way to know the briefing was read. Wrong answers re-show the relevant part rather
+   than failing the user.
+4. **Then the level**, at the lowest cap, with the cap fixed. Any later increase is opt-in, in
+   settings, hard-ceilinged, and **never** granted by progress, streak or completion.
+5. **The briefing re-runs** after a long absence, and the water warning shows every session
+   regardless.
+
+**What the unlock must never be:** a reward for finishing the other ten levels, a purchase, a
+streak milestone, or anything that makes a user want to get to it. If the only path through
+the door is understanding the risk, then wanting it badly doesn't help you — which is exactly
+the incentive we want.
 
 ### 2.5 What else I'd cut
 
@@ -252,66 +310,204 @@ device claim. This is cheap to get right at the start and expensive to retrofit.
 
 ---
 
-## 3. The music question, answered honestly
+## 3. Sound and music
 
-You thought musical theory might be a basis for this. Here is where that is real and where it
-is decoration. Detail in [`research/03-practices-and-music.md`](../research/03-practices-and-music.md).
+Supporting research: [`research/03-practices-and-music.md`](../research/03-practices-and-music.md)
+(the breathing-and-music literature) and
+[`research/05-loop-music.md`](../research/05-loop-music.md) (what makes short loops survive
+repetition, and the valence/arousal basis for mapping feeling to sound).
 
-### 3.1 Genuine
+### 3.1 Two different kinds of claim, two different standards
 
-**The arithmetic is exact, and it is also trivial.** 6 breaths/min is 0.1 Hz is a ten-second
-cycle. A four-bar phrase of 4/4 at 96 BPM is exactly ten seconds. That is a real and useful
-correspondence — it means a composer can write to the breath without fighting it — but it is
-division, not music theory. Nothing follows from it that wouldn't follow from a metronome.
+An earlier draft of this document applied one evidence standard across the whole project.
+That was a category error and it is corrected here. There are two kinds of claim in this app
+and they are not the same kind of thing:
 
-| Musical tempo | Beats per breath cycle | Breaths/min | Suggested in : hold : out, in beats |
-|---|---|---|---|
-| 96 BPM | 16 (four bars of 4/4) | 6.0 | 7 : 0 : 9 |
-| 66 BPM | 12 (three bars of 4/4) | 5.5 | 5 : 0 : 7 |
-| 60 BPM | 11 | 5.45 | 5 : 0 : 6 |
-| 72 BPM | 16 | 4.5 | 6 : 2 : 8 |
-| 80 BPM | 16 (4-4-4-4) | 5.0 | 4 : 4 : 4 (+4 empty) |
-| 110 BPM | 20 (five bars) | 5.5 | 8 : 0 : 12 |
+**Claim type A — breathing rate and pattern produce physiological and emotional change.**
+This is a health claim. It is testable, it has a literature, people have been hurt by
+over-claimed versions of it, and a regulator would read it as one. **The evidence discipline
+in §1 applies in full and does not relax.** If we say slow breathing does something to the
+body, we must be able to point at the study and the effect size, and say where it is weak.
 
-**The phrase-equals-breath link is real, and the causality runs the right way.** Sung phrases
-cluster around five seconds because that is what a breath affords. Music inherited its
-phrase lengths from lungs, not the other way round. This is the one place where the musical
-analogy is more than analogy: **writing in phrases means writing in breaths, because that is
-where phrases came from.** Singers and wind players are a natural experiment in long
-controlled exhalation and worth studying for the sound design.
+**Claim type B — music of a given tempo, texture and register is heard as calm, or urgent,
+or bright.** This is not a health claim. It is an aesthetic and user-experience decision,
+of exactly the same kind as choosing a palette for a storm scene, and demanding randomised
+trials of it is the wrong instrument. Nobody asks for an RCT before scoring a film. We are
+not claiming the music changes anyone's autonomic state; we are claiming it *sounds like*
+something, which is a claim about perception, and a well-studied one.
 
-**Adaptive loudness envelopes work.** Leslie et al. (2019) slowed listeners' breathing with
-an audio envelope, and the best results came from setting the target rate at about 75% of
-the user's own baseline rather than jumping straight to 6/min. **That is a concrete design
-instruction: measure first, then lead down gradually, rather than starting at the
-destination.** It should shape how every level opens.
+The line between them is easy to hold in practice: **the breathing engine makes the
+physiological claims, and the music makes none.** The moment a piece of copy says the music
+does something to the listener's body, it has crossed into type A and needs type A evidence.
+Everything short of that is craft, and we should be confident about it.
 
-### 3.2 Decorative
+### 3.2 The basis for the music layer
 
-- **Harmonic tension mapped to breath phase.** Appealing, unsupported, fine as an aesthetic
-  choice as long as nobody writes marketing copy about it.
-- **Interval ratios as breath ratios** (a 3:2 fifth as a 3:2 inhale:exhale). This is numerology.
-- **432 Hz, solfeggio frequencies, "healing frequencies".** No. If we use them we are lying.
-- **Binaural beats.** A pooled g ≈ 0.45 exists for anxiety and cognition, which is not
-  nothing, but the literature is weak and heterogeneous. Not a foundation.
+There is a real empirical foundation here; it is just a different literature from the
+physiological one. Perceived emotion in music — what listeners reliably say music *sounds
+like* — is well studied and reasonably stable.
 
-### 3.3 The warning that matters most
+- **Russell's circumplex** (valence × arousal) and **Thayer's** energy/tension variant give us
+  a two-axis space to place each level's destination in.
+- **Eerola, Friberg & Bresin (2013)** manipulated six musical cues factorially across 200
+  synthesised stimuli and found cue effects were **mostly linear and essentially additive**,
+  explaining 77–89% of variance with almost no interactions. That is the finding that makes a
+  parameter table legitimate rather than hand-waving: we can set tempo, mode, register and
+  articulation more or less independently and predict roughly how the result will read.
+- **MIR and audio-feature work** backs the arousal axis strongly. Vidas et al. (2026) found
+  Spotify's `energy` correlated strongly with listener-rated energy; `valence` only moderately
+  with perceived mood; `danceability` weakly.
 
-**Music can speed breathing up as easily as slow it down.** Bernardi et al. (2006) found
-faster tempi increased respiration and arousal, and — the finding that should give us
-pause — **silence was more relaxing than any of the music tested.** Breathing entrains to
-auditory rhythm only partially: around half of subjects in Haas (1986), and not at all at
-intermediate tempi in Bernardi. It is far weaker than gait entrainment, and gait entrainment's
-own evidence base is rated low quality.
+Your formulation — intensity scales with BPM, and emotional quality can be derived from how
+people actually describe music — is the right one, and the data supports it with one
+qualification worth knowing: **arousal is the strong axis and valence is the weak one.**
 
-I also found no controlled evidence that a *ritardando* leads a listener's breathing down,
-which is a shame, because it is the most obvious thing we'd want to do.
+| Parameter (increase) | Perceived arousal | Perceived valence | Consensus | For our loops |
+|---|---|---|---|---|
+| Tempo / event rate | **Up, strongly** | Slightly up | Arousal **A**, valence C | The main dial. Low event density for calm. |
+| Loudness / dynamics | **Up, strongly** | Mixed | Arousal **A**, valence C | Keep quiet; no spikes. |
+| Mode (major vs minor) | Little | Major positive, minor negative | Valence **A** (Western listeners) | Use modal and ambiguous — see §3.4. |
+| Consonance vs dissonance | Dissonance up | Dissonance down | **B** | Open and consonant; sus and add9. |
+| Timbral brightness | Up | Mixed; harsh bright is negative | Arousal **B**, valence C | Low-pass for calm. |
+| Articulation (staccato) | Up | Slightly up | **B** | Soft attacks, legato. |
+| Register (higher) | Up | Up | **B** | Mid-low for calm; high bells sparingly. |
+| Rhythmic regularity | Regular lowers it | Regular is neutral-positive | **B** | Regular breath layer, irregular ornaments. |
 
-**Verdict: music is an interface layer over a physiologically grounded breathing engine, not
-the mechanism.** Build the engine on the rate. Let the music serve it. And ship a
-properly silent mode, because the evidence says some people will do better with it.
+**Design rule that falls out of this:** set each level's destination as a point in
+valence/arousal space, then reach it with tempo, density, register and brightness. Treat
+valence as something to nudge rather than to dial, because the literature says it won't
+reliably obey.
 
----
+### 3.3 The tempo arithmetic
+
+The requirement is that the music and the breath never drift apart, which means one breath
+cycle must be a whole number of bars. In 4/4 that reduces to one line:
+
+> **breaths per minute = BPM ÷ (4 × bars per breath)**
+> and therefore **BPM = 4 × bars × breaths per minute**
+
+Every target rate in §1.4 has clean integer tempos. The recommended setting for each:
+
+| Breaths/min | Level use | Bars per breath | **BPM** | Bar (s) | Cycle (s) | In : out, in beats |
+|---|---|---|---|---|---|---|
+| 3.75 | Focused — box 4-4-4-4 | 4 | **60** | 4.000 | 16.000 | 4 : 4 : 4 : 4 — one bar per phase, one beat per second |
+| 4.5 | Sleepy | 4 | **72** | 3.333 | 13.333 | 6 : 10 |
+| 5.0 | Soothed | 6 | **120** | 2.000 | 12.000 | 8 : 16 — an exact 1:2 landing on the bar |
+| 5.5 | **Calm — the default** | 4 | **88** | 2.727 | 10.909 | 7 : 9 |
+| 6.0 | Coherent | 5 | **120** | 2.000 | 10.000 | 8 : 12 |
+| 8.0 | Alert / energised | 4 | **128** | 1.875 | 7.500 | 6 : 10 |
+
+Other valid tempos exist for each rate (3, 5 and 6 bars per breath all give integer BPMs);
+these are the ones that sit most comfortably as music.
+
+**One change this forces, and I think it is an improvement.** Our default was inhale 5 s /
+exhale 6 s — an 11-second cycle, which is 5.45 breaths/min and gives **no integer BPM** at
+any usable bar count (65.45 at three bars, 87.27 at four). **Recommend moving the default to
+88 BPM, 4 bars, 7 beats in and 9 beats out: 4.77 s in, 6.14 s out, 5.5 breaths/min.** That is
+within rounding of what we had, sits dead centre of the resonance range, and locks perfectly.
+
+Two notes worth having:
+
+- **60 BPM makes box breathing exact.** One beat is one second, each phase is four beats and
+  one bar, and the whole structure of the level is audible without a word of instruction.
+- 120 BPM at six bars gives a true 1:2 ratio landing on the barline, which is the cleanest
+  way to build the soothed levels.
+
+### 3.4 What makes a short loop survive repetition
+
+From [`research/05-loop-music.md`](../research/05-loop-music.md). These are the composition
+rules, and all four sketches follow them.
+
+1. **Keep the harmonic field static or very slow — modal, pedal or drone — and never cadence
+   at the loop point.** This is counter-intuitive and it is the most important rule here: a
+   satisfying resolution makes the restart *audible*, so a well-closed loop is a worse loop.
+2. **Only the breath layer is strictly periodic.** Every other layer runs on a coprime number
+   of bars so the combination takes a long time to come round. This is the single best trick
+   in the research: Eno's *Discreet Music* used 63- and 68-second tape loops, which realign
+   once every 71 minutes. Our equivalent — layers of 5, 7 and 8 bars — gives a 280-bar cycle.
+   It only works over a static field, because every phase offset has to stay harmonically
+   safe; rules 1 and 2 are a pair.
+3. **Spend the variation budget on slow, low-salience dimensions** — filter, reverb, layer
+   gain, ornament density — and leave the melodic identity alone.
+4. **Place ornaments stochastically**, with probability gates, jittered timing and velocity,
+   and plenty of real silence.
+5. **Keep the sound soft:** low-passed, soft attacks, a noise bed, slight detune, long-decay
+   plucked and bell timbres, and no limiter.
+6. **No voice and no singable hook.** The earworm literature describes exactly the properties
+   we need to avoid; memorability is a defect in functional music.
+7. **Mark the breath turnaround with the envelope first.** An identical event every ten
+   seconds becomes the most salient and most irritating thing in the mix. A soft, varied
+   marker is a reasonable *second* cue, and is most useful at the bottom of the breath where
+   the envelope carries least information. Offer a mode with no marker at all.
+8. **Make the loop point invisible:** wrap the reverb tail onto the head, match the phase of
+   every slow modulator at both ends, and avoid encoder padding. Synthesising in-app, as the
+   sketches do, sidesteps most of this because the reverb simply never resets.
+
+Three findings worth flagging because they contradict what you'd assume:
+
+- **A sample-accurate, zero-crossing loop can still have an audible seam** — from a truncated
+  reverb tail, a slow filter at a different phase at each end, or MP3/AAC padding.
+- **Listeners implicitly learn even meaningless sound.** Agus and Pressnitzer found that
+  repeated noise segments of up to four seconds were learned within a handful of exposures
+  and remembered for weeks. So no fixed stretch can ever recur in an identical context, and
+  irregular spacing of repeats makes them much harder to detect.
+- **The inverted-U of liking against repetition mostly shows up under focused listening**, and
+  in fewer than half of individuals. Incidental listening tolerates repetition well. Our risk
+  is that a breathing app sits awkwardly between the two — it asks for partial attention.
+
+### 3.5 Where the earlier caution still stands
+
+Two things from the breathing-and-music literature remain true and are about type-A claims,
+not about the music layer:
+
+- **Music can speed breathing up as easily as slow it down.** Bernardi et al. (2006) found
+  faster tempi raised respiration and arousal, and silence was more relaxing than any music
+  tested. Breath entrainment to rhythm is partial — around half of subjects in Haas (1986) —
+  and much weaker than gait entrainment. **So: ship a real silent mode and A/B it.**
+- **Lead the listener down rather than starting at the destination.** Leslie et al. (2019)
+  slowed breathing most effectively with a target set at about 75% of the listener's own
+  baseline. Every level should open near where the user already is and descend.
+
+And one genuine link worth keeping: musical phrase lengths cluster around a few seconds
+because that is what a breath affords. Music inherited its phrasing from lungs. Writing in
+phrases is writing in breaths — which is the one place the musical analogy is more than
+analogy.
+
+### 3.6 The four sketches
+
+Built and playable: **[prototypes/04-breath-loops.html](https://book-of-rates.netlify.app/prototypes/04-breath-loops.html)**
+
+| Sketch | State | BPM | Bars | Rate | Coprime layers |
+|---|---|---|---|---|---|
+| **The Long Shore** | Calm | 88 | 4 | 5.5/min | 5 and 7 bars — realign at 140 bars, ~6.4 min |
+| **The Still Pool** | Soothed, exact 1:2 | 120 | 6 | 5.0/min | 7 and 8 bars — realign at 336 bars, ~11 min |
+| **Kite Line** | Focused, box | 60 | 4 | 3.75/min | nested 16 / 4 / 2 beats, colotomic |
+| **The Run** | Energised | 128 | 4 | 8.0/min | 3, 4 and 5 bars — realign at 60 bars, ~3.75 min |
+
+Everything is synthesised live from oscillators, filtered noise and generated impulse
+responses. The drone opens and closes with the breath, ornaments fire on probability gates
+over coprime bar cycles, and nothing cadences.
+
+### 3.7 How we stayed on the right side of copyright
+
+The hard constraint is that we ship no existing recording or composition. The method:
+
+- **The research identified properties, not pieces.** Where the research names a work, it
+  names it to illustrate a technique and then describes the technique. There is no notation,
+  no melody, no song-specific chord progression, and no drum or bass pattern anywhere in
+  `research/05-loop-music.md`. The one structural pattern given in full is the generic
+  gamelan colotomic template — a gong every sixteen beats, a middle stroke in groups of four
+  — which is an anonymous traditional structure rather than anybody's composition.
+- **The sketches are generated, not assembled.** There are no audio samples in the repository.
+  Every sound is built at runtime from oscillators, noise and envelopes written for this
+  project, and the note choices come from scale degrees and probability, not from
+  transcription.
+- **What we are working in is an idiom, not a work.** Modal drones, nested cyclic percussion,
+  coprime layer lengths, long-decay struck tones and generative ambience are compositional
+  techniques. Techniques are not owned; particular pieces are. The same distinction we are
+  relying on for the visual style (§4.1) applies here, and the discipline is the same: stay
+  at the level of method, and never get close enough to a specific piece to be recognisable.
+- **Nothing is described as being "in the style of" a named artist** in any user-facing copy.
 
 ## 4. Visual style
 
@@ -451,12 +647,20 @@ with the eyes unfocused, this is it — which makes it right for sleep and wind-
 for anything requiring precision. The marker stones recover some of the legibility; they
 don't recover all of it.
 
-### 5.4 Recommendation
+### 5.4 Decision (11 Oct)
 
-Ship all three as selectable displays rather than picking one, because they fail in different
-directions and users differ. Default to **The Long Shore**. Offer **The Still Pool** as the
-ritual/record mode for people who want something to keep. Offer **The Tide** for sleep. If we
-only build one, build the Long Shore, for the predictive reason above.
+**Prototype 1, The Long Shore, is the display we build** — the desert-dusk landscape that
+scrolls at breath pace, where the terrain ahead of the traveller is the breath about to be
+taken. Chosen for the predictive property in §5.1: it is the only one of the three that shows
+you the breath *before it arrives*.
+
+**Prototype 3, The Tide,** is kept as a likely second mode, for sleep and wind-down, where
+its lower legibility costs least.
+
+**Prototype 2, The Still Pool,** is shelved, not deleted. It stays in the repository and
+stays live. It is the only one that produces an artefact the user keeps, and that idea is
+worth coming back to — most likely as an end-of-session summary rather than as the thing you
+watch while breathing.
 
 ---
 
@@ -539,7 +743,9 @@ In the order I'd worry about it.
    conveying only position. Worth stating as a rule for every future level.
 
 4. **Silence may beat our soundtrack.** Bernardi found silence more relaxing than any music
-   tested. We should A/B this rather than assume, and ship a real silent mode.
+   tested. We should A/B this rather than assume, and ship a real silent mode. Note this is a
+   claim about *physiological* effect, so it sits on the type-A side of §3.1 and does not
+   undercut the music layer as design.
 
 5. **Netlify's free-tier badge** sits over the bottom-right of the prototypes and slightly
    obscures the cue text in screenshots. Cosmetic, but worth knowing before you forward them.
@@ -561,10 +767,24 @@ In the order I'd worry about it.
 
 ---
 
-## 8. Open questions for you
+## 8. Decisions and open questions
 
-1. Pearl diver: agreed on removing the retention for v1?
-2. Should Phase 2 build out the Long Shore as the real breath engine, or prototype the
-   haptic/audio-only display first?
-3. How much of the honest-about-the-evidence voice do you want visible to users, versus
-   just governing what we don't claim?
+### Settled on 11 October
+
+1. **Display: The Long Shore** (prototype 1). The Tide kept as a second mode; the Still Pool
+   shelved rather than deleted. §5.4.
+2. **No retention anywhere in v1.** The pearl diver ships as the bottom-of-exhale version.
+   Retention becomes a visible locked future feature, designed at §2.4a.
+3. **Two evidence standards, separated.** Breathing-to-body claims keep the full discipline;
+   the music layer is design and is not apologised for. §3.1.
+
+### Still open
+
+1. Does the default move to 88 BPM / 5.5 breaths per minute, as §3.3 recommends? It is a
+   rounding-level change to the breathing and it makes everything lock.
+2. Which of the four loop sketches is closest? They are deliberately different in density,
+   and the right answer may be different per level rather than one house sound.
+3. Phase 2 order: build the Long Shore as the real breath engine with audio attached, or
+   prototype the haptic/audio-only display first (§7.7)?
+4. How much of the honest-about-the-evidence voice do you want visible to users, versus just
+   governing what we don't claim?

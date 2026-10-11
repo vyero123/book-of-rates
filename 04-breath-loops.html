@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Book of Rates — Breath-locked loop sketches</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;min-height:100%;background:#14183F;color:#F3EAD7;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:420px;margin:0 auto;padding:30px 20px 48px}
+  h1{font:300 25px/1.2 ui-serif,Georgia,serif;margin:0 0 5px;letter-spacing:.01em}
+  .sub{font:500 9.5px/1.5 ui-sans-serif,sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);margin:0 0 20px}
+  .intro{font:400 12.5px/1.65 ui-sans-serif,sans-serif;color:rgba(243,234,215,.68);margin:0 0 22px}
+  .intro b{color:#9FF0E2;font-weight:600}
+
+  /* ---- breath readout ---- */
+  #meter{position:sticky;top:0;z-index:10;background:#14183F;
+    padding:12px 0 14px;margin:0 0 6px;border-bottom:1px solid rgba(243,234,215,.1)}
+  #track{height:4px;background:rgba(243,234,215,.14);border-radius:2px;overflow:hidden}
+  #lvl{height:100%;width:0%;background:#46D6C8}
+  .rowm{display:flex;justify-content:space-between;align-items:baseline;margin-top:9px}
+  #ph{font:300 17px/1 ui-serif,Georgia,serif;letter-spacing:.2em;text-transform:lowercase}
+  #stat{font:500 9px/1.4 ui-sans-serif,sans-serif;letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);text-align:right}
+  canvas#scope{display:block;width:100%;height:46px;margin-top:10px;
+    background:rgba(243,234,215,.045);border-radius:5px}
+
+  /* ---- loop cards ---- */
+  .card{border-radius:12px;padding:15px 16px 16px;margin:12px 0;
+    background:rgba(243,234,215,.05);box-shadow:0 0 0 1px rgba(243,234,215,.12)}
+  .card.on{box-shadow:0 0 0 1.5px #46D6C8;background:rgba(70,214,200,.08)}
+  .ct{font:400 18px/1.2 ui-serif,Georgia,serif;margin:0 0 3px}
+  .cm{font:500 9px/1.5 ui-sans-serif,sans-serif;letter-spacing:.13em;text-transform:uppercase;
+    color:#46D6C8;margin-bottom:9px}
+  .cd{font:400 12.5px/1.6 ui-sans-serif,sans-serif;color:rgba(243,234,215,.62);margin:0 0 12px}
+  .cd em{color:rgba(243,234,215,.85);font-style:normal}
+  button.play{appearance:none;border:0;border-radius:999px;padding:11px 22px;
+    background:#F3EAD7;color:#14183F;font:600 11px/1 ui-sans-serif,sans-serif;letter-spacing:.16em}
+  .card.on button.play{background:#46D6C8}
+  .lay{margin:11px 0 0;padding:0;list-style:none;
+    font:400 10.5px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace;color:rgba(243,234,215,.42)}
+  .lay b{color:rgba(243,234,215,.72);font-weight:500}
+
+  h2{font:600 9.5px/1 ui-sans-serif,sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.42);margin:34px 0 10px}
+  table{width:100%;border-collapse:collapse;font:400 11.5px/1.5 ui-sans-serif,sans-serif}
+  th,td{text-align:left;padding:6px 6px 6px 0;border-bottom:1px solid rgba(243,234,215,.09)}
+  th{font:600 9px/1.4 ui-sans-serif,sans-serif;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(243,234,215,.42)}
+  td b{color:#9FF0E2;font-weight:600}
+  .formula{background:rgba(70,214,200,.1);border-radius:9px;padding:13px 15px;margin:14px 0;
+    font:400 13px/1.7 ui-sans-serif,sans-serif;color:rgba(243,234,215,.86)}
+  .formula code{font:600 13.5px/1 ui-monospace,Menlo,monospace;color:#9FF0E2}
+  footer{margin-top:32px;font:400 11px/1.65 ui-sans-serif,sans-serif;color:rgba(243,234,215,.36)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Breath-locked loop sketches</h1>
+  <p class="sub">The Book of Rates · phase 1 · audio</p>
+
+  <p class="intro">Four original loops, synthesised live in the browser — no samples, no
+  recordings, nothing quoted. Each one is <b>locked to its breathing rate by construction</b>:
+  one breath cycle is a whole number of bars, so the music and the breath cannot drift apart,
+  however long it runs. Headphones or a quiet room. Give each one a minute — the point is
+  what happens on the <em>fifth</em> repeat, not the first.</p>
+
+  <div id="meter">
+    <div id="track"><div id="lvl"></div></div>
+    <div class="rowm">
+      <div id="ph">nothing playing</div>
+      <div id="stat">tap a loop below</div>
+    </div>
+    <canvas id="scope"></canvas>
+  </div>
+
+  <div id="cards"></div>
+
+  <h2>The arithmetic</h2>
+  <div class="formula">
+    In 4/4, with one breath cycle spanning a whole number of bars:<br>
+    <code>breaths per minute = BPM ÷ (4 × bars per breath)</code><br>
+    so <code>BPM = 4 × bars × breaths per minute</code>.
+  </div>
+  <table id="arith"></table>
+
+  <footer>
+    Everything here is composed procedurally from scales, intervals and envelopes written for
+    this project. No existing recording or composition is used, sampled, or imitated closely
+    enough to be recognisable. The idioms — modal drones, nested cyclic percussion,
+    coprime-length layers — are techniques, not works, and techniques aren't owned.
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   BOOK OF RATES — breath-locked loop sketches
+   All sound is synthesised from oscillators and noise. There are
+   no samples and nothing is transcribed from any existing piece.
+
+   Construction rules taken from research/05-loop-music.md:
+    - static or modal harmonic field, no cadence at the loop point
+    - only the breath layer is strictly periodic; everything else
+      runs on a coprime number of bars so the combination takes
+      many minutes to repeat
+    - variation spent on slow, low-salience dimensions
+    - ornaments placed stochastically, with real silence
+    - soft attacks, low-passed, long decays, no voice, no hook
+   ============================================================ */
+
+const AC = window.AudioContext || window.webkitAudioContext;
+let ctx=null, master=null, dry=null, wet=null, verb=null, analyser=null, scopeData=null;
+
+function initAudio(){
+  if(ctx) return;
+  ctx = new AC();
+  // Base level set by measuring the analyser: this lands the loops around
+  // -8 dBFS peak, which is audible on a phone speaker without a limiter.
+  master = ctx.createGain(); master.gain.value = 3.0;
+
+  // Reverb from a synthesised noise impulse: original by construction.
+  verb = ctx.createConvolver();
+  const len = Math.floor(ctx.sampleRate*3.2), ir = ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let c=0;c<2;c++){
+    const d = ir.getChannelData(c);
+    for(let i=0;i<len;i++){
+      const t = i/len;
+      d[i] = (Math.random()*2-1) * Math.pow(1-t, 2.6) * (1 - t*0.25);
+    }
+  }
+  verb.buffer = ir;
+
+  dry = ctx.createGain(); dry.gain.value = 0.72;
+  wet = ctx.createGain(); wet.gain.value = 0.45;
+  const wetLP = ctx.createBiquadFilter(); wetLP.type='lowpass'; wetLP.frequency.value=2600;
+
+  analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+  scopeData = new Uint8Array(analyser.fftSize);
+
+  dry.connect(master);
+  wet.connect(wetLP); wetLP.connect(verb); verb.connect(master);
+  master.connect(analyser); analyser.connect(ctx.destination);
+}
+function send(node, amt){           // every voice goes to both buses
+  node.connect(dry);
+  const w = ctx.createGain(); w.gain.value = amt; node.connect(w); w.connect(wet);
+}
+
+/* ---------- a shared noise buffer ---------- */
+let noiseBuf=null;
+function getNoise(){
+  if(noiseBuf) return noiseBuf;
+  const n = Math.floor(ctx.sampleRate*4);
+  noiseBuf = ctx.createBuffer(1,n,ctx.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  let b0=0,b1=0,b2=0;                       // cheap pink-ish filtering
+  for(let i=0;i<n;i++){
+    const w = Math.random()*2-1;
+    b0 = 0.99765*b0 + w*0.0990460;
+    b1 = 0.96300*b1 + w*0.2965164;
+    b2 = 0.57000*b2 + w*1.0526913;
+    d[i] = (b0+b1+b2+w*0.1848)*0.22;
+  }
+  return noiseBuf;
+}
+
+/* ---------- voices ---------- */
+// Inharmonic struck tone. Partial ratios chosen for this project; the
+// higher partials decay faster, which is what makes it read as struck.
+function struck(t, freq, dur, vel, ratios, bright){
+  const partials = ratios || [1, 2.01, 3.03, 4.22];
+  const out = ctx.createGain(); out.gain.value = 1; send(out, bright===undefined?0.5:bright);
+  partials.forEach((r,i)=>{
+    const o = ctx.createOscillator(); o.type='sine';
+    o.frequency.value = freq*r;
+    o.detune.value = (Math.random()*2-1)*4;
+    const g = ctx.createGain();
+    const a = vel * Math.pow(0.52, i);
+    const d = dur * Math.pow(0.62, i);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(a, t+0.012);      // soft attack, never a click
+    g.gain.exponentialRampToValueAtTime(0.0001, t+d);
+    o.connect(g); g.connect(out);
+    o.start(t); o.stop(t+d+0.05);
+  });
+  setTimeout(()=>{ try{out.disconnect();}catch(e){} }, (t-ctx.currentTime+dur+0.4)*1000);
+}
+
+// Low gong: same idea, stretched partials and a long tail.
+function gong(t, freq, vel){
+  struck(t, freq, 7.5, vel, [1, 1.52, 2.41, 3.47, 5.11], 0.85);
+}
+
+// A breathing drone: detuned saws through a lowpass we move with the breath.
+function makeDrone(freqs, baseCut){
+  const out = ctx.createGain(); out.gain.value = 0;
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass';
+  lp.frequency.value = baseCut; lp.Q.value = 0.6;
+  freqs.forEach((f,i)=>{
+    [-6, 6].forEach(cents=>{
+      const o = ctx.createOscillator();
+      o.type = i===0 ? 'sine' : 'sawtooth';
+      o.frequency.value = f; o.detune.value = cents;
+      const g = ctx.createGain(); g.gain.value = (i===0?0.30:0.085)/freqs.length;
+      o.connect(g); g.connect(lp); o.start();
+    });
+  });
+  lp.connect(out); send(out, 0.38);
+  return {gain:out.gain, cut:lp.frequency};
+}
+
+// Wind / water bed: looping noise through a lowpass that follows the breath.
+function makeBed(baseCut){
+  const s = ctx.createBufferSource(); s.buffer = getNoise(); s.loop = true;
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = baseCut;
+  const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 90;
+  const out = ctx.createGain(); out.gain.value = 0;
+  s.connect(hp); hp.connect(lp); lp.connect(out); send(out, 0.3);
+  s.start();
+  return {gain:out.gain, cut:lp.frequency, src:s};
+}
+
+/* ---------- the four sketches ----------
+   bars = bars per breath cycle, so bpm = 4 * bars * breathsPerMin.
+   inBeats/outBeats must sum to bars*4.
+   Every ornament layer's cycle length is coprime with the others.      */
+const LOOPS = [
+{
+  id:'shore', trim:1.00, name:'The Long Shore', state:'Calm · 5.5 breaths / min',
+  bpm:88, bars:4, inBeats:7, outBeats:9, root:146.83,      // D3
+  scale:[0,2,3,5,7,9,10],                                  // dorian field
+  desc:'A drone that opens and closes with the breath, a wind bed, and struck tones scattered across <em>five</em>- and <em>seven</em>-bar cycles. Nothing cadences, so the restart is inaudible. The three cycles only realign after 140 bars — about six and a half minutes.',
+  layers:['<b>drone</b>  D2·A2·D3, lowpass follows breath',
+          '<b>bed</b>    pink noise, gain follows breath',
+          '<b>pluck</b>  5-bar cycle, p=0.55, dorian',
+          '<b>bell</b>   7-bar cycle, p=0.3, two octaves up'],
+  build(S){
+    S.drone = makeDrone([73.42,110,146.83], 420);
+    S.bed   = makeBed(700);
+    S.drone.gain.setTargetAtTime(0.30, ctx.currentTime, 1.2);
+    S.bed.gain.setTargetAtTime(0.16, ctx.currentTime, 1.5);
+  },
+  beat(S, t, beat, bar, inCycle, lvl){
+    const sc = this.scale, root = this.root;
+    if(bar % 5 === 0 && beat % 2 === 0 && Math.random() < 0.55){
+      const deg = sc[(Math.random()*sc.length)|0];
+      struck(t, root*Math.pow(2, deg/12), 2.6, 0.10 + lvl*0.05, [1,2.01,3.03], 0.55);
+    }
+    if(bar % 7 === 3 && beat === 2 && Math.random() < 0.3){
+      const deg = sc[(Math.random()*4)|0];
+      struck(t, root*4*Math.pow(2, deg/12), 1.6, 0.035, [1,2.76,5.4], 0.8);
+    }
+  },
+  breath(S, t, inDur, outDur){
+    S.drone.cut.setValueAtTime(420, t);
+    S.drone.cut.linearRampToValueAtTime(1500, t+inDur);
+    S.drone.cut.linearRampToValueAtTime(420, t+inDur+outDur);
+    S.bed.gain.setValueAtTime(0.085, t);
+    S.bed.gain.linearRampToValueAtTime(0.26, t+inDur);
+    S.bed.gain.linearRampToValueAtTime(0.085, t+inDur+outDur);
+  }
+},
+{
+  id:'pool', trim:0.70, name:'The Still Pool', state:'Soothed · 5.0 breaths / min · exactly 1:2',
+  bpm:120, bars:6, inBeats:8, outBeats:16, root:110,       // A2
+  scale:[0,3,5,7,10],                                      // minor pentatonic: no leading note, nothing to resolve
+  desc:'Six bars to the breath, split <em>eight beats in, sixteen out</em> — a true 1:2 ratio that lands exactly on the bar. Water-drop tones fall on a <em>seven</em>-bar cycle against an <em>eight</em>-bar gong. Pentatonic, so every accidental collision is still consonant.',
+  layers:['<b>sub</b>    A1·A2 drone, barely moving',
+          '<b>drop</b>   7-bar cycle, p=0.4, pentatonic, long decay',
+          '<b>gong</b>   8-bar cycle, beat 0 only',
+          '<b>bed</b>    very dark noise, slow swell'],
+  build(S){
+    S.drone = makeDrone([55,110], 300);
+    S.bed   = makeBed(380);
+    S.drone.gain.setTargetAtTime(0.34, ctx.currentTime, 1.5);
+    S.bed.gain.setTargetAtTime(0.12, ctx.currentTime, 2.0);
+  },
+  beat(S, t, beat, bar, inCycle, lvl){
+    const sc=this.scale, root=this.root;
+    if(bar % 7 !== 6 && Math.random() < 0.22){
+      const oct = 2 + ((Math.random()*2)|0);
+      const deg = sc[(Math.random()*sc.length)|0];
+      struck(t + Math.random()*0.04, root*oct*Math.pow(2,deg/12),
+             3.4, 0.055 + lvl*0.03, [1,2.4,4.1], 0.75);
+    }
+    if(bar % 8 === 0 && beat === 0) gong(t, 55, 0.14);
+  },
+  breath(S, t, inDur, outDur){
+    S.drone.cut.setValueAtTime(300, t);
+    S.drone.cut.linearRampToValueAtTime(900, t+inDur);
+    S.drone.cut.linearRampToValueAtTime(300, t+inDur+outDur);
+    S.bed.gain.setValueAtTime(0.07, t);
+    S.bed.gain.linearRampToValueAtTime(0.18, t+inDur);
+    S.bed.gain.linearRampToValueAtTime(0.07, t+inDur+outDur);
+  }
+},
+{
+  id:'kite', trim:2.30, name:'Kite Line', state:'Focused · 3.75 breaths / min · box 4-4-4-4',
+  bpm:60, bars:4, inBeats:4, outBeats:4, hold:4, holdOut:4, root:98,  // G2
+  scale:[0,2,4,7,9],
+  desc:'At 60 BPM one beat is one second, so box breathing is <em>literally</em> four beats a side and each phase is exactly one bar. Built as a nested cycle after the colotomic principle: a deep stroke every sixteen beats, a middle one every four, a light one every two. The structure tells you where you are without a word of instruction.',
+  layers:['<b>low</b>    every 16 beats — top of the cycle',
+          '<b>mid</b>    every 4 beats — each phase change',
+          '<b>tick</b>   every 2 beats — the pulse',
+          '<b>drone</b>  G1·D2·G2, static, no breath motion'],
+  build(S){
+    S.drone = makeDrone([49,73.42,98], 520);
+    S.drone.gain.setTargetAtTime(0.24, ctx.currentTime, 1.2);
+  },
+  beat(S, t, beat, bar, inCycle, lvl){
+    if(inCycle === 0)            gong(t, 49, 0.16);
+    else if(inCycle % 4 === 0)   struck(t, 196, 2.2, 0.085, [1,2.3,3.8], 0.6);
+    if(inCycle % 2 === 0 && inCycle % 4 !== 0)
+      struck(t, 392*(1+(Math.random()*0.01)), 0.5, 0.022, [1,3.1], 0.35);
+  },
+  breath(){}
+},
+{
+  id:'run', trim:1.30, name:'The Run', state:'Energised · 8 breaths / min',
+  bpm:128, bars:4, inBeats:6, outBeats:10, root:164.81,    // E3
+  scale:[0,2,4,7,9,11],
+  desc:'Brisk — but note this is still eight breaths a minute with no holds, nowhere near hyperventilation. The energy comes from the <em>rate of events</em>, not the breathing. Bass on a <em>three</em>-bar cycle, bright tones on <em>four</em>, noise ticks on <em>five</em>: 60 bars before it comes round.',
+  layers:['<b>bass</b>   3-bar cycle, lowpassed, short',
+          '<b>bright</b> 4-bar cycle, p=0.5',
+          '<b>tick</b>   5-bar cycle, filtered noise',
+          '<b>bed</b>    air, opens hard on the inhale'],
+  build(S){
+    S.drone = makeDrone([82.41,164.81], 700);
+    S.bed   = makeBed(1400);
+    S.drone.gain.setTargetAtTime(0.20, ctx.currentTime, 0.8);
+    S.bed.gain.setTargetAtTime(0.10, ctx.currentTime, 1.0);
+  },
+  beat(S, t, beat, bar, inCycle, lvl){
+    const sc=this.scale, root=this.root;
+    if(bar % 3 === 0 && beat % 2 === 0)
+      struck(t, 82.41, 0.7, 0.13, [1,2.0], 0.2);
+    if(bar % 4 === 1 && Math.random() < 0.5){
+      const deg = sc[(Math.random()*sc.length)|0];
+      struck(t, root*2*Math.pow(2,deg/12), 1.1, 0.05+lvl*0.04, [1,2.76,5.4], 0.6);
+    }
+    if(bar % 5 === 2 && beat % 2 === 1){
+      const s = ctx.createBufferSource(); s.buffer = getNoise(); s.loop = true;
+      const bp = ctx.createBiquadFilter(); bp.type='bandpass';
+      bp.frequency.value = 3800; bp.Q.value = 2.2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t+0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.14);
+      s.connect(bp); bp.connect(g); send(g, 0.3);
+      s.start(t); s.stop(t+0.2);
+    }
+  },
+  breath(S, t, inDur, outDur){
+    S.bed.gain.setValueAtTime(0.05, t);
+    S.bed.gain.linearRampToValueAtTime(0.19, t+inDur);
+    S.bed.gain.linearRampToValueAtTime(0.05, t+inDur+outDur);
+    S.drone.cut.setValueAtTime(700, t);
+    S.drone.cut.linearRampToValueAtTime(2200, t+inDur);
+    S.drone.cut.linearRampToValueAtTime(700, t+inDur+outDur);
+  }
+}
+];
+
+/* ---------- transport ---------- */
+let active=null, S={}, startTime=0, nextBeat=0, timer=null;
+const LOOKAHEAD = 0.22, TICK = 30;
+
+function stopAll(){
+  if(timer){ clearInterval(timer); timer=null; }
+  if(S.drone) S.drone.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
+  if(S.bed)   S.bed.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
+  const old = S;
+  setTimeout(()=>{ try{ if(old.bed) old.bed.src.stop(); }catch(e){} }, 1400);
+  S = {}; active = null;
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('on'));
+  document.querySelectorAll('button.play').forEach(b=>b.textContent='PLAY');
+}
+
+function start(loop){
+  initAudio();
+  if(ctx.state === 'suspended') ctx.resume();
+  stopAll();
+  active = loop; S = {};
+  // per-loop trim, measured so the four sit at the same loudness
+  master.gain.setTargetAtTime(3.0*(loop.trim||1), ctx.currentTime, 0.05);
+  loop.build(S);
+  startTime = ctx.currentTime + 0.25;
+  nextBeat = 0;
+  timer = setInterval(schedule, TICK);
+  schedule();
+}
+
+function schedule(){
+  if(!active) return;
+  const L = active, spb = 60/L.bpm, beatsPerCycle = L.bars*4;
+  while(startTime + nextBeat*spb < ctx.currentTime + LOOKAHEAD){
+    const t = startTime + nextBeat*spb;
+    const inCycle = nextBeat % beatsPerCycle;
+    const bar = Math.floor(nextBeat/4);
+    const beat = nextBeat % 4;
+    // the breath envelope is scheduled once per cycle, at its first beat
+    if(inCycle === 0 && L.breath) L.breath(S, t, L.inBeats*spb, (beatsPerCycle-L.inBeats)*spb);
+    L.beat(S, t, beat, bar, inCycle, levelAt(L, inCycle/beatsPerCycle));
+    nextBeat++;
+  }
+}
+
+// Breath level 0..1 from the position within the cycle. Box loops get
+// flat tops and bottoms; the others are a smoothstepped rise and fall.
+function levelAt(L, q){
+  const total = L.bars*4;
+  const b = q*total;
+  const sm = x=>x*x*(3-2*x);
+  if(L.hold !== undefined){
+    if(b < L.inBeats) return sm(b/L.inBeats);
+    if(b < L.inBeats+L.hold) return 1;
+    if(b < L.inBeats+L.hold+L.outBeats) return 1-sm((b-L.inBeats-L.hold)/L.outBeats);
+    return 0;
+  }
+  return b < L.inBeats ? sm(b/L.inBeats)
+                       : 1 - sm((b-L.inBeats)/(total-L.inBeats));
+}
+
+/* ---------- readout ---------- */
+const lvlEl=document.getElementById('lvl'), phEl=document.getElementById('ph'),
+      statEl=document.getElementById('stat'), scope=document.getElementById('scope');
+const sg = scope.getContext('2d');
+
+function frame(){
+  if(active && ctx){
+    const L=active, spb=60/L.bpm, total=L.bars*4;
+    const elapsed = ctx.currentTime - startTime;
+    const beats = elapsed/spb;
+    const q = ((beats % total)+total)%total / total;
+    const lv = levelAt(L, q);
+    lvlEl.style.width = (lv*100).toFixed(1)+'%';
+    const b = q*total;
+    let word;
+    if(L.hold!==undefined){
+      word = b<L.inBeats ? 'breathe in' : b<L.inBeats+L.hold ? 'hold'
+           : b<L.inBeats+L.hold+L.outBeats ? 'breathe out' : 'hold empty';
+    } else word = b<L.inBeats ? 'breathe in' : 'breathe out';
+    phEl.textContent = word;
+    const cycles = Math.floor(beats/total);
+    statEl.innerHTML = L.bpm+' BPM · '+L.bars+' bars/breath<br>'+
+      'cycle '+(cycles+1)+' · bar '+(Math.floor(beats/4)%L.bars+1)+' of '+L.bars;
+  }
+  // scope: proof that sound is actually coming out
+  const w=scope.clientWidth, h=scope.clientHeight;
+  if(scope.width!==w*2){ scope.width=w*2; scope.height=h*2; sg.scale(2,2); }
+  sg.clearRect(0,0,w,h);
+  if(analyser){
+    analyser.getByteTimeDomainData(scopeData);
+    sg.beginPath();
+    for(let i=0;i<scopeData.length;i++){
+      const x = i/scopeData.length*w, y = h/2 + (scopeData[i]-128)/128*h*0.46;
+      i?sg.lineTo(x,y):sg.moveTo(x,y);
+    }
+    sg.strokeStyle='#46D6C8'; sg.lineWidth=1.3; sg.stroke();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- cards ---------- */
+const cards=document.getElementById('cards');
+LOOPS.forEach(L=>{
+  const el=document.createElement('div'); el.className='card'; el.id='c-'+L.id;
+  el.innerHTML = '<div class="ct">'+L.name+'</div><div class="cm">'+L.state+'</div>'+
+    '<p class="cd">'+L.desc+'</p><button class="play">PLAY</button>'+
+    '<ul class="lay">'+L.layers.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+  el.querySelector('button').onclick=()=>{
+    const wasOn = active===L;
+    stopAll();
+    if(!wasOn){ start(L); el.classList.add('on'); el.querySelector('button').textContent='STOP'; }
+    else { phEl.textContent='nothing playing'; statEl.textContent='tap a loop below'; }
+  };
+  cards.appendChild(el);
+});
+
+/* ---------- arithmetic table ---------- */
+const rows=[['3.75','Focused / box','4','60','4.000','16.000'],
+            ['4.5','Sleepy','4','72','3.333','13.333'],
+            ['5.0','Soothed','6','120','2.000','12.000'],
+            ['5.5','Calm — the default','4','88','2.727','10.909'],
+            ['6.0','Coherent','5','120','2.000','10.000'],
+            ['8.0','Alert / energised','4','128','1.875','7.500']];
+document.getElementById('arith').innerHTML =
+  '<tr><th>br/min</th><th>use</th><th>bars</th><th>BPM</th><th>bar s</th><th>cycle s</th></tr>'+
+  rows.map(r=>'<tr><td><b>'+r[0]+'</b></td><td>'+r[1]+'</td><td>'+r[2]+
+    '</td><td><b>'+r[3]+'</b></td><td>'+r[4]+'</td><td>'+r[5]+'</td></tr>').join('');
+</script>
+</body>
+</html>
