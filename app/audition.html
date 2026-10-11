@@ -95,14 +95,17 @@
 import { initAudio, closeAudio, Music, THEMES, setMuted, setTrim, fadeIn, fadeOut,
          audioContext, waveform, fftSize, meter } from './js/audio.js';
 import { Transport, buildSession, query } from './js/engine.js';
-import { P } from './js/protocols.js';
+import { protocol, BOX, CASCADE_BPM } from './js/protocols.js';
 
+const mk = (id, beats, bpm=CASCADE_BPM, ratio=0.44) =>
+  protocol({ id, bpm, beats, ratio });
 const RATES = [
-  ['calm',   P.calm,   '5.5 · 88'],
-  ['soothe', P.soothe, '5.0 · 120'],
-  ['sleepy', P.sleepy, '4.5 · 72'],
-  ['box',    P.box,    '3.75 · 60'],
-  ['alert',  P.alert,  '8.0 · 128']
+  ['brisk',  mk('brisk',16),  '7.5 · 16b'],
+  ['coher',  mk('coher',20),  '6.0 · 20b'],
+  ['calm',   mk('calm',22),   '5.45 · 22b'],
+  ['soothe', mk('soothe',24), '5.0 · 24b'],
+  ['slow',   mk('slow',28),   '4.3 · 28b'],
+  ['box',    BOX,             'box · 60bpm']
 ];
 
 let tp = null, music = null, session = null;
@@ -134,7 +137,7 @@ async function play(){
   halt();
   const ctx = await initAudio();
   const proto = RATES.find(r => r[0] === rateId)[1];
-  session = buildSession({ stages: [{ protocol: proto, cycles: 500 }] }, 500);
+  session = buildSession([{ protocol: proto, cycles: 500 }], 500);
   music = new Music(themeId);
   music.begin();
   solo = null; mutes = {};
@@ -201,7 +204,7 @@ function frame(){
     const q = query(session, tp.time);
     lv.style.width = (q.level*100).toFixed(1) + '%';
     ph.textContent = { in:'breathe in', out:'breathe out', hold:'hold', holdout:'hold empty' }[q.phase];
-    st.innerHTML = `${q.protocol.bpm} BPM · ${q.protocol.bars} bars/breath<br>` +
+    st.innerHTML = `${q.protocol.bpm} BPM · ${q.protocol.cycleBeats} beats/breath<br>` +
                    `${q.protocol.breathsPerMin.toFixed(2)} breaths/min · bar ${q.bar} of ${q.protocol.bars}`;
     const m = meter();
     if (!m.ok){ met.textContent = 'meter: ' + m.reason; met.classList.remove('hot'); }

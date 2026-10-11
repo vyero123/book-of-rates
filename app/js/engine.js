@@ -17,14 +17,20 @@ const SMOOTH = x => x * x * (3 - 2 * x);
  *  Session plan
  * ------------------------------------------------------------------ */
 
-export function buildSession(level, totalCycles){
+/** Build a session from a ladder of rungs: [{ protocol, cycles | 'rest' }].
+ *  Each rung may have its own tempo and its own beat count, so a cascade
+ *  is just a session whose rungs differ. Stage changes always land on a
+ *  breath boundary, which is a whole number of beats, which keeps the
+ *  music locked across the change. */
+export function buildSession(rungs, totalCycles){
+  if (rungs && rungs.stages) rungs = rungs.stages;      // tolerate a level object
   const stages = [];
   let t = 0, beat = 0;
 
   // 'rest' on the final stage means "whatever is left of the chosen length"
-  const fixed = level.stages.filter(s => s.cycles !== 'rest')
-                            .reduce((a, s) => a + s.cycles, 0);
-  for (const s of level.stages){
+  const fixed = rungs.filter(s => s.cycles !== 'rest')
+                     .reduce((a, s) => a + s.cycles, 0);
+  for (const s of rungs){
     const cycles = s.cycles === 'rest' ? Math.max(1, totalCycles - fixed) : s.cycles;
     const P = s.protocol;
     const beats = P.cycleBeats * cycles;
@@ -45,7 +51,18 @@ export function buildSession(level, totalCycles){
   }
   beatTimes[i] = t;
 
-  return { level, stages, duration: t, totalBeats: beat, beatTimes };
+  return { stages, duration: t, totalBeats: beat, beatTimes };
+}
+
+/** The rate ladder, for drawing and for debugging a cascade. */
+export function rateTrack(session){
+  return session.stages.map(s => ({
+    t0: s.t0, t1: s.t1,
+    beats: s.protocol.cycleBeats,
+    bpm: s.protocol.bpm,
+    rate: s.protocol.breathsPerMin,
+    cycles: s.cycles
+  }));
 }
 
 /* ------------------------------------------------------------------ *

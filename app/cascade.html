@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Book of Rates — cascades</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;min-height:100%;background:#14183F;color:#F3EAD7;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:430px;margin:0 auto;padding:22px 16px 70px}
+  h1{font:300 23px/1.2 ui-serif,Georgia,serif;margin:0 0 3px}
+  .sub{font:500 9px/1.5 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);margin:0 0 14px}
+  p.i{font:400 12.5px/1.65 ui-sans-serif;color:rgba(243,234,215,.68);margin:0 0 16px}
+  p.i b{color:#9FF0E2}
+
+  #top{position:sticky;top:0;z-index:30;background:#14183F;padding:10px 0 12px;
+    border-bottom:1px solid rgba(243,234,215,.12);margin-bottom:14px}
+  #stopbig{width:100%;appearance:none;border:0;border-radius:10px;padding:14px 0;
+    background:#E8473C;color:#fff;font:700 12px/1 ui-sans-serif;letter-spacing:.2em}
+  .meta{display:flex;justify-content:space-between;gap:10px;margin-top:9px;align-items:baseline}
+  #ph{font:300 16px/1 ui-serif,Georgia,serif;letter-spacing:.16em;text-transform:lowercase}
+  #st{font:500 8.5px/1.45 ui-sans-serif;letter-spacing:.1em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);text-align:right}
+  #trk{height:4px;background:rgba(243,234,215,.14);border-radius:2px;overflow:hidden;margin-top:9px}
+  #lv{height:100%;width:0;background:#46D6C8}
+  #ladder{display:block;width:100%;height:132px;margin-top:10px;
+    background:rgba(243,234,215,.05);border-radius:7px}
+
+  h2{font:600 9px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.42);margin:20px 0 9px}
+  .sel{display:flex;flex-wrap:wrap;gap:6px}
+  .sel button{appearance:none;border:0;border-radius:999px;padding:10px 13px;
+    font:600 9.5px/1 ui-sans-serif;background:rgba(243,234,215,.1);color:rgba(243,234,215,.8)}
+  .sel button.on{background:#F3EAD7;color:#14183F}
+  .entry{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+  .entry button{appearance:none;border:0;border-radius:11px;padding:12px 8px;text-align:left;
+    background:rgba(243,234,215,.05);box-shadow:0 0 0 1px rgba(243,234,215,.12);color:#F3EAD7}
+  .entry button.on{box-shadow:0 0 0 1.5px #46D6C8;background:rgba(70,214,200,.1)}
+  .entry b{display:block;font:400 13px/1.2 ui-serif,Georgia,serif;margin-bottom:4px}
+  .entry span{font:400 9px/1.35 ui-sans-serif;color:rgba(243,234,215,.5)}
+  #go{width:100%;appearance:none;border:0;border-radius:10px;padding:14px 0;margin-top:12px;
+    background:#46D6C8;color:#14183F;font:700 11px/1 ui-sans-serif;letter-spacing:.18em}
+  table{width:100%;border-collapse:collapse;font:400 11px/1.5 ui-monospace,Menlo,monospace;margin-top:4px}
+  td,th{text-align:right;padding:4px 3px;border-bottom:1px solid rgba(243,234,215,.08)}
+  th{font:600 8.5px/1.3 ui-sans-serif;letter-spacing:.1em;text-transform:uppercase;
+     color:rgba(243,234,215,.4)}
+  td:first-child,th:first-child{text-align:left}
+  tr.now td{color:#46D6C8}
+  footer{margin-top:24px;font:400 10.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.36)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cascades</h1>
+  <p class="sub">The Book of Rates · meeting you where you are</p>
+  <p class="i">A session starts near the rate you are actually breathing and steps down to its
+  destination. Because <b>rate = BPM ÷ beats per breath</b>, a descending cascade needs
+  <b>no tempo change at all</b> — the music keeps running at one tempo and the breath simply
+  spans two more beats at each rung. Watch the BPM readout stay put while the rate falls.</p>
+
+  <div id="top">
+    <button id="stopbig">STOP</button>
+    <div class="meta"><div id="ph">not started</div><div id="st">choose a starting point</div></div>
+    <div id="trk"><div id="lv"></div></div>
+    <canvas id="ladder"></canvas>
+  </div>
+
+  <h2>How wound up are you?</h2>
+  <div class="entry" id="entry"></div>
+
+  <h2>Destination</h2>
+  <div class="sel" id="dest"></div>
+
+  <h2>Length</h2>
+  <div class="sel" id="len"></div>
+
+  <button id="go">BEGIN THE CASCADE</button>
+
+  <h2>The ladder</h2>
+  <table id="tbl"></table>
+
+  <footer>Cascading is a design judgement about what is easy to follow, not a claim about
+  physiology. The nearest real support is Leslie et al. 2019, where an audio envelope slowed
+  breathing best when it targeted about 75% of the listener's own baseline rather than
+  jumping straight to a destination.</footer>
+</div>
+
+<script type="module">
+import { initAudio, closeAudio, Music, setMuted, setTrim, fadeIn, fadeOut } from './js/audio.js';
+import { Transport, buildSession, query, rateTrack, levelAt } from './js/engine.js';
+import { plan as makePlan, ENTRY, RATES, LENGTHS, CASCADE_BPM } from './js/protocols.js';
+
+let tp = null, music = null, session = null, track = null;
+let entryId = 'busy', destKey = 'calm', lenId = 'standard';
+
+const $ = id => document.getElementById(id);
+const lad = $('ladder'), lg = lad.getContext('2d');
+
+$('entry').innerHTML = Object.values(ENTRY).map(e =>
+  `<button data-e="${e.id}"><b>${e.label}</b><span>${e.note}</span></button>`).join('');
+$('dest').innerHTML = Object.entries(RATES).map(([k,v]) =>
+  `<button data-d="${k}">${v.label}</button>`).join('');
+$('len').innerHTML = Object.values(LENGTHS).map(l =>
+  `<button data-l="${l.id}">${l.label} · ${l.note}</button>`).join('');
+
+const mark = () => {
+  document.querySelectorAll('#entry button').forEach(b => b.classList.toggle('on', b.dataset.e===entryId));
+  document.querySelectorAll('#dest button').forEach(b => b.classList.toggle('on', b.dataset.d===destKey));
+  document.querySelectorAll('#len button').forEach(b => b.classList.toggle('on', b.dataset.l===lenId));
+};
+document.querySelectorAll('#entry button').forEach(b => b.onclick = () => { entryId=b.dataset.e; mark(); preview(); });
+document.querySelectorAll('#dest button').forEach(b => b.onclick = () => { destKey=b.dataset.d; mark(); preview(); });
+document.querySelectorAll('#len button').forEach(b => b.onclick = () => { lenId=b.dataset.l; mark(); preview(); });
+mark();
+
+function plan(){
+  const rungs = makePlan({ fromBeats: ENTRY[entryId].beats, toBeats: RATES[destKey].beats });
+  return buildSession(rungs, LENGTHS[lenId].cycles);
+}
+function preview(){
+  session = plan(); track = rateTrack(session);
+  drawLadder(); fillTable();
+  $('st').innerHTML = `${CASCADE_BPM} BPM throughout · ${track.length} rungs<br>` +
+                      `${(session.duration/60).toFixed(1)} min total`;
+}
+preview();
+
+function fillTable(){
+  $('tbl').innerHTML = '<tr><th>rung</th><th>beats</th><th>br/min</th><th>bpm</th><th>breaths</th></tr>' +
+    track.map((r,i) => `<tr data-i="${i}"><td>${i+1}</td><td>${r.beats}</td>` +
+      `<td>${r.rate.toFixed(2)}</td><td>${r.bpm}</td><td>${r.cycles}</td></tr>`).join('');
+}
+
+function drawLadder(now = -1){
+  const W = lad.clientWidth, H = lad.clientHeight;
+  if (lad.width !== W*2){ lad.width = W*2; lad.height = H*2; lg.setTransform(2,0,0,2,0,0); }
+  lg.clearRect(0,0,W,H);
+  if (!track || !track.length) return;
+  const pad = 14;
+  const rates = track.map(r => r.rate);
+  const hi = Math.max(...rates)*1.04, lo = Math.min(...rates)*0.94;
+  const x = t => pad + (t/session.duration)*(W-pad*2);
+  const y = r => pad + (1-(r-lo)/(hi-lo))*(H-pad*2);
+  // the staircase
+  lg.beginPath();
+  track.forEach((r,i) => {
+    const yy = y(r.rate);
+    if (i===0) lg.moveTo(x(r.t0), yy); else lg.lineTo(x(r.t0), yy);
+    lg.lineTo(x(r.t1), yy);
+  });
+  lg.strokeStyle = 'rgba(243,234,215,.5)'; lg.lineWidth = 1.6; lg.stroke();
+  // filled area under it
+  lg.lineTo(x(session.duration), H-pad); lg.lineTo(x(0), H-pad); lg.closePath();
+  lg.fillStyle = 'rgba(70,214,200,.10)'; lg.fill();
+  // playhead
+  if (now >= 0){
+    lg.beginPath(); lg.moveTo(x(now), pad*0.4); lg.lineTo(x(now), H-pad*0.4);
+    lg.strokeStyle = '#46D6C8'; lg.lineWidth = 1.4; lg.stroke();
+  }
+  lg.fillStyle = 'rgba(243,234,215,.4)';
+  lg.font = '9px ui-sans-serif';
+  lg.fillText(rates[0].toFixed(2)+'/min', pad, y(rates[0])-6);
+  lg.fillText(rates[rates.length-1].toFixed(2)+'/min', W-pad-54, y(rates[rates.length-1])+13);
+}
+
+$('go').onclick = () => start();
+$('stopbig').onclick = () => stop();
+
+async function start(){
+  halt();
+  const ctx = await initAudio();
+  session = plan(); track = rateTrack(session);
+  drawLadder(); fillTable();
+  music = new Music('desert-dusk'); music.begin();
+  if (!tp || tp.ctx !== ctx) tp = new Transport(ctx);
+  tp.onBeat = (when, i, info) => music.beat(when, i, info);
+  tp.onEnd = () => { halt(); $('ph').textContent = 'arrived'; };
+  await tp.start(session);
+  setMuted(false); setTrim(1); fadeIn(2.0);
+}
+function halt(){
+  if (tp) tp.stop();
+  if (music){ music.end(); music = null; }
+  fadeOut(0.8);
+}
+async function stop(){
+  halt(); setMuted(true);
+  $('ph').textContent = 'stopped'; $('lv').style.width = '0%';
+  drawLadder();
+  setTimeout(() => closeAudio(), 900);
+}
+
+function frame(){
+  if (tp && tp.state === 'running' && session){
+    const q = query(session, tp.time);
+    $('lv').style.width = (q.level*100).toFixed(1) + '%';
+    $('ph').textContent = { in:'breathe in', out:'breathe out', hold:'hold', holdout:'hold empty' }[q.phase];
+    const idx = track.findIndex(r => tp.time < r.t1);
+    $('st').innerHTML =
+      `<b style="color:#46D6C8">${q.protocol.bpm} BPM</b> · ${q.protocol.cycleBeats} beats/breath<br>` +
+      `${q.protocol.breathsPerMin.toFixed(2)} breaths/min · rung ${idx+1} of ${track.length}`;
+    document.querySelectorAll('#tbl tr[data-i]').forEach(tr =>
+      tr.classList.toggle('now', +tr.dataset.i === idx));
+    drawLadder(tp.time);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+addEventListener('pagehide', () => { halt(); closeAudio(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+window.__bor = { stop, halt };
+</script>
+</body>
+</html>
