@@ -34,6 +34,11 @@ let ctx = null, master = null, dry = null, wet = null, analyser = null,
 
 export function audioContext(){ return ctx; }
 
+/** Debug only: lets a diagnostic page tap intermediate nodes so a runaway
+ *  can be located upstream of the master gain — i.e. while muted, in
+ *  silence. The user can hear anything that reaches the speakers. */
+export function _internals(){ return { ctx, master, dry, wet, duck, statics, limiter }; }
+
 /* Peak budget per layer kind, linear. */
 const BUDGET = {
   pad: 0.085, low: 0.090, bell: 0.055, pluck: 0.050, bowed: 0.050,
