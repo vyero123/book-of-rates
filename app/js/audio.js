@@ -31,14 +31,23 @@ export async function initAudio(){
   master = ctx.createGain(); master.gain.value = 0;
 
   const verb = ctx.createConvolver();
+  verb.normalize = false;                 // we normalise it ourselves, below
   const n = Math.floor(ctx.sampleRate * 3.4);
   const ir = ctx.createBuffer(2, n, ctx.sampleRate);
   for (let c = 0; c < 2; c++){
     const d = ir.getChannelData(c);
+    let energy = 0;
     for (let i = 0; i < n; i++){
       const t = i / n;
       d[i] = (Math.random()*2-1) * Math.pow(1-t, 2.6) * (1 - t*0.25);
+      energy += d[i]*d[i];
     }
+    // A convolver sums across every sample of the impulse. Over a transient
+    // that is harmless; under a SUSTAINED pad it integrates and the output
+    // runs away. Scaling by the impulse's own energy fixes the gain for
+    // sustained and transient material alike.
+    const k = 0.22 / Math.sqrt(energy);
+    for (let i = 0; i < n; i++) d[i] *= k;
   }
   verb.buffer = ir;
 
