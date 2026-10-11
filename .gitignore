@@ -1,0 +1,22 @@
+# --- credentials: never commit ---
+token.txt
+*token*
+.secrets/
+*.lock
+.env
+.env.*
+*.pem
+*.key
+
+# --- os / editor noise ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# --- build / deps ---
+node_modules/
+dist/
+.netlify/

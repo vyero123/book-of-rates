@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Book of Rates — Prototype 2: The Still Pool</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#080A22;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(8,10,34,.55);backdrop-filter:blur(6px);
+    color:#F3EAD7;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(243,234,215,.35)}
+  #stop i{width:11px;height:11px;background:#E8473C;display:block;border-radius:2px}
+
+  #cue{position:fixed;left:0;right:0;bottom:max(58px,calc(env(safe-area-inset-bottom) + 50px));
+    z-index:20;text-align:center;pointer-events:none;color:#CDE6E2}
+  #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 16px rgba(8,10,34,.75)}
+  #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    opacity:.6;text-transform:uppercase}
+  #bar{position:fixed;left:0;right:0;bottom:max(28px,calc(env(safe-area-inset-bottom) + 20px));
+    z-index:20;height:2px;margin:0 36px;background:rgba(205,230,226,.16);pointer-events:none}
+  #barfill{height:100%;width:0;background:rgba(205,230,226,.7)}
+  #note{position:fixed;left:0;right:0;bottom:max(8px,env(safe-area-inset-bottom));z-index:20;
+    text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;color:rgba(205,230,226,.38);
+    letter-spacing:.06em;padding:0 20px;pointer-events:none}
+
+  #halt{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(8,10,34,.85);backdrop-filter:blur(3px);text-align:center;padding:30px}
+  #halt.on{display:grid}
+  #halt h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F3EAD7;letter-spacing:.06em}
+  #halt p{margin:0 0 26px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(243,234,215,.72);max-width:280px}
+  #halt button{appearance:none;border:0;border-radius:999px;padding:13px 26px;
+    background:#F3EAD7;color:#14183F;font:600 12px/1 ui-sans-serif,sans-serif;letter-spacing:.18em}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="cue"><div id="phase">breathe in</div><div id="sub">the line reaches out</div></div>
+<div id="bar"><div id="barfill"></div></div>
+<div id="note">Prototype. Sit or lie down. Never practise breathing exercises in or near water, or while driving.</div>
+
+<div id="halt"><div>
+  <h2>Stopped</h2>
+  <p>Let your breathing go back to whatever it wants to do. The drawing keeps whatever it got to.</p>
+  <button id="resume">RESUME</button>
+</div></div>
+
+<script>
+/* ============================================================
+   BOOK OF RATES — Prototype 2: THE STILL POOL  (ink spiral)
+   The camera never moves and nothing scrolls. A single brush
+   walks one lap of a slowly tightening spiral per breath, and
+   the breath pushes the line outward and draws it back in.
+   The ink persists, so the session leaves a finished drawing
+   and the destination is literal: the centre of the pool.
+   ============================================================ */
+
+const PROTOCOL = { label:'Resonance · 5.5 breaths / min',
+                   phases:[ {k:'in', d:5.0}, {k:'out', d:6.0} ] };
+const CYCLES = 12;
+const CYCLE = PROTOCOL.phases.reduce((a,p)=>a+p.d,0);
+const SESSION = CYCLE*CYCLES;
+
+function phaseAt(t){
+  let u=t%CYCLE; if(u<0)u+=CYCLE;
+  for(const p of PROTOCOL.phases){ if(u<p.d) return {k:p.k, pr:u/p.d}; u-=p.d; }
+  const p=PROTOCOL.phases[PROTOCOL.phases.length-1]; return {k:p.k, pr:1};
+}
+const smooth = x=>x*x*(3-2*x);
+function level(t){
+  const s=phaseAt(t);
+  if(s.k==='in')  return smooth(s.pr);
+  if(s.k==='out') return 1-smooth(s.pr);
+  if(s.k==='hold')return 1;
+  return 0;
+}
+
+/* ---------- palette: night pool (derived) ---------- */
+const P = {
+  skyTop:'#14183F', skyMid:'#2C3E8C', skyLow:'#3E5BA8',
+  far:'#0E1433', mid:'#0A0F28', near:'#06091C',
+  waterDeep:'#101A4A', waterLit:'#1B3270',
+  moon:'#F2E3C8', ink:'#46D6C8', inkWarm:'#9FF0E2'
+};
+const hex=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+const mix=(a,b,t)=>{const A=hex(a),B=hex(b);
+  return `rgb(${A[0]+(B[0]-A[0])*t|0},${A[1]+(B[1]-A[1])*t|0},${A[2]+(B[2]-A[2])*t|0})`;};
+
+/* ---------- canvas: one live layer + one persistent ink layer ---------- */
+const cv=document.getElementById('c'), g=cv.getContext('2d');
+let ink, ig, W=0,H=0,DPR=1, grain=null;
+
+function fit(){
+  DPR=Math.min(window.devicePixelRatio||1,2.5);
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  g.setTransform(DPR,0,0,DPR,0,0);
+  ink=document.createElement('canvas');
+  ink.width=cv.width; ink.height=cv.height;
+  ig=ink.getContext('2d'); ig.setTransform(DPR,0,0,DPR,0,0);
+  lastA=null; buildGrain();
+}
+addEventListener('resize',fit);
+
+function buildGrain(){
+  const n=140,t=document.createElement('canvas'); t.width=t.height=n;
+  const tg=t.getContext('2d'), d=tg.createImageData(n,n);
+  for(let i=0;i<n*n;i++){ const v=120+(Math.random()*70|0);
+    d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=22+(Math.random()*26|0); }
+  tg.putImageData(d,0,0); grain=g.createPattern(t,'repeat');
+}
+
+/* ---------- the spiral ---------- */
+// One full lap per breath. The radius marches steadily inward across the
+// whole session, so the brush arrives at the centre exactly as the last
+// breath ends: the "destination rate" made spatial.
+const R_OUT = 0.44, R_IN = 0.045, WOBBLE = 0.075;
+
+function spiralPoint(t, cx, cy, R){
+  const q = Math.min(t/SESSION, 1);
+  const theta = -Math.PI/2 + q*CYCLES*Math.PI*2;          // one turn per breath
+  const base  = (R_OUT + (R_IN-R_OUT)*q) * R;
+  const r     = base + (level(t)-0.5)*WOBBLE*R*2;
+  return [cx + Math.cos(theta)*r, cy + Math.sin(theta)*r*0.72]; // squashed: we see the pool at an angle
+}
+
+/* ---------- flat scenery ---------- */
+function cloudBand(y,h,fill){ g.fillStyle=fill; g.fillRect(-2,y,W+4,h); }
+
+function reeds(x,y,s,lean,fill){
+  g.fillStyle=fill;
+  for(let i=0;i<9;i++){
+    const o=(i-4)*s*0.14, hh=s*(0.5+((i*53)%13)/13), b=s*0.04;
+    g.beginPath(); g.moveTo(x+o-b,y); g.lineTo(x+o+b,y);
+    g.lineTo(x+o+lean*hh*0.45, y-hh); g.closePath(); g.fill();
+  }
+}
+function boulder(x,y,s,lit,sh){
+  g.fillStyle=lit; g.beginPath();
+  g.moveTo(x-s,y); g.lineTo(x-s*0.62,y-s*0.74); g.lineTo(x+s*0.05,y-s*0.95);
+  g.lineTo(x+s*0.72,y-s*0.44); g.lineTo(x+s,y); g.closePath(); g.fill();
+  g.fillStyle=sh; g.beginPath();
+  g.moveTo(x+s*0.05,y-s*0.95); g.lineTo(x+s*0.72,y-s*0.44);
+  g.lineTo(x+s,y); g.lineTo(x+s*0.07,y); g.closePath(); g.fill();
+}
+// Flat-banded mountain: angular facets, one hard shadow split, no stroke.
+function peak(cx, baseY, w, h, lit, sh){
+  g.fillStyle=lit; g.beginPath();
+  g.moveTo(cx-w,baseY); g.lineTo(cx-w*0.30,baseY-h*0.78);
+  g.lineTo(cx,baseY-h); g.lineTo(cx+w*0.44,baseY-h*0.52);
+  g.lineTo(cx+w,baseY); g.closePath(); g.fill();
+  g.fillStyle=sh; g.beginPath();
+  g.moveTo(cx,baseY-h); g.lineTo(cx+w*0.44,baseY-h*0.52);
+  g.lineTo(cx+w,baseY); g.lineTo(cx+w*0.02,baseY); g.closePath(); g.fill();
+}
+
+/* ---------- state ---------- */
+let t0=performance.now()/1000, running=true, stoppedAt=0, lastA=null;
+
+function draw(now){
+  const t = running ? (now/1000-t0) : stoppedAt;
+  const lv = level(t);
+
+  /* --- sky: three flat bands, the lowest one breathing in brightness --- */
+  g.fillStyle=P.skyTop;  g.fillRect(0,0,W,H*0.20);
+  g.fillStyle=P.skyMid;  g.fillRect(0,H*0.20,W,H*0.14);
+  g.fillStyle=mix(P.skyMid,P.skyLow,lv); g.fillRect(0,H*0.34,W,H*0.12);
+
+  /* --- moon: fixed, flat, no glow gradient. The one bright shape. --- */
+  const mx=W*0.70, my=H*0.145, mr=H*0.044;
+  g.fillStyle=`rgba(242,227,200,${0.14+lv*0.12})`;
+  g.beginPath(); g.arc(mx,my,mr*1.9,0,6.2832); g.fill();
+  g.fillStyle=P.moon; g.beginPath(); g.arc(mx,my,mr,0,6.2832); g.fill();
+  g.fillStyle=P.skyTop; g.beginPath(); g.arc(mx+mr*0.52,my-mr*0.3,mr*0.88,0,6.2832); g.fill();
+
+  /* --- slow cloud bars: motion that is never the breath, so a hold
+         is still never a frozen frame --- */
+  for(let i=0;i<3;i++){
+    const w=W*(0.5+i*0.18), x=((t*(5+i*3))%(W+w))-w;
+    g.fillStyle=`rgba(62,91,168,${0.30-i*0.07})`;
+    g.fillRect(x, H*(0.11+i*0.055), w, H*0.012);
+  }
+
+  /* --- discrete depth bands, each lighter-to-darker as it nears --- */
+  peak(W*0.20, H*0.465, W*0.34, H*0.17, '#1A2252', '#121839');
+  peak(W*0.74, H*0.465, W*0.42, H*0.22, '#151B45', '#0E1330');
+  g.fillStyle=P.far; g.fillRect(0,H*0.455,W,H*0.035);
+
+  /* --- the pool: flat water, lit by the breath --- */
+  const shore=H*0.49;
+  g.fillStyle=mix(P.waterDeep,P.waterLit,lv*0.8);
+  g.fillRect(0,shore,W,H-shore);
+
+  // moon's reflection: offset flat shapes, not a mirror. Rungs that
+  // spread a little as the breath fills.
+  for(let i=0;i<7;i++){
+    const ry=shore+H*0.035+i*H*0.030;
+    const rw=mr*(1.5+i*0.42)*(0.85+lv*0.3);
+    g.fillStyle=`rgba(242,227,200,${0.16-i*0.019})`;
+    g.fillRect(mx-rw/2, ry, rw, Math.max(1.5,H*0.0055));
+  }
+
+  /* --- ink: stamped into the persistent layer, so the drawing builds --- */
+  const cx=W*0.5, cy=shore+(H-shore)*0.46, R=Math.min(W,H*0.62);
+  if(running && t<=SESSION){
+    const a=spiralPoint(t,cx,cy,R);
+    if(lastA){
+      // brush pressure: heavier on the exhale, as a real brush would be
+      const wgt = (0.9 + (1-lv)*2.3) * (Math.min(W,H)/375) * 1.25;
+      const steps = 6;
+      for(let i=1;i<=steps;i++){
+        const px=lastA[0]+(a[0]-lastA[0])*i/steps, py=lastA[1]+(a[1]-lastA[1])*i/steps;
+        ig.fillStyle=`rgba(70,214,200,0.5)`;
+        ig.beginPath(); ig.arc(px,py,wgt,0,6.2832); ig.fill();
+      }
+    }
+    lastA=a;
+  }
+  // fade the oldest ink very slightly each frame so early laps sit back
+  // in the water instead of competing with the live head of the stroke
+  if(running && (now|0)%4===0){
+    ig.save(); ig.globalCompositeOperation='destination-out';
+    ig.fillStyle='rgba(0,0,0,0.006)'; ig.fillRect(0,0,W,H); ig.restore();
+  }
+  g.drawImage(ink,0,0,W,H);
+
+  /* --- the live brush head: the only thing the eye needs to follow --- */
+  const head=spiralPoint(Math.min(t,SESSION),cx,cy,R);
+  g.fillStyle=`rgba(159,240,226,${0.20+lv*0.16})`;
+  g.beginPath(); g.arc(head[0],head[1],(5.5+lv*7)*(Math.min(W,H)/375)*1.3,0,6.2832); g.fill();
+  g.fillStyle=P.inkWarm;
+  g.beginPath(); g.arc(head[0],head[1],(2.4+(1-lv)*2.2)*(Math.min(W,H)/375)*1.3,0,6.2832); g.fill();
+
+  /* --- shore furniture, cropped hard by the frame --- */
+  boulder(W*0.10, shore+H*0.012, H*0.030, P.mid, P.near);
+  boulder(W*0.92, shore+H*0.030, H*0.046, P.mid, P.near);
+  reeds(W*0.04, H*0.995, H*0.085, (lv-0.5)*1.1, P.near);
+  reeds(W*0.97, H*0.985, H*0.070, (lv-0.5)*1.1, P.near);
+  g.fillStyle=P.near; g.beginPath();
+  g.moveTo(0,H); g.lineTo(0,H*0.93); g.lineTo(W*0.42,H*0.975); g.lineTo(W,H*0.90);
+  g.lineTo(W,H); g.closePath(); g.fill();
+
+  if(grain){ g.save(); g.globalAlpha=0.46; g.fillStyle=grain; g.fillRect(0,0,W,H); g.restore(); }
+  const vg=g.createRadialGradient(W*0.5,H*0.52,H*0.16,W*0.5,H*0.55,H*0.8);
+  vg.addColorStop(0,'rgba(8,10,34,0)'); vg.addColorStop(1,'rgba(8,10,34,0.5)');
+  g.fillStyle=vg; g.fillRect(0,0,W,H);
+
+  const s=phaseAt(t);
+  const words={in:'breathe in',out:'breathe out',hold:'hold',holdout:'hold empty'};
+  const subs ={in:'the line reaches out',out:'the line draws in',hold:'the outer edge',holdout:'the inner edge'};
+  if(t>=SESSION){ ph.textContent='arrived'; sb.textContent='the drawing is finished'; }
+  else { ph.textContent=words[s.k]; sb.textContent=subs[s.k]; }
+  fill.style.width=Math.min(100,t/SESSION*100)+'%';
+
+  requestAnimationFrame(draw);
+}
+
+const ph=document.getElementById('phase'), sb=document.getElementById('sub'),
+      fill=document.getElementById('barfill'), halt=document.getElementById('halt');
+document.getElementById('stop').onclick=()=>{
+  stoppedAt=performance.now()/1000-t0; running=false; halt.classList.add('on'); };
+document.getElementById('resume').onclick=()=>{
+  t0=performance.now()/1000-stoppedAt; running=true; lastA=null; halt.classList.remove('on'); };
+
+fit(); requestAnimationFrame(draw);
+</script>
+</body>
+</html>
