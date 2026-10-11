@@ -48,9 +48,17 @@ export async function initAudio(){
 
   analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
 
+  // A safety ceiling, not loudness processing. The research says no heavy
+  // compression, and there is none: this sits high with a fast attack and
+  // only ever acts if a stochastic pile-up would otherwise clip, which is
+  // far worse for the ear than the ceiling is.
+  const ceiling = ctx.createDynamicsCompressor();
+  ceiling.threshold.value = -3; ceiling.knee.value = 0;
+  ceiling.ratio.value = 20; ceiling.attack.value = 0.003; ceiling.release.value = 0.25;
+
   dry.connect(master);
   wet.connect(wetLP); wetLP.connect(verb); verb.connect(master);
-  master.connect(analyser); analyser.connect(ctx.destination);
+  master.connect(ceiling); ceiling.connect(analyser); analyser.connect(ctx.destination);
   return ctx;
 }
 
@@ -66,7 +74,7 @@ export async function closeAudio(){
   ctx = null; master = null; dry = null; wet = null; analyser = null; noiseBuf = null;
 }
 
-const BASE = 3.0;   // measured against the analyser: ~-7 dBFS peak
+const BASE = 0.9;   // measured against the analyser with all layers summed
 let userTrim = 1, muted = false;
 
 export function fadeIn(sec = 2.0){
@@ -279,7 +287,7 @@ class Heart extends Layer {
   constructor(o = {}){
     super(o.wet ?? 0.12);
     this.f1 = o.f1 ?? 54; this.f2 = o.f2 ?? 44;
-    this.vel = o.vel ?? 0.5;
+    this.vel = o.vel ?? 0.20;
     this.everyBeats = o.everyBeats ?? 2;
   }
   thump(t, freq, vel, dur){
@@ -574,7 +582,7 @@ export const THEMES = {
     trim: 1.25,
     make: () => ({
       pad:    new Pad([82.41, 164.81], 700, 2200),
-      heart:  new Heart({ vel: 0.42, everyBeats: 2, f1: 56, f2: 45 }),
+      heart:  new Heart({ vel: 0.20, everyBeats: 2, f1: 56, f2: 45 }),
       wind:   new Wind({ bed: 0.12, cut: 900, top: 2600 }),
       bass:   new Ornament({ root: E/2, scale: [0,7], everyBars: 3, p: 0.9, onBeats: [0,2],
                              voice: 'pluck', vel: 0.09, damp: 0.93, tone: 1400 }),
