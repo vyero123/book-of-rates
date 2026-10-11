@@ -110,7 +110,7 @@ breathing and general calm.
 
 | State | Pattern | Rate | Evidence for the state link | Notes |
 |---|---|---|---|---|
-| **Calm** | 4.77 / 6.14 | 5.5/min | **MODERATE** — closest to the resonance literature | The default. Odd-looking seconds because it is 7 and 9 beats at 88 BPM — see §3.3. |
+| **Calm** | 4.5 / 6.5 | 5.45/min | **MODERATE** — closest to the resonance literature | The default: 22 beats at 120 BPM, split 10:12. See §3.3. |
 | **Grounded** | 5.5 / 5.5 | 5.5/min | **MODERATE** (inherits the resonance evidence) | Equal ratio; "grounded" is our word, not a finding. |
 | **Soothed** | 4 / 8 | 5/min | **WEAK** — mechanism solid, comparative claim unproven | Use it; don't claim superiority over 1:1. |
 | **Sleepy** | 4 / 8 tapering to 4 / 9.3 | 5 → 4.5/min | **WEAK** | Slowing within a session is sensible and untested. |
@@ -378,40 +378,70 @@ valence/arousal space, then reach it with tempo, density, register and brightnes
 valence as something to nudge rather than to dial, because the literature says it won't
 reliably obey.
 
-### 3.3 The tempo arithmetic
+### 3.3 The tempo arithmetic, and cascades
 
-The requirement is that the music and the breath never drift apart, which means one breath
-cycle must be a whole number of bars. In 4/4 that reduces to one line:
+**Superseded note (11 Oct, second revision).** An earlier version of this section counted in
+BARS and recommended a default of 88 BPM / 4 bars / 5.5 breaths per minute. That was correct
+as far as it went, and it is no longer what we do. Counting in BEATS instead turned out to be
+strictly more general and to unlock something the bar version could not do, so the 88 BPM
+figure is withdrawn. It is recorded here only so a later reader does not find it elsewhere
+and think it is live.
 
-> **breaths per minute = BPM ÷ (4 × bars per breath)**
-> and therefore **BPM = 4 × bars × breaths per minute**
+**The rule.** A breath cycle spans a whole number of beats, so
 
-Every target rate in §1.4 has clean integer tempos. The recommended setting for each:
+> **breaths per minute = BPM ÷ beats per breath**
 
-| Breaths/min | Level use | Bars per breath | **BPM** | Bar (s) | Cycle (s) | In : out, in beats |
-|---|---|---|---|---|---|---|
-| 3.75 | Focused — box 4-4-4-4 | 4 | **60** | 4.000 | 16.000 | 4 : 4 : 4 : 4 — one bar per phase, one beat per second |
-| 4.5 | Sleepy | 4 | **72** | 3.333 | 13.333 | 6 : 10 |
-| 5.0 | Soothed | 6 | **120** | 2.000 | 12.000 | 8 : 16 — an exact 1:2 landing on the bar |
-| 5.5 | **Calm — the default** | 4 | **88** | 2.727 | 10.909 | 7 : 9 |
-| 6.0 | Coherent | 5 | **120** | 2.000 | 10.000 | 8 : 12 |
-| 8.0 | Alert / energised | 4 | **128** | 1.875 | 7.500 | 6 : 10 |
+The bar version — breaths/min = BPM ÷ (4 × bars) — is the special case where the beat count
+happens to be a multiple of four.
 
-Other valid tempos exist for each rate (3, 5 and 6 bars per breath all give integer BPMs);
-these are the ones that sit most comfortably as music.
+**Why this matters: cascades come free.** A session should start near the rate the user is
+actually breathing and step down to its destination, rather than dropping them cold into a
+target rate. Because rate is BPM over beats, **a descending cascade needs no tempo change at
+all**: hold the tempo and let the breath span two more beats at each rung. The music keeps
+running, completely unbroken, while the breathing slows. At 120 BPM, stepping by two beats:
 
-**One change this forces, and I think it is an improvement.** Our default was inhale 5 s /
-exhale 6 s — an 11-second cycle, which is 5.45 breaths/min and gives **no integer BPM** at
-any usable bar count (65.45 at three bars, 87.27 at four). **Recommend moving the default to
-88 BPM, 4 bars, 7 beats in and 9 beats out: 4.77 s in, 6.14 s out, 5.5 breaths/min.** That is
-within rounding of what we had, sits dead centre of the resonance range, and locks perfectly.
+| beats | 16 | 18 | 20 | 22 | 24 | 26 | 28 | 30 | 32 |
+|---|---|---|---|---|---|---|---|---|---|
+| breaths/min | 7.50 | 6.67 | 6.00 | **5.45** | 5.00 | 4.62 | 4.29 | 4.00 | 3.75 |
+| step | — | −11% | −10% | −9.1% | −8.3% | −7.7% | −7.1% | −6.7% | −6.2% |
 
-Two notes worth having:
+The steps get gentler as the rate falls, which is the right shape: the slower you are already
+breathing, the more a given proportional change is felt. Nothing should exceed about 12%.
 
-- **60 BPM makes box breathing exact.** One beat is one second, each phase is four beats and
-  one bar, and the whole structure of the level is audible without a word of instruction.
-- 120 BPM at six bars gives a true 1:2 ratio landing on the barline, which is the cleanest
-  way to build the soothed levels.
+**120 BPM is the cascade tempo for every calming journey.** It lands 7.5, 6.0, 5.0 and 3.75
+breaths/min on exact integer beat counts.
+
+**The one cost, accepted deliberately.** 5.5 breaths/min is not reachable at 120 BPM — it
+needs 21.8 beats. The destination is therefore **22 beats = 5.45 breaths/min**. That is a 1%
+difference from the old figure, physiologically meaningless, and it buys a cascade with no
+tempo change anywhere in it. Decision recorded: seamless wins.
+
+**Energising cascades do change tempo** (120 → 128), deliberately, because faster music is
+part of what makes them read as energising (§3.2 — arousal is the strong axis). The breath
+still spans whole beats at every rung.
+
+**Box breathing keeps its own tempo.** At 60 BPM one beat is one second, so each side of the
+box is exactly four beats and one bar, and the structure is audible without instruction.
+
+**Design decisions on cascade behaviour**
+
+- *Step size*: two beats per rung, 6–11%.
+- *Where changes land*: on a breath boundary, which is a whole number of beats. Since the
+  tempo does not change on a descending cascade, the lock is preserved trivially.
+- *Announced?* No, but **visible in advance**. The Long Shore draws the terrain ahead of the
+  traveller from the upcoming breath, so a longer breath arrives as a visibly longer dune
+  several seconds before it is taken. The user sees the step coming rather than being told.
+  No voice, no label, no chime.
+- *Starting rate*: three cards, no numbers and no slider — Wound up (16 beats), Busy (20),
+  Already calm (22). Stored as a preference, never shown back as a score. If the chosen start
+  is already slower than the destination there is no cascade, rather than one running
+  backwards.
+
+**Evidence note.** Cascading is a design judgement about what is easy to follow, not a
+physiological claim. The resonance literature is entirely fixed-rate. The nearest real
+support is Leslie et al. 2019, where an audio envelope slowed breathing most effectively when
+it targeted about 75% of the listener's own baseline rather than jumping to a destination. We
+may say a cascade is easier to follow. We may not say it does more to the body.
 
 ### 3.4 What makes a short loop survive repetition
 
@@ -780,8 +810,9 @@ In the order I'd worry about it.
 
 ### Still open
 
-1. Does the default move to 88 BPM / 5.5 breaths per minute, as §3.3 recommends? It is a
-   rounding-level change to the breathing and it makes everything lock.
+1. ~~Does the default move to 88 BPM / 5.5 breaths per minute?~~ **Settled 11 Oct:** no —
+   superseded by counting in beats. 120 BPM throughout, destination 22 beats = 5.45
+   breaths/min, because that makes cascades seamless. See §3.3.
 2. Which of the four loop sketches is closest? They are deliberately different in density,
    and the right answer may be different per level rather than one house sound.
 3. Phase 2 order: build the Long Shore as the real breath engine with audio attached, or
