@@ -154,7 +154,7 @@ function draw(now){
   const t = running ? (now/1000-t0) : stoppedAt;
   const lv = level(t);
 
-  const horizon = H*0.40;
+  const horizon = H*0.34;
 
   /* --- sky: three flat bands. The whole scene's colour is the breath. --- */
   g.fillStyle=pair(P.skyA,lv); g.fillRect(0,0,W,horizon*0.42);
@@ -163,9 +163,7 @@ function draw(now){
 
   /* --- sun: rises a little on each inhale, sets on each exhale, flat disc --- */
   const sy = horizon - H*0.012 - lv*H*0.055;
-  g.fillStyle=`rgba(255,233,168,${0.18+lv*0.22})`;
-  g.beginPath(); g.arc(W*0.30,sy,H*0.085,0,6.2832); g.fill();
-  g.fillStyle=P.sun; g.beginPath(); g.arc(W*0.30,sy,H*0.042,0,6.2832); g.fill();
+  g.fillStyle=P.sun; g.beginPath(); g.arc(W*0.30,sy,H*0.046,0,6.2832); g.fill();
 
   /* --- clouds and birds: independent of the breath, so the frame is
          never still even at the top of a hold --- */
@@ -185,19 +183,22 @@ function draw(now){
   g.fillStyle=pair(P.seaNear,lv); g.fillRect(0,horizon+H*0.055,W,H*0.14);
 
   // The waterline. This is the breath, and it is the only thing that is.
-  const wlHi = horizon+H*0.195, wlLo = H*0.74;
-  const waterline = wlLo + (wlHi-wlLo)*lv;
+  // yFar = the water's edge at its most distant (fully exhaled).
+  // yNear = the edge at its closest, up the beach (fully inhaled).
+  // Inhaling brings the sea TOWARDS you, which is DOWN the screen.
+  const yFar = horizon+H*0.17, yNear = H*0.80;
+  const waterline = yFar + (yNear-yFar)*lv;
 
   g.fillStyle=pair(P.seaNear,lv);
-  g.fillRect(0,horizon+H*0.195,W,waterline-(horizon+H*0.195));
+  g.fillRect(0,yFar,W,waterline-yFar);
 
   // wave crests: stylised flat bars, scrolling in at a constant pace
-  for(let i=0;i<9;i++){
-    const prog=((t*0.17+i/9)%1);
-    const y=horizon+H*0.06+prog*(waterline-horizon-H*0.06);
-    const w=W*(0.3+prog*0.75), x=(((i*137)%100)/100)*(W-w*0.4)-w*0.2;
-    g.fillStyle=`rgba(253,241,220,${0.05+prog*0.17})`;
-    g.fillRect(x,y,w,Math.max(1.5,H*0.0045+prog*H*0.003));
+  for(let i=0;i<6;i++){
+    const prog=((t*0.15+i/6)%1);
+    const y=horizon+H*0.05+prog*(waterline-horizon-H*0.05);
+    const w=W*(0.3+prog*0.7), x=(((i*137)%100)/100)*(W-w*0.4)-w*0.2;
+    g.fillStyle=`rgba(253,241,220,${0.04+prog*0.13})`;
+    g.fillRect(x,y,w,Math.max(1.5,H*0.004+prog*H*0.003));
   }
 
   /* --- the foam edge: a scalloped flat band, the sharpest shape in frame --- */
@@ -217,16 +218,17 @@ function draw(now){
   g.fillStyle=pair(P.sandDry,lv);
   g.beginPath(); g.moveTo(-4,H+4);
   for(let x=-4;x<=W+4;x+=8){
-    g.lineTo(x, wlHi + H*0.035 + Math.sin(x*0.021)*H*0.008);
+    g.lineTo(x, yNear + H*0.025 + Math.sin(x*0.021)*H*0.008);
   }
   g.lineTo(W+4,H+4); g.closePath();
   g.save(); g.beginPath(); g.rect(0,waterline+H*0.012,W,H); g.clip(); g.fill(); g.restore();
 
   /* --- marker stones: a graduated scale for the waterline, so the
          scene can be read precisely without ever drawing a gauge --- */
-  const marks=[[0.16,0.18],[0.52,0.52],[0.84,0.85]];
+  const marks=[[0.16,0.24],[0.55,0.55],[0.85,0.84]];
   for(const [mx,atLevel] of marks){
-    const my = wlLo + (wlHi-wlLo)*atLevel;
+    const my = yFar + (yNear-yFar)*atLevel;
+    // Covered once the tide has climbed past the mark this stone sits at.
     const submerged = lv > atLevel;
     stone(W*mx, my+H*0.004, H*0.022,
           submerged ? pair(P.seaNear,lv) : P.dune,
@@ -243,10 +245,8 @@ function draw(now){
   g.lineTo(W*0.62,H*0.915); g.lineTo(W+4,H*0.965); g.lineTo(W+4,H+4);
   g.closePath(); g.fill();
   const lean=(lv-0.5)*1.4;
-  grass(W*0.07,H*0.915,H*0.085,lean,P.deepest);
-  grass(W*0.21,H*0.945,H*0.062,lean,P.deepest);
-  grass(W*0.72,H*0.928,H*0.072,lean,P.deepest);
-  grass(W*0.92,H*0.958,H*0.055,lean,P.deepest);
+  grass(W*0.07,H*0.918,H*0.055,lean,P.deepest);
+  grass(W*0.80,H*0.935,H*0.044,lean,P.deepest);
 
   if(grain){ g.save(); g.globalAlpha=0.46; g.fillStyle=grain; g.fillRect(0,0,W,H); g.restore(); }
   const vg=g.createRadialGradient(W*0.5,H*0.45,H*0.2,W*0.5,H*0.5,H*0.82);
