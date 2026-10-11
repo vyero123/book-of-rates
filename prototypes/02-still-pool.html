@@ -123,11 +123,17 @@ function buildGrain(){
 // One full lap per breath. The radius marches steadily inward across the
 // whole session, so the brush arrives at the centre exactly as the last
 // breath ends: the "destination rate" made spatial.
-const R_OUT = 0.44, R_IN = 0.045, WOBBLE = 0.075;
+// Two breaths per lap, so the breath shows up as the line visibly bulging
+// out and drawing back in twice per revolution. At exactly one lap per
+// breath the radial signal collapses into "which side of the circle you
+// are on", which is no better than a dot going round — the thing we are
+// trying to get away from.
+const LAPS = CYCLES/2;
+const R_OUT = 0.34, R_IN = 0.05, WOBBLE = 0.045;
 
 function spiralPoint(t, cx, cy, R){
   const q = Math.min(t/SESSION, 1);
-  const theta = -Math.PI/2 + q*CYCLES*Math.PI*2;          // one turn per breath
+  const theta = -Math.PI/2 + q*LAPS*Math.PI*2;
   const base  = (R_OUT + (R_IN-R_OUT)*q) * R;
   const r     = base + (level(t)-0.5)*WOBBLE*R*2;
   return [cx + Math.cos(theta)*r, cy + Math.sin(theta)*r*0.72]; // squashed: we see the pool at an angle
@@ -176,9 +182,7 @@ function draw(now){
   g.fillStyle=mix(P.skyMid,P.skyLow,lv); g.fillRect(0,H*0.34,W,H*0.12);
 
   /* --- moon: fixed, flat, no glow gradient. The one bright shape. --- */
-  const mx=W*0.70, my=H*0.145, mr=H*0.044;
-  g.fillStyle=`rgba(242,227,200,${0.14+lv*0.12})`;
-  g.beginPath(); g.arc(mx,my,mr*1.9,0,6.2832); g.fill();
+  const mx=W*0.70, my=H*0.145, mr=H*0.030;
   g.fillStyle=P.moon; g.beginPath(); g.arc(mx,my,mr,0,6.2832); g.fill();
   g.fillStyle=P.skyTop; g.beginPath(); g.arc(mx+mr*0.52,my-mr*0.3,mr*0.88,0,6.2832); g.fill();
 
@@ -210,7 +214,7 @@ function draw(now){
   }
 
   /* --- ink: stamped into the persistent layer, so the drawing builds --- */
-  const cx=W*0.5, cy=shore+(H-shore)*0.46, R=Math.min(W,H*0.62);
+  const cx=W*0.5, cy=shore+(H-shore)*0.37, R=Math.min(W,H*0.62);
   if(running && t<=SESSION){
     const a=spiralPoint(t,cx,cy,R);
     if(lastA){
