@@ -167,7 +167,13 @@ export class Transport {
     if (this._pump || this._fallback) return;
     try {
       const url = URL.createObjectURL(new Blob([PUMP_SRC], {type:'application/javascript'}));
-      await this.ctx.audioWorklet.addModule(url);
+      // A hung addModule would leave start() awaiting forever and the
+      // session would never begin. Race it against a timeout and fall
+      // back to the timer pump.
+      await Promise.race([
+        this.ctx.audioWorklet.addModule(url),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('worklet timeout')), 1500))
+      ]);
       URL.revokeObjectURL(url);
       const node = new AudioWorkletNode(this.ctx, 'bor-pump');
       // A worklet only runs while connected. Route it into a silent gain

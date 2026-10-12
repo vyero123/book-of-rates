@@ -425,7 +425,18 @@ requestAnimationFrame(frame);
 
 /* ---------- never leave sound running ---------- */
 addEventListener('pagehide', () => { if (tp) tp.stop(); if (music) music.end(); closeAudio(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) finish(false); });
+/* Hiding the tab pauses the session and silences it; it does not throw
+   the session away. Someone who glances at a notification mid-journey
+   should come back to where they were. Audio is always silenced, because
+   it plays in a real room. */
+document.addEventListener('visibilitychange', () => {
+  if (!tp) return;
+  if (document.hidden){
+    if (tp.state === 'running'){ tp.pause(); fadeOut(0.4); d('phase').textContent = 'paused'; }
+  } else if (tp.state === 'paused'){
+    tp.resume(); if (PREF.sound) fadeIn(1.2);
+  }
+});
 window.__bor = { finish, buildPlan };
 
 /* offline: register once, fail quietly */
