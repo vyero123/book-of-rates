@@ -191,6 +191,7 @@ import { JOURNEYS, journeyById, journeyPlan, ENTRY, LENGTHS } from './js/protoco
 import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
+import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { requireGate, gatePassed, retentionAllowed } from './js/gate.js';
 
 /* ---------- preferences ---------- */
@@ -270,19 +271,20 @@ if (!retentionAllowed() && gatePassed()){
 
 /* ================= one render loop for everything ================= */
 const bg = $('bg'), bgx = bg.getContext('2d');
-let W=0, H=0, grain=null;
+let W=0, H=0, grain=null, grainTile=null;
 function fitBg(){
-  const dpr = Math.min(window.devicePixelRatio||1, 2);
-  W = bg.clientWidth; H = bg.clientHeight;
-  bg.width = Math.round(W*dpr); bg.height = Math.round(H*dpr);
-  bgx.setTransform(dpr,0,0,dpr,0,0);
-  const n=120, tc=document.createElement('canvas'); tc.width=tc.height=n;
-  const tg=tc.getContext('2d'), d=tg.createImageData(n,n);
-  for (let i=0;i<n*n;i++){ const v=118+(Math.random()*76|0);
-    d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=20+(Math.random()*24|0); }
-  tg.putImageData(d,0,0); grain = bgx.createPattern(tc,'repeat');
+  const r = sizeCanvas(bg, bgx, 900_000, 2);   // the background is scenery, not detail
+  W = r.W; H = r.H;
+  if (!grainTile){
+    const n=120; grainTile = offscreen(n,n);
+    const tg=grainTile.getContext('2d'), d=tg.createImageData(n,n);
+    for (let i=0;i<n*n;i++){ const v=118+(Math.random()*76|0);
+      d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=20+(Math.random()*24|0); }
+    tg.putImageData(d,0,0);
+  }
+  grain = bgx.createPattern(grainTile,'repeat');
 }
-addEventListener('resize', fitBg); fitBg();
+onResizeDebounced(fitBg); fitBg();
 
 /* background cycles through the worlds, turning a page between them */
 const ORDER = ['glide','swell','gallop'];
@@ -308,6 +310,7 @@ if ('IntersectionObserver' in window){
 let rr = 0;
 
 function frame(now){
+  if (!running) return;        // never keep drawing a page we have left
   const t = now/1000;
 
   /* --- background --- */
@@ -393,10 +396,22 @@ async function openGateAgain(){
   m.openGate(() => {});
 }
 
-/* carry preferences through to the session page */
+/* Leaving for a journey: stop the loop and hand back every canvas. iOS
+   may keep this document alive in the back/forward cache while the next
+   page allocates its own surfaces, and two full sets at once is exactly
+   what gets a tab killed. */
+let running = true;
+function teardown(){
+  running = false;
+  bgTurn.release();
+  previews.forEach(p => release(p.cv));
+  releaseAll();
+}
+addEventListener('pagehide', teardown);
 document.querySelectorAll('a.entry').forEach(a => {
-  a.addEventListener('click', () => save());
+  a.addEventListener('click', () => { save(); teardown(); });
 });
+window.__bor = { diag };
 
 /* offline: register once, fail quietly */
 if ('serviceWorker' in navigator){

@@ -161,6 +161,7 @@ import { sceneForBeats, SCENES } from './js/scenes.js';
 import { LEVEL_SCENES } from './js/levels.js';
 import { PageTurn } from './js/pageturn.js';
 import { requireGate } from './js/gate.js';
+import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 
 /* ---------- preferences: remembered, never scored ---------- */
 const JOURNEY = journeyById(new URLSearchParams(location.search).get('j') || '');
@@ -180,19 +181,22 @@ const savePref = () => { try { localStorage.setItem('bor.pref', JSON.stringify(P
 
 /* ---------- canvas ---------- */
 const cv = document.getElementById('c'), g = cv.getContext('2d');
-let W=0, H=0, DPR=1, grain=null;
+let W=0, H=0, grain=null, grainTile=null;
 function fit(){
-  DPR = Math.min(window.devicePixelRatio||1, 2.5);
-  W = cv.clientWidth; H = cv.clientHeight;
-  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
-  g.setTransform(DPR,0,0,DPR,0,0);
-  const n=140, tc=document.createElement('canvas'); tc.width=tc.height=n;
-  const tg=tc.getContext('2d'), d=tg.createImageData(n,n);
-  for (let i=0;i<n*n;i++){ const v=118+(Math.random()*76|0);
-    d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=22+(Math.random()*26|0); }
-  tg.putImageData(d,0,0); grain = g.createPattern(tc,'repeat');
+  // Budgeted, not devicePixelRatio x whatever. See js/surface.js.
+  const r = sizeCanvas(cv, g, 1_300_000, 2);
+  W = r.W; H = r.H;
+  if (!grainTile){
+    const n = 140;
+    grainTile = offscreen(n, n);
+    const tg = grainTile.getContext('2d'), d = tg.createImageData(n,n);
+    for (let i=0;i<n*n;i++){ const v=118+(Math.random()*76|0);
+      d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=22+(Math.random()*26|0); }
+    tg.putImageData(d,0,0);
+  }
+  grain = g.createPattern(grainTile, 'repeat');   // tile is built ONCE
 }
-addEventListener('resize', fit); fit();
+onResizeDebounced(fit); fit();
 
 /* ---------- state ---------- */
 let tp=null, music=null, session=null, turn=new PageTurn();
@@ -424,7 +428,13 @@ function frame(now){
 requestAnimationFrame(frame);
 
 /* ---------- never leave sound running ---------- */
-addEventListener('pagehide', () => { if (tp) tp.stop(); if (music) music.end(); closeAudio(); });
+addEventListener('pagehide', () => {
+  if (tp) tp.stop();
+  if (music) music.end();
+  closeAudio();
+  turn.release();
+  releaseAll();          // hand every backing store back before we leave
+});
 /* Hiding the tab pauses the session and silences it; it does not throw
    the session away. Someone who glances at a notification mid-journey
    should come back to where they were. Audio is always silenced, because
@@ -437,7 +447,7 @@ document.addEventListener('visibilitychange', () => {
     tp.resume(); if (PREF.sound) fadeIn(1.2);
   }
 });
-window.__bor = { finish, buildPlan };
+window.__bor = { finish, buildPlan, diag, turn, get tp(){ return tp; } };
 
 /* offline: register once, fail quietly */
 if ('serviceWorker' in navigator){

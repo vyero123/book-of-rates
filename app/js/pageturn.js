@@ -14,8 +14,11 @@
  * underneath.
  */
 
+import { offscreen, release } from './surface.js';
+
 const PAPER  = '#F3EAD7';
 const INK    = 'rgba(20,12,26,0.30)';
+
 const ease   = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2, 3)/2;
 
 export class PageTurn {
@@ -23,19 +26,19 @@ export class PageTurn {
     this.duration = duration;
     this.active = false;
     this.p = 0;
-    this.snap = document.createElement('canvas');
-    this.sg = this.snap.getContext('2d');
+    this.snap = null;      // allocated only while a turn is running
+    this.sg = null;
   }
 
   /** Capture the frame currently on screen as the face of the page. */
   begin(canvas){
-    if (this.snap.width !== canvas.width || this.snap.height !== canvas.height){
-      this.snap.width = canvas.width;
-      this.snap.height = canvas.height;
-    }
-    this.sg.setTransform(1,0,0,1,0,0);
-    this.sg.clearRect(0,0,this.snap.width,this.snap.height);
-    this.sg.drawImage(canvas, 0, 0);
+    // Half resolution. The page is in motion for the whole turn, so the
+    // loss is invisible — and it is a quarter of the backing store. On an
+    // iPhone a full-size snapshot is several megabytes held permanently.
+    this.release();
+    this.snap = offscreen(Math.max(1, canvas.width >> 1), Math.max(1, canvas.height >> 1));
+    this.sg = this.snap.getContext('2d');
+    this.sg.drawImage(canvas, 0, 0, this.snap.width, this.snap.height);
     this.active = true;
     this.p = 0;
     this.t0 = performance.now()/1000;
@@ -46,7 +49,7 @@ export class PageTurn {
     if (!this.active) return false;
     this.p = Math.min(1, (now - this.t0) / this.duration);
     const e = ease(this.p);
-    if (this.p >= 1){ this.active = false; return false; }
+    if (this.p >= 1){ this.active = false; this.release(); return false; }
 
     // leading edge: a bowed vertical line travelling right to left
     const curl = W*0.16;
@@ -62,6 +65,7 @@ export class PageTurn {
     path.closePath();
 
     // the old world, still on the page that is turning
+    if (!this.snap){ this.active = false; return false; }
     g.save();
     g.clip(path);
     g.drawImage(this.snap, 0, 0, W, H);
@@ -93,5 +97,11 @@ export class PageTurn {
       g.fillRect(edgeX, -4, shw, H+8);
     }
     return true;
+  }
+
+  /** Give the snapshot memory back immediately, rather than waiting for a
+   *  garbage collection that may not come before the tab is killed. */
+  release(){
+    if (this.snap){ release(this.snap); this.snap = null; this.sg = null; }
   }
 }

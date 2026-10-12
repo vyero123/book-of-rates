@@ -1,11 +1,12 @@
 /* The Book of Rates — offline.
  * Cache-first for the shell so a session can run with no network at all,
  * with a background refresh so a new deploy is picked up next launch. */
-const CACHE = 'bor-v1';
+const CACHE = 'bor-v2';
 const SHELL = [
   './', './index.html', './journey.html', './manifest.webmanifest', './icon.svg',
   './js/protocols.js', './js/engine.js', './js/audio.js', './js/art.js',
-  './js/scenes.js', './js/levels.js', './js/pageturn.js', './js/gate.js'
+  './js/scenes.js', './js/levels.js', './js/pageturn.js', './js/gate.js',
+  './js/surface.js'
 ];
 
 self.addEventListener('install', e => {
