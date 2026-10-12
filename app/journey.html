@@ -453,9 +453,22 @@ document.addEventListener('visibilitychange', () => {
 });
 window.__bor = { finish, buildPlan, diag, turn, get tp(){ return tp; } };
 
-/* offline: register once, fail quietly */
+/* Offline, without getting stuck on a stale build. When a new worker
+   takes control we reload ONCE, so a deployed fix actually reaches the
+   reader instead of sitting behind yesterday's cache. The guard stops a
+   reload loop. */
 if ('serviceWorker' in navigator){
-  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      if (reg) reg.update();
+    }).catch(()=>{});
+  });
 }
 </script>
 </body>
