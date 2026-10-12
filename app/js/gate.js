@@ -12,8 +12,12 @@
  *     gate that is not operating. They are recorded so that the locked
  *     chapter stays locked if it ever arrives.
  *
- * Written to be read rather than dismissed: each rule must be tapped
- * individually. Three small acts of reading, instead of one blind accept.
+ * ONE acknowledgement, not three taps. That is defensible for THIS
+ * edition specifically, because v1 contains no fast breathing and no
+ * retention: the rules here are posture, water and how to stop, and the
+ * thin caution line stays at the foot of the app. The FULL briefing —
+ * unskippable, with a comprehension check — returns as part of unlocking
+ * "The Breath Held", which is where the real risk sits. (Design doc 2.4a.)
  */
 
 const KEY = 'bor.gate';
@@ -60,17 +64,13 @@ const CSS = `
 #bor-gate .lede{font:400 13px/1.65 ui-sans-serif;color:rgba(243,234,215,.7);margin:0 0 20px}
 #bor-gate .rule{border:1px solid rgba(243,234,215,.16);border-radius:12px;padding:14px 15px;
   margin-bottom:10px;background:rgba(243,234,215,.03)}
-#bor-gate .rule.ack{border-color:#46D6C8;background:rgba(70,214,200,.08)}
+#bor-gate .rule{border-color:rgba(243,234,215,.2)}
 #bor-gate .rule .hd{display:flex;align-items:center;gap:10px}
 #bor-gate .rule .tick{width:19px;height:19px;flex:0 0 19px;border-radius:50%;
-  border:1.5px solid rgba(243,234,215,.4);display:grid;place-items:center;
+  background:#46D6C8;display:grid;place-items:center;
   font:700 10px/1 ui-sans-serif;color:#0C0716}
-#bor-gate .rule.ack .tick{background:#46D6C8;border-color:#46D6C8}
 #bor-gate .rule h3{margin:0;font:400 16px/1.25 ui-serif,Georgia,serif}
 #bor-gate .rule p{margin:9px 0 0 29px;font:400 12px/1.6 ui-sans-serif;color:rgba(243,234,215,.6)}
-#bor-gate .tapme{margin:8px 0 0 29px;font:600 8px/1 ui-sans-serif;letter-spacing:.2em;
-  text-transform:uppercase;color:rgba(243,234,215,.34)}
-#bor-gate .rule.ack .tapme{color:#46D6C8}
 #bor-gate h2{font:600 8.5px/1 ui-sans-serif;letter-spacing:.24em;text-transform:uppercase;
   color:rgba(243,234,215,.4);margin:26px 0 8px}
 #bor-gate .screennote{font:400 11.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.5);margin:0 0 12px}
@@ -97,12 +97,11 @@ export function openGate(onDone){
   el.innerHTML = `<div class="wrap">
     <div class="of">The Book of Rates</div>
     <h1>Before you begin</h1>
-    <p class="lede">Three rules. Tap each one — they are short, and they are the part of this
-      that actually matters.</p>
+    <p class="lede">Three rules. They are short, and they are the part of this that
+      actually matters.</p>
     ${RULES.map(r => `<div class="rule" data-r="${r.id}">
         <div class="hd"><div class="tick">✓</div><h3>${r.t}</h3></div>
         <p>${r.d}</p>
-        <div class="tapme">Tap to acknowledge</div>
       </div>`).join('')}
 
     <h2>One more thing</h2>
@@ -112,31 +111,14 @@ export function openGate(onDone){
       so that the one locked chapter stays locked if it is ever written.</p>
     ${SCREEN.map((s,i) => `<label><input type="checkbox" data-s="${i}"><span>${s}</span></label>`).join('')}
 
-    <button class="go" id="bor-gate-go">ACKNOWLEDGE ALL THREE</button>
+    <button class="go ready" id="bor-gate-go">I UNDERSTAND — BEGIN</button>
     <p class="foot">This is not medical advice. If you are unsure whether breathing exercises
       are right for you, ask a doctor.</p>
   </div>`;
   document.body.appendChild(el);
 
-  const acked = new Set();
   const go = el.querySelector('#bor-gate-go');
-  const refresh = () => {
-    const ready = acked.size === RULES.length;
-    go.classList.toggle('ready', ready);
-    go.textContent = ready ? 'BEGIN' : `ACKNOWLEDGE ALL THREE (${acked.size}/3)`;
-  };
-  el.querySelectorAll('.rule').forEach(r => {
-    r.onclick = () => {
-      const id = r.dataset.r;
-      if (acked.has(id)){ acked.delete(id); r.classList.remove('ack'); }
-      else { acked.add(id); r.classList.add('ack'); }
-      refresh();
-    };
-  });
-  refresh();
-
   go.onclick = () => {
-    if (acked.size !== RULES.length) return;
     const flags = [...el.querySelectorAll('input[data-s]')]
       .map((c,i) => c.checked ? SCREEN[i] : null).filter(Boolean);
     save({ rules:true, screened:true, anyFlag: flags.length > 0, flags, at: Date.now() });
