@@ -118,6 +118,7 @@ import { Transport, buildSession, query, levelAt, rateTrack } from './js/engine.
 import { journeyById, journeyPlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
 import { sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
+import { requireGate } from './js/gate.js';
 
 /* ---------- preferences: remembered, never scored ---------- */
 const JOURNEY = journeyById(new URLSearchParams(location.search).get('j') || '');
@@ -199,6 +200,7 @@ d('stop').onclick  = () => finish(false);
 d('again').onclick = () => { location.href = './index.html'; };
 
 async function begin(){
+  if (requireGate(() => begin())) return;   // rules first, always
   d('start').classList.add('gone');
   session = buildPlan();
   inkTrail = [];

@@ -180,10 +180,20 @@ const gallop = {
     const breathLift = smooth(lv)*H*0.030;
     const horizon = H*0.40 + breathLift + Math.sin(stride)*H*0.006;
 
-    band(g, W, 0, horizon*0.56, pair(P.skyHi, lv));
-    band(g, W, horizon*0.56, horizon+2, pair(P.skyLo, lv));
+    band(g, W, 0, horizon*0.50, pair(P.skyHi, lv));
+    band(g, W, horizon*0.50, horizon*0.74, mix(pair(P.skyHi, lv), pair(P.skyLo, lv), 0.5));
+    band(g, W, horizon*0.74, horizon+2, pair(P.skyLo, lv));
 
-    const sx = W*0.70, sy = horizon*0.42;
+    // flat cloud bars drifting, so the sky band is not an empty slab
+    for (let i = 0; i < 4; i++){
+      const cw = W*(0.38 + (i%3)*0.16);
+      const cx = ((i*W*0.7 - t*9) % (W + cw*2)) - cw;
+      g.fillStyle = `rgba(243,234,215,${0.07 + (i%2)*0.04})`;
+      g.fillRect(cx, horizon*(0.20 + i*0.11), cw, H*0.012);
+      g.fillRect(cx + cw*0.22, horizon*(0.20 + i*0.11) + H*0.012, cw*0.55, H*0.008);
+    }
+
+    const sx = W*0.70, sy = horizon*0.40;
     g.fillStyle = `rgba(255,243,196,${0.45+lv*0.3})`;
     g.beginPath(); g.arc(sx, sy, H*0.042, 0, TAU); g.fill();
 
@@ -206,8 +216,14 @@ const gallop = {
     const py = z => horizon + k/z;
     const px = (xw, z) => W*0.5 + (xw*k)/z;
 
-    // road edges
-    g.fillStyle = pair(P.road, lv*0.8);
+    if (!this.st) this.st = { off:0, last:t };
+    const S = this.st;
+    const dt = Math.min(0.1, Math.max(0, t - S.last)); S.last = t;
+    S.off = (S.off + dt*1.35) % 1;
+
+    // the road: a lit surface between two darker verges, with ruts that
+    // converge on the vanishing point so the ground reads as ground
+    g.fillStyle = mix(pair(P.road, lv*0.8), '#8A7549', 0.35);
     g.beginPath();
     g.moveTo(px(-0.42, 9), py(9));
     g.lineTo(px(0.42, 9), py(9));
@@ -215,12 +231,26 @@ const gallop = {
     g.lineTo(px(-0.95, 0.45), H+8);
     g.closePath(); g.fill();
 
-    // trees both sides, marching toward the viewer
-    if (!this.st) this.st = { off:0, last:t };
-    const S = this.st;
-    const dt = Math.min(0.1, Math.max(0, t - S.last)); S.last = t;
-    S.off = (S.off + dt*1.35) % 1;
+    for (const rx of [-0.17, 0.17]){
+      g.fillStyle = 'rgba(40,32,20,0.30)';
+      g.beginPath();
+      g.moveTo(px(rx-0.012, 9), py(9));
+      g.lineTo(px(rx+0.012, 9), py(9));
+      g.lineTo(px(rx*2.1+0.055, 0.45), H+8);
+      g.lineTo(px(rx*2.1-0.055, 0.45), H+8);
+      g.closePath(); g.fill();
+    }
+    // stones and ruts rushing past, tied to the same marching offset
+    for (let i = 14; i >= 1; i--){
+      const z = (i - S.off)*0.72;
+      if (z < 0.35) continue;
+      const jx = (hash(i*13)*2-1)*0.36;
+      g.fillStyle = `rgba(28,22,14,${(0.05 + 0.18/z).toFixed(3)})`;
+      const w = (k/z)*0.045, h2 = Math.max(1, (k/z)*0.012);
+      g.fillRect(px(jx, z) - w/2, py(z), w, h2);
+    }
 
+    // trees both sides, marching toward the viewer
     const N = 13;
     for (let i = N; i >= 1; i--){
       const z = (i - S.off)*0.72;
@@ -333,7 +363,8 @@ const glide = {
   energy: 'slow',
   pal: {
     skyHi: ['#2B1B4E','#5B3A6E'], skyMid: ['#8A3B63','#D86B52'], skyLo: ['#C9663F','#F6B04A'],
-    wallL: '#3A1F43', wallR: '#2A1733', floor: ['#4A2440','#7A4A48'],
+    wallL: '#4A2A52', wallLs: '#331B3B', wallR: '#2A1733', wallRs: '#1C0F24',
+    wallLit: '#8A4A5E', talus: '#5A3048', floor: ['#4A2440','#7A4A48'],
     rib: 'rgba(246,176,74,0.16)', fig: '#160C1A', lit: '#F6D9A8'
   },
   state: null,
@@ -355,8 +386,15 @@ const glide = {
     const py = z => horizon + k/z;      // ground plane at unit depth below eye
     const px = (xw, z) => W*0.5 + (xw*k)/z;
 
-    g.fillStyle = pair(P.floor, lv*0.5);
-    g.fillRect(-2, horizon, W+4, H-horizon+4);
+    // floor in discrete depth bands: lighter far, darker near
+    for (let i = 0; i < 5; i++){
+      const z0 = 0.45 + i*1.6, z1 = 0.45 + (i+1)*1.6;
+      const y0 = Math.max(horizon, py(z1)), y1 = py(z0);
+      g.fillStyle = mix(pair(P.floor, lv*0.5), '#2A1024', i/6);
+      g.fillRect(-2, y0, W+4, Math.max(1, y1-y0)+1);
+    }
+    g.fillStyle = mix(pair(P.floor, lv*0.5), '#2A1024', 5/6);
+    g.fillRect(-2, py(0.45), W+4, H);
 
     // transverse ribs on the valley floor, marching toward the viewer
     if (!this.state) this.state = { off: 0, last: t };
@@ -375,30 +413,53 @@ const glide = {
       g.fillRect(px(-half, z), y, px(half, z) - px(-half, z), Math.max(1, k/(z*z)*0.05));
     }
 
-    // Valley walls. Built from the vanishing point outward, following the
-    // ridge, then DOWN the screen edge and back along the bottom — a wall
-    // closed upward instead fills the sky, which is what it did at first.
-    const wall = (sign, fill, hw) => {
+    // Valley walls, built from the vanishing point outward along the ridge,
+    // then DOWN the screen edge and back along the bottom. Closing them
+    // upward instead fills the sky, which is what the first version did.
+    //
+    // Each wall gets three value steps rather than one flat fill: a lit
+    // upper facet, the body, and a talus slope at the foot. Flat colour
+    // reads as depth only when the values are stepped.
+    const ridgePts = (sign, hw) => {
+      const pts = [[W*0.5, horizon]];
+      for (let i = 1; i <= 10; i++){
+        const z = 0.5 + i*0.68;
+        const r = 0.38 + hash(i*7 + (sign>0?11:23))*0.55;
+        const x = px(sign*hw, z), y = py(z) - (k/z)*r*0.5;
+        pts.push([x, y]);
+        if (sign > 0 ? x > W + 10 : x < -10) break;
+      }
+      return pts;
+    };
+    const fillTo = (pts, sign, bottomY, fill) => {
       g.fillStyle = fill;
       g.beginPath();
-      g.moveTo(W*0.5, horizon);
-      let lastX = W*0.5, lastY = horizon;
-      for (let i = 1; i <= 9; i++){
-        const z = 0.55 + i*0.75;
-        const ridge = 0.42 + hash(i*7 + (sign>0?11:23))*0.55;
-        const x = px(sign*hw, z);
-        const y = py(z) - (k/z)*ridge*0.5;
-        g.lineTo(x, y);
-        lastX = x; lastY = y;
-        if (sign > 0 ? x > W + 8 : x < -8) break;
-      }
-      g.lineTo(sign > 0 ? W+8 : -8, lastY);
-      g.lineTo(sign > 0 ? W+8 : -8, H+8);
-      g.lineTo(W*0.5, H+8);
+      pts.forEach(([x,y], i) => i ? g.lineTo(x,y) : g.moveTo(x,y));
+      const last = pts[pts.length-1];
+      g.lineTo(sign > 0 ? W+10 : -10, last[1]);
+      g.lineTo(sign > 0 ? W+10 : -10, bottomY);
+      g.lineTo(W*0.5, bottomY);
       g.closePath(); g.fill();
     };
-    wall(-1, P.wallL, 0.95);
-    wall( 1, P.wallR, 1.05);
+    for (const [sign, hw, body, shade, lit] of
+         [[-1, 0.95, P.wallL, P.wallLs, P.wallLit], [1, 1.08, P.wallR, P.wallRs, null]]){
+      const ridge = ridgePts(sign, hw);
+      fillTo(ridge, sign, H+10, body);
+      // talus: the foot of the wall, a step darker, meeting the floor
+      const foot = ridge.map(([x,y]) => [x, y + (y - horizon)*0.85 + H*0.02]);
+      fillTo(foot, sign, H+10, shade);
+      // one lit facet, on the side the sun is on
+      if (lit){
+        g.fillStyle = lit;
+        g.beginPath();
+        ridge.forEach(([x,y], i) => i ? g.lineTo(x,y) : g.moveTo(x,y));
+        for (let i = ridge.length-1; i >= 0; i--){
+          const [x,y] = ridge[i];
+          g.lineTo(x + sign*W*0.012, y + (y - horizon)*0.22 + H*0.006);
+        }
+        g.closePath(); g.fill();
+      }
+    }
 
     // THE BREATH: the glider climbs on the inhale, sinks on the exhale
     const gy = horizon - H*0.02 - smooth(lv)*H*0.20;

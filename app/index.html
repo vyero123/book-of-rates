@@ -181,6 +181,7 @@
     you would rather start somewhere else.</p>
   <h2>Hand</h2><div class="row" id="optHand"></div>
   <h2>Opening</h2><div class="row" id="optCover"></div>
+  <h2>Safety</h2><div class="row"><button class="opt" id="reGate">Read the rules again</button></div>
   <p class="note" id="noteAbout"></p>
   <button id="sheetClose">Done</button>
 </div>
@@ -190,6 +191,7 @@ import { JOURNEYS, journeyById, journeyPlan, ENTRY, LENGTHS } from './js/protoco
 import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
+import { requireGate, gatePassed, retentionAllowed } from './js/gate.js';
 
 /* ---------- preferences ---------- */
 const PREF = (() => {
@@ -214,7 +216,11 @@ function openBook(){
   $('cover').style.transition = `transform ${ms}ms cubic-bezier(.33,0,.2,1), opacity ${ms}ms ease`;
   coverWrap.classList.add('opening');
   $('contents').classList.add('on');
-  setTimeout(() => coverWrap.classList.add('gone'), ms + 40);
+  setTimeout(() => {
+    coverWrap.classList.add('gone');
+    // the rules are shown once, after the book opens, before anything else
+    requireGate(() => {});
+  }, ms + 40);
   PREF.coverSeen = true; save();
 }
 coverWrap.addEventListener('click', openBook);
@@ -254,6 +260,13 @@ const lockedHTML = `<div class="entry locked">
   </div>`;
 
 $('list').innerHTML = JOURNEYS.map(entryHTML).join('') + (SHOW_LOCKED ? lockedHTML : '');
+// if the reader flagged a condition, say so on the locked chapter rather
+// than leaving them to wonder
+if (!retentionAllowed() && gatePassed()){
+  const n = document.querySelector('.locked .bl');
+  if (n) n.innerHTML += `<br><em style="color:rgba(232,71,60,.8)">From what you told us at the
+    start, this chapter would stay closed for you even once it is written.</em>`;
+}
 
 /* ================= one render loop for everything ================= */
 const bg = $('bg'), bgx = bg.getContext('2d');
@@ -358,6 +371,7 @@ function markSheet(){
     b.classList.toggle('on', String(PREF[b.dataset.k]) === b.dataset.v));
 }
 buildSheet();
+$('reGate').onclick = () => { $('sheet').classList.remove('on'); openGateAgain(); };
 $('optBtn').onclick   = () => $('sheet').classList.add('on');
 $('sheetClose').onclick = () => $('sheet').classList.remove('on');
 $('aboutBtn').onclick = () => {
@@ -373,6 +387,11 @@ $('aboutBtn').onclick = () => {
     `claim nothing about your body.`;
   $('sheet').classList.add('on');
 };
+
+async function openGateAgain(){
+  const m = await import('./js/gate.js');
+  m.openGate(() => {});
+}
 
 /* carry preferences through to the session page */
 document.querySelectorAll('a.entry').forEach(a => {
