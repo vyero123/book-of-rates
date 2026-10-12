@@ -30,6 +30,32 @@
     z-index:30;height:2px;margin:0 34px;background:rgba(243,234,215,.16);pointer-events:none}
   #fill{height:100%;width:0;background:rgba(243,234,215,.7)}
 
+
+  /* --- interaction overlays. Expressive only: nothing here can fail. --- */
+  #slider{position:fixed;top:26%;bottom:22%;width:62px;z-index:35;display:none;
+    touch-action:none}
+  #slider.on{display:block}
+  #slider.left{left:8px} #slider.right{right:8px}
+  #slider .trk{position:absolute;left:50%;top:0;bottom:0;width:4px;margin-left:-2px;
+    border-radius:3px;background:rgba(243,234,215,.22)}
+  #slider .kn{position:absolute;left:50%;width:50px;height:50px;margin-left:-25px;
+    margin-top:-25px;border-radius:50%;background:rgba(243,234,215,.92);
+    box-shadow:0 2px 14px rgba(12,7,22,.5)}
+  #slider .kn::after{content:'';position:absolute;inset:18px;border-radius:50%;
+    background:#14183F}
+  #btns{position:fixed;left:0;right:0;bottom:max(80px,calc(env(safe-area-inset-bottom) + 70px));
+    z-index:35;display:none;justify-content:space-between;padding:0 18px;pointer-events:none}
+  #btns.on{display:flex}
+  #btns button{pointer-events:auto;appearance:none;border:0;width:88px;height:88px;
+    border-radius:50%;background:rgba(243,234,215,.14);color:#F3EAD7;
+    font:600 10px/1.3 ui-sans-serif;letter-spacing:.14em;text-transform:uppercase;
+    box-shadow:0 0 0 1.5px rgba(243,234,215,.35);touch-action:none}
+  #btns button.hit{background:rgba(243,234,215,.42);color:#14183F}
+  #holdHint{position:fixed;left:0;right:0;top:46%;z-index:35;display:none;text-align:center;
+    pointer-events:none;font:500 10px/1.5 ui-sans-serif;letter-spacing:.2em;
+    text-transform:uppercase;color:rgba(243,234,215,.5)}
+  #holdHint.on{display:block}
+
   /* --- start card --- */
   #start{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:28px;
     background:rgba(12,7,22,.30);backdrop-filter:blur(1px);text-align:center}
@@ -79,6 +105,10 @@
 <canvas id="c"></canvas>
 
 <button id="stop" aria-label="Stop"><i></i>STOP</button>
+
+<div id="slider"><div class="trk"></div><div class="kn"></div></div>
+<div id="btns"><button id="btnL">Breathe in</button><button id="btnR">Breathe out</button></div>
+<div id="holdHint">hold anywhere · lift whenever you like</div>
 <div id="cue"><div id="phase"></div><div id="scene"></div></div>
 <div id="bar"><div id="fill"></div></div>
 <div id="caution">Sit or lie down. Never in or near water, or while driving.</div>
@@ -116,12 +146,20 @@ import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeO
   from './js/audio.js';
 import { Transport, buildSession, query, levelAt, rateTrack } from './js/engine.js';
 import { journeyById, journeyPlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
-import { sceneForBeats } from './js/scenes.js';
+import { sceneForBeats, SCENES } from './js/scenes.js';
+import { LEVEL_SCENES } from './js/levels.js';
 import { PageTurn } from './js/pageturn.js';
 import { requireGate } from './js/gate.js';
 
 /* ---------- preferences: remembered, never scored ---------- */
 const JOURNEY = journeyById(new URLSearchParams(location.search).get('j') || '');
+const ALL_SCENES = { ...SCENES, ...LEVEL_SCENES };
+/* A level with a fixed scene keeps it for the whole session: its
+   interaction belongs to that world, so the cascade changes the rate
+   without changing the stage. */
+const pickScene = beats => JOURNEY.fixedScene ? ALL_SCENES[JOURNEY.fixedScene]
+                                              : sceneForBeats(beats);
+const INPUT = { down:false, x:0, y:0, slider:0.5, left:false, right:false };
 const PREF = (() => {
   let p = { entry:'', len:'standard', sound:true, hand:'right' };
   try { Object.assign(p, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
@@ -194,6 +232,56 @@ buildDrawer();
 d('more').onclick = () => d('drawer').classList.add('open');
 d('close').onclick = () => d('drawer').classList.remove('open');
 
+
+/* ---------- interaction overlays ----------
+ * Every one of these is EXPRESSIVE. The session advances on the schedule
+ * whatever the reader does: there is no collision test, no timer, no
+ * score, and lifting your finger never costs anything. */
+const slider = d('slider'), knob = slider.querySelector('.kn');
+function placeKnob(){
+  const r = slider.getBoundingClientRect();
+  knob.style.top = ((1 - INPUT.slider) * r.height) + 'px';
+}
+function sliderFromY(clientY){
+  const r = slider.getBoundingClientRect();
+  INPUT.slider = Math.max(0, Math.min(1, 1 - (clientY - r.top)/r.height));
+  placeKnob();
+}
+let sliding = false;
+slider.addEventListener('pointerdown', e => { sliding = true; slider.setPointerCapture(e.pointerId); sliderFromY(e.clientY); });
+slider.addEventListener('pointermove', e => { if (sliding) sliderFromY(e.clientY); });
+slider.addEventListener('pointerup',   () => { sliding = false; });
+slider.addEventListener('pointercancel', () => { sliding = false; });
+
+const bind = (el, key) => {
+  const on  = e => { INPUT[key] = true;  el.classList.add('hit');   e.preventDefault(); };
+  const off = e => { INPUT[key] = false; el.classList.remove('hit'); };
+  el.addEventListener('pointerdown', on);
+  el.addEventListener('pointerup', off);
+  el.addEventListener('pointerleave', off);
+  el.addEventListener('pointercancel', off);
+};
+bind(d('btnL'), 'left');
+bind(d('btnR'), 'right');
+
+let holdMode = false;
+cv.addEventListener('pointerdown', () => { if (holdMode) INPUT.down = true; });
+addEventListener('pointerup',   () => { INPUT.down = false; });
+addEventListener('pointercancel', () => { INPUT.down = false; });
+
+function showControls(on){
+  const k = on ? JOURNEY.interaction : null;
+  slider.classList.toggle('on', k === 'slider');
+  slider.classList.toggle('left',  PREF.hand === 'left');
+  slider.classList.toggle('right', PREF.hand !== 'left');
+  d('btns').classList.toggle('on', k === 'buttons');
+  holdMode = (k === 'hold');
+  d('holdHint').classList.toggle('on', k === 'hold');
+  if (k === 'slider') placeKnob();
+  if (k === 'hold') setTimeout(() => d('holdHint').classList.remove('on'), 7000);
+}
+showControls(false);
+
 /* ---------- transport ---------- */
 d('begin').onclick = () => begin();
 d('stop').onclick  = () => finish(false);
@@ -205,8 +293,9 @@ async function begin(){
   session = buildPlan();
   inkTrail = [];
   curScene = null;
+  showControls(true);
   const ctx = await initAudio();
-  music = new Music(sceneForBeats(session.stages[0].protocol.cycleBeats).theme);
+  music = new Music(pickScene(session.stages[0].protocol.cycleBeats).theme);
   music.begin();
   tp = new Transport(ctx);
   tp.onBeat = (when, i, info) => music && music.beat(when, i, info);
@@ -221,6 +310,7 @@ async function finish(complete){
   if (music){ music.end(); music = null; }
   fadeOut(1.0);
   setTimeout(() => closeAudio(), 1400);
+  showControls(false);
   d('phase').textContent = ''; d('scene').textContent = '';
   if (complete){ drawInk(); d('end').classList.add('on'); }
   else d('start').classList.remove('gone');
@@ -248,10 +338,10 @@ function drawInk(){
 let lastLv = 0;
 let idleScene = null;
 function drawIdle(t){
-  if (!idleScene) idleScene = sceneForBeats(JOURNEY.fromBeats);
+  if (!idleScene) idleScene = pickScene(JOURNEY.fromBeats);
   // a slow synthetic breath so the opening scene is alive but not pacing
   const lv = 0.5 - 0.5*Math.cos(t*2*Math.PI/13);
-  idleScene.draw({ g, W, H, t, lv, dlv: 0, info:{} });
+  idleScene.draw({ g, W, H, t, lv, dlv: 0, info:{}, input: INPUT });
   if (grain){ g.save(); g.globalAlpha=0.42; g.fillStyle=grain; g.fillRect(0,0,W,H); g.restore(); }
   const vg = g.createRadialGradient(W*0.5,H*0.46,H*0.18,W*0.5,H*0.5,H*0.82);
   vg.addColorStop(0,'rgba(12,7,22,0)'); vg.addColorStop(1,'rgba(12,7,22,0.34)');
@@ -264,7 +354,7 @@ function frame(now){
   if (tp && (tp.state === 'running')){
     const time = tp.time;
     const q = query(session, time);
-    const scene = sceneForBeats(q.protocol.cycleBeats);
+    const scene = pickScene(q.protocol.cycleBeats);
 
     // a rung that changes the scene turns the page
     if (curScene && scene !== curScene) turn.begin(cv);
@@ -272,7 +362,7 @@ function frame(now){
 
     const lv = q.level;
     const dlv = lv - lastLv; lastLv = lv;
-    scene.draw({ g, W, H, t, lv, dlv, info: q });
+    scene.draw({ g, W, H, t, lv, dlv, info: q, input: INPUT });
 
     // grain and vignette over the scenery, never over the UI
     if (grain){ g.save(); g.globalAlpha = 0.42; g.fillStyle = grain; g.fillRect(0,0,W,H); g.restore(); }

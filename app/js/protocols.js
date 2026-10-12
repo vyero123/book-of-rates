@@ -158,7 +158,25 @@ export const JOURNEYS = [
     fromBeats: 22, toBeats: 26, preview: 'glide', needsScreening: false
   },
   {
-    id: 'deep-water', chapter: 'Chapter four', title: 'Deep Water',
+    id: 'kite-line', chapter: 'Chapter four', title: 'The Kite Line',
+    blurb: 'A kite on a long string over a plateau. Pull up to breathe in, let down to breathe out.',
+    fromBeats: 20, toBeats: 24, preview: 'kite', fixedScene: 'kite',
+    interaction: 'slider', needsScreening: false
+  },
+  {
+    id: 'the-run', chapter: 'Chapter five', title: 'The Run',
+    blurb: 'Fast and low between the cliffs. Two buttons, one for each half of the breath.',
+    fromBeats: 15, toBeats: 15, preview: 'flight', fixedScene: 'flight',
+    interaction: 'buttons', needsScreening: false, bpm: 128
+  },
+  {
+    id: 'pearl-diver', chapter: 'Chapter six', title: 'The Pearl Diver',
+    blurb: 'Hold a finger on the water and she goes down with your breath out. Lift it and she comes up — with the pearl either way.',
+    fromBeats: 22, toBeats: 26, preview: 'dive', fixedScene: 'dive',
+    interaction: 'hold', needsScreening: false
+  },
+  {
+    id: 'deep-water', chapter: 'Chapter seven', title: 'Deep Water',
     blurb: 'The slowest passage in the book. For the end of a day.',
     fromBeats: 24, toBeats: 32, preview: 'glide', needsScreening: false
   }

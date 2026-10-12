@@ -24,14 +24,14 @@
 
 import { mix, pair } from './art.js';
 
-const TAU = Math.PI*2;
-const hash = i => { const x = Math.sin(i*127.1)*43758.5453; return x - Math.floor(x); };
-const smooth = x => x*x*(3-2*x);
+export const TAU = Math.PI*2;
+export const hash = i => { const x = Math.sin(i*127.1)*43758.5453; return x - Math.floor(x); };
+export const smooth = x => x*x*(3-2*x);
 
 /* ---------- shared flat primitives ---------- */
-function band(g, W, y0, y1, fill){ g.fillStyle = fill; g.fillRect(-2, y0, W+4, y1-y0+2); }
+export function band(g, W, y0, y1, fill){ g.fillStyle = fill; g.fillRect(-2, y0, W+4, y1-y0+2); }
 
-function cloudLobes(g, cx, cy, s, fill){
+export function cloudLobes(g, cx, cy, s, fill){
   g.fillStyle = fill; g.beginPath();
   for (const [dx,dy,r] of [[-1.5,.15,.55],[-.6,-.25,.78],[.35,-.42,.95],[1.2,-.1,.62],[1.9,.2,.42]]){
     g.moveTo(cx+dx*s, cy+dy*s); g.arc(cx+dx*s, cy+dy*s, r*s, 0, TAU);
@@ -41,7 +41,7 @@ function cloudLobes(g, cx, cy, s, fill){
 }
 
 /* A conifer as a stack of flat triangles — no outline, no gradient. */
-function conifer(g, x, baseY, h, w, fill){
+export function conifer(g, x, baseY, h, w, fill){
   g.fillStyle = fill;
   const tiers = 4;
   for (let i = 0; i < tiers; i++){
@@ -392,7 +392,7 @@ const glide = {
     for (let i = 0; i < 5; i++){
       const z0 = 0.45 + i*1.6, z1 = 0.45 + (i+1)*1.6;
       const y0 = Math.max(horizon, py(z1)), y1 = py(z0);
-      g.fillStyle = mix(pair(P.floor, lv*0.5), '#3A1A30', i/7);
+      g.fillStyle = mix(pair(P.floor, lv*0.5), '#4A2440', i/7);
       g.fillRect(-2, y0, W+4, Math.max(1, y1-y0)+1);
     }
     g.fillStyle = mix(pair(P.floor, lv*0.5), '#3A1A30', 5/7);
