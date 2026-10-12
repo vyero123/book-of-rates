@@ -59,74 +59,55 @@ function conifer(g, x, baseY, h, w, fill){
 
 /* Original horse-and-rider silhouette. Deliberately generic: no tack
    detail, no costume, nothing that reads as any particular character. */
-function horseAndRider(g, x, y, s, legPhase, fill){
-  // Proportions matter more than detail in a silhouette: legs are about as
-  // long as the barrel is deep, the chest sits forward of the hip, and the
-  // neck leaves the body at a diagonal. The first version had a round
-  // barrel on short legs and read as a blob.
-  g.fillStyle = fill;
-  const backY = y - s*0.92;          // top line of the back
-  const bellyY = y - s*0.66;         // underside of the barrel
+/* The horse, seen from the saddle. A side-on silhouette demands anatomy
+ * to be right and reads as a blob when it is not; from up here the animal
+ * is carried by two ears and the crest of a neck, which is both far more
+ * legible and far more immersive. Original, generic, no tack detail. */
+function neckAndEars(g, W, H, cx, poll, bob, fill, mane){
+  const baseW = W*0.30, pollW = W*0.085;
+  const lean = Math.sin(bob*0.5)*W*0.012;
 
-  // legs first, so the body overlaps them
-  for (let i = 0; i < 4; i++){
-    const front = i < 2;
-    const ph = legPhase + (front ? 0 : Math.PI*0.85) + (i%2 ? 0.9 : 0);
-    const lx = x + (front ? s*0.44 : -s*0.40);
-    const sw = Math.sin(ph), lift = Math.max(0, Math.cos(ph))*0.55;
-    const hoofX = lx + sw*s*0.34, hoofY = y - lift*s*0.26;
+  // the neck: a tapering wedge from the bottom edge up to the poll
+  g.fillStyle = fill;
+  g.beginPath();
+  g.moveTo(cx - baseW, H + 6);
+  g.bezierCurveTo(cx - baseW*0.78, poll + (H-poll)*0.45,
+                  cx - pollW*1.5 + lean, poll + (H-poll)*0.16,
+                  cx - pollW + lean, poll);
+  g.lineTo(cx + pollW + lean, poll);
+  g.bezierCurveTo(cx + pollW*1.5 + lean, poll + (H-poll)*0.16,
+                  cx + baseW*0.78, poll + (H-poll)*0.45,
+                  cx + baseW, H + 6);
+  g.closePath(); g.fill();
+
+  // mane along the crest: flat tapering flicks, lagging the bob
+  g.fillStyle = mane;
+  for (let i = 0; i < 9; i++){
+    const f = i/8;
+    const y = poll + (H - poll)*f*0.72;
+    const w = pollW + (baseW - pollW)*f*0.8;
+    const flick = Math.sin(bob*0.5 - f*1.8)*W*0.020*(0.4 + f);
     g.beginPath();
-    g.moveTo(lx - s*0.075, bellyY);
-    g.lineTo(lx + s*0.075, bellyY);
-    g.lineTo(hoofX + s*0.05, hoofY);
-    g.lineTo(hoofX - s*0.05, hoofY);
+    g.moveTo(cx - w + lean*(1-f), y);
+    g.lineTo(cx - w - W*0.055 + flick, y + H*0.022);
+    g.lineTo(cx - w + lean*(1-f), y + H*0.030);
     g.closePath(); g.fill();
   }
 
-  // barrel: a flattened body, deeper at the chest than the hip
-  g.beginPath();
-  g.moveTo(x - s*0.52, bellyY - s*0.06);
-  g.lineTo(x - s*0.46, backY + s*0.04);
-  g.lineTo(x + s*0.34, backY);
-  g.lineTo(x + s*0.56, bellyY - s*0.10);
-  g.lineTo(x + s*0.40, bellyY + s*0.02);
-  g.lineTo(x - s*0.38, bellyY + s*0.02);
-  g.closePath(); g.fill();
-
-  // neck and head, leaving the chest on a diagonal
-  g.beginPath();
-  g.moveTo(x + s*0.38, backY + s*0.02);
-  g.lineTo(x + s*0.80, y - s*1.42);
-  g.lineTo(x + s*1.02, y - s*1.44);
-  g.lineTo(x + s*1.06, y - s*1.28);
-  g.lineTo(x + s*0.86, y - s*1.22);
-  g.lineTo(x + s*0.60, bellyY - s*0.08);
-  g.closePath(); g.fill();
-
-  // tail
-  g.beginPath();
-  g.moveTo(x - s*0.46, backY + s*0.08);
-  g.lineTo(x - s*0.92, y - s*0.84);
-  g.lineTo(x - s*0.86, y - s*0.56);
-  g.lineTo(x - s*0.42, bellyY - s*0.04);
-  g.closePath(); g.fill();
-
-  // rider: seated, leaning slightly forward
-  const rY = backY - s*0.02;
-  g.beginPath();
-  g.moveTo(x - s*0.10, rY);
-  g.lineTo(x + s*0.16, rY);
-  g.lineTo(x + s*0.24, rY - s*0.44);
-  g.lineTo(x + s*0.02, rY - s*0.46);
-  g.closePath(); g.fill();
-  g.beginPath(); g.arc(x + s*0.17, rY - s*0.56, s*0.115, 0, TAU); g.fill();
-  // upper arm reaching to the neck
-  g.beginPath();
-  g.moveTo(x + s*0.16, rY - s*0.36);
-  g.lineTo(x + s*0.46, rY - s*0.16);
-  g.lineTo(x + s*0.44, rY - s*0.06);
-  g.lineTo(x + s*0.13, rY - s*0.26);
-  g.closePath(); g.fill();
+  // ears: two flat triangles at the poll, angled apart and twitching
+  g.fillStyle = fill;
+  [-1, 1].forEach(sgn => {
+    const tw = Math.sin(bob*0.37 + (sgn>0?1.3:0))*0.10;
+    const bx = cx + lean + sgn*pollW*0.62;
+    const h = H*0.052;
+    g.save(); g.translate(bx, poll); g.rotate(sgn*(0.17 + tw));
+    g.beginPath();
+    g.moveTo(-W*0.022, 0);
+    g.lineTo(0, -h);
+    g.lineTo(W*0.020, 0);
+    g.closePath(); g.fill();
+    g.restore();
+  });
 }
 
 /* Original small boat: hull, mast, sail. */
@@ -186,65 +167,78 @@ const gallop = {
   energy: 'fast',
   pal: {
     skyHi: ['#2E4A3C','#4E7A52'], skyLo: ['#6E9A5E','#C9D98A'],
-    far:'#2A4436', mid:'#1C3328', near:'#122018', ground:['#3A3326','#6B5A37'],
-    fig:'#0B1410', dust:'rgba(201,217,138,0.16)'
+    far:'#2A4436', mid:'#1C3328', near:'#122018',
+    road:['#3A3326','#6B5A37'], fig:'#0B1410', mane:'#060C08',
+    dust:'rgba(201,217,138,0.14)'
   },
   draw(c){
     const { g, W, H, t, lv } = c;
     const P = this.pal;
-    const horizon = H*0.52;
-    band(g, W, 0, horizon*0.55, pair(P.skyHi, lv));
-    band(g, W, horizon*0.55, horizon+2, pair(P.skyLo, lv));
 
-    const sx = W*0.70, sy = horizon*0.40 - lv*H*0.02;
-    g.fillStyle = `rgba(255,243,196,${0.5+lv*0.3})`;
-    g.beginPath(); g.arc(sx, sy, H*0.045, 0, TAU); g.fill();
+    // the gallop bob is fast; the breath moves the whole camera slowly
+    const stride = t*7.6;
+    const breathLift = smooth(lv)*H*0.030;
+    const horizon = H*0.40 + breathLift + Math.sin(stride)*H*0.006;
 
-    g.fillStyle = P.ground[0]; g.fillRect(-2, horizon, W+4, H-horizon+4);
+    band(g, W, 0, horizon*0.56, pair(P.skyHi, lv));
+    band(g, W, horizon*0.56, horizon+2, pair(P.skyLo, lv));
 
-    // three depths of trees at different parallax speeds
-    const layers = [
-      { sp: 60,  y: horizon+H*0.010, h: H*0.16, w: W*0.030, fill: P.far,  n: 9,  seed: 3 },
-      { sp: 130, y: horizon+H*0.055, h: H*0.24, w: W*0.045, fill: P.mid,  n: 7,  seed: 31 },
-      { sp: 320, y: horizon+H*0.160, h: H*0.40, w: W*0.075, fill: P.near, n: 5,  seed: 77 }
-    ];
-    const drawTrees = L => {
-      const span = W/L.n*1.6;
-      const total = span*(L.n+2);
-      const scroll = (t*L.sp) % total;
-      for (let i = 0; i <= L.n+2; i++){
-        const xx = i*span - scroll;
-        if (xx < -span || xx > W+span) continue;
-        const jitter = hash(i + Math.floor(t*L.sp/total)*(L.n+2) + L.seed);
-        conifer(g, xx, L.y + jitter*H*0.012, L.h*(0.8+jitter*0.45), L.w*(0.8+jitter*0.4), L.fill);
-      }
-    };
-    drawTrees(layers[0]); drawTrees(layers[1]);
+    const sx = W*0.70, sy = horizon*0.42;
+    g.fillStyle = `rgba(255,243,196,${0.45+lv*0.3})`;
+    g.beginPath(); g.arc(sx, sy, H*0.042, 0, TAU); g.fill();
 
-    // road
-    const roadY = H*0.78;
-    g.fillStyle = pair(P.ground, lv*0.6);
+    g.fillStyle = pair(P.road, lv*0.5);
+    g.fillRect(-2, horizon, W+4, H-horizon+4);
+
+    // perspective: the road and the trees recede to the vanishing point,
+    // so the world comes AT the viewer rather than sliding past
+    const k = H*0.40;
+    const py = z => horizon + k/z;
+    const px = (xw, z) => W*0.5 + (xw*k)/z;
+
+    // road edges
+    g.fillStyle = pair(P.road, lv*0.8);
     g.beginPath();
-    g.moveTo(-4, H+4); g.lineTo(-4, roadY+H*0.02);
-    g.lineTo(W*0.5, roadY-H*0.01); g.lineTo(W+4, roadY+H*0.03); g.lineTo(W+4, H+4);
+    g.moveTo(px(-0.42, 9), py(9));
+    g.lineTo(px(0.42, 9), py(9));
+    g.lineTo(px(0.95, 0.45), H+8);
+    g.lineTo(px(-0.95, 0.45), H+8);
     g.closePath(); g.fill();
 
-    // dust kicked up behind, independent of the breath
-    for (let i = 0; i < 7; i++){
-      const p = ((t*0.9 + i/7) % 1);
-      const dx = W*0.34 - p*W*0.30, dy = roadY - p*H*0.02;
-      g.fillStyle = P.dust;
-      g.beginPath(); g.arc(dx, dy, H*0.008*(0.4+p*1.4), 0, TAU); g.fill();
+    // trees both sides, marching toward the viewer
+    if (!this.st) this.st = { off:0, last:t };
+    const S = this.st;
+    const dt = Math.min(0.1, Math.max(0, t - S.last)); S.last = t;
+    S.off = (S.off + dt*1.35) % 1;
+
+    const N = 13;
+    for (let i = N; i >= 1; i--){
+      const z = (i - S.off)*0.72;
+      if (z < 0.32) continue;
+      const scale = k/z;
+      for (const sgn of [-1, 1]){
+        const jitter = hash(i*5 + (sgn>0?17:41) + Math.floor(S.off*0 ));
+        const xw = sgn*(0.62 + jitter*0.55);
+        const x = px(xw, z);
+        if (x < -W*0.5 || x > W*1.5) continue;
+        const fill = z > 5 ? P.far : z > 2.2 ? P.mid : P.near;
+        conifer(g, x, py(z), scale*(0.55 + jitter*0.45), scale*0.11, fill);
+      }
     }
 
-    // THE BREATH: the rider rises on the inhale and settles on the exhale.
-    // Small and far back: this style puts a tiny figure in a lot of empty
-    // space, and at that scale a silhouette reads by shape alone.
-    const rise = smooth(lv)*H*0.030;
-    horseAndRider(g, W*0.46, roadY - rise, H*0.052, t*9.0, P.fig);
+    // dust thrown up beside the road, faster than the breath
+    for (let i = 0; i < 6; i++){
+      const p = ((t*1.3 + i/6) % 1);
+      const z = 0.5 + p*1.6;
+      g.fillStyle = P.dust;
+      g.beginPath();
+      g.arc(px((i%2?-1:1)*0.55, z), py(z), (k/z)*0.035*(0.3+p), 0, TAU);
+      g.fill();
+    }
 
-    // the nearest trees pass IN FRONT, which sells the depth
-    drawTrees(layers[2]);
+    // THE BREATH: the neck lengthens and lifts on the inhale
+    const poll = H*0.60 - breathLift*1.4 - Math.sin(stride)*H*0.012;
+    neckAndEars(g, W, H, W*0.5, poll, stride, P.fig, P.mane);
   }
 };
 

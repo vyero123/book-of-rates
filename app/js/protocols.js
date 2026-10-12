@@ -134,6 +134,47 @@ export const LENGTHS = {
 };
 
 /* ================================================================== *
+ *  journeys
+ *
+ *  A journey declares its OWN starting rate. That is part of its
+ *  identity, not something derived from a self-report — so a reader who
+ *  wants the full three-scene descent can choose one without having to
+ *  claim to be more wound up than they are.
+ * ================================================================== */
+export const JOURNEYS = [
+  {
+    id: 'long-descent', chapter: 'Chapter one', title: 'The Long Descent',
+    blurb: 'A ride through the forest, a crossing, and a long glide down.',
+    fromBeats: 16, toBeats: 22, preview: 'gallop', needsScreening: false
+  },
+  {
+    id: 'the-crossing', chapter: 'Chapter two', title: 'The Crossing',
+    blurb: 'Open water, and the slow settling that comes after it.',
+    fromBeats: 20, toBeats: 24, preview: 'swell', needsScreening: false
+  },
+  {
+    id: 'high-valley', chapter: 'Chapter three', title: 'The High Valley',
+    blurb: 'Already quiet. One long glide, and nothing to do but follow it.',
+    fromBeats: 22, toBeats: 26, preview: 'glide', needsScreening: false
+  },
+  {
+    id: 'deep-water', chapter: 'Chapter four', title: 'Deep Water',
+    blurb: 'The slowest passage in the book. For the end of a day.',
+    fromBeats: 24, toBeats: 32, preview: 'glide', needsScreening: false
+  }
+];
+
+export function journeyById(id){ return JOURNEYS.find(j => j.id === id) || JOURNEYS[0]; }
+
+/** Rungs for a journey. An explicit entry override is honoured only if the
+ *  reader has deliberately chosen one; otherwise the journey's own
+ *  starting rate is used. */
+export function journeyPlan(journey, entryOverride){
+  const from = (entryOverride && ENTRY[entryOverride]) ? ENTRY[entryOverride].beats : journey.fromBeats;
+  return plan({ fromBeats: from, toBeats: journey.toBeats });
+}
+
+/* ================================================================== *
  *  levels
  * ================================================================== */
 export const LEVELS = [

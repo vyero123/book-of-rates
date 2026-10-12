@@ -1,0 +1,14 @@
+{
+  "name": "The Book of Rates",
+  "short_name": "Book of Rates",
+  "description": "Guided breathing journeys, paced by cascade.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14183F",
+  "theme_color": "#14183F",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

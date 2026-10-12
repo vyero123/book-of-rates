@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14183F">
+<link rel="manifest" href="manifest.webmanifest">
+<title>The Book of Rates</title>
+<style>
+  :root{ --paper:#F3EAD7; --ink:#14183F; --deep:#0C0716; --jade:#46D6C8; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--deep);
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif;
+    -webkit-font-smoothing:antialiased;color:var(--paper)}
+
+  /* ---------- the living background, shared by everything ---------- */
+  #bg{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  #scrim{position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(180deg, rgba(12,7,22,.30) 0%, rgba(12,7,22,.52) 42%, rgba(12,7,22,.80) 100%)}
+
+  /* ---------- the cover ---------- */
+  #coverWrap{position:fixed;inset:0;z-index:40;perspective:1600px;background:var(--deep)}
+  #cover{position:absolute;inset:0;transform-origin:left center;
+    background:
+      radial-gradient(120% 90% at 20% 10%, rgba(243,234,215,.07), transparent 60%),
+      linear-gradient(160deg,#1B2150 0%,#14183F 45%,#0E1130 100%);
+    display:grid;place-items:center;padding:34px;text-align:center;
+    box-shadow:inset -14px 0 28px rgba(0,0,0,.45)}
+  #cover::after{content:'';position:absolute;left:0;top:0;bottom:0;width:16px;
+    background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,0))}
+  #coverWrap.opening #cover{transform:rotateY(-142deg);opacity:.15}
+  #coverWrap.gone{display:none}
+  .mark{width:92px;height:92px;margin:0 auto 20px;display:block}
+  #cover h1{font:300 36px/1.08 ui-serif,Georgia,serif;margin:0;letter-spacing:.01em}
+  #cover .of{display:block;font:400 14px/1 ui-serif,Georgia,serif;
+    letter-spacing:.42em;text-transform:uppercase;opacity:.55;margin-bottom:9px}
+  #cover .sub{margin-top:18px;font:500 9px/1.6 ui-sans-serif;letter-spacing:.3em;
+    text-transform:uppercase;color:rgba(243,234,215,.42)}
+  #cover .open{margin-top:30px;font:500 9px/1 ui-sans-serif;letter-spacing:.3em;
+    text-transform:uppercase;color:rgba(243,234,215,.55);
+    border:1px solid rgba(243,234,215,.3);border-radius:999px;padding:12px 24px;display:inline-block}
+  #cover .edge{position:absolute;right:0;top:6%;bottom:6%;width:5px;border-radius:2px;
+    background:repeating-linear-gradient(180deg, rgba(243,234,215,.22) 0 2px, transparent 2px 5px)}
+
+  /* ---------- contents ---------- */
+  #contents{position:fixed;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;opacity:0;transition:opacity .6s ease .25s}
+  #contents.on{opacity:1}
+  .pad{max-width:430px;margin:0 auto;padding:max(22px,env(safe-area-inset-top)) 18px 26px}
+
+  header.hd{display:flex;align-items:center;gap:11px;margin-bottom:4px}
+  header.hd .mk{width:38px;height:38px;flex:0 0 38px}
+  header.hd h1{margin:0;font:300 21px/1.1 ui-serif,Georgia,serif;letter-spacing:.01em}
+  header.hd .of{display:block;font:400 8px/1 ui-serif,Georgia,serif;letter-spacing:.34em;
+    text-transform:uppercase;opacity:.5;margin-bottom:3px}
+  .ct{margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+  .ct span{font:500 8.5px/1 ui-sans-serif;letter-spacing:.3em;text-transform:uppercase;
+    color:rgba(243,234,215,.42);white-space:nowrap}
+  .ct i{flex:1;height:1px;background:rgba(243,234,215,.2)}
+
+  a.entry{display:flex;gap:13px;align-items:stretch;text-decoration:none;color:inherit;
+    padding:11px 0;border-bottom:1px solid rgba(243,234,215,.12)}
+  a.entry:first-of-type{border-top:1px solid rgba(243,234,215,.12)}
+  a.entry .thumb{flex:0 0 96px;height:66px;border-radius:5px;overflow:hidden;
+    background:rgba(243,234,215,.06);box-shadow:0 0 0 1px rgba(243,234,215,.14)}
+  a.entry canvas{display:block;width:96px;height:66px}
+  a.entry .body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  a.entry .ch{font:500 7.5px/1 ui-sans-serif;letter-spacing:.26em;text-transform:uppercase;
+    color:rgba(243,234,215,.4);margin-bottom:5px}
+  a.entry .ti{font:400 18px/1.15 ui-serif,Georgia,serif;margin-bottom:4px}
+  a.entry .bl{font:400 11.5px/1.45 ui-sans-serif;color:rgba(243,234,215,.58)}
+  a.entry .pg{flex:0 0 auto;align-self:center;font:400 12px/1 ui-serif,Georgia,serif;
+    color:rgba(243,234,215,.3);padding-left:4px}
+
+  .locked{opacity:.62}
+  .locked .ti{color:rgba(243,234,215,.72)}
+  .locked .thumb{display:grid;place-items:center;background:rgba(243,234,215,.04)}
+  .locked .gate{width:30px;height:30px;opacity:.55}
+  .locked .bl em{color:rgba(243,234,215,.5);font-style:normal}
+
+  .tail{margin-top:22px;display:flex;gap:10px}
+  .tail button{flex:1;appearance:none;border:0;border-radius:9px;padding:12px 0;
+    background:rgba(243,234,215,.09);color:rgba(243,234,215,.75);
+    font:600 9px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase}
+  #caution{margin-top:20px;font:400 9.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.36);
+    text-align:center;padding:0 6px}
+  #caution b{color:rgba(243,234,215,.55);font-weight:600}
+  .colophon{margin-top:14px;text-align:center;font:400 8.5px/1.6 ui-sans-serif;
+    color:rgba(243,234,215,.22)}
+
+  /* ---------- options sheet ---------- */
+  #sheet{position:fixed;inset:0;z-index:30;background:rgba(12,7,22,.96);display:none;
+    overflow:auto;padding:28px 18px 50px}
+  #sheet.on{display:block}
+  #sheet h2{font:600 8.5px/1 ui-sans-serif;letter-spacing:.24em;text-transform:uppercase;
+    color:rgba(243,234,215,.4);margin:18px 0 8px}
+  #sheet .row{display:flex;flex-wrap:wrap;gap:6px}
+  #sheet button.opt{appearance:none;border:0;border-radius:999px;padding:10px 13px;
+    font:600 9.5px/1 ui-sans-serif;background:rgba(243,234,215,.1);color:rgba(243,234,215,.8)}
+  #sheet button.opt.on{background:var(--paper);color:var(--ink)}
+  #sheet .note{font:400 10.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.38);margin-top:12px}
+  #sheetClose{width:100%;appearance:none;border:0;border-radius:10px;padding:14px 0;margin-top:24px;
+    background:rgba(243,234,215,.14);color:var(--paper);font:600 10px/1 ui-sans-serif;letter-spacing:.2em}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+<div id="scrim"></div>
+
+<!-- ============ cover ============ -->
+<div id="coverWrap">
+  <div id="cover">
+    <div>
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <defs><clipPath id="ck"><circle cx="32" cy="32" r="26"/></clipPath></defs>
+        <g clip-path="url(#ck)">
+          <rect x="0" y="0" width="64" height="64" fill="#1B2150"/>
+          <rect x="0" y="38" width="64" height="26" fill="#2C3E8C"/>
+          <polygon points="8,38 24,16 40,38" fill="#F3EAD7"/>
+          <polygon points="30,38 44,22 60,38" fill="#C9B7A0"/>
+          <rect x="0" y="44" width="64" height="2.4" fill="#46D6C8" opacity=".85"/>
+          <rect x="0" y="51" width="64" height="1.8" fill="#46D6C8" opacity=".55"/>
+          <polygon points="38,12 50,16 38,18" fill="#F6B04A"/>
+        </g>
+        <circle cx="32" cy="32" r="26" fill="none" stroke="#F3EAD7" stroke-width="2.2" opacity=".9"/>
+        <circle cx="32" cy="32" r="30" fill="none" stroke="#F3EAD7" stroke-width="0.8" opacity=".35"/>
+      </svg>
+      <span class="of">The Book of</span>
+      <h1>Rates</h1>
+      <div class="sub">Breath · Journeys · Weather</div>
+      <div class="open">Open</div>
+    </div>
+    <div class="edge"></div>
+  </div>
+</div>
+
+<!-- ============ contents ============ -->
+<div id="contents">
+  <div class="pad">
+    <header class="hd">
+      <svg class="mk" viewBox="0 0 64 64" aria-hidden="true">
+        <g clip-path="url(#ck)">
+          <rect x="0" y="0" width="64" height="64" fill="#1B2150"/>
+          <rect x="0" y="38" width="64" height="26" fill="#2C3E8C"/>
+          <polygon points="8,38 24,16 40,38" fill="#F3EAD7"/>
+          <polygon points="30,38 44,22 60,38" fill="#C9B7A0"/>
+          <rect x="0" y="44" width="64" height="2.4" fill="#46D6C8" opacity=".85"/>
+          <polygon points="38,12 50,16 38,18" fill="#F6B04A"/>
+        </g>
+        <circle cx="32" cy="32" r="26" fill="none" stroke="#F3EAD7" stroke-width="2.4" opacity=".9"/>
+      </svg>
+      <div><span class="of">The Book of</span><h1>Rates</h1></div>
+    </header>
+
+    <div class="ct"><span>Contents</span><i></i></div>
+    <div id="list"></div>
+
+    <div class="tail">
+      <button id="optBtn">Options</button>
+      <button id="aboutBtn">About</button>
+    </div>
+
+    <div id="caution">
+      <b>Sit or lie down before you begin.</b><br>
+      Never do breathing exercises in or near water, or while driving.
+      Stop if you feel chest pain, faint, or lose vision.
+      This is not medical advice.
+    </div>
+    <div class="colophon">Original artwork, music and code.<br>
+      Mid-century cartoon modern with ukiyo-e influence.</div>
+  </div>
+</div>
+
+<!-- ============ options ============ -->
+<div id="sheet">
+  <h2>Length</h2><div class="row" id="optLen"></div>
+  <h2>Sound</h2><div class="row" id="optSound"></div>
+  <h2>Starting rate</h2><div class="row" id="optEntry"></div>
+  <p class="note" id="noteEntry">Each journey begins at its own pace. Override this only if
+    you would rather start somewhere else.</p>
+  <h2>Hand</h2><div class="row" id="optHand"></div>
+  <h2>Opening</h2><div class="row" id="optCover"></div>
+  <p class="note" id="noteAbout"></p>
+  <button id="sheetClose">Done</button>
+</div>
+
+<script type="module">
+import { JOURNEYS, journeyById, journeyPlan, ENTRY, LENGTHS } from './js/protocols.js';
+import { buildSession, rateTrack } from './js/engine.js';
+import { SCENES, sceneForBeats } from './js/scenes.js';
+import { PageTurn } from './js/pageturn.js';
+
+/* ---------- preferences ---------- */
+const PREF = (() => {
+  const d = { len:'standard', sound:true, entry:'', hand:'right', coverSeen:false };
+  try { Object.assign(d, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
+  return d;
+})();
+const save = () => { try { localStorage.setItem('bor.pref', JSON.stringify(PREF)); } catch(e){} };
+
+const $ = id => document.getElementById(id);
+
+/* ================= the cover ================= */
+const coverWrap = $('coverWrap');
+let opened = false;
+function openBook(){
+  if (opened) return;
+  opened = true;
+  // fast on return visits: a beautiful animation you cannot bypass becomes
+  // an obstacle by the fifth session
+  const ms = PREF.coverSeen ? 420 : 1500;
+  coverWrap.style.transition = `none`;
+  $('cover').style.transition = `transform ${ms}ms cubic-bezier(.33,0,.2,1), opacity ${ms}ms ease`;
+  coverWrap.classList.add('opening');
+  $('contents').classList.add('on');
+  setTimeout(() => coverWrap.classList.add('gone'), ms + 40);
+  PREF.coverSeen = true; save();
+}
+coverWrap.addEventListener('click', openBook);
+coverWrap.addEventListener('touchstart', openBook, {passive:true});
+
+/* ================= contents ================= */
+const SHOW_LOCKED = true;
+function entryHTML(j, i){
+  return `<a class="entry" href="journey.html?j=${j.id}">
+    <div class="thumb"><canvas data-prev="${j.preview}" width="192" height="132"></canvas></div>
+    <div class="body">
+      <div class="ch">${j.chapter}</div>
+      <div class="ti">${j.title}</div>
+      <div class="bl">${j.blurb}</div>
+    </div>
+    <div class="pg">${i+1}</div>
+  </a>`;
+}
+const lockedHTML = `<div class="entry locked">
+    <div class="thumb">
+      <svg class="gate" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="3" y="13" width="26" height="3" fill="#F3EAD7" opacity=".8"/>
+        <rect x="3" y="19" width="26" height="3" fill="#F3EAD7" opacity=".6"/>
+        <rect x="3" y="25" width="26" height="3" fill="#F3EAD7" opacity=".4"/>
+        <rect x="2" y="6" width="3" height="24" fill="#F3EAD7" opacity=".9"/>
+        <rect x="27" y="6" width="3" height="24" fill="#F3EAD7" opacity=".9"/>
+      </svg>
+    </div>
+    <div class="body">
+      <div class="ch">Not in this edition</div>
+      <div class="ti">The Breath Held</div>
+      <div class="bl"><em>Breath retention is the one practice here that has actually hurt
+        people, so it is left out until it can be introduced properly — with the reasons,
+        and never as something you score.</em></div>
+    </div>
+    <div class="pg">—</div>
+  </div>`;
+
+$('list').innerHTML = JOURNEYS.map(entryHTML).join('') + (SHOW_LOCKED ? lockedHTML : '');
+
+/* ================= one render loop for everything ================= */
+const bg = $('bg'), bgx = bg.getContext('2d');
+let W=0, H=0, grain=null;
+function fitBg(){
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  W = bg.clientWidth; H = bg.clientHeight;
+  bg.width = Math.round(W*dpr); bg.height = Math.round(H*dpr);
+  bgx.setTransform(dpr,0,0,dpr,0,0);
+  const n=120, tc=document.createElement('canvas'); tc.width=tc.height=n;
+  const tg=tc.getContext('2d'), d=tg.createImageData(n,n);
+  for (let i=0;i<n*n;i++){ const v=118+(Math.random()*76|0);
+    d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=20+(Math.random()*24|0); }
+  tg.putImageData(d,0,0); grain = bgx.createPattern(tc,'repeat');
+}
+addEventListener('resize', fitBg); fitBg();
+
+/* background cycles through the worlds, turning a page between them */
+const ORDER = ['glide','swell','gallop'];
+let bgIdx = 0, bgTurn = new PageTurn(1.6), nextTurnAt = 14;
+
+/* previews: one canvas each, drawn ROUND-ROBIN — one per frame, not all
+   of them every frame — and skipped entirely when off screen. No preview
+   ever creates an audio context. */
+const previews = [...document.querySelectorAll('canvas[data-prev]')].map(cv => ({
+  cv, g: cv.getContext('2d'),
+  scene: SCENES[cv.dataset.prev] || SCENES.glide,
+  visible: true, phase: Math.random()*10
+}));
+if ('IntersectionObserver' in window){
+  const io = new IntersectionObserver(es => {
+    for (const e of es){
+      const p = previews.find(p => p.cv === e.target);
+      if (p) p.visible = e.isIntersecting;
+    }
+  }, { rootMargin: '60px' });
+  previews.forEach(p => io.observe(p.cv));
+}
+let rr = 0;
+
+function frame(now){
+  const t = now/1000;
+
+  /* --- background --- */
+  if (W > 0){
+    if (t > nextTurnAt && !bgTurn.active){
+      bgTurn.begin(bg);
+      bgIdx = (bgIdx + 1) % ORDER.length;
+      nextTurnAt = t + 16;
+    }
+    const sc = SCENES[ORDER[bgIdx]];
+    const lv = 0.5 - 0.5*Math.cos(t*2*Math.PI/13);
+    sc.draw({ g: bgx, W, H, t, lv, dlv: 0, info:{} });
+    if (grain){ bgx.save(); bgx.globalAlpha=0.4; bgx.fillStyle=grain; bgx.fillRect(0,0,W,H); bgx.restore(); }
+    bgTurn.draw(bgx, W, H, t);
+  }
+
+  /* --- one preview per frame --- */
+  if (previews.length){
+    for (let tries = 0; tries < previews.length; tries++){
+      const p = previews[rr % previews.length];
+      rr++;
+      if (!p.visible) continue;
+      const w = p.cv.width, h = p.cv.height;
+      const lv = 0.5 - 0.5*Math.cos((t + p.phase)*2*Math.PI/9);
+      p.g.setTransform(1,0,0,1,0,0);
+      p.g.save(); p.g.scale(w/192, h/132);
+      try { p.scene.draw({ g: p.g, W: 192, H: 132, t: t + p.phase, lv, dlv: 0, info:{} }); }
+      catch(e){ /* a preview must never take the page down */ }
+      p.g.restore();
+      break;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ================= options ================= */
+function buildSheet(){
+  $('optLen').innerHTML = Object.values(LENGTHS).map(l =>
+    `<button class="opt" data-k="len" data-v="${l.id}">${l.label}</button>`).join('');
+  $('optSound').innerHTML =
+    `<button class="opt" data-k="sound" data-v="true">Sound</button>
+     <button class="opt" data-k="sound" data-v="false">Silent</button>`;
+  $('optEntry').innerHTML =
+    `<button class="opt" data-k="entry" data-v="">As written</button>` +
+    Object.values(ENTRY).map(e => `<button class="opt" data-k="entry" data-v="${e.id}">${e.label}</button>`).join('');
+  $('optHand').innerHTML =
+    `<button class="opt" data-k="hand" data-v="left">Left</button>
+     <button class="opt" data-k="hand" data-v="right">Right</button>`;
+  $('optCover').innerHTML =
+    `<button class="opt" data-k="coverSeen" data-v="false">Show the full opening</button>`;
+  document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+    const v = b.dataset.v;
+    PREF[b.dataset.k] = v === 'true' ? true : v === 'false' ? false : v;
+    save(); markSheet();
+  });
+  markSheet();
+}
+function markSheet(){
+  document.querySelectorAll('.opt').forEach(b =>
+    b.classList.toggle('on', String(PREF[b.dataset.k]) === b.dataset.v));
+}
+buildSheet();
+$('optBtn').onclick   = () => $('sheet').classList.add('on');
+$('sheetClose').onclick = () => $('sheet').classList.remove('on');
+$('aboutBtn').onclick = () => {
+  const j = JOURNEYS[0];
+  const s = buildSession(journeyPlan(j, PREF.entry), LENGTHS[PREF.len].cycles);
+  const tr = rateTrack(s);
+  $('noteAbout').textContent =
+    `The Book of Rates paces breathing with a cascade: a journey starts near where you are ` +
+    `and steps down. "${j.title}" runs ${tr.length} rungs, ${tr[0].rate.toFixed(2)} down to ` +
+    `${tr[tr.length-1].rate.toFixed(2)} breaths a minute over ${(s.duration/60).toFixed(1)} ` +
+    `minutes, at one unchanging tempo. Slow breathing around five to six breaths a minute is ` +
+    `the part of this with real evidence behind it; the music and the artwork are design, and ` +
+    `claim nothing about your body.`;
+  $('sheet').classList.add('on');
+};
+
+/* carry preferences through to the session page */
+document.querySelectorAll('a.entry').forEach(a => {
+  a.addEventListener('click', () => save());
+});
+</script>
+</body>
+</html>
