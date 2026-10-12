@@ -248,8 +248,6 @@ const gallop = {
   }
 };
 
-};
-
 /* --- SWELL: open water, medium energy, swaying. The hull lifts on the
    inhale. The boat's tilt follows the RATE OF CHANGE of the breath, so
    it leans into the turnarounds the way a hull actually does. --- */
