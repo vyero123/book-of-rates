@@ -41,6 +41,19 @@ silent. Prefer structures that cannot diverge (no audio feedback loops) over
 structures that need a limiter to stay safe. And distrust any node that reports
 impossible values rather than building on top of it.
 
+## Never push without the gate
+
+`sh tools/check.sh .` syntax-checks every ES module and every inline
+`<script>` block, and scans the index for a credential. It exits non-zero
+on failure. It MUST be the first link in the push chain:
+
+    sh tools/check.sh . && git commit -q -m "..." && GIT_ASKPASS=... git push
+
+On 11 October a broken `scenes.js` went live because the check ran as
+`node --check && echo OK` on one line and the commit ran on the next, so
+the check gated nothing. A check that is not in the same `&&` chain as the
+push is decoration.
+
 ## Other standing constraints for this project
 
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an
