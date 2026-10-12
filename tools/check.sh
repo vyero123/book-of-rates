@@ -72,7 +72,19 @@ PY
   fi
 done
 
-# --- 3. no credential may ever reach the index ---
+# --- 3. every named import must actually be exported ---
+# A syntax check cannot see this. On 12 October journey.html imported
+# `resumeAudio` from audio.js, which did not export it: every file parsed
+# cleanly, the gate passed, and the journey page failed to load at all in
+# production. Syntax validity is not module validity.
+if ! python3 "$ROOT/tools/imports.py" "$ROOT"; then
+  say "  FAIL  import/export mismatch"
+  FAIL=1
+else
+  say "  ok    imports resolve"
+fi
+
+# --- 4. no credential may ever reach the index ---
 PAT="github""_pat_"
 if [ -d "$ROOT/.git" ]; then
   if git -C "$ROOT" grep --cached -lE "$PAT" >/dev/null 2>&1; then

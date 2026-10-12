@@ -36,11 +36,22 @@ const BUDGET = {
   reed:0.055, stab:0.045, wood:0.030, bed:0.035, spark:0.022, boom:0.085
 };
 
+/* WebKit has a third AudioContext state, 'interrupted', which is neither
+ * 'running' nor 'suspended' and in which currentTime does not advance.
+ * Checking only for 'suspended' leaves the context frozen. */
+export async function resumeAudio(){
+  if (!ctx) return false;
+  if (ctx.state !== 'running'){
+    try { await ctx.resume(); } catch(e){}
+  }
+  return ctx.state === 'running';
+}
+
 export async function initAudio(){
-  if (ctx){ if (ctx.state==='suspended') await ctx.resume(); return ctx; }
+  if (ctx){ await resumeAudio(); return ctx; }
   const AC = window.AudioContext || window.webkitAudioContext;
   ctx = new AC();
-  if (ctx.state==='suspended') await ctx.resume();
+  await resumeAudio();
 
   master = ctx.createGain(); master.gain.value = 0;
 
@@ -75,6 +86,11 @@ export async function initAudio(){
   clip.curve = CURVE; clip.oversample = '4x';
 
   analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+
+  // if iOS interrupts us mid-session, try to come back
+  ctx.onstatechange = () => {
+    if (ctx && ctx.state !== 'running'){ try { ctx.resume(); } catch(e){} }
+  };
 
   ctx.onstatechange = () => {
     if (ctx && ctx.state !== 'running'){ try { ctx.resume(); } catch(e){} }
