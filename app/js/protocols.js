@@ -167,7 +167,7 @@ export const JOURNEYS = [
     id: 'the-run', chapter: 'Chapter five', title: 'The Run',
     blurb: 'Fast and low between the cliffs. Two buttons, one for each half of the breath.',
     fromBeats: 15, toBeats: 15, preview: 'flight', fixedScene: 'flight',
-    interaction: 'buttons', needsScreening: false, bpm: 128
+    interaction: 'buttons', needsScreening: false
   },
   {
     id: 'pearl-diver', chapter: 'Chapter six', title: 'The Pearl Diver',
