@@ -60,47 +60,73 @@ function conifer(g, x, baseY, h, w, fill){
 /* Original horse-and-rider silhouette. Deliberately generic: no tack
    detail, no costume, nothing that reads as any particular character. */
 function horseAndRider(g, x, y, s, legPhase, fill){
+  // Proportions matter more than detail in a silhouette: legs are about as
+  // long as the barrel is deep, the chest sits forward of the hip, and the
+  // neck leaves the body at a diagonal. The first version had a round
+  // barrel on short legs and read as a blob.
   g.fillStyle = fill;
-  // barrel
-  g.beginPath();
-  g.ellipse(x, y - s*0.52, s*0.52, s*0.26, -0.06, 0, TAU);
-  g.fill();
-  // neck + head
-  g.beginPath();
-  g.moveTo(x + s*0.34, y - s*0.68);
-  g.lineTo(x + s*0.80, y - s*1.02);
-  g.lineTo(x + s*0.98, y - s*0.96);
-  g.lineTo(x + s*0.86, y - s*0.78);
-  g.lineTo(x + s*0.46, y - s*0.50);
-  g.closePath(); g.fill();
-  // tail
-  g.beginPath();
-  g.moveTo(x - s*0.50, y - s*0.66);
-  g.lineTo(x - s*0.92, y - s*0.52);
-  g.lineTo(x - s*0.88, y - s*0.30);
-  g.lineTo(x - s*0.46, y - s*0.52);
-  g.closePath(); g.fill();
-  // four legs, two phase pairs — faster than the breath, as a gallop is
+  const backY = y - s*0.92;          // top line of the back
+  const bellyY = y - s*0.66;         // underside of the barrel
+
+  // legs first, so the body overlaps them
   for (let i = 0; i < 4; i++){
     const front = i < 2;
-    const ph = legPhase + (front ? 0 : Math.PI) + (i%2)*0.7;
-    const lx = x + (front ? s*0.34 : -s*0.34);
-    const sw = Math.sin(ph), lift = Math.max(0, Math.cos(ph));
+    const ph = legPhase + (front ? 0 : Math.PI*0.85) + (i%2 ? 0.9 : 0);
+    const lx = x + (front ? s*0.44 : -s*0.40);
+    const sw = Math.sin(ph), lift = Math.max(0, Math.cos(ph))*0.55;
+    const hoofX = lx + sw*s*0.34, hoofY = y - lift*s*0.26;
     g.beginPath();
-    g.moveTo(lx - s*0.07, y - s*0.46);
-    g.lineTo(lx + s*0.07, y - s*0.46);
-    g.lineTo(lx + s*0.10 + sw*s*0.30, y - lift*s*0.16);
-    g.lineTo(lx - s*0.02 + sw*s*0.30, y - lift*s*0.16);
+    g.moveTo(lx - s*0.075, bellyY);
+    g.lineTo(lx + s*0.075, bellyY);
+    g.lineTo(hoofX + s*0.05, hoofY);
+    g.lineTo(hoofX - s*0.05, hoofY);
     g.closePath(); g.fill();
   }
-  // rider
+
+  // barrel: a flattened body, deeper at the chest than the hip
   g.beginPath();
-  g.moveTo(x - s*0.10, y - s*0.72);
-  g.lineTo(x + s*0.14, y - s*0.72);
-  g.lineTo(x + s*0.09, y - s*1.16);
-  g.lineTo(x - s*0.07, y - s*1.16);
+  g.moveTo(x - s*0.52, bellyY - s*0.06);
+  g.lineTo(x - s*0.46, backY + s*0.04);
+  g.lineTo(x + s*0.34, backY);
+  g.lineTo(x + s*0.56, bellyY - s*0.10);
+  g.lineTo(x + s*0.40, bellyY + s*0.02);
+  g.lineTo(x - s*0.38, bellyY + s*0.02);
   g.closePath(); g.fill();
-  g.beginPath(); g.arc(x + s*0.02, y - s*1.26, s*0.11, 0, TAU); g.fill();
+
+  // neck and head, leaving the chest on a diagonal
+  g.beginPath();
+  g.moveTo(x + s*0.38, backY + s*0.02);
+  g.lineTo(x + s*0.80, y - s*1.42);
+  g.lineTo(x + s*1.02, y - s*1.44);
+  g.lineTo(x + s*1.06, y - s*1.28);
+  g.lineTo(x + s*0.86, y - s*1.22);
+  g.lineTo(x + s*0.60, bellyY - s*0.08);
+  g.closePath(); g.fill();
+
+  // tail
+  g.beginPath();
+  g.moveTo(x - s*0.46, backY + s*0.08);
+  g.lineTo(x - s*0.92, y - s*0.84);
+  g.lineTo(x - s*0.86, y - s*0.56);
+  g.lineTo(x - s*0.42, bellyY - s*0.04);
+  g.closePath(); g.fill();
+
+  // rider: seated, leaning slightly forward
+  const rY = backY - s*0.02;
+  g.beginPath();
+  g.moveTo(x - s*0.10, rY);
+  g.lineTo(x + s*0.16, rY);
+  g.lineTo(x + s*0.24, rY - s*0.44);
+  g.lineTo(x + s*0.02, rY - s*0.46);
+  g.closePath(); g.fill();
+  g.beginPath(); g.arc(x + s*0.17, rY - s*0.56, s*0.115, 0, TAU); g.fill();
+  // upper arm reaching to the neck
+  g.beginPath();
+  g.moveTo(x + s*0.16, rY - s*0.36);
+  g.lineTo(x + s*0.46, rY - s*0.16);
+  g.lineTo(x + s*0.44, rY - s*0.06);
+  g.lineTo(x + s*0.13, rY - s*0.26);
+  g.closePath(); g.fill();
 }
 
 /* Original small boat: hull, mast, sail. */
@@ -184,11 +210,12 @@ const gallop = {
     ];
     for (const L of layers){
       const span = W/L.n*1.6;
-      const first = Math.floor((t*L.sp)/span);
-      for (let i = first-1; i <= first + L.n + 1; i++){
-        const x = i*span - t*L.sp % (span*1e6);
-        const xx = ((x % (span*(L.n+2))) + span*(L.n+2)) % (span*(L.n+2)) - span;
-        const jitter = hash(i+L.seed);
+      const total = span*(L.n+2);
+      const scroll = (t*L.sp) % total;
+      for (let i = 0; i <= L.n+2; i++){
+        const xx = i*span - scroll;
+        const jitter = hash(i + Math.floor(t*L.sp/total)*(L.n+2) + L.seed);
+        if (xx < -span || xx > W+span) continue;
         conifer(g, xx, L.y + jitter*H*0.012, L.h*(0.8+jitter*0.45), L.w*(0.8+jitter*0.4), L.fill);
       }
     }
