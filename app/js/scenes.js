@@ -208,20 +208,21 @@ const gallop = {
       { sp: 130, y: horizon+H*0.055, h: H*0.24, w: W*0.045, fill: P.mid,  n: 7,  seed: 31 },
       { sp: 320, y: horizon+H*0.160, h: H*0.40, w: W*0.075, fill: P.near, n: 5,  seed: 77 }
     ];
-    for (const L of layers){
+    const drawTrees = L => {
       const span = W/L.n*1.6;
       const total = span*(L.n+2);
       const scroll = (t*L.sp) % total;
       for (let i = 0; i <= L.n+2; i++){
         const xx = i*span - scroll;
-        const jitter = hash(i + Math.floor(t*L.sp/total)*(L.n+2) + L.seed);
         if (xx < -span || xx > W+span) continue;
+        const jitter = hash(i + Math.floor(t*L.sp/total)*(L.n+2) + L.seed);
         conifer(g, xx, L.y + jitter*H*0.012, L.h*(0.8+jitter*0.45), L.w*(0.8+jitter*0.4), L.fill);
       }
-    }
+    };
+    drawTrees(layers[0]); drawTrees(layers[1]);
 
     // road
-    const roadY = H*0.80;
+    const roadY = H*0.78;
     g.fillStyle = pair(P.ground, lv*0.6);
     g.beginPath();
     g.moveTo(-4, H+4); g.lineTo(-4, roadY+H*0.02);
@@ -231,15 +232,22 @@ const gallop = {
     // dust kicked up behind, independent of the breath
     for (let i = 0; i < 7; i++){
       const p = ((t*0.9 + i/7) % 1);
-      const dx = W*0.30 - p*W*0.42, dy = roadY - p*H*0.04;
+      const dx = W*0.34 - p*W*0.30, dy = roadY - p*H*0.02;
       g.fillStyle = P.dust;
-      g.beginPath(); g.arc(dx, dy, H*0.012*(0.4+p*1.6), 0, TAU); g.fill();
+      g.beginPath(); g.arc(dx, dy, H*0.008*(0.4+p*1.4), 0, TAU); g.fill();
     }
 
-    // THE BREATH: the rider rises on the inhale and settles on the exhale
-    const rise = smooth(lv)*H*0.055;
-    horseAndRider(g, W*0.40, roadY - rise, H*0.085, t*9.0, P.fig);
+    // THE BREATH: the rider rises on the inhale and settles on the exhale.
+    // Small and far back: this style puts a tiny figure in a lot of empty
+    // space, and at that scale a silhouette reads by shape alone.
+    const rise = smooth(lv)*H*0.030;
+    horseAndRider(g, W*0.46, roadY - rise, H*0.052, t*9.0, P.fig);
+
+    // the nearest trees pass IN FRONT, which sells the depth
+    drawTrees(layers[2]);
   }
+};
+
 };
 
 /* --- SWELL: open water, medium energy, swaying. The hull lifts on the
