@@ -85,11 +85,10 @@
 
 <div id="start">
   <div class="plate">
-    <div class="ch">Chapter one</div>
-    <h1>The Long Shore</h1>
+    <div class="ch" id="jch"></div>
+    <h1 id="jti"></h1>
     <div class="rule"></div>
-    <p>A ride, a crossing and a long glide down. The world changes as your
-       breathing slows; you do not have to do anything but follow it.</p>
+    <p id="jbl"></p>
     <button id="begin">BEGIN</button>
     <div><button id="more">Options</button></div>
   </div>
@@ -97,7 +96,6 @@
 
 <div id="drawer">
   <h2>How wound up are you?</h2><div class="row" id="optEntry"></div>
-  <h2>Destination</h2><div class="row" id="optDest"></div>
   <h2>Length</h2><div class="row" id="optLen"></div>
   <h2>Sound</h2><div class="row" id="optSound"></div>
   <p class="note" id="planNote"></p>
@@ -109,7 +107,7 @@
     <h2>Arrived</h2>
     <p>Your breathing drew this. Nothing is counted and nothing is kept but the picture.</p>
     <canvas id="ink" width="460" height="460"></canvas>
-    <button id="again">CLOSE</button>
+    <button id="again">BACK TO THE CONTENTS</button>
   </div>
 </div>
 
@@ -117,13 +115,14 @@
 import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeOut }
   from './js/audio.js';
 import { Transport, buildSession, query, levelAt, rateTrack } from './js/engine.js';
-import { plan as makePlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
+import { journeyById, journeyPlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
 import { sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
 
 /* ---------- preferences: remembered, never scored ---------- */
+const JOURNEY = journeyById(new URLSearchParams(location.search).get('j') || '');
 const PREF = (() => {
-  let p = { entry:'busy', dest:'calm', len:'standard', sound:true };
+  let p = { entry:'', len:'standard', sound:true, hand:'right' };
   try { Object.assign(p, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
   return p;
 })();
@@ -150,17 +149,18 @@ let tp=null, music=null, session=null, turn=new PageTurn();
 let curScene=null, inkTrail=[];
 
 function buildPlan(){
-  const rungs = makePlan({ fromBeats: ENTRY[PREF.entry].beats, toBeats: RATES[PREF.dest].beats });
-  return buildSession(rungs, LENGTHS[PREF.len].cycles);
+  // The journey's own starting rate is its identity; an entry override is
+  // honoured only if the reader has deliberately chosen one.
+  return buildSession(journeyPlan(JOURNEY, PREF.entry), LENGTHS[PREF.len].cycles);
 }
 
 /* ---------- options drawer: everything numeric hides in here ---------- */
 const d = id => document.getElementById(id);
 function buildDrawer(){
-  d('optEntry').innerHTML = Object.values(ENTRY).map(e =>
-    `<button class="opt" data-k="entry" data-v="${e.id}">${e.label}</button>`).join('');
-  d('optDest').innerHTML = Object.entries(RATES).map(([k,v]) =>
-    `<button class="opt" data-k="dest" data-v="${k}">${v.label}</button>`).join('');
+  d('optEntry').innerHTML =
+    `<button class="opt" data-k="entry" data-v="">As written</button>` +
+    Object.values(ENTRY).map(e =>
+      `<button class="opt" data-k="entry" data-v="${e.id}">${e.label}</button>`).join('');
   d('optLen').innerHTML = Object.values(LENGTHS).map(l =>
     `<button class="opt" data-k="len" data-v="${l.id}">${l.label}</button>`).join('');
   d('optSound').innerHTML =
@@ -185,6 +185,10 @@ function notePlan(){
     `breaths per minute, ${(s.duration/60).toFixed(1)} minutes, one tempo throughout. ` +
     `Scenes: ${scenes.join(' to ')}.`;
 }
+d('jch').textContent = JOURNEY.chapter;
+d('jti').textContent = JOURNEY.title;
+d('jbl').textContent = JOURNEY.blurb;
+document.title = JOURNEY.title + ' — The Book of Rates';
 buildDrawer();
 d('more').onclick = () => d('drawer').classList.add('open');
 d('close').onclick = () => d('drawer').classList.remove('open');
@@ -192,7 +196,7 @@ d('close').onclick = () => d('drawer').classList.remove('open');
 /* ---------- transport ---------- */
 d('begin').onclick = () => begin();
 d('stop').onclick  = () => finish(false);
-d('again').onclick = () => { d('end').classList.remove('on'); d('start').classList.remove('gone'); };
+d('again').onclick = () => { location.href = './index.html'; };
 
 async function begin(){
   d('start').classList.add('gone');
@@ -242,7 +246,7 @@ function drawInk(){
 let lastLv = 0;
 let idleScene = null;
 function drawIdle(t){
-  if (!idleScene) idleScene = sceneForBeats(RATES[PREF.dest].beats);
+  if (!idleScene) idleScene = sceneForBeats(JOURNEY.fromBeats);
   // a slow synthetic breath so the opening scene is alive but not pacing
   const lv = 0.5 - 0.5*Math.cos(t*2*Math.PI/13);
   idleScene.draw({ g, W, H, t, lv, dlv: 0, info:{} });
