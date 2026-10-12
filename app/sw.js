@@ -1,7 +1,13 @@
 /* The Book of Rates — offline.
- * Cache-first for the shell so a session can run with no network at all,
- * with a background refresh so a new deploy is picked up next launch. */
-const CACHE = 'bor-v2';
+ *
+ * NETWORK-FIRST for same-origin HTML and JS, cache-first for static
+ * assets. The first version was cache-first for everything, which meant a
+ * deployed fix could sit behind a stale cache indefinitely — and worse,
+ * a page could end up running a MIXTURE of old and new modules, which is
+ * its own class of bug. A breathing app must work with no network, but
+ * not at the cost of being unable to ship a correction.
+ */
+const CACHE = 'bor-v3';
 const SHELL = [
   './', './index.html', './journey.html', './manifest.webmanifest', './icon.svg',
   './js/protocols.js', './js/engine.js', './js/audio.js', './js/art.js',
@@ -17,19 +23,36 @@ self.addEventListener('activate', e => {
     .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
+
+const isCode = url => /\.(?:js|html)$/.test(url.pathname) || url.pathname.endsWith('/');
+
 self.addEventListener('fetch', e => {
   const r = e.request;
-  if (r.method !== 'GET' || new URL(r.url).origin !== location.origin) return;
-  e.respondWith(
-    caches.match(r).then(hit => {
-      const net = fetch(r).then(res => {
+  if (r.method !== 'GET') return;
+  const url = new URL(r.url);
+  if (url.origin !== location.origin) return;
+
+  if (isCode(url)){
+    // network first: the newest correct code wins whenever we can reach it
+    e.respondWith(
+      fetch(r).then(res => {
         if (res && res.status === 200){
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put(r, copy));
         }
         return res;
-      }).catch(() => hit);
-      return hit || net;
-    })
+      }).catch(() => caches.match(r).then(hit => hit || Response.error()))
+    );
+    return;
+  }
+  // everything else: cache first, refreshed in the background
+  e.respondWith(
+    caches.match(r).then(hit => hit || fetch(r).then(res => {
+      if (res && res.status === 200){
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(r, copy));
+      }
+      return res;
+    }))
   );
 });
