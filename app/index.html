@@ -192,6 +192,8 @@ import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
+import { lastNote, clearNote, install as installBlackbox } from './js/blackbox.js';
+installBlackbox();
 import { requireGate, gatePassed, retentionAllowed } from './js/gate.js';
 
 /* ---------- preferences ---------- */
@@ -377,6 +379,18 @@ buildSheet();
 $('reGate').onclick = () => { $('sheet').classList.remove('on'); openGateAgain(); };
 $('optBtn').onclick   = () => $('sheet').classList.add('on');
 $('sheetClose').onclick = () => $('sheet').classList.remove('on');
+/* If the last session never reached its end, say so — quietly, in the
+   options, with what we know. Better than the reader wondering. */
+const crumb = lastNote();
+if (crumb && (crumb.stage === 'session-start' || crumb.stage === 'page-turn')){
+  const n = document.createElement('div');
+  n.style.cssText = 'margin-top:14px;font:400 10px/1.6 ui-sans-serif;color:rgba(232,71,60,.7)';
+  n.textContent = 'The last session ended unexpectedly at "' + crumb.stage +
+    '". Nothing was lost. If this keeps happening, tell me what you were doing.';
+  document.querySelector('#caution').after(n);
+}
+clearNote();
+
 $('aboutBtn').onclick = () => {
   const j = JOURNEYS[0];
   const s = buildSession(journeyPlan(j, PREF.entry), LENGTHS[PREF.len].cycles);

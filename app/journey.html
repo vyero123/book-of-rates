@@ -162,6 +162,8 @@ import { LEVEL_SCENES } from './js/levels.js';
 import { PageTurn } from './js/pageturn.js';
 import { requireGate } from './js/gate.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
+import { note, clearNote, install as installBlackbox } from './js/blackbox.js';
+installBlackbox();
 
 /* ---------- preferences: remembered, never scored ---------- */
 const JOURNEY = journeyById(new URLSearchParams(location.search).get('j') || '');
@@ -316,6 +318,7 @@ function applyEyesClosed(on){
   document.body.classList.toggle('eyes', on);
 }
 async function begin(){
+  note('session-start', JOURNEY.id + ' ' + JSON.stringify(diag()));
   applyEyesClosed(PREF.eyesClosed);
   if (requireGate(() => begin())) return;   // rules first, always
   d('start').classList.add('gone');
@@ -350,6 +353,7 @@ async function finish(complete){
   setTimeout(() => closeAudio(), 1400);
   showControls(false);
   d('phase').textContent = ''; d('scene').textContent = '';
+  clearNote();
   if (complete){ drawInk(); d('end').classList.add('on'); }
   else d('start').classList.remove('gone');
 }
@@ -395,7 +399,7 @@ function frame(now){
     const scene = pickScene(q.protocol.cycleBeats);
 
     // a rung that changes the scene turns the page
-    if (curScene && scene !== curScene) turn.begin(cv);
+    if (curScene && scene !== curScene){ note('page-turn', scene.id + ' ' + JSON.stringify(diag())); turn.begin(cv); }
     curScene = scene;
 
     const lv = q.level;
