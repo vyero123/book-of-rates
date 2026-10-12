@@ -153,8 +153,8 @@
 </div>
 
 <script type="module">
-import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeOut, marker }
-  from './js/audio.js';
+import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeOut, marker,
+         resumeAudio, audioContext } from './js/audio.js';
 import { Transport, buildSession, query, levelAt, rateTrack } from './js/engine.js';
 import { journeyById, journeyPlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
 import { sceneForBeats, SCENES } from './js/scenes.js';
@@ -326,7 +326,11 @@ async function begin(){
   inkTrail = [];
   curScene = null;
   showControls(true);
+  // Resume inside the tap that got here, and wait for it. If it does not
+  // come up, the session still runs — the clock falls back (engine.js).
   const ctx = await initAudio();
+  await resumeAudio();
+  note('audio-state', ctx ? ctx.state : 'none');
   music = new Music(pickScene(session.stages[0].protocol.cycleBeats).theme);
   music.begin();
   tp = new Transport(ctx);
@@ -341,6 +345,10 @@ async function begin(){
     }
   };
   tp.onEnd = () => finish(true);
+  tp.onClockFallback = why => {
+    note('clock-fallback', why + ' / ctx=' + (audioContext() ? audioContext().state : 'none'));
+    console.warn('breath clock fell back to performance.now():', why);
+  };
   await tp.start(session);
   setMuted(!PREF.sound);
   fadeIn(2.4);

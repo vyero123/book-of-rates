@@ -7,7 +7,7 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v4';
+const CACHE = 'bor-v5';
 const SHELL = [
   './', './index.html', './journey.html', './manifest.webmanifest', './icon.svg',
   './js/protocols.js', './js/engine.js', './js/audio.js', './js/art.js',

@@ -76,6 +76,10 @@ export async function initAudio(){
 
   analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
 
+  ctx.onstatechange = () => {
+    if (ctx && ctx.state !== 'running'){ try { ctx.resume(); } catch(e){} }
+  };
+
   master.connect(subHP); subHP.connect(air); air.connect(clip);
   clip.connect(analyser); analyser.connect(ctx.destination);
 

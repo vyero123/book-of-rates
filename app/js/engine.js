@@ -149,58 +149,123 @@ registerProcessor('bor-pump', Pump);
 `;
 
 export class Transport {
+  /* THE BREATH CLOCK MUST NEVER BE ABLE TO FREEZE.
+   *
+   * This used to read `ctx.currentTime - startTime` and nothing else. On
+   * iOS an AudioContext starts suspended, and WebKit also has an
+   * 'interrupted' state that is neither running nor suspended. In either
+   * case currentTime stops advancing — and because requestAnimationFrame
+   * keeps running, the scene draws perfectly while the breath sits at zero
+   * forever. That is a permanent inhale, and it is the worst failure this
+   * app can have: a breathing app that stops breathing.
+   *
+   * So the session clock prefers the audio clock (it is the one that keeps
+   * music and breath locked) but watches it, and switches to
+   * performance.now() without a seam the moment it stops advancing.
+   *
+   * Audio scheduling is handled separately: note times are computed as a
+   * LEAD from ctx.currentTime, so they stay correct in either mode.
+   */
   constructor(ctx){
     this.ctx = ctx;
     this.session = null;
-    this.startTime = 0;       // ctx time of session t=0
-    this.state = 'idle';      // idle | running | paused | ended
-    this.pausedAt = 0;        // session time at which we paused
+    this.startTime = 0;
+    this.state = 'idle';
+    this.pausedAt = 0;
     this.nextBeat = 0;
     this.lookahead = 0.25;
-    this.onBeat = null;       // (time, beatIndex, info) => void
+    this.onBeat = null;
     this.onEnd = null;
+    this.onClockFallback = null;
     this._pump = null;
-    this._fallback = null;
+    this._safety = null;
+    this._useAudio = true;
+    this._lastPerf = null;
+    this._lastAudio = 0;
+    this._lastValue = 0;
+    this._perfBase = 0;
+    this._perfStart = 0;
+    this._wdValue = null;
+    this._wdAt = 0;
   }
 
-  async initPump(){
-    if (this._pump || this._fallback) return;
-    try {
-      const url = URL.createObjectURL(new Blob([PUMP_SRC], {type:'application/javascript'}));
-      // A hung addModule would leave start() awaiting forever and the
-      // session would never begin. Race it against a timeout and fall
-      // back to the timer pump.
-      await Promise.race([
-        this.ctx.audioWorklet.addModule(url),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('worklet timeout')), 1500))
-      ]);
-      URL.revokeObjectURL(url);
-      const node = new AudioWorkletNode(this.ctx, 'bor-pump');
-      // A worklet only runs while connected. Route it into a silent gain
-      // so it pumps without making a sound.
-      const mute = this.ctx.createGain(); mute.gain.value = 0;
-      node.connect(mute); mute.connect(this.ctx.destination);
-      node.port.onmessage = () => this.tick();
-      this._pump = node;
-    } catch (e){
-      console.warn('AudioWorklet unavailable, falling back to a timer pump', e);
-      const loop = () => { this.tick(); this._fallback = setTimeout(loop, 25); };
-      loop();
+  /** Monotonic session clock, in seconds. Never stalls. */
+  _now(){
+    const perf = performance.now() / 1000;
+    if (this._useAudio && this.ctx){
+      const a = this.ctx.currentTime;
+      if (this._lastPerf !== null){
+        const dp = perf - this._lastPerf;
+        const da = a - this._lastAudio;
+        if (dp > 0.8 && da < 0.05) this._toPerfClock(perf, 'audio clock stopped');
+      }
+      if (this._useAudio){
+        this._lastPerf = perf; this._lastAudio = a; this._lastValue = a;
+        return a;
+      }
     }
+    const v = this._perfStart + (perf - this._perfBase);
+    this._lastValue = v;
+    return v;
+  }
+
+  _toPerfClock(perf, why){
+    if (!this._useAudio) return;
+    this._useAudio = false;
+    this._perfBase = perf;
+    this._perfStart = this._lastValue;   // continue from where we were
+    if (this.onClockFallback) this.onClockFallback(why);
   }
 
   get time(){
-    if (this.state === 'running') return this.ctx.currentTime - this.startTime;
+    if (this.state === 'running') return this._now() - this.startTime;
     if (this.state === 'paused')  return this.pausedAt;
     if (this.state === 'ended')   return this.session ? this.session.duration : 0;
     return 0;
   }
 
+  async initPump(){
+    // The worklet pump is precise and survives a backgrounded tab, but it
+    // only runs if the audio thread is running. A timer pump ALWAYS runs
+    // as well: tick() is idempotent, so two pumps are harmless, and one
+    // of them failing can no longer stop the session.
+    if (!this._safety){
+      const loop = () => { try { this.tick(); } catch(e){} this._safety = setTimeout(loop, 40); };
+      loop();
+    }
+    if (this._pump) return;
+    try {
+      const url = URL.createObjectURL(new Blob([PUMP_SRC], {type:'application/javascript'}));
+      await Promise.race([
+        this.ctx.audioWorklet.addModule(url),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('worklet timeout')), 1200))
+      ]);
+      URL.revokeObjectURL(url);
+      const node = new AudioWorkletNode(this.ctx, 'bor-pump');
+      const mute = this.ctx.createGain(); mute.gain.value = 0;
+      node.connect(mute); mute.connect(this.ctx.destination);
+      node.port.onmessage = () => this.tick();
+      this._pump = node;
+    } catch (e){
+      // not fatal: the safety timer is already pumping
+    }
+  }
+
   async start(session){
+    // Resume inside the gesture that reached here, and wait for it — but
+    // never let failure stop the session starting.
+    if (this.ctx && this.ctx.state !== 'running'){
+      try { await this.ctx.resume(); } catch(e){}
+    }
+    if (!this.ctx || this.ctx.state !== 'running'){
+      this._toPerfClock(performance.now()/1000, 'context not running at start');
+    }
     await this.initPump();
     this.session = session;
     this.nextBeat = 0;
-    this.startTime = this.ctx.currentTime + 0.18;   // a beat of air before it begins
+    this._lastPerf = null;
+    this.startTime = this._now() + 0.18;
+    this._wdValue = null;
     this.state = 'running';
   }
 
@@ -212,9 +277,10 @@ export class Transport {
 
   resume(){
     if (this.state !== 'paused') return;
-    this.startTime = this.ctx.currentTime - this.pausedAt;
+    this._lastPerf = null;
+    this.startTime = this._now() - this.pausedAt;
     this.state = 'running';
-    // re-point the scheduler at the first beat we have not played
+    this._wdValue = null;
     const bt = this.session.beatTimes;
     while (this.nextBeat < this.session.totalBeats && bt[this.nextBeat] < this.pausedAt) this.nextBeat++;
   }
@@ -223,15 +289,34 @@ export class Transport {
     this.state = 'idle';
     this.session = null;
     this.nextBeat = 0;
+    if (this._safety){ clearTimeout(this._safety); this._safety = null; }
+  }
+
+  /** Has the breath actually moved lately? If not, say so and recover. */
+  _watchdog(now, t){
+    if (this._wdValue === null){ this._wdValue = t; this._wdAt = now; return; }
+    if (Math.abs(t - this._wdValue) > 0.05){ this._wdValue = t; this._wdAt = now; return; }
+    if (now - this._wdAt > 2){
+      this._toPerfClock(now, 'breath stalled for 2s');
+      this._wdValue = null;
+      this._wdAt = now;
+    }
   }
 
   tick(){
     if (this.state !== 'running' || !this.session) return;
     const S = this.session, bt = S.beatTimes;
-    const horizon = this.time + this.lookahead;
+    const sessionTime = this.time;
+    this._watchdog(performance.now()/1000, sessionTime);
+    const horizon = sessionTime + this.lookahead;
     while (this.nextBeat < S.totalBeats && bt[this.nextBeat] <= horizon){
       const i = this.nextBeat;
-      const when = this.startTime + bt[i];
+      // Lead time from now, mapped onto the AUDIO clock. When the session
+      // is on the audio clock this is identical to startTime + bt[i]; when
+      // it has fallen back to performance.now() it still schedules notes
+      // correctly relative to the audio context.
+      const lead = Math.max(0, bt[i] - sessionTime);
+      const when = (this.ctx ? this.ctx.currentTime : 0) + lead;
       if (this.onBeat){
         const s = stageAt(S, bt[i] + 1e-6);
         const rel = i - s.beat0;
