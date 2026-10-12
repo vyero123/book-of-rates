@@ -64,7 +64,7 @@ function conifer(g, x, baseY, h, w, fill){
  * is carried by two ears and the crest of a neck, which is both far more
  * legible and far more immersive. Original, generic, no tack detail. */
 function neckAndEars(g, W, H, cx, poll, bob, fill, mane){
-  const baseW = W*0.30, pollW = W*0.085;
+  const baseW = W*0.215, pollW = W*0.060;
   const lean = Math.sin(bob*0.5)*W*0.012;
 
   // the neck: a tapering wedge from the bottom edge up to the poll
@@ -86,11 +86,11 @@ function neckAndEars(g, W, H, cx, poll, bob, fill, mane){
     const f = i/8;
     const y = poll + (H - poll)*f*0.72;
     const w = pollW + (baseW - pollW)*f*0.8;
-    const flick = Math.sin(bob*0.5 - f*1.8)*W*0.020*(0.4 + f);
+    const flick = Math.sin(bob*0.5 - f*1.8)*W*0.013*(0.4 + f);
     g.beginPath();
     g.moveTo(cx - w + lean*(1-f), y);
-    g.lineTo(cx - w - W*0.055 + flick, y + H*0.022);
-    g.lineTo(cx - w + lean*(1-f), y + H*0.030);
+    g.lineTo(cx - w - W*0.030 + flick, y + H*0.016);
+    g.lineTo(cx - w + lean*(1-f), y + H*0.022);
     g.closePath(); g.fill();
   }
 
@@ -99,12 +99,12 @@ function neckAndEars(g, W, H, cx, poll, bob, fill, mane){
   [-1, 1].forEach(sgn => {
     const tw = Math.sin(bob*0.37 + (sgn>0?1.3:0))*0.10;
     const bx = cx + lean + sgn*pollW*0.62;
-    const h = H*0.052;
+    const h = H*0.040;
     g.save(); g.translate(bx, poll); g.rotate(sgn*(0.17 + tw));
     g.beginPath();
-    g.moveTo(-W*0.022, 0);
+    g.moveTo(-W*0.016, 0);
     g.lineTo(0, -h);
-    g.lineTo(W*0.020, 0);
+    g.lineTo(W*0.015, 0);
     g.closePath(); g.fill();
     g.restore();
   });
@@ -187,6 +187,16 @@ const gallop = {
     g.fillStyle = `rgba(255,243,196,${0.45+lv*0.3})`;
     g.beginPath(); g.arc(sx, sy, H*0.042, 0, TAU); g.fill();
 
+    // distant tree line, so the horizon band is not an empty slab
+    g.fillStyle = P.far;
+    g.beginPath(); g.moveTo(-4, horizon+2);
+    for (let x = -4; x <= W+4; x += 9){
+      const hh = (0.5 + hash(Math.floor(x/9)+5)*0.5) * H*0.030;
+      g.lineTo(x, horizon - hh);
+      g.lineTo(x+4.5, horizon - hh*0.45);
+    }
+    g.lineTo(W+4, horizon+2); g.closePath(); g.fill();
+
     g.fillStyle = pair(P.road, lv*0.5);
     g.fillRect(-2, horizon, W+4, H-horizon+4);
 
@@ -231,13 +241,14 @@ const gallop = {
       const p = ((t*1.3 + i/6) % 1);
       const z = 0.5 + p*1.6;
       g.fillStyle = P.dust;
+      const dz = z, dx = px((i%2?-1:1)*(0.48+p*0.3), dz), dy = py(dz);
       g.beginPath();
-      g.arc(px((i%2?-1:1)*0.55, z), py(z), (k/z)*0.035*(0.3+p), 0, TAU);
+      g.ellipse(dx, dy, (k/dz)*0.055*(0.3+p), (k/dz)*0.016*(0.3+p), 0, 0, TAU);
       g.fill();
     }
 
     // THE BREATH: the neck lengthens and lifts on the inhale
-    const poll = H*0.60 - breathLift*1.4 - Math.sin(stride)*H*0.012;
+    const poll = H*0.695 - breathLift*1.3 - Math.sin(stride)*H*0.010;
     neckAndEars(g, W, H, W*0.5, poll, stride, P.fig, P.mane);
   }
 };
