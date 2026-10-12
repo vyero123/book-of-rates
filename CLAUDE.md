@@ -54,6 +54,40 @@ On 11 October a broken `scenes.js` went live because the check ran as
 the check gated nothing. A check that is not in the same `&&` chain as the
 push is decoration.
 
+## My own test code is the most common source of false alarms
+
+Four times on 11-12 October I reported a bug that was my instrument, not
+the app:
+
+1. Byte time-domain silence is 128, not 0 — a failed analyser read
+   computes as full-scale clipping.
+2. Reading `transport.nextBeat` AFTER `stop()` reports 0, because stop
+   resets it. "No beats scheduled" was a measurement artefact.
+3. A one-shot canvas draw verified by screenshot looks blank, because
+   taking the screenshot fires a resize which reallocates and clears the
+   canvas. Drive a loop, don't draw once.
+4. Netlify rewrites `../archive.html` to `/archive`, so a
+   `querySelector('a[href="../archive.html"]')` finds nothing on a page
+   where the link is present and working.
+
+Before reporting a fault, check the measurement can detect a known-good
+case. Prove the instrument, then trust it.
+
+## Deployment can hide a fix
+
+The service worker was cache-first and served a MIXTURE of old and new
+modules after a deploy — concretely observed: `pageturn.js` on the network
+and in the cache both had a method the running page did not. It is now
+network-first for HTML and JS, with a one-shot reload on
+`controllerchange`. When a fix seems not to have landed, check what the
+page is actually running before changing the code again.
+
+## Do not use curl or wget for web content
+
+Web fetching goes through the provided tools. I used `curl` once to check
+a deployed file; that was wrong even for our own site. Verify from inside
+the page with `fetch`, or use the browser tools.
+
 ## Other standing constraints for this project
 
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an
