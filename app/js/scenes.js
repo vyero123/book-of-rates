@@ -387,15 +387,15 @@ const glide = {
     const px = (xw, z) => W*0.5 + (xw*k)/z;
 
     // floor in discrete depth bands: lighter far, darker near
-    g.fillStyle = mix(pair(P.floor, lv*0.5), '#2A1024', 0.5);
+    g.fillStyle = mix(pair(P.floor, lv*0.5), '#3A1A30', 0.35);
     g.fillRect(-2, horizon, W+4, H-horizon+4);
     for (let i = 0; i < 5; i++){
       const z0 = 0.45 + i*1.6, z1 = 0.45 + (i+1)*1.6;
       const y0 = Math.max(horizon, py(z1)), y1 = py(z0);
-      g.fillStyle = mix(pair(P.floor, lv*0.5), '#2A1024', i/6);
+      g.fillStyle = mix(pair(P.floor, lv*0.5), '#3A1A30', i/7);
       g.fillRect(-2, y0, W+4, Math.max(1, y1-y0)+1);
     }
-    g.fillStyle = mix(pair(P.floor, lv*0.5), '#2A1024', 5/6);
+    g.fillStyle = mix(pair(P.floor, lv*0.5), '#3A1A30', 5/7);
     g.fillRect(-2, py(0.45), W+4, H);
 
     // transverse ribs on the valley floor, marching toward the viewer
@@ -415,41 +415,68 @@ const glide = {
       g.fillRect(px(-half, z), y, px(half, z) - px(-half, z), Math.max(1, k/(z*z)*0.05));
     }
 
-    // Valley walls. A wall is the STRIP between its ridge line and the
-    // floor line at the same depth — not a polygon closed to the bottom of
-    // the screen, which is what the first two attempts did and which hid
-    // the valley floor entirely. Three value steps per wall, because flat
-    // colour only reads as depth when the values are stepped.
-    const wallStrip = (sign, hw, body, shade, lit) => {
-      const ridge = [], base = [];
-      for (let i = 0; i <= 11; i++){
-        const z = 0.42 + i*0.62;
+    // Valley walls. Each wall is ONE flat wedge: from the vanishing point,
+    // out along a rising ridge to the screen edge, down to the bottom
+    // corner, then back along the bottom only as far as the floor's edge —
+    // which leaves a corridor of valley floor down the middle.
+    //
+    // Two earlier attempts failed in opposite directions: closing the
+    // polygon upward filled the sky, and building it as a ridge-to-floor
+    // strip collapsed to nothing at depth. A wedge cannot do either.
+    const FLOOR_HALF = 0.34;        // how much floor is left in the middle
+    const wedge = (sign, hw, fill, shadeFill) => {
+      const edgeX = sign > 0 ? W + 12 : -12;
+      const pts = [[W*0.5, horizon]];
+      for (let i = 1; i <= 12; i++){
+        const z = 0.45 + i*0.55;
         const r = 0.34 + hash(i*7 + (sign>0?11:23))*0.5;
         const x = px(sign*hw, z);
-        ridge.push([x, py(z) - (k/z)*r*0.5]);
-        base.push([x, py(z)]);
-        if (sign > 0 ? x > W + 14 : x < -14) break;
+        pts.push([x, py(z) - (k/z)*r*0.5]);
+        if (sign > 0 ? x > W + 10 : x < -10) break;
       }
-      const strip = (top, bot, fill) => {
-        g.fillStyle = fill;
-        g.beginPath();
-        top.forEach(([x,y], i) => i ? g.lineTo(x,y) : g.moveTo(x,y));
-        for (let i = bot.length-1; i >= 0; i--) g.lineTo(bot[i][0], bot[i][1]);
-        g.closePath(); g.fill();
-      };
-      // body: ridge down to the floor
-      strip(ridge, base, body);
-      // talus: the lower third, a step darker, sitting on the floor
-      const mid = ridge.map(([x,y], i) => [x, y + (base[i][1]-y)*0.62]);
-      strip(mid, base, shade);
-      // a lit band just under the ridge on the sunlit side
-      if (lit){
-        const under = ridge.map(([x,y], i) => [x, y + (base[i][1]-y)*0.17]);
-        strip(ridge, under, lit);
+      g.fillStyle = fill;
+      g.beginPath();
+      pts.forEach(([x,y], i) => i ? g.lineTo(x,y) : g.moveTo(x,y));
+      g.lineTo(edgeX, pts[pts.length-1][1]);
+      g.lineTo(edgeX, H + 12);
+      g.lineTo(px(sign*FLOOR_HALF, 0.42), H + 12);
+      g.closePath(); g.fill();
+
+      // the lower slope of the wall, one value darker, meeting the floor
+      g.fillStyle = shadeFill;
+      g.beginPath();
+      g.moveTo(W*0.5, horizon);
+      for (let i = 1; i <= 12; i++){
+        const z = 0.45 + i*0.55;
+        g.lineTo(px(sign*hw*0.55, z), py(z) - (k/z)*0.07);
+        if ((sign>0 ? px(sign*hw*0.55, z) : -px(sign*hw*0.55, z)) > W) break;
       }
+      g.lineTo(edgeX, H + 12);
+      g.lineTo(px(sign*FLOOR_HALF, 0.42), H + 12);
+      g.closePath(); g.fill();
     };
-    wallStrip(-1, 0.80, P.wallL, P.wallLs, P.wallLit);
-    wallStrip( 1, 0.92, P.wallR, P.wallRs, null);
+    wedge(-1, 0.88, P.wallL, P.wallLs);
+    wedge( 1, 1.00, P.wallR, P.wallRs);
+
+    // a lit rim on the sunward ridge: one hard shape, no gradient
+    g.fillStyle = P.wallLit;
+    g.beginPath();
+    g.moveTo(W*0.5, horizon);
+    for (let i = 1; i <= 12; i++){
+      const z = 0.45 + i*0.55;
+      const r = 0.34 + hash(i*7 + 11)*0.5;
+      const x = px(-0.88, z);
+      g.lineTo(x, py(z) - (k/z)*r*0.5);
+      if (x < -10) break;
+    }
+    for (let i = 12; i >= 1; i--){
+      const z = 0.45 + i*0.55;
+      const r = 0.34 + hash(i*7 + 11)*0.5;
+      const x = px(-0.88, z);
+      if (x < -10) continue;
+      g.lineTo(x + W*0.010, py(z) - (k/z)*r*0.5 + (k/z)*0.05);
+    }
+    g.closePath(); g.fill();
 
     // THE BREATH: the glider climbs on the inhale, sinks on the exhale
     const gy = horizon - H*0.02 - smooth(lv)*H*0.20;
