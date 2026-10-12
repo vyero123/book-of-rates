@@ -107,7 +107,9 @@ export async function initAudio(){
  *  sample, so the impulse is energy-normalised — without that a sustained
  *  pad integrates and runs away. */
 export function applySpace({ decay=3.0, tilt=2400, pre=0.02, wet:wetAmt=0.55, curve=2.8 } = {}){
-  if (!ctx) return;
+  // Guard every node: a caller that runs before initAudio used to crash
+  // here with 'cannot set buffer of null'.
+  if (!ctx || !verb || !wetLP || !preDelay || !wet) return;
   const n = Math.max(1, Math.floor(ctx.sampleRate*decay));
   const ir = ctx.createBuffer(2, n, ctx.sampleRate);
   for (let c=0;c<2;c++){
@@ -878,6 +880,7 @@ export class Music {
   }
   begin(){
     if (this.live) return;
+    if (!ctx) return;          // no audio yet: the session still runs silently
     applySpace(this.def.space || {});
     setTrim(this.def.trim ?? 1);
     this.layers = this.def.make();

@@ -127,9 +127,21 @@ export function openGate(onDone){
   };
 }
 
-/** Run the gate if it has never been passed; otherwise call straight through. */
+/** Gate a caller that looks like:
+ *
+ *      if (requireGate(() => begin())) return;   // ...then carry on
+ *
+ *  Returns TRUE if the gate was opened and the caller should stop; the
+ *  callback runs once the reader has acknowledged. Returns FALSE if the
+ *  gate was already passed, and the caller simply continues.
+ *
+ *  It must NOT invoke the callback in the already-passed case. The first
+ *  version did, so `begin()` called requireGate, which called `() =>
+ *  begin()`, which called requireGate... a stack overflow on every single
+ *  attempt to start a session. The scene still rendered from the idle
+ *  loop, so it looked like the breath was simply stuck on the inhale. */
 export function requireGate(onReady){
-  if (gatePassed()){ onReady(); return false; }
+  if (gatePassed()) return false;
   openGate(onReady);
   return true;
 }
