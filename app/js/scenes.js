@@ -374,9 +374,9 @@ export const SCENES = { gallop, swell, glide };
 /** Which scene a rung gets. Motion energy maps to rate: the faster the
  *  breathing, the more active the world. */
 export function sceneForBeats(beats){
-  if (beats <= 18) return gallop;
-  if (beats <= 22) return swell;
-  return glide;
+  if (beats <= 18) return gallop;   // 7.5 - 6.7 /min
+  if (beats <= 20) return swell;    // 6.0 /min
+  return glide;                     // 5.45 /min and slower
 }
 
 /** The scene list a whole session will pass through, in order. */
