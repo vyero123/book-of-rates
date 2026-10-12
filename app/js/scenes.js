@@ -337,23 +337,30 @@ const glide = {
       g.fillRect(px(-half, z), y, px(half, z) - px(-half, z), Math.max(1, k/(z*z)*0.05));
     }
 
-    // valley walls: flat silhouettes converging on the vanishing point
-    const wall = (sign, fill, inset) => {
+    // Valley walls. Built from the vanishing point outward, following the
+    // ridge, then DOWN the screen edge and back along the bottom — a wall
+    // closed upward instead fills the sky, which is what it did at first.
+    const wall = (sign, fill, hw) => {
       g.fillStyle = fill;
       g.beginPath();
-      g.moveTo(W*0.5 + sign*W*0.02, horizon);
-      for (let i = 1; i <= 7; i++){
-        const z = i*0.9;
-        const xw = (0.5 + i*0.42)*sign*inset;
-        const ridge = 0.55 + hash(i*7 + (sign>0?11:23))*0.7;
-        g.lineTo(px(xw, z), py(z) - (k/z)*ridge*0.42);
+      g.moveTo(W*0.5, horizon);
+      let lastX = W*0.5, lastY = horizon;
+      for (let i = 1; i <= 9; i++){
+        const z = 0.55 + i*0.75;
+        const ridge = 0.42 + hash(i*7 + (sign>0?11:23))*0.55;
+        const x = px(sign*hw, z);
+        const y = py(z) - (k/z)*ridge*0.5;
+        g.lineTo(x, y);
+        lastX = x; lastY = y;
+        if (sign > 0 ? x > W + 8 : x < -8) break;
       }
-      g.lineTo(sign > 0 ? W+6 : -6, -6);
-      g.lineTo(W*0.5, -6);
+      g.lineTo(sign > 0 ? W+8 : -8, lastY);
+      g.lineTo(sign > 0 ? W+8 : -8, H+8);
+      g.lineTo(W*0.5, H+8);
       g.closePath(); g.fill();
     };
-    wall(-1, P.wallL, 1.0);
-    wall( 1, P.wallR, 1.0);
+    wall(-1, P.wallL, 0.95);
+    wall( 1, P.wallR, 1.05);
 
     // THE BREATH: the glider climbs on the inhale, sinks on the exhale
     const gy = horizon - H*0.02 - smooth(lv)*H*0.20;
