@@ -397,6 +397,11 @@ async function openGateAgain(){
 document.querySelectorAll('a.entry').forEach(a => {
   a.addEventListener('click', () => save());
 });
+
+/* offline: register once, fail quietly */
+if ('serviceWorker' in navigator){
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>

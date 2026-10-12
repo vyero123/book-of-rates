@@ -31,6 +31,14 @@
   #fill{height:100%;width:0;background:rgba(243,234,215,.7)}
 
 
+  /* --- eyes closed: the screen stops being the instrument --- */
+  body.eyes #cue, body.eyes #bar, body.eyes canvas#c, body.eyes #slider,
+  body.eyes #btns, body.eyes #holdHint{opacity:.06;transition:opacity 1.2s}
+  body.eyes #caution{opacity:.25}
+  #eyesNote{position:fixed;left:0;right:0;top:44%;z-index:36;display:none;text-align:center;
+    pointer-events:none;padding:0 32px;font:400 12px/1.7 ui-sans-serif;color:rgba(243,234,215,.5)}
+  body.eyes #eyesNote{display:block}
+
   /* --- interaction overlays. Expressive only: nothing here can fail. --- */
   #slider{position:fixed;top:26%;bottom:22%;width:62px;z-index:35;display:none;
     touch-action:none}
@@ -109,6 +117,7 @@
 <div id="slider"><div class="trk"></div><div class="kn"></div></div>
 <div id="btns"><button id="btnL">Breathe in</button><button id="btnR">Breathe out</button></div>
 <div id="holdHint">hold anywhere · lift whenever you like</div>
+<div id="eyesNote">Put the phone down and close your eyes.<br>A rising tone begins each breath in, a falling one each breath out.<br>The stop button still works.</div>
 <div id="cue"><div id="phase"></div><div id="scene"></div></div>
 <div id="bar"><div id="fill"></div></div>
 <div id="caution">Sit or lie down. Never in or near water, or while driving.</div>
@@ -128,6 +137,8 @@
   <h2>How wound up are you?</h2><div class="row" id="optEntry"></div>
   <h2>Length</h2><div class="row" id="optLen"></div>
   <h2>Sound</h2><div class="row" id="optSound"></div>
+  <h2>Eyes closed</h2><div class="row" id="optEyes"></div>
+  <p class="note">Audio-led, with a tone at each turnaround. Haptics are used where the browser supports them — iPhone Safari does not, so on an iPhone the sound is doing all of it.</p>
   <p class="note" id="planNote"></p>
   <button id="close">DONE</button>
 </div>
@@ -142,7 +153,7 @@
 </div>
 
 <script type="module">
-import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeOut }
+import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeOut, marker }
   from './js/audio.js';
 import { Transport, buildSession, query, levelAt, rateTrack } from './js/engine.js';
 import { journeyById, journeyPlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
@@ -161,7 +172,7 @@ const pickScene = beats => JOURNEY.fixedScene ? ALL_SCENES[JOURNEY.fixedScene]
                                               : sceneForBeats(beats);
 const INPUT = { down:false, x:0, y:0, slider:0.5, left:false, right:false };
 const PREF = (() => {
-  let p = { entry:'', len:'standard', sound:true, hand:'right' };
+  let p = { entry:'', len:'standard', sound:true, hand:'right', eyesClosed:false };
   try { Object.assign(p, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
   return p;
 })();
@@ -202,6 +213,9 @@ function buildDrawer(){
       `<button class="opt" data-k="entry" data-v="${e.id}">${e.label}</button>`).join('');
   d('optLen').innerHTML = Object.values(LENGTHS).map(l =>
     `<button class="opt" data-k="len" data-v="${l.id}">${l.label}</button>`).join('');
+  d('optEyes').innerHTML =
+    `<button class="opt" data-k="eyesClosed" data-v="false">Normal</button>
+     <button class="opt" data-k="eyesClosed" data-v="true">Eyes closed</button>`;
   d('optSound').innerHTML =
     `<button class="opt" data-k="sound" data-v="true">Sound on</button>` +
     `<button class="opt" data-k="sound" data-v="false">Silent</button>`;
@@ -232,6 +246,13 @@ buildDrawer();
 d('more').onclick = () => d('drawer').classList.add('open');
 d('close').onclick = () => d('drawer').classList.remove('open');
 
+
+/* Haptics. iOS Safari does not implement navigator.vibrate, so on an
+   iPhone this is a no-op and the audio cue is doing all the work. Said
+   plainly in the options rather than pretended otherwise. */
+function buzz(pattern){
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e){}
+}
 
 /* ---------- interaction overlays ----------
  * Every one of these is EXPRESSIVE. The session advances on the schedule
@@ -287,7 +308,11 @@ d('begin').onclick = () => begin();
 d('stop').onclick  = () => finish(false);
 d('again').onclick = () => { location.href = './index.html'; };
 
+function applyEyesClosed(on){
+  document.body.classList.toggle('eyes', on);
+}
 async function begin(){
+  applyEyesClosed(PREF.eyesClosed);
   if (requireGate(() => begin())) return;   // rules first, always
   d('start').classList.add('gone');
   session = buildPlan();
@@ -298,7 +323,16 @@ async function begin(){
   music = new Music(pickScene(session.stages[0].protocol.cycleBeats).theme);
   music.begin();
   tp = new Transport(ctx);
-  tp.onBeat = (when, i, info) => music && music.beat(when, i, info);
+  tp.onBeat = (when, i, info) => {
+    if (music) music.beat(when, i, info);
+    // Eyes-closed: an audible and (where supported) tactile turnaround,
+    // so a whole session can be run with the phone face down.
+    if (PREF.eyesClosed){
+      const P2 = info.protocol, inB = P2.phases[0].beats;
+      if (info.beatInCycle === 0){ marker(when, true);  buzz([70]); }
+      if (info.beatInCycle === inB){ marker(when, false); buzz([35,60,35]); }
+    }
+  };
   tp.onEnd = () => finish(true);
   await tp.start(session);
   setMuted(!PREF.sound);
@@ -393,6 +427,11 @@ requestAnimationFrame(frame);
 addEventListener('pagehide', () => { if (tp) tp.stop(); if (music) music.end(); closeAudio(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) finish(false); });
 window.__bor = { finish, buildPlan };
+
+/* offline: register once, fail quietly */
+if ('serviceWorker' in navigator){
+  addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>

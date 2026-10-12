@@ -169,6 +169,35 @@ export function meter(){
   const db = x => x<1e-5 ? -100 : 20*Math.log10(x);
   return { ok:true, peak, rms, peakDb:+db(peak).toFixed(1), rmsDb:+db(rms).toFixed(1), reduction:0 };
 }
+/* A soft phase marker for eyes-closed use. The research is clear that the
+ * envelope should carry the turnaround and an event should be secondary
+ * and varied — an identical chime every ten seconds becomes the most
+ * irritating thing in the mix. So this is low, slow-attacked, slightly
+ * different every time, and only used when the reader cannot see. */
+export function marker(when, up){
+  if (!ctx || !master) return;
+  const t = Math.max(when, ctx.currentTime + 0.01);
+  const f0 = up ? 294 : 196;
+  const g1 = ctx.createGain(); g1.gain.value = 1;
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 1400;
+  g1.connect(lp); lp.connect(dry);
+  const w = ctx.createGain(); w.gain.value = 0.5; lp.connect(w); w.connect(wet);
+  [[1,1.0],[2,0.22],[3,0.08]].forEach(([h,a]) => {
+    const o = ctx.createOscillator(); o.type='sine';
+    const jitter = 1 + (Math.random()*0.012 - 0.006);
+    o.frequency.setValueAtTime(f0*h*jitter, t);
+    o.frequency.linearRampToValueAtTime(f0*h*jitter*(up?1.045:0.955), t+0.5);
+    const g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0, t);
+    g2.gain.linearRampToValueAtTime(0.09*a, t+0.09);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t+0.95);
+    o.connect(g2); g2.connect(g1);
+    o.start(t); o.stop(t+1.0);
+  });
+  setTimeout(() => { try { g1.disconnect(); } catch(e){} },
+             Math.max(0, (t - ctx.currentTime + 1.3))*1000);
+}
+
 export function waveform(arr){ if (!analyser) return false; analyser.getByteTimeDomainData(arr); return true; }
 export function fftSize(){ return analyser ? analyser.fftSize : 1024; }
 
