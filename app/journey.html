@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>The Book of Rates — a journey</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;
+    -webkit-user-select:none;user-select:none}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0C0716;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  canvas#c{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  /* --- the only thing always on screen --- */
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:40;
+    appearance:none;border:0;border-radius:999px;padding:11px 17px 11px 14px;
+    display:flex;align-items:center;gap:8px;background:rgba(12,7,22,.5);
+    backdrop-filter:blur(6px);color:#F3EAD7;font:600 12px/1 ui-sans-serif;
+    letter-spacing:.14em;box-shadow:0 0 0 1.5px rgba(243,234,215,.35)}
+  #stop i{width:10px;height:10px;background:#E8473C;display:block;border-radius:2px}
+
+  #cue{position:fixed;left:0;right:0;bottom:max(54px,calc(env(safe-area-inset-bottom) + 46px));
+    z-index:30;text-align:center;pointer-events:none;color:#F6E7C9}
+  #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 16px rgba(12,7,22,.75);transition:opacity .5s}
+  #scene{margin-top:8px;font:500 9px/1 ui-sans-serif;letter-spacing:.24em;
+    opacity:.5;text-transform:uppercase}
+  #bar{position:fixed;left:0;right:0;bottom:max(26px,calc(env(safe-area-inset-bottom) + 18px));
+    z-index:30;height:2px;margin:0 34px;background:rgba(243,234,215,.16);pointer-events:none}
+  #fill{height:100%;width:0;background:rgba(243,234,215,.7)}
+
+  /* --- start card --- */
+  #start{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:28px;
+    background:#14183F;text-align:center}
+  #start.gone{display:none}
+  .plate{max-width:320px}
+  .rule{height:1px;background:rgba(243,234,215,.25);margin:16px 0}
+  #start h1{margin:0;font:300 30px/1.15 ui-serif,Georgia,serif;color:#F3EAD7;letter-spacing:.01em}
+  #start .ch{font:500 9px/1.5 ui-sans-serif;letter-spacing:.26em;text-transform:uppercase;
+    color:rgba(243,234,215,.45);margin-bottom:8px}
+  #start p{font:400 13px/1.7 ui-sans-serif;color:rgba(243,234,215,.7);margin:0 0 20px}
+  #begin{appearance:none;border:0;border-radius:999px;padding:15px 34px;background:#F3EAD7;
+    color:#14183F;font:600 11px/1 ui-sans-serif;letter-spacing:.2em}
+  #more{margin-top:16px;background:none;border:0;color:rgba(243,234,215,.4);
+    font:500 9px/1 ui-sans-serif;letter-spacing:.18em;text-transform:uppercase}
+
+  /* --- everything numeric lives in here, closed by default --- */
+  #drawer{position:fixed;inset:0;z-index:60;background:rgba(12,7,22,.95);display:none;
+    overflow:auto;padding:30px 20px 60px}
+  #drawer.open{display:block}
+  #drawer h2{font:600 9px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(243,234,215,.4);margin:20px 0 9px}
+  #drawer .row{display:flex;flex-wrap:wrap;gap:6px}
+  #drawer button.opt{appearance:none;border:0;border-radius:999px;padding:10px 13px;
+    font:600 9.5px/1 ui-sans-serif;background:rgba(243,234,215,.1);color:rgba(243,234,215,.8)}
+  #drawer button.opt.on{background:#F3EAD7;color:#14183F}
+  #close{width:100%;appearance:none;border:0;border-radius:10px;padding:14px 0;margin-top:26px;
+    background:rgba(243,234,215,.14);color:#F3EAD7;font:600 11px/1 ui-sans-serif;letter-spacing:.18em}
+  #drawer .note{font:400 11px/1.6 ui-sans-serif;color:rgba(243,234,215,.4);margin-top:14px}
+
+  /* --- end card --- */
+  #end{position:fixed;inset:0;z-index:55;display:none;place-items:center;
+    background:rgba(8,10,34,.92);padding:30px;text-align:center}
+  #end.on{display:grid}
+  #end h2{margin:0 0 6px;font:300 26px/1.2 ui-serif,Georgia,serif;color:#F3EAD7}
+  #end p{margin:0 0 18px;font:400 12.5px/1.7 ui-sans-serif;color:rgba(243,234,215,.62);max-width:280px}
+  #ink{display:block;width:230px;height:230px;margin:0 auto 18px}
+  #again{appearance:none;border:0;border-radius:999px;padding:13px 26px;background:#F3EAD7;
+    color:#14183F;font:600 11px/1 ui-sans-serif;letter-spacing:.18em}
+
+  /* --- the caution lives at the bottom, not in the way --- */
+  #caution{position:fixed;left:0;right:0;bottom:max(6px,env(safe-area-inset-bottom));z-index:30;
+    text-align:center;font:400 8.5px/1.45 ui-sans-serif;color:rgba(243,234,215,.34);
+    letter-spacing:.05em;padding:0 22px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="stop" aria-label="Stop"><i></i>STOP</button>
+<div id="cue"><div id="phase"></div><div id="scene"></div></div>
+<div id="bar"><div id="fill"></div></div>
+<div id="caution">Sit or lie down. Never in or near water, or while driving.</div>
+
+<div id="start">
+  <div class="plate">
+    <div class="ch">Chapter one</div>
+    <h1>The Long Shore</h1>
+    <div class="rule"></div>
+    <p>A ride, a crossing and a long glide down. The world changes as your
+       breathing slows; you do not have to do anything but follow it.</p>
+    <button id="begin">BEGIN</button>
+    <div><button id="more">Options</button></div>
+  </div>
+</div>
+
+<div id="drawer">
+  <h2>How wound up are you?</h2><div class="row" id="optEntry"></div>
+  <h2>Destination</h2><div class="row" id="optDest"></div>
+  <h2>Length</h2><div class="row" id="optLen"></div>
+  <h2>Sound</h2><div class="row" id="optSound"></div>
+  <p class="note" id="planNote"></p>
+  <button id="close">DONE</button>
+</div>
+
+<div id="end">
+  <div>
+    <h2>Arrived</h2>
+    <p>Your breathing drew this. Nothing is counted and nothing is kept but the picture.</p>
+    <canvas id="ink" width="460" height="460"></canvas>
+    <button id="again">CLOSE</button>
+  </div>
+</div>
+
+<script type="module">
+import { initAudio, closeAudio, Music, setMuted, isMuted, setTrim, fadeIn, fadeOut }
+  from './js/audio.js';
+import { Transport, buildSession, query, levelAt, rateTrack } from './js/engine.js';
+import { plan as makePlan, ENTRY, RATES, LENGTHS } from './js/protocols.js';
+import { sceneForBeats } from './js/scenes.js';
+import { PageTurn } from './js/pageturn.js';
+
+/* ---------- preferences: remembered, never scored ---------- */
+const PREF = (() => {
+  let p = { entry:'busy', dest:'calm', len:'standard', sound:true };
+  try { Object.assign(p, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
+  return p;
+})();
+const savePref = () => { try { localStorage.setItem('bor.pref', JSON.stringify(PREF)); } catch(e){} };
+
+/* ---------- canvas ---------- */
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+let W=0, H=0, DPR=1, grain=null;
+function fit(){
+  DPR = Math.min(window.devicePixelRatio||1, 2.5);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+  g.setTransform(DPR,0,0,DPR,0,0);
+  const n=140, tc=document.createElement('canvas'); tc.width=tc.height=n;
+  const tg=tc.getContext('2d'), d=tg.createImageData(n,n);
+  for (let i=0;i<n*n;i++){ const v=118+(Math.random()*76|0);
+    d.data[i*4]=d.data[i*4+1]=d.data[i*4+2]=v; d.data[i*4+3]=22+(Math.random()*26|0); }
+  tg.putImageData(d,0,0); grain = g.createPattern(tc,'repeat');
+}
+addEventListener('resize', fit); fit();
+
+/* ---------- state ---------- */
+let tp=null, music=null, session=null, turn=new PageTurn();
+let curScene=null, inkTrail=[];
+
+function buildPlan(){
+  const rungs = makePlan({ fromBeats: ENTRY[PREF.entry].beats, toBeats: RATES[PREF.dest].beats });
+  return buildSession(rungs, LENGTHS[PREF.len].cycles);
+}
+
+/* ---------- options drawer: everything numeric hides in here ---------- */
+const d = id => document.getElementById(id);
+function buildDrawer(){
+  d('optEntry').innerHTML = Object.values(ENTRY).map(e =>
+    `<button class="opt" data-k="entry" data-v="${e.id}">${e.label}</button>`).join('');
+  d('optDest').innerHTML = Object.entries(RATES).map(([k,v]) =>
+    `<button class="opt" data-k="dest" data-v="${k}">${v.label}</button>`).join('');
+  d('optLen').innerHTML = Object.values(LENGTHS).map(l =>
+    `<button class="opt" data-k="len" data-v="${l.id}">${l.label}</button>`).join('');
+  d('optSound').innerHTML =
+    `<button class="opt" data-k="sound" data-v="true">Sound on</button>` +
+    `<button class="opt" data-k="sound" data-v="false">Silent</button>`;
+  document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+    const v = b.dataset.v;
+    PREF[b.dataset.k] = (v === 'true') ? true : (v === 'false') ? false : v;
+    savePref(); markOpts(); notePlan();
+  });
+  markOpts(); notePlan();
+}
+function markOpts(){
+  document.querySelectorAll('.opt').forEach(b =>
+    b.classList.toggle('on', String(PREF[b.dataset.k]) === b.dataset.v));
+}
+function notePlan(){
+  const s = buildPlan(), tr = rateTrack(s);
+  const scenes = [...new Set(tr.map(r => sceneForBeats(r.beats).name))];
+  d('planNote').textContent =
+    `${tr.length} rungs, ${tr[0].rate.toFixed(2)} down to ${tr[tr.length-1].rate.toFixed(2)} ` +
+    `breaths per minute, ${(s.duration/60).toFixed(1)} minutes, one tempo throughout. ` +
+    `Scenes: ${scenes.join(' to ')}.`;
+}
+buildDrawer();
+d('more').onclick = () => d('drawer').classList.add('open');
+d('close').onclick = () => d('drawer').classList.remove('open');
+
+/* ---------- transport ---------- */
+d('begin').onclick = () => begin();
+d('stop').onclick  = () => finish(false);
+d('again').onclick = () => { d('end').classList.remove('on'); d('start').classList.remove('gone'); };
+
+async function begin(){
+  d('start').classList.add('gone');
+  session = buildPlan();
+  inkTrail = [];
+  curScene = null;
+  const ctx = await initAudio();
+  music = new Music(sceneForBeats(session.stages[0].protocol.cycleBeats).theme);
+  music.begin();
+  tp = new Transport(ctx);
+  tp.onBeat = (when, i, info) => music && music.beat(when, i, info);
+  tp.onEnd = () => finish(true);
+  await tp.start(session);
+  setMuted(!PREF.sound);
+  fadeIn(2.4);
+}
+
+async function finish(complete){
+  if (tp) tp.stop();
+  if (music){ music.end(); music = null; }
+  fadeOut(1.0);
+  setTimeout(() => closeAudio(), 1400);
+  d('phase').textContent = ''; d('scene').textContent = '';
+  if (complete){ drawInk(); d('end').classList.add('on'); }
+  else d('start').classList.remove('gone');
+}
+
+/* ---------- the end-of-session artefact: the Still Pool spiral ---------- */
+function drawInk(){
+  const c = d('ink'), ig = c.getContext('2d');
+  const S = c.width;
+  ig.clearRect(0,0,S,S);
+  ig.fillStyle = '#0E1230'; ig.fillRect(0,0,S,S);
+  if (!inkTrail.length) return;
+  ig.strokeStyle = 'rgba(70,214,200,0.0)';
+  for (let i = 1; i < inkTrail.length; i++){
+    const a = inkTrail[i-1], b = inkTrail[i];
+    ig.beginPath(); ig.moveTo(a.x*S, a.y*S); ig.lineTo(b.x*S, b.y*S);
+    ig.strokeStyle = `rgba(70,214,200,${0.10 + b.w*0.5})`;
+    ig.lineWidth = 1 + b.w*7;
+    ig.lineCap = 'round';
+    ig.stroke();
+  }
+}
+
+/* ---------- frame ---------- */
+let lastLv = 0;
+function frame(now){
+  const t = now/1000;
+  if (tp && (tp.state === 'running')){
+    const time = tp.time;
+    const q = query(session, time);
+    const scene = sceneForBeats(q.protocol.cycleBeats);
+
+    // a rung that changes the scene turns the page
+    if (curScene && scene !== curScene) turn.begin(cv);
+    curScene = scene;
+
+    const lv = q.level;
+    const dlv = lv - lastLv; lastLv = lv;
+    scene.draw({ g, W, H, t, lv, dlv, info: q });
+
+    // grain and vignette over the scenery, never over the UI
+    if (grain){ g.save(); g.globalAlpha = 0.42; g.fillStyle = grain; g.fillRect(0,0,W,H); g.restore(); }
+    const vg = g.createRadialGradient(W*0.5,H*0.46,H*0.18,W*0.5,H*0.5,H*0.82);
+    vg.addColorStop(0,'rgba(12,7,22,0)'); vg.addColorStop(1,'rgba(12,7,22,0.44)');
+    g.fillStyle = vg; g.fillRect(0,0,W,H);
+
+    turn.draw(g, W, H, t);
+
+    // the ink record: one point per frame on a slowly tightening spiral
+    const prog = Math.min(1, time/session.duration);
+    const th = -Math.PI/2 + prog*(session.duration/11)*Math.PI*2*0.5;
+    const r  = (0.40 + (0.05-0.40)*prog) + (lv-0.5)*0.055;
+    if (inkTrail.length === 0 || prog - inkTrail[inkTrail.length-1].p > 0.0016){
+      inkTrail.push({ x:0.5+Math.cos(th)*r, y:0.5+Math.sin(th)*r*0.96, w:1-lv, p:prog });
+    }
+
+    const words = { in:'breathe in', out:'breathe out', hold:'hold', holdout:'hold empty' };
+    d('phase').textContent = words[q.phase];
+    d('scene').textContent = scene.name;
+    d('fill').style.width = (prog*100).toFixed(1)+'%';
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- never leave sound running ---------- */
+addEventListener('pagehide', () => { if (tp) tp.stop(); if (music) music.end(); closeAudio(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) finish(false); });
+window.__bor = { finish, buildPlan };
+</script>
+</body>
+</html>
