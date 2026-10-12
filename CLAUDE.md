@@ -88,6 +88,32 @@ Web fetching goes through the provided tools. I used `curl` once to check
 a deployed file; that was wrong even for our own site. Verify from inside
 the page with `fetch`, or use the browser tools.
 
+## The gate only covers what it checks
+
+12 October, in one session, three things got past a passing gate:
+
+1. **A missing export.** `journey.html` imported `resumeAudio` from
+   `audio.js`, which did not export it. Every file parsed cleanly, the gate
+   said OK, and the journey page failed to load entirely in production.
+   Syntax validity is not module validity. `tools/imports.py` now resolves
+   every named import against the target's real exports.
+2. **A shell line that lied.** `check && commit && push` on one line with
+   `echo pushed` on the next printed success for a push the gate had
+   correctly refused. Use `tools/push.sh`: it stages, gates, commits,
+   pushes, and then compares the local head against the remote before
+   claiming anything.
+3. **An abandoned restore.** A "prove the gate catches a break" test broke
+   a file, and `set -e` aborted the script before the restore line ran, so
+   the deliberate breakage was committed. Restore in a trap, or verify the
+   file afterwards.
+
+And the fault underneath all of it: `requireGate(() => begin())` called
+its own callback when the gate had already been passed, so `begin()`
+re-entered itself until the stack overflowed. The scene still drew from
+the idle loop, so it looked exactly like a stuck breath. A render loop
+that keeps running can disguise a control path that is completely dead —
+when something looks frozen, check whether the thing driving it ever ran.
+
 ## Other standing constraints for this project
 
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an
