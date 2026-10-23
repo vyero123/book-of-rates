@@ -209,6 +209,19 @@ const BOTTOM_Y  = -14.4;   // the seabed, where the pearl is
 
 const C = h => new THREE.Color(h);
 
+/* Shared water fog. Without it every plane reads as a flat slab of its own
+   colour all the way to the horizon. Banded, not smooth, so distance still
+   resolves into discrete steps (§4.2 rule 5). uFog is re-tinted each frame
+   from the current depth, so the far water matches the column behind it. */
+const fogCol = C(PAL.high);
+const FOG_GLSL = `
+  uniform vec3 uFog;
+  float fogAmount(float dist){
+    float f = 1.0 - exp(-max(dist - 3.0, 0.0) * 0.062);
+    return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0;
+  }
+`;
+
 /* ------------------------------------------------------------------
    1. THE WATER COLUMN — one fullscreen quad, drawn first.
    Banded depth gradient plus hard-edged shafts of light coming down
@@ -279,7 +292,7 @@ scene.add(waterQuad);
    flat bands with stylised crests.
    ------------------------------------------------------------------ */
 const surfUniforms = {
-  uTime:{value:0}, uCam:{value:new THREE.Vector3()},
+  uTime:{value:0}, uCam:{value:new THREE.Vector3()}, uFog:{value:fogCol},
   uPale:{value:C(PAL.pale)}, uMid:{value:C(PAL.mid)},
   uHigh:{value:C(PAL.high)}, uDeep:{value:C(PAL.deep)}, uWarm:{value:C(PAL.warm)}
 };
@@ -289,6 +302,7 @@ const surfaceMat = new THREE.ShaderMaterial({
     uniform float uTime;
     varying vec3 vWorld;
     varying float vCrest;
+    varying float vDist;
     void main(){
       vec3 p = position;
       float w = sin(p.x * 0.42 + uTime * 0.55) * 0.34
@@ -299,34 +313,40 @@ const surfaceMat = new THREE.ShaderMaterial({
       p.z += w;
       vec4 wp = modelMatrix * vec4(p, 1.0);
       vWorld = wp.xyz;
-      gl_Position = projectionMatrix * viewMatrix * wp;
+      vec4 mv = viewMatrix * wp;
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
     }
   `,
   fragmentShader:`
     precision mediump float;
     varying vec3 vWorld;
     varying float vCrest;
+    varying float vDist;
     uniform vec3 uCam, uPale, uMid, uHigh, uDeep, uWarm;
+    ${FOG_GLSL}
     float band(float x, float n){ return floor(clamp(x,0.0,0.999) * n) / (n - 1.0); }
     void main(){
       // Looking up, the world above is compressed into a bright disc
       // more or less overhead; outside it the surface mirrors the dark
-      // water back down. Four hard bands, no gradient.
+      // water back down. Four hard bands, no gradient. The disc is kept
+      // deliberately small: a wide one fills the top of a phone screen
+      // with one flat slab of pale green and the frame dies.
       float r = length(vWorld.xz - uCam.xz);
       float d = clamp(uCam.y * -1.0, 0.0, 20.0);
-      float win = 1.0 - smoothstep(2.0 + d * 0.42, 9.0 + d * 0.95, r);
+      float win = 1.0 - smoothstep(0.8 + d * 0.10, 4.2 + d * 0.38, r);
       float v = band(win, 4.0);
       vec3 col = mix(uDeep, uHigh, v);
-      col = mix(col, uMid,  smoothstep(0.45, 0.6, v));
-      col = mix(col, uPale, smoothstep(0.78, 0.9, v));
+      col = mix(col, uMid,  step(0.45, v));
+      col = mix(col, uPale, step(0.95, v));
       // crests catch the light as their own hard-edged shapes
-      float c = step(0.58, vCrest) * win;
-      col = mix(col, uWarm, c * 0.5);
-      gl_FragColor = vec4(col, 1.0);
+      float c = step(0.52, vCrest) * step(0.2, win);
+      col = mix(col, uWarm, c * 0.45);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
-const surface = new THREE.Mesh(new THREE.PlaneGeometry(150, 150, 60, 60), surfaceMat);
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(90, 90, 54, 54), surfaceMat);
 surface.rotation.x = -Math.PI / 2;
 surface.position.y = SURFACE_Y;
 scene.add(surface);
@@ -335,28 +355,34 @@ scene.add(surface);
    3. THE SEABED — one plane, faceted, two values.
    ------------------------------------------------------------------ */
 const bedMat = new THREE.ShaderMaterial({
-  uniforms:{ uInk:{value:C(PAL.ink)}, uDeep:{value:C(PAL.deep)} },
+  uniforms:{ uInk:{value:C(PAL.ink)}, uDeep:{value:C(PAL.deep)}, uFog:{value:fogCol} },
   vertexShader:`
     varying float vH;
+    varying float vDist;
     void main(){
       vec3 p = position;
       float h = sin(p.x * 0.21) * 1.5 + sin(p.y * 0.17 + 1.3) * 1.2 + sin((p.x - p.y) * 0.09) * 1.8;
       h = floor(h / 0.75) * 0.75;
       p.z += h; vH = h;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
     }
   `,
   fragmentShader:`
     precision mediump float;
     varying float vH;
+    varying float vDist;
     uniform vec3 uInk, uDeep;
+    ${FOG_GLSL}
     void main(){
       float v = floor(clamp(vH * 0.16 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
-      gl_FragColor = vec4(mix(uInk, uDeep, v * 0.8), 1.0);
+      vec3 col = mix(uInk, uDeep, v * 0.8);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
-const bed = new THREE.Mesh(new THREE.PlaneGeometry(130, 130, 54, 54), bedMat);
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(90, 90, 48, 48), bedMat);
 bed.rotation.x = -Math.PI / 2;
 bed.position.y = BED_Y;
 scene.add(bed);
@@ -372,11 +398,11 @@ function kelpGeometry(n, seg){
   let base = 0;
   for(let i = 0; i < n; i++){
     const ang   = (i / n) * Math.PI * 2 + (i * 2.399);
-    const rad   = 7 + ((i * 7919) % 97) / 97 * 17;
+    const rad   = 5 + ((i * 7919) % 97) / 97 * 14;
     const cx    = Math.cos(ang) * rad;
-    const cz    = Math.sin(ang) * rad - 4;
-    const h     = 5 + ((i * 6367) % 83) / 83 * 7.5;
-    const wBase = 0.16 + ((i * 5281) % 61) / 61 * 0.2;
+    const cz    = Math.sin(ang) * rad - 3;
+    const h     = 5 + ((i * 6367) % 83) / 83 * 8.5;
+    const wBase = 0.34 + ((i * 5281) % 61) / 61 * 0.5;
     const ph    = (i * 1.7) % 6.283;
     for(let s = 0; s <= seg; s++){
       const f = s / seg;
@@ -401,31 +427,35 @@ function kelpGeometry(n, seg){
   return g;
 }
 const kelpMat = new THREE.ShaderMaterial({
-  uniforms:{ uTime:{value:0}, uInk:{value:C(PAL.ink)}, uMid:{value:C(PAL.mid)}, uDeep:{value:C(PAL.deep)} },
+  uniforms:{ uTime:{value:0}, uInk:{value:C(PAL.ink)}, uMid:{value:C(PAL.mid)},
+             uDeep:{value:C(PAL.deep)}, uFog:{value:fogCol} },
   side: THREE.DoubleSide,
   vertexShader:`
     attribute float aH; attribute float aPhase; attribute float aSide;
     uniform float uTime;
-    varying float vH; varying float vSide;
+    varying float vH; varying float vSide; varying float vDist;
     void main(){
       vec3 p = position;
       float bend = aH * aH;                       // rooted at the bottom
       p.x += sin(uTime * 0.42 + aPhase) * bend * 1.25;
       p.z += cos(uTime * 0.33 + aPhase * 1.7) * bend * 0.9;
       vH = aH; vSide = aSide;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
     }
   `,
   fragmentShader:`
     precision mediump float;
-    varying float vH; varying float vSide;
+    varying float vH; varying float vSide; varying float vDist;
     uniform vec3 uInk, uMid, uDeep;
+    ${FOG_GLSL}
     void main(){
       // three values, hue-shifted towards teal rather than darkened
       float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
       vec3 col = mix(uInk, uDeep, v);
       col = mix(col, uMid, step(0.5, vSide) * 0.22 * v);
-      gl_FragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
@@ -447,6 +477,7 @@ const armL  = new THREE.Mesh(sphere, inkMat); armL.scale.set(0.075, 0.42, 0.075)
 armL.position.set(-0.26, 0.34, 0); armL.rotation.z = 0.30;
 const armR  = armL.clone(); armR.position.x = 0.26; armR.rotation.z = -0.30;
 diver.add(torso, head, legs, armL, armR);
+diver.scale.setScalar(0.62);     // §4.2 rule 6: a tiny figure in a lot of water
 scene.add(diver);
 
 /* ------------------------------------------------------------------
@@ -510,6 +541,7 @@ let camY = TOP_Y + 2.0;
 
 const vBed  = new THREE.Vector3();
 const vHand = new THREE.Vector3();
+const cHigh = C(PAL.high), cDeep = C(PAL.deep), cInk = C(PAL.ink);
 
 function frame(now){
   rafId = requestAnimationFrame(frame);
@@ -538,11 +570,11 @@ function frame(now){
   halo.material.opacity = 0.055 + cr * 0.075;
 
   // --- camera: trails her, with a lag, so the water moves past ---
-  const wantY = diver.position.y + 1.45;
+  const wantY = diver.position.y + 1.9;
   camY += (wantY - camY) * Math.min(1, dt * 1.5);
-  const back = camera.aspect < 0.75 ? 8.2 : 10.5;
+  const back = camera.aspect < 0.75 ? 11.5 : 14.0;
   camera.position.set(Math.sin(t * 0.055) * 1.1, camY, back + Math.cos(t * 0.04) * 0.6);
-  camera.lookAt(diver.position.x * 0.5, diver.position.y + 0.1, 0);
+  camera.lookAt(diver.position.x * 0.5, diver.position.y + 0.35, 0);
 
   // --- uniforms ---
   const dn = Math.min(1, Math.max(0, (SURFACE_Y - camera.position.y) / (SURFACE_Y - BED_Y)));
@@ -551,6 +583,9 @@ function frame(now){
   surfUniforms.uTime.value   = t;
   surfUniforms.uCam.value.copy(camera.position);
   kelpMat.uniforms.uTime.value = t;
+  // the fog is the water at this depth, so distant geometry dissolves into
+  // the column behind it instead of ending in a hard black horizon
+  fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.45);
 
   // --- cue text + session bar ---
   if(st.p.label !== elPhase.textContent){
