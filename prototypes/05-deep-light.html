@@ -204,7 +204,7 @@ const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 120);
 
 const SURFACE_Y = 0;
 const BED_Y     = -17;
-const TOP_Y     = -2.4;    // where she floats at the top of the inhale
+const TOP_Y     = -4.2;    // where she floats at the top of the inhale
 const BOTTOM_Y  = -14.4;   // the seabed, where the pearl is
 
 const C = h => new THREE.Color(h);
@@ -346,7 +346,8 @@ const surfaceMat = new THREE.ShaderMaterial({
     }
   `
 });
-const surface = new THREE.Mesh(new THREE.PlaneGeometry(90, 90, 54, 54), surfaceMat);
+// Big enough that its own edge is beyond the fog and never shows as a seam.
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 56, 56), surfaceMat);
 surface.rotation.x = -Math.PI / 2;
 surface.position.y = SURFACE_Y;
 scene.add(surface);
@@ -382,7 +383,7 @@ const bedMat = new THREE.ShaderMaterial({
     }
   `
 });
-const bed = new THREE.Mesh(new THREE.PlaneGeometry(90, 90, 48, 48), bedMat);
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 50, 50), bedMat);
 bed.rotation.x = -Math.PI / 2;
 bed.position.y = BED_Y;
 scene.add(bed);
@@ -461,6 +462,50 @@ const kelpMat = new THREE.ShaderMaterial({
 });
 const kelp = new THREE.Mesh(kelpGeometry(26, 12), kelpMat);
 scene.add(kelp);
+
+/* ------------------------------------------------------------------
+   4b. LIGHT SHAFTS — one camera-facing plane hung in the water.
+   Painting them into the background quad did not work: the surface and
+   the bed cover most of that quad, so the shafts were never on screen.
+   They have to be an object standing in the water column. Hard-edged
+   wedges, three quantised steps, additive, no depth write.
+   ------------------------------------------------------------------ */
+const shaftMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime:{value:0}, uWarm:{value:C(PAL.warm)}, uPale:{value:C(PAL.pale)} },
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+  vertexShader:`
+    varying vec3 vW;
+    void main(){
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vW = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vW;
+    uniform float uTime;
+    uniform vec3 uWarm, uPale;
+    void main(){
+      // the shafts lean, so x shifts as you go down
+      float x = vW.x + vW.y * 0.26;
+      float s = sin(x * 0.46 + uTime * 0.035) * 0.5 + 0.5;
+      s *= sin(x * 0.19 - uTime * 0.022 + 1.9) * 0.5 + 0.5;
+      s = smoothstep(0.30, 0.78, s);
+      s = floor(clamp(s, 0.0, 0.999) * 3.0) / 2.0;      // three hard steps
+      // strongest just under the surface, gone by the seabed
+      float fall = smoothstep(-15.0, -2.0, vW.y);
+      float a = s * fall * 0.17;
+      gl_FragColor = vec4(mix(uPale, uWarm, 0.5) * a, a);
+    }
+  `
+});
+// Fixed in the world, tall enough to cover the whole descent, so the
+// camera really does travel down past them.
+const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), shaftMat);
+shafts.position.set(0, -9, -9);
+shafts.renderOrder = 5;
+scene.add(shafts);
 
 /* ------------------------------------------------------------------
    5. THE DIVER — a tiny generic silhouette, flat ink, no interior
@@ -570,7 +615,7 @@ function frame(now){
   halo.material.opacity = 0.055 + cr * 0.075;
 
   // --- camera: trails her, with a lag, so the water moves past ---
-  const wantY = diver.position.y + 1.9;
+  const wantY = diver.position.y + 1.15;
   camY += (wantY - camY) * Math.min(1, dt * 1.5);
   const back = camera.aspect < 0.75 ? 11.5 : 14.0;
   camera.position.set(Math.sin(t * 0.055) * 1.1, camY, back + Math.cos(t * 0.04) * 0.6);
@@ -583,6 +628,7 @@ function frame(now){
   surfUniforms.uTime.value   = t;
   surfUniforms.uCam.value.copy(camera.position);
   kelpMat.uniforms.uTime.value = t;
+  shaftMat.uniforms.uTime.value = t;
   // the fog is the water at this depth, so distant geometry dissolves into
   // the column behind it instead of ending in a hard black horizon
   fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.45);
