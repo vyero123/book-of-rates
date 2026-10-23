@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Book of Rates — Prototype 5: Deep Light (3-D)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#06181F;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(6,24,31,.5);backdrop-filter:blur(6px);
+    color:#F2E3C8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(242,227,200,.4)}
+  #stop i{width:11px;height:11px;background:#E8473C;display:block;border-radius:2px}
+
+  #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
+    font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+    color:rgba(242,227,200,.42);background:rgba(6,24,31,.32);border-radius:6px;
+    padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
+  #fps.off{opacity:0;pointer-events:none}
+  #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
+    width:22px;height:22px;border-radius:50%;display:none}
+  #fpsdot.on{display:block}
+
+  #cue{position:fixed;left:0;right:0;bottom:max(58px,calc(env(safe-area-inset-bottom) + 50px));
+    z-index:20;text-align:center;pointer-events:none;color:#F2E3C8}
+  #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 16px rgba(6,24,31,.8)}
+  #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    opacity:.6;text-transform:uppercase}
+  #bar{position:fixed;left:0;right:0;bottom:max(28px,calc(env(safe-area-inset-bottom) + 20px));
+    z-index:20;height:2px;margin:0 36px;background:rgba(242,227,200,.18);pointer-events:none}
+  #barfill{height:100%;width:0;background:rgba(242,227,200,.75)}
+  #note{position:fixed;left:0;right:0;bottom:max(8px,env(safe-area-inset-bottom));z-index:20;
+    text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;color:rgba(242,227,200,.4);
+    letter-spacing:.06em;padding:0 20px;pointer-events:none}
+
+  #halt{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(6,24,31,.88);backdrop-filter:blur(3px);text-align:center;padding:30px}
+  #halt.on{display:grid}
+  #halt h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.06em}
+  #halt p{margin:0 0 26px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(242,227,200,.72);max-width:290px}
+  #halt button{appearance:none;border:0;border-radius:999px;padding:13px 26px;
+    background:#F2E3C8;color:#06181F;font:600 12px/1 ui-sans-serif,sans-serif;letter-spacing:.18em}
+
+  /* graceful degradation: no WebGL, or three.js failed to load */
+  #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
+    text-align:center;
+    background:linear-gradient(#1B6A72 0%,#15555F 34%,#0E3E4C 62%,#0A2E3C 82%,#06181F 100%)}
+  #fallback.on{display:grid}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.05em}
+  #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
+    color:rgba(242,227,200,.78);max-width:300px}
+  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(242,227,200,.5)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="fpsdot" aria-hidden="true"></div>
+<div id="fps" role="status" title="Tap to hide">—</div>
+
+<div id="cue"><div id="phase">breathe out</div><div id="sub">she sinks</div></div>
+<div id="bar"><div id="barfill"></div></div>
+<div id="note">Prototype. Silent by design. Sit or lie down. Never practise breathing exercises in or near water. There is no breath-hold here — the pause is a rest at empty.</div>
+
+<div id="halt"><div>
+  <h2>Stopped</h2>
+  <p>Let your breathing go back to whatever it wants to do. She keeps the pearl either way.</p>
+  <button id="resume">RESUME</button>
+</div></div>
+
+<div id="fallback"><div>
+  <h2>Deep Light needs WebGL</h2>
+  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
+  <p>The 2-D prototypes do the same job without it.</p>
+  <p><code>prototypes/01-long-shore.html · 02-still-pool.html · 03-the-tide.html</code></p>
+</div></div>
+
+<script type="module">
+/* ============================================================
+   BOOK OF RATES — Prototype 5: DEEP LIGHT
+   A 3-D treatment of level 7, Pearl Diver (design doc §6, §2.4).
+
+   Protocol: 4 s exhale / 2 s rest at empty / 5 s inhale  =  5.45 / min.
+   There is NO breath retention. The pause is a rest at the bottom of an
+   exhale, which is physiologically trivial — see §2.4. Nothing is timed,
+   nothing is scored, and the scene is on a schedule the user cannot fail.
+
+   SILENT. This page creates no AudioContext and loads no media.
+
+   Style: the seven rules in §4.2 ported to 3-D. No outlines; every
+   shader posterises its output into four to six discrete value bands
+   rather than shading smoothly; shadow shifts hue towards ink-teal
+   instead of simply darkening; grain lives in the background layer only;
+   the figure is a tiny generic silhouette in a lot of empty water.
+   ============================================================ */
+
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+/* ---------- breath schedule: a pure function of elapsed time ---------- */
+const PHASES = [
+  { k:'out',  d:4.0, label:'breathe out', sub:'she sinks' },
+  { k:'rest', d:2.0, label:'rest',        sub:'drifting at the bottom' },
+  { k:'in',   d:5.0, label:'breathe in',  sub:'she rises' }
+];
+const CYCLE   = PHASES.reduce((a,p)=>a+p.d, 0);     // 11 s
+const CYCLES  = 14;
+const SESSION = CYCLE * CYCLES;                      // ~2 min 34 s
+
+function phaseAt(t){
+  let u = t % CYCLE; if(u < 0) u += CYCLE;
+  for(const p of PHASES){ if(u < p.d) return { p, pr:u/p.d }; u -= p.d; }
+  const p = PHASES[PHASES.length-1]; return { p, pr:1 };
+}
+const smooth = x => x*x*(3-2*x);
+/* 1 = full, at the top.  0 = empty, at the bottom. */
+function level(t){
+  const s = phaseAt(t);
+  if(s.p.k === 'out')  return 1 - smooth(s.pr);
+  if(s.p.k === 'rest') return 0;
+  return smooth(s.pr);
+}
+/* how much of the pearl is in her hand: picked up at the rest, carried up,
+   let go near the surface and settling back down through the next exhale. */
+function carry(t){
+  const s = phaseAt(t);
+  if(s.p.k === 'rest') return smooth(Math.min(1, s.pr/0.6));
+  if(s.p.k === 'in')   return 1 - smooth(Math.max(0, (s.pr-0.72)/0.28));
+  return 0;
+}
+
+/* ---------- palette: Composed / underwater (design doc §4.3) ---------- */
+const PAL = {
+  high : 0x1B6A72,   // sky, top of the water column
+  deep : 0x0A2E3C,   // sky, bottom
+  ink  : 0x06181F,   // shadow
+  warm : 0xF2E3C8,   // accent
+  pale : 0xBFE2D8,   // the surface seen from below, lit
+  mid  : 0x4E9C9A
+};
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
+const elFps = $('fps'), elFpsDot = $('fpsdot'), elHalt = $('halt'), elFall = $('fallback');
+
+function fallback(why){
+  if(why) $('fbwhy').textContent = why;
+  elFall.classList.add('on');
+  $('cue').style.display = $('bar').style.display = 'none';
+  elFps.classList.add('off');
+}
+
+/* ---------- is WebGL even available? ---------- */
+function webglOk(){
+  try{
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'));
+  }catch(e){ return false; }
+}
+
+(async function boot(){
+  if(!webglOk()){ fallback('This browser could not give the page a WebGL context, so the 3-D scene cannot be drawn.'); return; }
+  let THREE;
+  try{
+    THREE = await import(CDN);
+  }catch(e){
+    fallback('The 3-D library could not be loaded from the network, so the scene cannot be drawn.');
+    return;
+  }
+  try{ start(THREE); }
+  catch(e){
+    fallback('The 3-D scene failed to start: ' + (e && e.message ? e.message : e));
+    throw e;
+  }
+})();
+
+/* ============================================================ */
+function start(THREE){
+
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias:true, alpha:false, powerPreference:'high-performance',
+  stencil:false, depth:true
+});
+/* Perf, iPhone Safari: cap the pixel ratio. A 3x retina phone would
+   otherwise be filling nine times the pixels for a scene whose cost is
+   almost entirely fill rate. No shadow maps, no postprocessing stack. */
+const DPR_CAP = 1.5;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
+renderer.shadowMap.enabled = false;
+renderer.setClearColor(PAL.ink, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 120);
+
+const SURFACE_Y = 0;
+const BED_Y     = -17;
+const TOP_Y     = -2.4;    // where she floats at the top of the inhale
+const BOTTOM_Y  = -14.4;   // the seabed, where the pearl is
+
+const C = h => new THREE.Color(h);
+
+/* ------------------------------------------------------------------
+   1. THE WATER COLUMN — one fullscreen quad, drawn first.
+   Banded depth gradient plus hard-edged shafts of light coming down
+   from the surface. Everything posterised: §4.2 rule 5 says depth is
+   four to six discrete bands, never a continuous gradient.
+   ------------------------------------------------------------------ */
+const waterUniforms = {
+  uTime:{value:0}, uDepth:{value:0}, uAspect:{value:1},
+  uHigh:{value:C(PAL.high)}, uDeep:{value:C(PAL.deep)}, uInk:{value:C(PAL.ink)},
+  uWarm:{value:C(PAL.warm)}
+};
+const waterMat = new THREE.ShaderMaterial({
+  uniforms: waterUniforms,
+  depthTest:false, depthWrite:false,
+  vertexShader:`
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec2 vUv;
+    uniform float uTime, uDepth, uAspect;
+    uniform vec3 uHigh, uDeep, uInk, uWarm;
+
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+    float band(float x, float n){ return floor(x * n) / (n - 1.0); }
+
+    void main(){
+      // uDepth 0 at the surface, 1 on the seabed. The whole column
+      // slides as the camera descends, so going down really does get
+      // darker rather than the gradient just sitting on the glass.
+      float y = clamp(vUv.y * 0.42 + (1.0 - uDepth) * 0.58, 0.0, 1.0);
+
+      float b = band(clamp(1.0 - y, 0.0, 0.999), 6.0);   // 6 discrete bands
+      vec3 col = mix(uHigh, uDeep, b);
+      col = mix(col, uInk, band(uDepth, 5.0) * 0.55);
+
+      // Shafts. Three tilted sine ridges, quantised to three steps so the
+      // edges are hard polygons rather than a soft glow.
+      float x = (vUv.x - 0.5) * uAspect;
+      float sh = 0.0;
+      sh += sin(x * 5.3 + vUv.y * 1.3 + uTime * 0.045) * 0.5 + 0.5;
+      sh += sin(x * 2.1 - vUv.y * 0.9 - uTime * 0.031 + 1.7) * 0.5 + 0.5;
+      sh += sin(x * 9.7 + vUv.y * 2.1 + uTime * 0.067 + 4.1) * 0.5 + 0.5;
+      sh /= 3.0;
+      sh = smoothstep(0.52, 0.92, sh);
+      sh = band(clamp(sh, 0.0, 0.999), 3.0);
+      // shafts fade with depth and towards the bottom of the frame
+      float reach = (1.0 - smoothstep(0.15, 0.85, uDepth)) * smoothstep(-0.1, 0.75, vUv.y);
+      col += uWarm * sh * reach * 0.105;
+
+      // §4.2 rule 7: texture lives in the background layer only.
+      col += (hash(floor(vUv * 620.0)) - 0.5) * 0.022;
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+const waterQuad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), waterMat);
+waterQuad.frustumCulled = false;
+waterQuad.renderOrder = -10;
+scene.add(waterQuad);
+
+/* ------------------------------------------------------------------
+   2. THE SURFACE, FROM BELOW — a single faceted plane overhead.
+   Displacement is quantised in the vertex shader, so the water reads as
+   flat angular plates rather than a smooth swell: §4.4 says water is
+   flat bands with stylised crests.
+   ------------------------------------------------------------------ */
+const surfUniforms = {
+  uTime:{value:0}, uCam:{value:new THREE.Vector3()},
+  uPale:{value:C(PAL.pale)}, uMid:{value:C(PAL.mid)},
+  uHigh:{value:C(PAL.high)}, uDeep:{value:C(PAL.deep)}, uWarm:{value:C(PAL.warm)}
+};
+const surfaceMat = new THREE.ShaderMaterial({
+  uniforms: surfUniforms, side: THREE.DoubleSide,
+  vertexShader:`
+    uniform float uTime;
+    varying vec3 vWorld;
+    varying float vCrest;
+    void main(){
+      vec3 p = position;
+      float w = sin(p.x * 0.42 + uTime * 0.55) * 0.34
+              + sin(p.y * 0.33 - uTime * 0.41) * 0.28
+              + sin((p.x + p.y) * 0.19 + uTime * 0.23) * 0.22;
+      vCrest = w;
+      w = floor(w / 0.17) * 0.17;          // quantised: facets, not swell
+      p.z += w;
+      vec4 wp = modelMatrix * vec4(p, 1.0);
+      vWorld = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vWorld;
+    varying float vCrest;
+    uniform vec3 uCam, uPale, uMid, uHigh, uDeep, uWarm;
+    float band(float x, float n){ return floor(clamp(x,0.0,0.999) * n) / (n - 1.0); }
+    void main(){
+      // Looking up, the world above is compressed into a bright disc
+      // more or less overhead; outside it the surface mirrors the dark
+      // water back down. Four hard bands, no gradient.
+      float r = length(vWorld.xz - uCam.xz);
+      float d = clamp(uCam.y * -1.0, 0.0, 20.0);
+      float win = 1.0 - smoothstep(2.0 + d * 0.42, 9.0 + d * 0.95, r);
+      float v = band(win, 4.0);
+      vec3 col = mix(uDeep, uHigh, v);
+      col = mix(col, uMid,  smoothstep(0.45, 0.6, v));
+      col = mix(col, uPale, smoothstep(0.78, 0.9, v));
+      // crests catch the light as their own hard-edged shapes
+      float c = step(0.58, vCrest) * win;
+      col = mix(col, uWarm, c * 0.5);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(150, 150, 60, 60), surfaceMat);
+surface.rotation.x = -Math.PI / 2;
+surface.position.y = SURFACE_Y;
+scene.add(surface);
+
+/* ------------------------------------------------------------------
+   3. THE SEABED — one plane, faceted, two values.
+   ------------------------------------------------------------------ */
+const bedMat = new THREE.ShaderMaterial({
+  uniforms:{ uInk:{value:C(PAL.ink)}, uDeep:{value:C(PAL.deep)} },
+  vertexShader:`
+    varying float vH;
+    void main(){
+      vec3 p = position;
+      float h = sin(p.x * 0.21) * 1.5 + sin(p.y * 0.17 + 1.3) * 1.2 + sin((p.x - p.y) * 0.09) * 1.8;
+      h = floor(h / 0.75) * 0.75;
+      p.z += h; vH = h;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vH;
+    uniform vec3 uInk, uDeep;
+    void main(){
+      float v = floor(clamp(vH * 0.16 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
+      gl_FragColor = vec4(mix(uInk, uDeep, v * 0.8), 1.0);
+    }
+  `
+});
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(130, 130, 54, 54), bedMat);
+bed.rotation.x = -Math.PI / 2;
+bed.position.y = BED_Y;
+scene.add(bed);
+
+/* ------------------------------------------------------------------
+   4. KELP — one merged mesh, 26 tapering ribbons, swayed in the vertex
+   shader. Built by hand into a single buffer rather than instanced, so
+   there is exactly one draw call and no dependence on how the library
+   wires instancing into a custom shader.
+   ------------------------------------------------------------------ */
+function kelpGeometry(n, seg){
+  const verts = [], aH = [], aPhase = [], aSide = [], idx = [];
+  let base = 0;
+  for(let i = 0; i < n; i++){
+    const ang   = (i / n) * Math.PI * 2 + (i * 2.399);
+    const rad   = 7 + ((i * 7919) % 97) / 97 * 17;
+    const cx    = Math.cos(ang) * rad;
+    const cz    = Math.sin(ang) * rad - 4;
+    const h     = 5 + ((i * 6367) % 83) / 83 * 7.5;
+    const wBase = 0.16 + ((i * 5281) % 61) / 61 * 0.2;
+    const ph    = (i * 1.7) % 6.283;
+    for(let s = 0; s <= seg; s++){
+      const f = s / seg;
+      const w = wBase * (1 - f * 0.88);
+      for(const side of [-1, 1]){
+        verts.push(cx + side * w, BED_Y + f * h, cz);
+        aH.push(f); aPhase.push(ph); aSide.push(side);
+      }
+    }
+    for(let s = 0; s < seg; s++){
+      const a = base + s*2, b = a+1, c = a+2, d = a+3;
+      idx.push(a, c, b,  b, c, d);
+    }
+    base += (seg + 1) * 2;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  g.setAttribute('aH',     new THREE.Float32BufferAttribute(aH, 1));
+  g.setAttribute('aPhase', new THREE.Float32BufferAttribute(aPhase, 1));
+  g.setAttribute('aSide',  new THREE.Float32BufferAttribute(aSide, 1));
+  g.setIndex(idx);
+  return g;
+}
+const kelpMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime:{value:0}, uInk:{value:C(PAL.ink)}, uMid:{value:C(PAL.mid)}, uDeep:{value:C(PAL.deep)} },
+  side: THREE.DoubleSide,
+  vertexShader:`
+    attribute float aH; attribute float aPhase; attribute float aSide;
+    uniform float uTime;
+    varying float vH; varying float vSide;
+    void main(){
+      vec3 p = position;
+      float bend = aH * aH;                       // rooted at the bottom
+      p.x += sin(uTime * 0.42 + aPhase) * bend * 1.25;
+      p.z += cos(uTime * 0.33 + aPhase * 1.7) * bend * 0.9;
+      vH = aH; vSide = aSide;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vH; varying float vSide;
+    uniform vec3 uInk, uMid, uDeep;
+    void main(){
+      // three values, hue-shifted towards teal rather than darkened
+      float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
+      vec3 col = mix(uInk, uDeep, v);
+      col = mix(col, uMid, step(0.5, vSide) * 0.22 * v);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+const kelp = new THREE.Mesh(kelpGeometry(26, 12), kelpMat);
+scene.add(kelp);
+
+/* ------------------------------------------------------------------
+   5. THE DIVER — a tiny generic silhouette, flat ink, no interior
+   detail. Deliberately featureless: §4.1 forbids anything that reads
+   as a specific character or costume.
+   ------------------------------------------------------------------ */
+const inkMat  = new THREE.MeshBasicMaterial({ color: PAL.ink });
+const diver   = new THREE.Group();
+const sphere  = new THREE.SphereGeometry(1, 14, 10);
+const torso = new THREE.Mesh(sphere, inkMat); torso.scale.set(0.26, 0.60, 0.21);
+const head  = new THREE.Mesh(sphere, inkMat); head.scale.setScalar(0.165); head.position.y = 0.70;
+const legs  = new THREE.Mesh(sphere, inkMat); legs.scale.set(0.15, 0.52, 0.14); legs.position.y = -0.92;
+const armL  = new THREE.Mesh(sphere, inkMat); armL.scale.set(0.075, 0.42, 0.075);
+armL.position.set(-0.26, 0.34, 0); armL.rotation.z = 0.30;
+const armR  = armL.clone(); armR.position.x = 0.26; armR.rotation.z = -0.30;
+diver.add(torso, head, legs, armL, armR);
+scene.add(diver);
+
+/* ------------------------------------------------------------------
+   6. THE PEARL — the one warm thing in the frame, plus a soft halo.
+   ------------------------------------------------------------------ */
+const pearlMat = new THREE.ShaderMaterial({
+  uniforms:{ uWarm:{value:C(PAL.warm)}, uMid:{value:C(PAL.mid)} },
+  vertexShader:`
+    varying vec3 vN;
+    void main(){ vN = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vN;
+    uniform vec3 uWarm, uMid;
+    void main(){
+      // two values and a hard terminator — a flat highlight, not a sphere
+      float l = dot(normalize(vN), normalize(vec3(-0.35, 0.8, 0.5)));
+      gl_FragColor = vec4(mix(uMid, uWarm, step(0.12, l)), 1.0);
+    }
+  `
+});
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), pearlMat);
+scene.add(pearl);
+const halo = new THREE.Mesh(
+  new THREE.SphereGeometry(0.55, 12, 10),
+  new THREE.MeshBasicMaterial({ color:PAL.warm, transparent:true, opacity:0.085,
+                                depthWrite:false, blending:THREE.AdditiveBlending })
+);
+scene.add(halo);
+
+/* ------------------------------------------------------------------
+   Layout / resize
+   ------------------------------------------------------------------ */
+let W = 1, H = 1;
+function resize(){
+  W = Math.max(1, window.innerWidth);
+  H = Math.max(1, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
+  renderer.setSize(W, H, false);
+  camera.aspect = W / H;
+  // A narrow phone frame is tall and thin; pull back a little so the
+  // surface above and the bed below both stay in shot.
+  camera.fov = camera.aspect < 0.75 ? 62 : 52;
+  camera.updateProjectionMatrix();
+  waterUniforms.uAspect.value = camera.aspect;
+}
+window.addEventListener('resize', resize, { passive:true });
+window.addEventListener('orientationchange', () => setTimeout(resize, 120), { passive:true });
+resize();
+
+/* ------------------------------------------------------------------
+   The loop
+   ------------------------------------------------------------------ */
+let t = 0;                 // session time, seconds
+let last = performance.now();
+let running = true;
+let rafId = 0;
+let camY = TOP_Y + 2.0;
+
+const vBed  = new THREE.Vector3();
+const vHand = new THREE.Vector3();
+
+function frame(now){
+  rafId = requestAnimationFrame(frame);
+  let dt = (now - last) / 1000; last = now;
+  if(dt > 0.05) dt = 0.05;            // a backgrounded tab must not jump
+  if(!running){ fpsTick(now, true); return; }
+  t += dt;
+
+  const lv  = level(t);
+  const st  = phaseAt(t);
+  const cr  = carry(t);
+
+  // --- the diver rides the breath down and up ---
+  const dy = BOTTOM_Y + (TOP_Y - BOTTOM_Y) * lv;
+  diver.position.set(Math.sin(t * 0.21) * 0.35, dy, Math.cos(t * 0.17) * 0.3);
+  // face down on the way down, up on the way up
+  const aim = st.p.k === 'out' ? 0.55 : st.p.k === 'in' ? -0.5 : 0.1;
+  diver.rotation.x += (aim - diver.rotation.x) * Math.min(1, dt * 1.6);
+  diver.rotation.y  = Math.sin(t * 0.13) * 0.4;
+
+  // --- the pearl: on the bed, then in her hand, then let go ---
+  vBed.set(0.55, BOTTOM_Y + 0.22, -0.4);
+  vHand.set(diver.position.x + 0.22, diver.position.y - 0.42, diver.position.z + 0.2);
+  pearl.position.lerpVectors(vBed, vHand, cr);
+  halo.position.copy(pearl.position);
+  halo.material.opacity = 0.055 + cr * 0.075;
+
+  // --- camera: trails her, with a lag, so the water moves past ---
+  const wantY = diver.position.y + 1.45;
+  camY += (wantY - camY) * Math.min(1, dt * 1.5);
+  const back = camera.aspect < 0.75 ? 8.2 : 10.5;
+  camera.position.set(Math.sin(t * 0.055) * 1.1, camY, back + Math.cos(t * 0.04) * 0.6);
+  camera.lookAt(diver.position.x * 0.5, diver.position.y + 0.1, 0);
+
+  // --- uniforms ---
+  const dn = Math.min(1, Math.max(0, (SURFACE_Y - camera.position.y) / (SURFACE_Y - BED_Y)));
+  waterUniforms.uTime.value  = t;
+  waterUniforms.uDepth.value = dn;
+  surfUniforms.uTime.value   = t;
+  surfUniforms.uCam.value.copy(camera.position);
+  kelpMat.uniforms.uTime.value = t;
+
+  // --- cue text + session bar ---
+  if(st.p.label !== elPhase.textContent){
+    elPhase.textContent = st.p.label;
+    elSub.textContent   = st.p.sub;
+  }
+  elBar.style.width = (100 * Math.min(1, t / SESSION)).toFixed(2) + '%';
+
+  renderer.render(scene, camera);
+  fpsTick(now, false);
+}
+
+/* ---------- FPS readout: rolling mean, refreshed twice a second ---------- */
+let fAcc = 0, fN = 0, fLast = performance.now(), fPrev = performance.now();
+function fpsTick(now, idle){
+  const d = now - fPrev; fPrev = now;
+  if(!idle && d > 0){ fAcc += d; fN++; }
+  if(now - fLast > 500){
+    const fps = fN ? (1000 / (fAcc / fN)) : 0;
+    elFps.textContent = (idle ? 'paused' : fps.toFixed(0) + ' fps')
+      + '\n' + W + '×' + H + ' @' + renderer.getPixelRatio().toFixed(2);
+    fAcc = 0; fN = 0; fLast = now;
+  }
+}
+elFps.addEventListener('click', () => { elFps.classList.add('off'); elFpsDot.classList.add('on'); });
+elFpsDot.addEventListener('click', () => { elFps.classList.remove('off'); elFpsDot.classList.remove('on'); });
+
+/* ---------- pause when the page is not being looked at ---------- */
+function stopLoop(){ if(rafId){ cancelAnimationFrame(rafId); rafId = 0; } }
+function startLoop(){ if(!rafId){ last = fPrev = performance.now(); rafId = requestAnimationFrame(frame); } }
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) stopLoop(); else startLoop();
+});
+
+/* ---------- the always-visible stop (safety rule 4) ---------- */
+$('stop').addEventListener('click', () => { running = false; elHalt.classList.add('on'); });
+$('resume').addEventListener('click', () => {
+  elHalt.classList.remove('on'); running = true; last = fPrev = performance.now();
+});
+
+/* ---------- context loss ---------- */
+canvas.addEventListener('webglcontextlost', e => {
+  e.preventDefault();          // without this the context is never restored
+  stopLoop();
+  elPhase.textContent = 'paused';
+  elSub.textContent   = 'the graphics context was lost';
+}, false);
+canvas.addEventListener('webglcontextrestored', () => {
+  resize();
+  last = fPrev = performance.now();
+  startLoop();
+}, false);
+
+startLoop();
+}
+</script>
+</body>
+</html>

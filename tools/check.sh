@@ -29,7 +29,7 @@ for f in "$ROOT"/app/js/*.js; do
 done
 
 # --- 2. inline <script type="module"> blocks in every html page ---
-for f in "$ROOT"/app/*.html "$ROOT"/index.html; do
+for f in "$ROOT"/app/*.html "$ROOT"/prototypes/*.html "$ROOT"/index.html; do
   [ -e "$f" ] || continue
   name=$(basename "$f")
   if python3 - "$f" >/dev/null 2>&1 <<'PY'
