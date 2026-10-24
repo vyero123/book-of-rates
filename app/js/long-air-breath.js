@@ -154,21 +154,21 @@ import { corridor, ratesOf, courseOf as buildCourse, gateAt as findGate,
 
 /** The ridge below. Its tops are quantised and stay under the corridor. */
 export const GROUND    =  0.0;
-export const RIDGE_TOP =  2.4;     // the highest any ridge crest reaches
+export const RIDGE_TOP =  3.4;     // the highest any ridge crest reaches
 
 /** Where the kite is allowed to be. The first pass let the figure clip
  *  through the floor; this pass makes that unreachable by construction —
  *  the kite is clamped into this band, the band's floor sits well above
  *  the highest ridge crest, and tools/regress.mjs checks the margin
  *  rather than trusting it. */
-export const CORR_LO = 5.0;
-export const CORR_HI = 27.0;
+export const CORR_LO = 8.0;
+export const CORR_HI = 36.0;
 
 /** The band the SCHEDULE sweeps, inside the corridor. Narrower than the
  *  corridor at both ends, so a player who overshoots has somewhere to
  *  overshoot into instead of hitting a hard stop. */
-export const ALT_LOW  =  7.5;
-export const ALT_HIGH = 24.5;
+export const ALT_LOW  = 11.5;
+export const ALT_HIGH = 32.0;
 
 /** The kit's corridor object, which also checks the nesting the whole
  *  no-clipping guarantee rests on: CORR_LO < ALT_LOW < ALT_HIGH < CORR_HI. */
@@ -328,12 +328,85 @@ export const periodOf = proto =>
  *  has to be bigger than the worst of those put together with room to
  *  spare. tools/regress.mjs flies an on-pace player through a whole
  *  session and fails under 0.4 m of margin. */
-export const GATE_HALF = 4.6;
+export const GATE_HALF = 7.4;
 
 /** How much wider the gap gets when the player is completely off pace.
  *  §6.1 again: "when the user drifts off pace, the gap widens rather than
  *  the kite crashing". This is that sentence as a number. */
-export const FORGIVE_MAX = 3.2;
+export const FORGIVE_MAX = 4.6;
+
+/* ==================================================================
+   THE GLIDER MODEL — 24 October 2026
+   ==================================================================
+   Two forces and no others, by instruction:
+
+     THE GLIDER'S OWN DIRECTION. Near a surface it bends away from it
+       by itself (body.avoid). That is what makes crashing unreachable:
+       not a rule forbidding it, a tendency avoiding it.
+     SURFACE FRICTION. Contact is a SKIM — it rides the surface rather
+       than being shoved off it — and what it costs is FORWARD SPEED.
+       Breath is the only thing that takes the friction off again.
+
+   GRAVITY IS NOT MODELLED. No falling term, no weight, no lift, no
+   stall. A reader who stops breathing does not sink; they slow down.
+   Adding a third force for realism would be adding a way to lose to a
+   chapter that does not have one, and this chapter's whole claim is
+   that it cannot be lost.
+
+   WHAT THE OLD MODEL DID, and why it had to go. Contact used to push
+   the kite back towards the opening and add a velocity kick. A kite
+   held against a lip was shoved, kicked and shoved again: driving the
+   page with the buttons mashed produced a kite at 25.9 m/s, 10.8 m off
+   its schedule, with the entire grit pool saturated at 130 live
+   particles. "It cannot crash" was true and it was also visibly
+   thrashing, which is not the same promise.
+
+   THE APERTURE IS WIDER AND THE GROUND IS MORE VARIED, which the
+   author asked for and which the friction model also needs. The gates
+   open 7.4 m either side rather than 4.6, forgiveness adds up to 4.6
+   rather than 3.2, and the corridor moved up and grew (8..36 against
+   5..27, with the schedule sweeping 11.5..32 against 7.5..24.5) to
+   keep the lower lip clear of a ridge that now reaches 3.4 m and
+   varies much more on the way there.
+
+   The wider aperture is also what bounds the one feedback loop this
+   model could have had. Friction slows forward travel, so a slowed
+   glider is somewhere the course did not expect it at that moment —
+   and if that mismatch could exceed the opening, slowing would cause
+   contact, which would cause more slowing. It cannot: see
+   MAX_DESYNC_M below, which is derived from the model's own constants
+   and checked in tools/regress.mjs.
+   ================================================================== */
+
+/** The most forward speed friction can take away. */
+export const DRAG_MAX_LOSS = 0.45;
+/** Drag gained per second of continuous skimming... */
+export const DRAG_GAIN = 1.3;
+/** ...and removed per second of breathing on the cue. Clearing is
+ *  faster than gaining on purpose: recovery should never feel like a
+ *  penalty being served. */
+export const DRAG_CLEAR = 1.6;
+
+/** How near a lip the glider starts steering away, in metres, and how
+ *  hard. The margin is large relative to the gap because the avoidance
+ *  is meant to be a bend, not a save. */
+export const AVOID_MARGIN = 4.2;
+export const AVOID_STRENGTH = 30;
+
+/** THE WORST THE COURSE CAN GET OUT OF STEP WITH THE BREATH, in metres
+ *  of altitude, derived rather than hoped for.
+ *
+ *  Drag is cleared by breathing on the cue, so the longest a glider can
+ *  stay slowed while following the cue is one clearing time. In that
+ *  window it covers less ground than the course expects by at most
+ *  SPEED · DRAG_MAX_LOSS · (1/DRAG_CLEAR) metres, which is a time
+ *  offset of DRAG_MAX_LOSS/DRAG_CLEAR seconds against a schedule that
+ *  moves at most RANGE/shortest-phase metres a second.
+ *
+ *  This must stay comfortably inside the opening, or friction would
+ *  cause contact and contact would cause friction. It is the one
+ *  feedback loop in the model and this is the number that opens it. */
+export const MAX_DESYNC_M = (DRAG_MAX_LOSS / DRAG_CLEAR) * (RANGE / 4);
 
 /** Gates roughly every 0.55 s of schedule, rounded so a whole number
  *  fits in a cycle — a fraction of a gate per cycle would break the
@@ -371,10 +444,26 @@ export const forgiveness = (kiteY, targetY) =>
 /** The ridge crests below the corridor. Quantised to hard terraces
  *  (§4.2 rule 5) and clamped under RIDGE_TOP so the corridor floor is
  *  always clear of them. */
+/** GREATER VARIANCE OF GRADE, which the author asked for.
+ *
+ *  The old ridge was two harmonics quantised to 0.8 m steps between
+ *  0.4 and 2.4: a gentle corrugation that read as texture rather than
+ *  as terrain, and whose grade barely changed from one crest to the
+ *  next. This one runs 0.0 to 3.4 over four harmonics with a coarser
+ *  0.85 m step, so it has flats, long climbs and sudden drops instead
+ *  of one repeating bump — and the quantisation makes those read as
+ *  cut terraces (§4.2 rule 5) rather than as a wobble.
+ *
+ *  Still clamped under RIDGE_TOP, and the corridor floor is still
+ *  checked against it in tools/regress.mjs rather than trusted. */
 export function ridgeAt(z, period){
   const u = (z / period) * Math.PI * 2;
-  const h = Math.sin(u * 5) * 1.3 + Math.sin(u * 13 + 1.7) * 0.8 + 1.1;
-  return Math.min(RIDGE_TOP, Math.max(0.4, Math.round(h / 0.8) * 0.8));
+  const h = Math.sin(u * 3) * 1.55
+          + Math.sin(u * 7 + 0.9) * 1.05
+          + Math.sin(u * 13 + 1.7) * 0.6
+          + Math.sin(u * 23 + 4.2) * 0.3
+          + 1.3;
+  return Math.min(RIDGE_TOP, Math.max(0.0, Math.round(h / 0.85) * 0.85));
 }
 
 /** The flat underside of the cloud ceiling, well above the corridor. */

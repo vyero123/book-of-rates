@@ -120,7 +120,8 @@
   <div class="how">
     <p><b>Hold IN</b> and the kite fills and climbs. <b>Hold OUT</b> and it empties and falls. Let go of both and it flies level.</p>
     <p>The gaps in the course are placed where your breath should have taken you, so flying it well and breathing on pace are the same thing. You can see several breaths ahead of you.</p>
-    <p>It cannot crash. Drift off pace and the gaps simply open wider. Nothing here is timed, scored, counted or compared — not between sessions and not within one.</p>
+    <p>It cannot crash. It steers away from a surface by itself, and if it does touch one it skims along it and slows down — and your next breath is what takes the friction off again. Drift off pace and the gaps open wider too.</p>
+    <p>Nothing here is timed, scored, counted or compared — not between sessions and not within one.</p>
   </div>
   <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">two short holds · 3.75 a minute · each one a level channel</span></button>
   <button id="gateNo" class="alt">NO HOLDS · 4 IN / 5 OUT / 1<br><span class="sub2">a second at empty instead · 6 a minute</span></button>
@@ -212,8 +213,10 @@ import { PROTOCOLS, CHOICE, validChoice,
          GROUND, RIDGE_TOP, CORR_LO, CORR_HI, ALT_LOW, ALT_HIGH, RANGE,
          CORRIDOR, normOf, altOf, SPEED, BEHIND, periodOf, rates,
          courseOf, gateAt, forgiveness, GATE_HALF, FORGIVE_MAX,
+         DRAG_MAX_LOSS, DRAG_GAIN, DRAG_CLEAR,
+         AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
-import { body } from './js/course.js';
+import { body, drag } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, particles, scrollGlsl,
@@ -279,6 +282,7 @@ const uKite    = { value: new THREE.Vector3(0, ALT_LOW, 0) };
 const uFill    = { value: 0 };          // the player's own breath, 0..1
 const uForgive = { value: 0 };          // 0..1 of FORGIVE_MAX
 const uHit     = { value: 0 };          // soft contact, fades
+const uDrag    = { value: 0 };          // surface friction, 0..1
 const uRush    = { value: 0 };
 const uFog     = { value: C(AIR.haze) };
 const uRamp    = { value: ramp6 };
@@ -774,7 +778,7 @@ function lineGeometry(n){
   return b.geometry();
 }
 const lines = new THREE.Mesh(lineGeometry(70), posterMat(THREE, {
-  uniforms:{ uDist, uRush, uKite, uPale:{value:C(AIR.flare)} },
+  uniforms:{ uDist, uRush, uKite, uDrag, uPale:{value:C(AIR.flare)} },
   transparent:true, depthWrite:false, side:THREE.DoubleSide,
   vertex:`
     attribute float aEnd; attribute float aLen; attribute float aSeed; attribute float aRad;
@@ -857,13 +861,16 @@ function stepGrit(dt){
    pace, it is warm rather than alarming, and it is not a score.
    ------------------------------------------------------------------ */
 const flare = overlayQuad(THREE, {
-  uniforms:{ uForgive, uHit, uFlare:{value:C(AIR.flare)} },
+  uniforms:{ uForgive, uHit, uDrag, uFlare:{value:C(AIR.flare)} },
   fragment:`
     varying vec2 vUv;
-    uniform float uForgive, uHit;
+    uniform float uForgive, uHit, uDrag;
     uniform vec3 uFlare;
     void main(){
-      float a = max(uForgive * 0.10, uHit * 0.30);
+      // friction shows as the same warm edge the course uses when it is
+      // making room. It is information, never a penalty: there is no red
+      // anywhere in this chapter and nothing is counted.
+      float a = max(max(uForgive * 0.10, uHit * 0.30), uDrag * 0.16);
       if(a < 0.02) discard;
       // a vignette at the very edge, three hard steps. Nothing central:
       // whatever happens, the view of the course stays clear.
@@ -913,6 +920,15 @@ let RATE = rates(PROTOCOLS.box);
    proves only that two pieces of code agreed on the day they were
    written. */
 let KITE = body({ corridor: CORRIDOR, rates: RATE });
+
+/* FRICTION. Contact costs forward speed and breath is the only thing
+   that returns it; there is no gravity term anywhere in this chapter.
+   Reasoning in js/course.js and js/long-air-breath.js. */
+let DRAG = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
+/* Distance travelled is now an INTEGRAL, not SPEED*t, because the speed
+   is no longer constant. Everything that reads the strip reads this. */
+let dist = 0;
+let skimming = 0, avoiding = 0;
 let COURSE = null;
 let subShown = '';
 
@@ -928,7 +944,24 @@ const loop = clock((dt, now, running) => {
   const st = B.at(t);
   const ph = st.p;
   const sched = B.value(t);             // what the protocol wants. The course.
-  uDist.value = SPEED * t;
+
+  /* --- THE BREATH TAKES THE FRICTION OFF. `working` is the reader
+     doing what the cue asks: filling on an inhale, emptying on an
+     exhale, both buttons off through a hold. Nothing else clears drag —
+     there is no passive decay, because "the breath is what removes the
+     friction" means the breath and not time. --- */
+  const working = ph.k === 'in'  ? (inDown && !outDown)
+                : ph.k === 'out' ? (outDown && !inDown)
+                : (!inDown && !outDown);
+  DRAG.breathe(dt, working && started);
+
+  /* --- and the glider travels at whatever speed friction has left it.
+     Distance is an INTEGRAL now, not SPEED*t. No gravity anywhere in
+     this: the two forces are the glider's own direction and friction,
+     and that is all there is. --- */
+  const speed = SPEED * DRAG.speedFactor;
+  if(started) dist += speed * dt;
+  uDist.value = dist;
 
   /* --- FILL, then ALTITUDE, in the kit's controller.
      FILL is the player's breath, integrated at the protocol's own rate
@@ -948,40 +981,62 @@ const loop = clock((dt, now, running) => {
 
   const kiteX = Math.sin(t * 0.7) * 0.18;
   uKite.value.set(kiteX, kiteY, 0);
-  uRush.value = clamp01(-KITE.v / 7.0);
+  // the streaks are FORWARD SPEED now, not sink rate: this is the
+  // chapter's one reading of how much friction is on, and it is the
+  // thing that comes back when the reader breathes
+  uRush.value = clamp01(0.25 + 0.75 * DRAG.speedFactor) * (started ? 1 : 0);
 
   /* --- how far off pace, and therefore how much room the course makes.
      §6.1: the gap widens rather than the kite crashing. Measured against
      the gate the player is ABOUT TO MEET rather than the schedule right
      now — during a turnaround those differ by enough that the wrong gate
      opened by the wrong amount. --- */
-  const { gate, ahead } = gateAt(COURSE, uDist.value);
+  const { gate, ahead } = gateAt(COURSE, dist);
   const forg = forgiveness(kiteY, gate.centre);
   uForgive.value = forg.extra / FORGIVE_MAX;
 
-  /* --- contact. Soft, informative, and NOT COUNTED. The push-back is
-     the kit's `touch`; what it returns is how far past the lip the kite
-     was, which is only ever used to throw a little grit. --- */
+  /* --- THE TWO FORCES, in order.
+     First the glider steers away from a lip it is near, by itself,
+     before it gets there — that is what makes crashing unreachable, and
+     it is a tendency rather than a rule. Then, if it is past the lip
+     anyway, it SKIMS: it rides the surface instead of being shoved off
+     it, and what the contact costs is forward speed.
+     No push back towards the opening and no velocity kick. Those were
+     what made contact a vibration: driving the old build with the
+     buttons mashed gave a kite at 25.9 m/s, 10.8 m off its schedule,
+     with all 130 grit slots live. --- */
   const half = gate.half + forg.extra;
   const KITE_HALF = 0.78;
+  avoiding = 0; skimming = 0;
+  if(Math.abs(ahead) < SLAB_Z + AVOID_MARGIN * 2){
+    avoiding = KITE.avoid({ centre: gate.centre, half, bodyHalf: KITE_HALF, dt,
+                            margin: AVOID_MARGIN, strength: AVOID_STRENGTH });
+  }
   if(Math.abs(ahead) < SLAB_Z + 1.4){
     const off = kiteY - gate.centre;
-    const over = KITE.touch({ centre: gate.centre, half, bodyHalf: KITE_HALF, dt });
+    const over = KITE.skim({ centre: gate.centre, half, bodyHalf: KITE_HALF });
     if(over > 0){
       kiteY = KITE.value;
-      hit = Math.min(1, hit + dt * 7);
-      for(let i = 0; i < 2; i++){
-        dust(kiteX + (Math.random()-0.5)*2.2, gate.centre + Math.sign(off) * half, 0.6, 1);
-      }
+      skimming = 1;
+      DRAG.skim(dt);
+      hit = Math.min(1, hit + dt * 4);
+      // one grain, not two: a graze, not a collision
+      if(Math.random() < 0.5) dust(kiteX + (Math.random()-0.5)*1.6,
+                                   gate.centre + Math.sign(off) * half, 0.6, 1);
     }
   }
   hit = Math.max(0, hit - dt * 1.7);
   uHit.value = hit;
+  uDrag.value = DRAG.value;
 
-  /* a little grit off the tail on a fast sink */
-  if(uRush.value > 0.25){
-    gritAccum += dt * 18 * uRush.value;
-    while(gritAccum >= 1){ gritAccum -= 1; dust(kiteX, kiteY - 0.4, 1.2, 0); }
+  /* Grit comes off a SKIM now, not off a fast sink. uRush used to be
+     the sink rate and is forward speed since the model changed, so the
+     old test (uRush > 0.25) is true almost always and would have had
+     the kite shedding grit for the whole session. The rate is low and
+     it stops the instant the glider is clear. */
+  if(skimming){
+    gritAccum += dt * 10;
+    while(gritAccum >= 1){ gritAccum -= 1; dust(kiteX, kiteY - 0.3, 1.0, 0); }
   } else gritAccum = 0;
   stepGrit(dt);
 
@@ -991,7 +1046,10 @@ const loop = clock((dt, now, running) => {
   // it pitches with its vertical speed and rolls a little with the luff
   const pitch = clamp(-KITE.v * 0.055, -0.5, 0.5);
   sail.rotation.x = pitch; spars.rotation.x = pitch;
-  sail.rotation.z = Math.sin(t * 1.1) * 0.05 + drive * 0.04;
+  // and it banks away from whatever it is avoiding: the only place the
+  // first of the two forces is visible before it has done anything
+  const bank = avoiding * Math.sign(gate.centre - kiteY || 1) * 0.42;
+  sail.rotation.z = Math.sin(t * 1.1) * 0.05 + drive * 0.04 + bank;
   spars.rotation.z = sail.rotation.z;
   pushHistory(kiteX, kiteY, 0);
   updateTail();
@@ -1015,7 +1073,7 @@ const loop = clock((dt, now, running) => {
   uTime.value = t;
   const dn = clamp01((CORR_HI - kiteY) / CORR_HI);
   uFog.value.copy(cHaze).lerp(cMid, dn * 0.35);
-  mesas.position.x = -wanderAt(uDist.value, worlds[B.proto.id].period) * 0.5;
+  mesas.position.x = -wanderAt(dist, worlds[B.proto.id].period) * 0.5;
 
   /* --- cue text. The countdown points at the next breath, never at
      elapsed time (§2.4). Nothing here is a score. --- */
@@ -1053,7 +1111,9 @@ function beginWith(which, remember){
   // a fresh body for the new protocol: its rate cap is derived from the
   // protocol's own durations, so it cannot be carried over from the other
   KITE = body({ corridor: CORRIDOR, rates: RATE });
-  t = 0; hit = 0; histN = 0; subShown = '';
+  DRAG = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
+  t = 0; dist = 0; hit = 0; histN = 0; subShown = '';
+  skimming = 0; avoiding = 0;
   loop.resync();
 }
 $('gateHolds').addEventListener('click', () => beginWith('holds', true));
@@ -1104,9 +1164,9 @@ window.__longAir = {
     if(which === 'in') inDown = !!down; else outDown = !!down;
     return { inDown, outDown };
   },
-  seek(v){ t = v; uDist.value = SPEED * v; },
+  seek(v){ t = v; dist = SPEED * v; uDist.value = dist; },
   now(){ const s = B.at(t);
-    const g = gateAt(COURSE, uDist.value);
+    const g = gateAt(COURSE, dist);
     const f = forgiveness(KITE.value, g.gate.centre);
     return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
              phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
@@ -1116,8 +1176,11 @@ window.__longAir = {
              forgiveExtra:+f.extra.toFixed(2),
              gapCentre:+g.gate.centre.toFixed(2), gapHalf:+(g.gate.half + f.extra).toFixed(2),
              gateAhead:+g.ahead.toFixed(2),
-             clearanceOverRidge:+(KITE.value - ridgeAt(uDist.value, worlds[B.proto.id].period)).toFixed(2),
-             hit:+hit.toFixed(2), dist:+uDist.value.toFixed(1),
+             clearanceOverRidge:+(KITE.value - ridgeAt(dist, worlds[B.proto.id].period)).toFixed(2),
+             drag:+DRAG.value.toFixed(3), speed:+(SPEED*DRAG.speedFactor).toFixed(2),
+             skimming:!!skimming, avoiding:+avoiding.toFixed(2),
+             behindNominal:+(SPEED*t - dist).toFixed(2),
+             hit:+hit.toFixed(2), dist:+dist.toFixed(1),
              camY:+camY.toFixed(2), liveGrit: grit.live(),
              inDown, outDown }; },
   /* The claim the chapter rests on: for a point n metres ahead, the gap
@@ -1127,8 +1190,8 @@ window.__longAir = {
     const w = worlds[B.proto.id];
     const back = w.period * BEHIND;
     const arrive = t + metres / SPEED;
-    const zb = (SPEED * t + metres + back) % w.period;
-    const g = gateAt(w.course, uDist.value + metres);
+    const zb = (dist + metres + back) % w.period;
+    const g = gateAt(w.course, dist + metres);
     return { metres, inSeconds:+(metres / SPEED).toFixed(2),
              scheduleOnArrival:+B.value(arrive).toFixed(2),
              terrainBuiltFor:+B.value(zb / SPEED - back / SPEED).toFixed(2),

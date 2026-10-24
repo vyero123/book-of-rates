@@ -180,9 +180,125 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0 }){
       b.value -= s * Math.min(over, push * dt);
       b.v     += -s * kick * dt;
       return over;
+    },
+
+    /** THE FIGURE STEERS AWAY FROM A SURFACE BY ITSELF.
+     *
+     *  This is what makes crashing unreachable, and it is a TENDENCY
+     *  rather than a rule: inside `margin` of a lip the body takes an
+     *  acceleration away from it, growing as it gets closer, so it
+     *  bends off before it ever arrives. Nothing is forbidden and
+     *  nothing is corrected after the fact — it simply does not go
+     *  there, which is what "it naturally moves in a direction that
+     *  avoids it" means.
+     *
+     *  Returns 0..1, how hard it is avoiding, for a chapter that wants
+     *  to show the figure leaning away.
+     */
+    avoid({ centre, half, bodyHalf = 0, dt, margin = 3.0, strength = 26 }){
+      const off = b.value - centre;
+      const room = (half - bodyHalf) - Math.abs(off);   // distance to the lip
+      if(room >= margin) return 0;
+      const near = clamp01(1 - Math.max(0, room) / margin);
+      b.v -= Math.sign(off || 1) * near * near * strength * dt;
+      return near;
+    },
+
+    /** SKIMMING, which replaces touch() in Long Air.
+     *
+     *  Past the lip the body RIDES THE SURFACE: it is placed exactly on
+     *  it and any velocity into it is removed, so it travels along
+     *  rather than through. No push back towards the opening and no
+     *  kick — those two were what made contact a vibration rather than
+     *  a graze, and a figure held against a lip was being shoved,
+     *  kicked and shoved again at twenty-five metres a second.
+     *
+     *  What contact costs is not position. It is forward speed, and
+     *  that is drag()'s job, not this one's.
+     *
+     *  Returns how far past the lip it would have been, so a chapter
+     *  can throw a little grit, and 0 when it is clear.
+     */
+    skim({ centre, half, bodyHalf = 0 }){
+      const off = b.value - centre;
+      const lip = half - bodyHalf;
+      const over = Math.abs(off) - lip;
+      if(over <= 0) return 0;
+      const s = Math.sign(off || 1);
+      b.value = centre + s * lip;              // placed ON the surface
+      if(s * b.v > 0) b.v = 0;                 // no velocity into it
+      return over;
     }
   };
   return b.reset();
+}
+
+/* ------------------------------------------------------------------
+   SKIM AND DRAG — contact costs speed, and breath is what returns it
+   ------------------------------------------------------------------
+   The soft push-back this replaces was the wrong shape. It treated
+   contact as a correction applied TO the figure: the world shoved it
+   back towards the opening and added a velocity kick, so a figure held
+   against a lip got shoved, kicked, shoved again, and the result was a
+   figure vibrating against a surface at twenty-five metres a second
+   with the whole grit pool saturated. That is not "it cannot crash", it
+   is "it cannot crash, visibly and continuously".
+
+   The model here is the one the author described, and it has exactly
+   two forces in it:
+
+     THE FIGURE'S OWN DIRECTION. It steers away from a surface it is
+       near, by itself, before contact. That is what makes crashing
+       unreachable — not a rule that forbids it, a tendency that avoids
+       it. See body.avoid().
+     FRICTION WITH THE SURFACE. Contact is a SKIM: the figure rides
+       along the surface, loses no height authority and takes no kick,
+       and what it loses is FORWARD SPEED. Breath is the only thing that
+       takes the friction off again.
+
+   GRAVITY IS NOT IN HERE AT ALL, deliberately and by instruction. There
+   is no falling term, no weight, no lift. A reader who stops breathing
+   does not sink; they slow down. The whole interplay is those two
+   forces and nothing else, and adding a third "for realism" would be
+   adding a way to lose to a chapter that does not have one.
+
+   NOTHING HERE IS COUNTED. drag is a physical state, not a score: it
+   has no history, no best, no total, and it is gone the moment the
+   reader breathes.
+   ------------------------------------------------------------------ */
+
+/** @param maxLoss  the most speed friction can take, as a fraction
+ *  @param gain     drag gained per second of continuous skimming
+ *  @param clear    drag removed per second of breathing on the cue */
+export function drag({ maxLoss = 0.55, gain = 1.4, clear = 0.9 } = {}){
+  const d = {
+    value: 0,
+
+    reset(){ d.value = 0; return d; },
+
+    /** riding along a surface */
+    skim(dt){ d.value = Math.min(1, d.value + gain * dt); return d; },
+
+    /** THE RECOVERY, and the only one. `working` is true when the
+     *  reader is doing what the cue asks — filling on an inhale,
+     *  emptying on an exhale, holding still on a hold. Nothing else
+     *  clears drag: there is no passive decay, because "the breath is
+     *  what removes the friction" means the breath and not time. */
+    breathe(dt, working){
+      if(working) d.value = Math.max(0, d.value - clear * dt);
+      return d;
+    },
+
+    /** multiply the nominal speed by this */
+    get speedFactor(){ return 1 - maxLoss * d.value; },
+
+    /** how long, in seconds, from fully stuck to fully clear if the
+     *  reader breathes on the cue throughout. Derived, so a harness can
+     *  state the recovery guarantee in seconds rather than assert it. */
+    get recoverySeconds(){ return 1 / clear; },
+    maxLoss, gain, clear
+  };
+  return d;
 }
 
 /* ------------------------------------------------------------------

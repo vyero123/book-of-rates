@@ -38,7 +38,7 @@ import * as deepLight from '../app/js/deep-light-breath.js';
 import * as longAir from '../app/js/long-air-breath.js';
 import * as bamboo from '../app/js/bamboo-rain-breath.js';
 import * as lantern from '../app/js/lantern-breath.js';
-import { body, ratesOf, corridor as cor } from '../app/js/course.js';
+import { body, ratesOf, corridor as cor, drag } from '../app/js/course.js';
 
 const STEP = 0.05;          // 20 samples a second
 const EPS  = 1e-12;
@@ -411,42 +411,172 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
    CLAUDE.md about a reported bug turning out to be the instrument. The
    loop now lives in js/course.js and BOTH the page and this harness
    drive the same object, so what is checked here is what ships.
+
+   24 Oct, SECOND REWRITE: THE PHYSICS CHANGED, SO THE DERIVATION HAD
+   TO BE REDONE RATHER THAN THE THRESHOLD LOOSENED.
+
+   The old model pushed the kite back off a lip and kicked it. The new
+   one has exactly two forces: the glider steers away from a surface by
+   itself, and contact is a SKIM that costs forward speed, which breath
+   takes back off again. Speed is no longer constant, so `dist` is an
+   integral and the old `dist = SPEED * t` the harness used is simply
+   not what the page does any more.
+
+   The guarantee re-derives to something STRONGER and simpler:
+
+     ON-PACE PLAY NEVER TOUCHES A SURFACE AT ALL.
+
+   Not "clears by a margin" — zero contacts in a whole session. And
+   that is what makes the rest of it true, in a chain worth writing out:
+   no contact means no drag; no drag means nominal speed; nominal speed
+   means dist is exactly SPEED*t; and that is the condition under which
+   the course's arrival-time arithmetic is exact, which is what makes
+   every gate's opening the schedule's own altitude. The chapter's
+   promise now rests on a property the harness can check as a count of
+   zero rather than as a tolerance.
    ------------------------------------------------------------------ */
-function flyOnPace(proto){
+const KITE_HALF = 0.78;
+
+/** Fly the chapter with the REAL model: the same body, the same
+ *  avoid/skim, the same drag object the page drives. `press(t, kind)`
+ *  decides what the reader does. */
+function fly(proto, press){
   const b = breath(proto);
   const course = longAir.courseOf(proto, t => b.value(t));
   const kite = kiteBody(proto);
+  const fric = drag({ maxLoss: longAir.DRAG_MAX_LOSS, gain: longAir.DRAG_GAIN,
+                      clear: longAir.DRAG_CLEAR });
   const dt = 1 / 120;
-  let worstMargin = Infinity, worstAt = null, minRidge = Infinity;
+  let dist = 0, skims = 0, worstMargin = Infinity, worstAt = null;
+  let minRidge = Infinity, maxDrag = 0, minSpeed = Infinity, maxBehind = 0;
   for(let t = 0; t < proto.session; t += dt){
-    // press exactly what the cue says — nothing cleverer
-    kite.follow(dt, b.at(t).p.k);
-    const y = kite.value;
+    const kind = b.at(t).p.k;
+    const { inDown, outDown } = press(t, kind);
 
-    const dist = longAir.SPEED * t;
-    minRidge = Math.min(minRidge, y - longAir.ridgeAt(dist, course.period));
+    const working = kind === 'in'  ? (inDown && !outDown)
+                  : kind === 'out' ? (outDown && !inDown)
+                  : (!inDown && !outDown);
+    fric.breathe(dt, working);
+    const speed = longAir.SPEED * fric.speedFactor;
+    dist += speed * dt;
+    minSpeed = Math.min(minSpeed, speed);
+    maxDrag = Math.max(maxDrag, fric.value);
+    maxBehind = Math.max(maxBehind, longAir.SPEED * t - dist);
+
+    kite.drive(dt, inDown, outDown);
+
     const { gate, ahead } = longAir.gateAt(course, dist);
-    if(Math.abs(ahead) < 4.0){
-      // base gap only: no forgiveness spent
-      const margin = gate.half - Math.abs(y - gate.centre) - 0.78;   // kite half-height
+    const forg = longAir.forgiveness(kite.value, gate.centre);
+    const half = gate.half + forg.extra;
+    if(Math.abs(ahead) < 2.6 + longAir.AVOID_MARGIN * 2){
+      kite.avoid({ centre: gate.centre, half, bodyHalf: KITE_HALF, dt,
+                   margin: longAir.AVOID_MARGIN, strength: longAir.AVOID_STRENGTH });
+    }
+    if(Math.abs(ahead) < 2.6 + 1.4){
+      if(kite.skim({ centre: gate.centre, half, bodyHalf: KITE_HALF }) > 0){
+        skims++; fric.skim(dt);
+      }
+      // the BASE gap, with forgiveness left unspent
+      const margin = gate.half - Math.abs(kite.value - gate.centre) - KITE_HALF;
       if(margin < worstMargin){ worstMargin = margin; worstAt = +t.toFixed(2); }
     }
+    minRidge = Math.min(minRidge, kite.value - longAir.ridgeAt(dist, course.period));
   }
-  return { worstMargin:+worstMargin.toFixed(2), worstAt, minRidge:+minRidge.toFixed(2) };
+  return { skims, worstMargin:+worstMargin.toFixed(2), worstAt,
+           minRidge:+minRidge.toFixed(2), maxDrag:+maxDrag.toFixed(3),
+           minSpeed:+minSpeed.toFixed(2), maxBehind:+maxBehind.toFixed(2),
+           dist:+dist.toFixed(1) };
 }
+
+const ON_CUE  = (t, kind) => ({ inDown: kind === 'in', outDown: kind === 'out' });
+const NEVER   = () => ({ inDown:false, outDown:false });
+const ALWAYS  = () => ({ inDown:true,  outDown:false });
+const MASHING = (t) => ({ inDown: Math.floor(t * 7) % 2 === 0,
+                          outDown: Math.floor(t * 11) % 3 === 0 });
+
 for(const id of Object.keys(longAir.PROTOCOLS)){
-  const f = flyOnPace(longAir.PROTOCOLS[id]);
-  if(f.worstMargin < 0)
-    fail(`long air/${id}: an ON-PACE player clips a gate by ${(-f.worstMargin).toFixed(2)} m ` +
-         `at t=${f.worstAt} — §6.1 promises following the pacing always clears`);
-  else if(f.worstMargin < 0.4)
-    fail(`long air/${id}: an on-pace player clears by only ${f.worstMargin.toFixed(2)} m ` +
-         `at t=${f.worstAt}; that is too fine to call a guarantee`);
-  if(f.minRidge < 1.0)
-    fail(`long air/${id}: an on-pace player comes within ${f.minRidge.toFixed(2)} m of the ridge`);
-  if(failures === 0)
-    console.log(`    ok    long air/${id}: on-pace play clears every gate by ${f.worstMargin.toFixed(2)} m ` +
-                `with forgiveness unspent, ${f.minRidge.toFixed(1)} m over the ridge`);
+  const proto = longAir.PROTOCOLS[id];
+
+  /* (a) THE PROMISE, re-derived: on-pace play never touches anything. */
+  const cue = fly(proto, ON_CUE);
+  if(cue.skims)
+    fail(`long air/${id}: an ON-PACE player skims a surface ${cue.skims} times — the promise ` +
+         `is that following the pacing never touches one, and every other guarantee here ` +
+         `depends on it (no contact -> no drag -> nominal speed -> the course IS the schedule)`);
+  if(cue.maxDrag > 0)
+    fail(`long air/${id}: an on-pace player picked up drag (${cue.maxDrag})`);
+  if(Math.abs(cue.dist - longAir.SPEED * proto.session) > 0.5)
+    fail(`long air/${id}: an on-pace player covered ${cue.dist} m, not the nominal ` +
+         `${(longAir.SPEED * proto.session).toFixed(1)} m — the course and the schedule have ` +
+         `come apart`);
+  if(cue.worstMargin < 0.4)
+    fail(`long air/${id}: an on-pace player clears by only ${cue.worstMargin} m`);
+  if(cue.minRidge < 1.0)
+    fail(`long air/${id}: an on-pace player comes within ${cue.minRidge} m of the ridge`);
+
+  /* (b) THE GLIDER CANNOT CRASH, and this is what that means now: no
+         reader, however adversarial, leaves the corridor, stops dead,
+         or gets stuck. Three bad readers — one who never breathes, one
+         who holds the inhale for ever, one mashing both buttons. */
+  for(const [name, press] of [['never breathing', NEVER],
+                              ['holding in for ever', ALWAYS],
+                              ['mashing', MASHING]]){
+    const f = fly(proto, press);
+    if(f.minSpeed <= 0)
+      fail(`long air/${id}: a reader ${name} stops dead (${f.minSpeed} m/s) — friction may ` +
+           `slow the glider and may never stop it`);
+    if(f.minSpeed < longAir.SPEED * (1 - longAir.DRAG_MAX_LOSS) - 1e-9)
+      fail(`long air/${id}: a reader ${name} drops to ${f.minSpeed} m/s, below the floor the ` +
+           `model's own maxLoss allows`);
+    if(f.minRidge < 0)
+      fail(`long air/${id}: a reader ${name} goes through the ridge (${f.minRidge} m)`);
+  }
+
+  /* (c) THE FEEDBACK LOOP IS OPEN. Friction slows the glider, so a
+         slowed glider meets gates the course laid for a moment it has
+         not reached — and if that mismatch could exceed the opening,
+         slowing would cause contact and contact would cause slowing.
+         MAX_DESYNC_M is derived from the model's own constants; this is
+         where it is checked against the aperture rather than hoped for. */
+  const room = longAir.GATE_HALF - KITE_HALF;
+  if(longAir.MAX_DESYNC_M >= room)
+    fail(`long air/${id}: the worst desync friction can cause is ${longAir.MAX_DESYNC_M.toFixed(2)} m ` +
+         `against ${room.toFixed(2)} m of opening — friction would cause contact and contact ` +
+         `would cause friction`);
+
+  /* (d) BREATH IS WHAT RETURNS THE SPEED. From fully stuck, a reader
+         breathing on the cue must be back to full speed in the time the
+         model's own clear rate says, and nothing else may do it: a
+         reader who does NOT breathe must stay slowed. */
+  {
+    const f = drag({ maxLoss: longAir.DRAG_MAX_LOSS, gain: longAir.DRAG_GAIN,
+                     clear: longAir.DRAG_CLEAR });
+    f.value = 1;
+    let secs = 0;
+    for(let i = 0; i < 2000 && f.value > 0; i++){ f.breathe(1/120, true); secs += 1/120; }
+    if(f.value > 0) fail(`long air/${id}: breathing on the cue never clears the friction`);
+    // one dt of slack: the loop counts the step that reaches zero
+    if(secs > f.recoverySeconds + 1/120 + 1e-9)
+      fail(`long air/${id}: recovery took ${secs.toFixed(2)}s against the ` +
+           `${f.recoverySeconds.toFixed(2)}s the clear rate implies`);
+    const g = drag({ maxLoss: longAir.DRAG_MAX_LOSS, gain: longAir.DRAG_GAIN,
+                     clear: longAir.DRAG_CLEAR });
+    g.value = 1;
+    for(let i = 0; i < 2000; i++) g.breathe(1/120, false);
+    if(g.value < 1 - 1e-9)
+      fail(`long air/${id}: friction decays on its own (${g.value.toFixed(3)}) — the breath is ` +
+           `supposed to be the only thing that removes it`);
+  }
+
+  if(failures === 0){
+    const m = fly(proto, MASHING);
+    console.log(`    ok    long air/${id}: on-pace play never touches a surface (0 skims, ` +
+                `drag 0, ${cue.dist} m covered, clears by ${cue.worstMargin} m with ` +
+                `forgiveness unspent, ${cue.minRidge} m over the ridge); mashing skims ` +
+                `${m.skims}x, bottoms out at ${m.minSpeed} m/s and stays ${m.minRidge} m ` +
+                `over the ridge; worst desync ${longAir.MAX_DESYNC_M.toFixed(2)} m inside ` +
+                `${room.toFixed(2)} m of opening`);
+  }
 }
 
 /* ------------------------------------------------------------------
