@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Book of Rates — Chapter nine: Lantern Current (3-D)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#06070F;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  /* §6 row 4: "rest a finger anywhere to light a lantern." Anywhere is
+     the whole screen, so the target is the whole screen. */
+  #touch{position:fixed;inset:0;z-index:15;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(10,12,26,.6);backdrop-filter:blur(6px);
+    color:#C9A86A;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(201,168,106,.42)}
+  #stop i{width:11px;height:11px;background:#C9A86A;display:block;border-radius:2px}
+
+  #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
+    font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+    color:rgba(222,214,196,.72);background:rgba(10,12,26,.54);border-radius:6px;
+    padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
+  #fps.off{opacity:0;pointer-events:none}
+  #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
+    width:22px;height:22px;border-radius:50%;display:none}
+  #fpsdot.on{display:block}
+
+  #cue{position:fixed;left:0;right:0;bottom:max(104px,calc(env(safe-area-inset-bottom) + 96px));
+    z-index:20;text-align:center;pointer-events:none;color:#EFE4CC}
+  #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 20px rgba(4,5,12,.98)}
+  #sub{margin-top:8px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    opacity:.8;text-transform:uppercase;text-shadow:0 2px 14px rgba(4,5,12,.98)}
+  #hint{margin-top:14px;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    text-transform:uppercase;color:rgba(201,168,106,0);transition:color .8s ease}
+  #hint.on{color:rgba(201,168,106,.72)}
+  #bar{position:fixed;left:0;right:0;bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));
+    z-index:20;height:2px;margin:0 36px;background:rgba(239,228,204,.18);pointer-events:none}
+  #barfill{height:100%;width:0;background:rgba(201,168,106,.85)}
+  #note{position:fixed;left:0;right:0;bottom:max(22px,calc(env(safe-area-inset-bottom) + 14px));
+    z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
+    color:rgba(239,228,204,.5);letter-spacing:.06em;padding:0 20px;pointer-events:none;
+    text-shadow:0 1px 10px rgba(4,5,12,.98)}
+
+  .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(6,7,15,.95);backdrop-filter:blur(3px);text-align:center;padding:28px;
+    overflow-y:auto}
+  .sheet.on{display:grid}
+  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#C9A86A;letter-spacing:.06em}
+  .sheet p{margin:0 0 14px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(239,228,204,.8);max-width:320px}
+  .sheet .fine{font-size:11.5px;line-height:1.55;color:rgba(239,228,204,.6)}
+  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
+    background:#C9A86A;color:#0E1230;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    display:block;width:100%;max-width:320px}
+  .sheet button.alt{background:transparent;color:#C9A86A;
+    box-shadow:inset 0 0 0 1.5px rgba(201,168,106,.5);font-weight:500}
+  .sheet button.link,.sheet a.link{background:transparent;color:rgba(239,228,204,.55);
+    box-shadow:none;font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
+    text-decoration:underline;padding:8px;margin-top:14px;display:block;text-align:center}
+  .sheet a.link{margin-top:4px}
+  .sheet strong{color:#C9A86A;font-weight:600}
+  .sheet .own{border-left:2px solid rgba(201,168,106,.34);padding-left:12px;text-align:left;
+    margin-bottom:16px}
+  .sheet .how{text-align:left;max-width:320px;margin:0 auto 16px;
+    font:400 12px/1.6 ui-sans-serif;color:rgba(239,228,204,.76)}
+  .sheet .how b{color:#C9A86A}
+  .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(239,228,204,.46);margin-top:16px}
+  .sheet .sub2{display:block;margin-top:5px;font:400 9.5px/1.3 ui-sans-serif,sans-serif;
+    letter-spacing:.06em;text-transform:none;opacity:.62}
+
+  #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
+    text-align:center;
+    background:linear-gradient(#0E1230 0%,#1E2A5C 38%,#2C3E5E 54%,#13213C 70%,#06070F 100%)}
+  #fallback.on{display:grid}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#EFE4CC;letter-spacing:.05em}
+  #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
+    color:rgba(239,228,204,.8);max-width:300px}
+  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(201,168,106,.9)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="touch" aria-label="Rest a finger anywhere to light a lantern"></div>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="fpsdot" aria-hidden="true"></div>
+<div id="fps" role="status" title="Tap to hide">—</div>
+
+<div id="cue">
+  <div id="phase">breathe in</div>
+  <div id="sub">the boat lifts</div>
+  <div id="hint">rest a finger to light a lantern</div>
+</div>
+<div id="bar"><div id="barfill"></div></div>
+<div id="note"><span id="proto">Drifting · 4 in / 8 out · 5 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
+
+<!-- A CHOICE, not a screening gate. No breath is held anywhere in this
+     chapter and nothing in it is fast breathing — the quicker of the two
+     protocols is five breaths a minute. The blocking step is the warning
+     scroll (js/scroll.js), which discloses what the practice asks for
+     and gets out of the way: design doc §1.6. -->
+<div id="gate" class="sheet"><div>
+  <h2>Go down the river</h2>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. The last chapter before sleep.</p>
+  <div class="how">
+    <p><b>Rest a finger anywhere</b> and the nearest lantern ahead of you lights. It stays lit, and the river carries you past it.</p>
+    <p>The boat lifts as you breathe in and settles as you breathe out. You are not steering and there is nothing to avoid.</p>
+    <p>It gets darker as the session goes on, and ends dark — so the lanterns you lit become the only light on the water. Light all of them, or none. Nothing here is counted.</p>
+  </div>
+  <button id="gateDrift">DRIFTING · 4 IN / 8 OUT<br><span class="sub2">five breaths a minute</span></button>
+  <button id="gateSlower" class="alt">SLOWER · 4 IN / 9.3 OUT<br><span class="sub2">a longer exhale · four and a half a minute</span></button>
+  <p class="fine tiny">The exhale is twice the length of the inhale in both, which some people find makes them yawn. That is fine and it is the point of this chapter. No breath is held anywhere here. Your choice is remembered on this device and can be changed from the stop screen.</p>
+</div></div>
+
+<div id="halt" class="sheet"><div>
+  <h2>Stopped</h2>
+  <p>Let your breathing go back to whatever it wants to do. The lanterns stay lit.</p>
+  <button id="resume">RESUME</button>
+  <button id="rescreen" class="link">Choose a different pace</button>
+  <a class="link" href="./">Back to the book</a>
+</div></div>
+
+<div id="fallback"><div>
+  <h2>Lantern Current needs WebGL</h2>
+  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
+  <p>The 2-D prototypes do the same job without it.</p>
+  <p><code>prototypes/01-long-shore.html · 02-still-pool.html · 03-the-tide.html</code></p>
+</div></div>
+
+<script type="module">
+/* ============================================================
+   BOOK OF RATES — Chapter nine: LANTERN CURRENT
+   A 3-D treatment of design doc §6 row 4. Sleepy. Night river.
+
+   WHY THIS ONE IS IN THREE DIMENSIONS. Because a lantern is a light at
+   a DISTANCE, and distance is the whole of what makes a light on water
+   read as a light on water: the pool it throws shortens as you come
+   level with it, swings across the reeds as you pass, and stretches
+   away behind. Flat, a lantern is a sprite that gets smaller. Here the
+   ones you light stay where you lit them and the river carries you past
+   each in turn, so what is behind you is a line of lights going back up
+   the water — as far as the strip's own tail, which is about forty
+   metres, because a wrapped strip cannot keep more than it keeps. The
+   river laps three or four times in a session, so the ones lit early
+   come round again already lit. Either way it is a thing with a place
+   in it, and it has nowhere to exist in two dimensions.
+
+   THE BREATH DRIVES THE BOAT AND THE BOAT DRIVES THE CAMERA. The hull's
+   height above the waterline is the travelled scalar; the camera sits
+   in the boat, so every lift and settle is the reader's own breath
+   moving the horizon. Two thirds of a metre is a lot from twenty
+   centimetres above the water, which is why the numbers are small.
+
+   §1.6a — NO INHALE IS DEPICTED UNDERWATER — BINDS THIS CHAPTER, and it
+   is honoured by the SHAPE of the mapping rather than by a number: the
+   hull floats, both corridor walls are above the waterline, and there
+   is no phase, clamp or overshoot that puts anything under it. This
+   chapter IS in tools/regress.mjs's WATER list, which is the part it is
+   possible to forget.
+
+   NOTHING IS COUNTED. No total, no "lanterns lit", no comparison
+   between sessions. The river carries you the same distance whatever
+   you do and the chapter ends at the same moment.
+
+   SILENT. No AudioContext, no media elements.
+   ============================================================ */
+
+import { requireScroll } from './js/scroll.js';
+import { breath } from './js/breath.js';
+import { PROTOCOLS, CHOICE, validChoice, CORRIDOR, SURFACE,
+         HULL_LOW, HULL_HIGH, WALL_LOW, WALL_HIGH, normOf, liftOf,
+         SPEED, BEHIND, STRIP_CYCLES, periodOf, LANTERNS, lanternAt,
+         bankAt, treeAt, END_LIGHT } from './js/lantern-breath.js';
+import { body, ratesOf } from './js/course.js';
+import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
+         PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
+import { builder, bands, particles, scrollGlsl,
+         posterMat, screenQuad, overlayQuad, part } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
+
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+/* ---------- the night-river family. Six steps, palest first, and every
+   surface picks an index BY HAND: the water takes the dark end because
+   it is a mirror of a dark sky, the reeds take body because they are
+   the thing a lantern has to be legible against, and the paper of a lit
+   lantern takes the palest step because it is the brightest thing in
+   the chapter. Decisions about what each thing IS, never a function of
+   distance (§4.2 rule 5). ---------- */
+const R = ramp([0xEFE4CC, 0xC9A86A, 0x7C7E9A, 0x3A456F, 0x1E2A5C, 0x0E1230]);
+
+/* §4.3 sleepy-river row: sky #0E1230 → #1E2A5C, shadow #060818,
+   accent #C9A86A. The shadow is a HUE SHIFT into near-black blue, not a
+   darkening of the ramp — §4.2 rule 2. */
+const NIGHT = {
+  shadow:0x060818, shadowDeep:0x03040C,
+  accent:0xC9A86A, glow:0xF5D79A, paper:0xF7ECD2,
+  water:0x121A3C, waterLo:0x080C22, reed:0x27305A, reedLo:0x141A38
+};
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill'), elHint = $('hint');
+const elFps = $('fps'), elFpsDot = $('fpsdot');
+const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
+
+function fallback(why){
+  if(why) $('fbwhy').textContent = why;
+  elGate.classList.remove('on');
+  elFall.classList.add('on');
+  $('cue').style.display = $('bar').style.display = $('touch').style.display = 'none';
+  elFps.classList.add('off');
+}
+
+boot({ cdn:CDN, fallback, start });
+
+/* ============================================================ */
+function start(THREE){
+
+const canvas = $('c');
+const B = breath(PROTOCOLS.drift);
+
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const C = h => new THREE.Color(h);
+const ramp6 = R.steps.map(C);
+
+/* shared uniforms */
+const uTime   = { value: 0 };
+const uDist   = { value: 0 };
+const uPeriod = { value: 1 };
+const uLift   = { value: HULL_LOW };   // the hull above the waterline
+const uAmb    = { value: 1 };          // ambient light, falls to END_LIGHT
+const uBreath = { value: 0 };          // the figure's own fullness, 0..1
+const uFog    = { value: C(NIGHT.shadow) };
+const uRamp   = { value: ramp6 };
+const uHorizon= { value: 0.5 };
+
+/* THE THREE NEAREST LIT LANTERNS, in world space, with their brightness
+   in w. Three and not more because the loop that reads them in the
+   water shader must have constant bounds, and because a fourth light
+   on a flat posterised surface is not visible anyway — the pools are
+   hard-edged, so they either overlap or they do not. */
+const GLOWS = 3;
+const uGlow = { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] };
+
+const FOG = fogGlsl({ near: 6, rate: 0.045, steps: 5, max: 0.62 });
+const PRE = RAMP_GLSL + STEP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
+
+/* The lantern pools, as a function any surface can call. Hard-edged
+   rings in three steps — a lantern on water does not fall off smoothly
+   and §4.2 rule 5 applies to light as much as to depth. */
+const GLOW_GLSL = `
+  uniform vec4 uGlow[${GLOWS}];
+  float glowAt(vec3 w){
+    float g = 0.0;
+    for(int i = 0; i < ${GLOWS}; i++){
+      vec4 L = uGlow[i];
+      if(L.w <= 0.0) continue;
+      // elongated along z, because a reflection on moving water is a
+      // streak pointing at you, never a disc
+      vec2 d = vec2((w.x - L.x) * 1.0, (w.z - L.z) * 0.26);
+      float r = length(d) / (3.4 + L.w * 1.6);
+      g = max(g, L.w * (1.0 - floor(clamp(r, 0.0, 0.999) * 4.0) / 3.0));
+    }
+    return g;
+  }
+`;
+
+const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
+  canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 62 : 52, far: 400
+});
+
+const SCROLL_GLSL = scrollGlsl(BEHIND);
+
+/* ------------------------------------------------------------------
+   1. SKY — a night sky in four hard bands with a low moon, dimming
+   across the session. §4.2 rule 4: the sky is chosen first. Here it is
+   also the clock: "the screen dims across the session and ends dark"
+   is mostly this, and it is the one thing in the chapter the reader
+   cannot touch.
+   ------------------------------------------------------------------ */
+const skyU = {
+  uTime, uAspect:{value:1}, uHorizon, uRamp, uAmb,
+  uHigh:{value:C(0x0E1230)}, uLow:{value:C(0x1E2A5C)},
+  uMoon:{value:C(0xEFE4CC)}, uHalo:{value:C(0x3A456F)},
+  uBand:{value:C(0x13203F)}
+};
+onFit(() => { skyU.uAspect.value = camera.aspect; });
+scene.add(screenQuad(THREE, {
+  uniforms: skyU, prelude: RAMP_GLSL + GRAIN_GLSL,
+  fragment:`
+    varying vec2 vUv;
+    uniform float uTime, uAspect, uHorizon, uAmb;
+    uniform vec3 uHigh, uLow, uMoon, uHalo, uBand;
+    void main(){
+      float h = vUv.y - uHorizon;
+      float b = floor(clamp(h / 0.85, 0.0, 0.999) * 4.0) / 3.0;
+      vec3 col = mix(uLow, uHigh, b);
+
+      // a flat band of lighter air sitting on the horizon
+      col = mix(col, uBand, step(abs(h - 0.045), 0.040));
+
+      // the moon: a small hard disc, low and off to one side, with one
+      // step of halo. It does not move; the river does.
+      vec2 mp = vec2(0.74, uHorizon + 0.40);
+      vec2 q = vec2((vUv.x - mp.x) * uAspect, vUv.y - mp.y);
+      float d = length(q);
+      col = mix(col, uHalo, step(d, 0.072));
+      col = mix(col, uMoon, step(d, 0.028));
+
+      // stars: quantised cells, a sparse hash, nothing twinkling
+      vec2 cell = floor(vUv * vec2(140.0 * uAspect, 140.0));
+      float s = grainAt(cell);
+      col = mix(col, uMoon, step(0.9955, s) * step(0.10, h) * 0.85);
+
+      col *= uAmb;
+      col += (grainAt(vUv * 560.0) - 0.5) * 0.016 * uAmb;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+}));
+
+/* ------------------------------------------------------------------
+   2. THE FAR TREELINE — the kit's parallax band pattern, hand-assigned
+   tiers, deliberately not following the breath.
+   ------------------------------------------------------------------ */
+const far = new THREE.Mesh(bands(THREE, [
+  { z:-240, base: 15, amp:6.0, step:2.5, seed:7,  tier:4 },
+  { z:-150, base: 10, amp:4.0, step:2.0, seed:21, tier:5 },
+  { z: -96, base:  6, amp:2.5, step:1.5, seed:33, tier:5 }
+], { n: 38, span: 540, skirt: -24 }), posterMat(THREE, {
+  uniforms:{ uRamp, uAmb, uShadow:{value:C(NIGHT.shadow)} }, prelude: RAMP_GLSL,
+  vertex:`
+    attribute float aTier; varying float vTier;
+    void main(){ vTier = aTier;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying float vTier; uniform vec3 uShadow; uniform float uAmb;
+    void main(){
+      vec3 col = rampPick((vTier + 0.5) / 6.0);
+      // the two far layers are nearly the same value on purpose: at
+      // night a treeline is a silhouette, and the parallax has to come
+      // from the EDGES moving rather than from the fill differing
+      gl_FragColor = vec4(mix(col, uShadow, (6.0 - vTier) / 2.0 * 0.30) * uAmb, 1.0);
+    }
+  `
+}));
+scene.add(far);
+
+/* ------------------------------------------------------------------
+   3. THE WATER. One big quad, scrolled by nothing — the river does not
+   move under you, the strip does — carrying the reflections, the
+   lantern pools and a stepped ripple. Everything hard-edged.
+   ------------------------------------------------------------------ */
+const water = new THREE.Mesh(new THREE.PlaneGeometry(400, 400, 1, 1), posterMat(THREE, {
+  uniforms:{ uTime, uDist, uAmb, uRamp, uFog, uGlow, uLift,
+             uWater:{value:C(NIGHT.water)}, uWaterLo:{value:C(NIGHT.waterLo)},
+             uGlowCol:{value:C(NIGHT.glow)}, uMoon:{value:C(0xEFE4CC)} },
+  prelude: PRE + GLOW_GLSL,
+  vertex:`
+    varying vec3 vW; varying float vDist;
+    void main(){
+      vec4 w = modelMatrix * vec4(position, 1.0);
+      vW = w.xyz;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying vec3 vW; varying float vDist;
+    uniform float uTime, uDist, uAmb, uLift;
+    uniform vec3 uWater, uWaterLo, uGlowCol, uMoon;
+    void main(){
+      // the current: bands of surface sliding towards the lens. The
+      // scroll is in the TEXTURE here rather than in the geometry,
+      // because a plane this size has no vertices to move.
+      float z = vW.z + uDist;
+      float lane = posterise(fract(z * 0.085 + uTime * 0.02), 4.0);
+      vec3 col = mix(uWaterLo, uWater, lane);
+
+      // one hard streak of moonlight, fixed in x, broken into cells
+      float moon = step(abs(vW.x - 7.0), 1.5 + posterise(fract(z * 0.3), 3.0) * 1.2);
+      col = mix(col, uMoon, moon * 0.10 * uAmb);
+
+      // the lantern pools. THE ONE PLACE THE READER CHANGES THE WORLD.
+      float g = glowAt(vW);
+      col = mix(col, uGlowCol, g * 0.72);
+
+      // a stepped chop, finer near the boat
+      float chop = chipAt(floor(vec2(vW.x * 1.1, z * 0.9)));
+      col *= 1.0 + (chop - 0.5) * 0.10;
+
+      col *= mix(0.55, 1.0, uAmb);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+    }
+  `
+}));
+water.rotation.x = -Math.PI / 2;
+water.position.set(0, SURFACE, -120);
+water.renderOrder = 1;
+scene.add(water);
+
+/* ------------------------------------------------------------------
+   4. THE BANKS AND THE REEDS. One merged mesh for both sides: a bank
+   ribbon along each edge, with reed blades standing out of it. Scrolled
+   by the kit's modulo, so the whole river is one draw call and endless.
+   ------------------------------------------------------------------ */
+function bankGeometry(proto){
+  const period = periodOf(proto);
+  const n = Math.round(period / 2.4);
+  const b = builder(THREE, { aTone:1, aSun:1, aSeed:1, aReed:1 });
+
+  for(const side of [-1, 1]){
+    // the bank: a ribbon from the waterline up to the treeline
+    const base0 = b.count;
+    for(let i = 0; i <= n; i++){
+      const z = (i / n) * period;
+      const x = bankAt(z, period, side);
+      const h = treeAt(z, period, side);
+      const seed = ((i * 7919) % 97) / 97;
+      b.vertex(x, SURFACE, z, { aTone:DEEP, aSun: side > 0 ? 1 : 0, aSeed:seed, aReed:0 });
+      b.vertex(x + side * 26, h, z, { aTone:DARK, aSun: side > 0 ? 1 : 0, aSeed:seed, aReed:0 });
+    }
+    b.strip(n, side < 0);
+    void base0;
+
+    // reeds: flat blades standing in the shallows, every few steps
+    for(let i = 0; i < n; i += 2){
+      const z = (i / n) * period;
+      const x = bankAt(z, period, side);
+      const seed = ((i * 6367) % 89) / 89;
+      const count = 2 + (i % 3);
+      for(let k = 0; k < count; k++){
+        const dx = -side * (0.15 + ((i * 31 + k * 17) % 13) / 13 * 1.5);
+        const h = 0.55 + ((i * 97 + k * 29) % 19) / 19 * 1.25;
+        const w = 0.035;
+        const lean = (((i * 53 + k * 7) % 11) / 11 - 0.5) * 0.5;
+        const bb = b.count;
+        const at = { aTone: BODY, aSun: (k % 2) ? 1 : 0, aSeed: seed, aReed: 1 };
+        b.vertex(x + dx - w,        SURFACE,     z,        at);
+        b.vertex(x + dx + w,        SURFACE,     z,        at);
+        b.vertex(x + dx + lean - w, SURFACE + h, z - 0.12, at);
+        b.vertex(x + dx + lean + w, SURFACE + h, z - 0.12, at);
+        b.tri(bb, bb+1, bb+2); b.tri(bb+1, bb+3, bb+2);
+      }
+    }
+  }
+  return b.geometry();
+}
+
+const bankMat = posterMat(THREE, {
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uAmb, uGlow, uTime,
+             uShadow:{value:C(NIGHT.shadow)}, uDeep:{value:C(NIGHT.shadowDeep)},
+             uReed:{value:C(NIGHT.reed)}, uReedLo:{value:C(NIGHT.reedLo)},
+             uGlowCol:{value:C(NIGHT.glow)} },
+  side: THREE.DoubleSide, prelude: PRE + GLOW_GLSL,
+  vertex: SCROLL_GLSL + `
+    attribute float aTone; attribute float aSun; attribute float aSeed; attribute float aReed;
+    uniform float uTime;
+    varying float vTone; varying float vSun; varying float vSeed; varying float vReed;
+    varying float vDist; varying vec3 vW;
+    void main(){
+      vec3 p = scrolled(position);
+      // the reeds lean in the current, tips only
+      p.x += aReed * sin(uTime * 1.1 + aSeed * 19.0) * 0.06 * (p.y - ${SURFACE.toFixed(2)});
+      vTone = aTone; vSun = aSun; vSeed = aSeed; vReed = aReed; vW = p;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vTone; varying float vSun; varying float vSeed; varying float vReed;
+    varying float vDist; varying vec3 vW;
+    uniform vec3 uShadow, uDeep, uReed, uReedLo, uGlowCol;
+    uniform float uAmb;
+    void main(){
+      vec3 col = rampPick((vTone + 0.5) / 6.0);
+      col = mix(col, uReed, vReed);
+      float sh = 1.0 - step(0.5, vSun);
+      col = mix(col, mix(uShadow, uReedLo, vReed), sh * 0.5);
+      col = mix(col, uDeep, (1.0 - vReed) * 0.25);
+      // A LANTERN LIGHTS THE BANK IT IS NEXT TO. This is the whole of
+      // "the world responds": the reeds beside a lit lantern come out
+      // of the dark, and as you pass it they go back in.
+      col = mix(col, uGlowCol, glowAt(vW) * (0.30 + vReed * 0.45));
+      col *= 1.0 + (chipAt(vec2(floor(vW.y * 3.0), floor(vSeed * 41.0))) - 0.5) * 0.10;
+      col *= mix(0.42, 1.0, uAmb);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+    }
+  `
+});
+
+/* ------------------------------------------------------------------
+   5. THE LANTERNS. One merged mesh, scrolled with everything else, and
+   a per-vertex `aLit` rewritten when one is lit.
+   ------------------------------------------------------------------
+   aLit is an ATTRIBUTE, not a uniform array indexed by a lantern id.
+   Dynamic indexing of a uniform array is allowed in a vertex shader and
+   is not reliably allowed in a fragment one, and this chapter needs the
+   paper lit in both stages; writing eight floats into a buffer when the
+   reader taps is cheaper than finding that out on somebody's phone.
+   It is the same trick the kit's particle pool uses on aSize.
+   ------------------------------------------------------------------ */
+const LANTERN_VERTS = 12;      // 8 for the box, 4 for the flame card
+function lanternGeometry(proto){
+  const period = periodOf(proto);
+  const b = builder(THREE, { aLit:1, aPart:1, aSeed:1, aCorner:2 });
+  for(let i = 0; i < LANTERNS; i++){
+    const L = lanternAt(i, period);
+    const seed = ((i * 2311) % 101) / 101;
+    const s = 0.26 + seed * 0.12;
+    const y = SURFACE + 0.02;
+    // the paper box: four upright quads would be eight draw-worth of
+    // vertices; two crossed quads read the same at this size and at
+    // this value range, and halve the geometry.
+    const quad = (ax, az, part) => {
+      const bb = b.count;
+      const at = { aLit:0, aPart:part, aSeed:seed };
+      b.vertex(L.x - ax, y,           L.z - az, { ...at, aCorner:[0,0] });
+      b.vertex(L.x + ax, y,           L.z + az, { ...at, aCorner:[1,0] });
+      b.vertex(L.x - ax, y + s * 1.5, L.z - az, { ...at, aCorner:[0,1] });
+      b.vertex(L.x + ax, y + s * 1.5, L.z + az, { ...at, aCorner:[1,1] });
+      b.tri(bb, bb+1, bb+2); b.tri(bb+1, bb+3, bb+2);
+    };
+    quad(s, L.lean * s, 0);
+    quad(L.lean * s, s, 1);
+    // the flame card: a small billboard inside the paper
+    const bb = b.count;
+    const at = { aLit:0, aPart:2, aSeed:seed };
+    for(const [cx, cy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+      b.vertex(L.x, y + s * 0.70, L.z, { ...at, aCorner:[cx, cy] });
+    }
+    b.tri(bb, bb+1, bb+2); b.tri(bb+1, bb+3, bb+2);
+  }
+  return b.geometry();
+}
+
+const lanternMat = posterMat(THREE, {
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uAmb, uTime,
+             uPaper:{value:C(NIGHT.paper)}, uGlowCol:{value:C(NIGHT.glow)},
+             uDark:{value:C(NIGHT.reed)}, uAccent:{value:C(NIGHT.accent)} },
+  side: THREE.DoubleSide, transparent:true, prelude: PRE,
+  vertex: SCROLL_GLSL + `
+    attribute float aLit; attribute float aPart; attribute float aSeed; attribute vec2 aCorner;
+    uniform float uTime;
+    varying float vLit; varying float vPart; varying float vSeed;
+    varying vec2 vC; varying float vDist;
+    void main(){
+      vec3 p = scrolled(position);
+      // every lantern bobs, lit or not, on its own phase
+      p.y += sin(uTime * 1.3 + aSeed * 23.0) * 0.035;
+      vLit = aLit; vPart = aPart; vSeed = aSeed; vC = aCorner;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      // the flame card is a view-space billboard, so it faces the lens
+      // however the boat is sitting
+      if(aPart > 1.5) mv.xy += aCorner * (0.075 + 0.045 * aLit);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vLit; varying float vPart; varying float vSeed;
+    varying vec2 vC; varying float vDist;
+    uniform vec3 uPaper, uGlowCol, uDark, uAccent;
+    uniform float uAmb, uTime;
+    void main(){
+      if(vPart > 1.5){
+        // the flame: a hard lozenge, and it does not exist unlit
+        if(vLit < 0.5) discard;
+        if(abs(vC.x) + abs(vC.y) > 1.0) discard;
+        gl_FragColor = vec4(mix(uGlowCol, uPaper, step(0.0, vC.y) * 0.6), 1.0);
+        return;
+      }
+      // the paper: two values, a lit upper and a shadowed lower, with
+      // one hard accent band where the hoop is
+      vec3 unlit = mix(uDark, rampPick(3.5 / 6.0), 0.5) * mix(0.35, 1.0, uAmb);
+      vec3 lit   = mix(uGlowCol, uPaper, step(0.45, vC.y));
+      vec3 col   = mix(unlit, lit, vLit);
+      col = mix(col, uAccent, step(abs(vC.y - 0.18), 0.05) * (0.3 + vLit * 0.4));
+      // a lit lantern does not take the fog: it is the light source
+      float f = fogAmount(vDist) * (1.0 - vLit * 0.8);
+      gl_FragColor = vec4(mix(col, uFog, f), 1.0);
+    }
+  `
+});
+
+/* Both protocols' rivers are built at boot and one is shown. Rebuilding
+   on the gate would mean disposing live geometry from inside an event
+   handler, which is how a megabyte-per-switch leak happens. */
+const worlds = {};
+for(const id of Object.keys(PROTOCOLS)){
+  const proto = PROTOCOLS[id];
+  const period = periodOf(proto);
+  const banks = new THREE.Mesh(bankGeometry(proto), bankMat);
+  const lamps = new THREE.Mesh(lanternGeometry(proto), lanternMat);
+  lamps.renderOrder = 4;
+  for(const m of [banks, lamps]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
+  worlds[id] = {
+    period, meshes:[banks, lamps],
+    lanterns: Array.from({ length: LANTERNS }, (_, i) => ({ ...lanternAt(i, period), lit: 0 })),
+    aLit: lamps.geometry.getAttribute('aLit')
+  };
+}
+let WORLD = worlds.drift;
+
+/** Light lantern i, by writing its own vertices. */
+function lightLantern(w, i){
+  if(w.lanterns[i].lit) return false;
+  w.lanterns[i].lit = 1;
+  const o = i * LANTERN_VERTS;
+  for(let v = 0; v < LANTERN_VERTS; v++) w.aLit.array[o + v] = 1;
+  w.aLit.needsUpdate = true;
+  return true;
+}
+
+/* ------------------------------------------------------------------
+   6. THE BOAT AND THE FIGURE. A dozen stretched primitives sharing
+   three flat materials (§4.2 rule 1). The camera sits in the boat, so
+   most of what the reader sees of it is the bow and her shoulders.
+   ------------------------------------------------------------------ */
+const matOf = hex => new THREE.MeshBasicMaterial({ color: hex });
+const mHull  = matOf(0x2B2335);
+const mHullS = matOf(NIGHT.shadowDeep);
+const mFig   = matOf(R.at(MID));
+const mFigS  = matOf(NIGHT.shadow);
+const mWarm  = matOf(NIGHT.accent);
+
+const box  = new THREE.BoxGeometry(1, 1, 1);
+const ball = new THREE.SphereGeometry(0.5, 10, 7);
+
+const boat = new THREE.Group();
+boat.add(part(THREE, box,  mHull,  1.5, 0.22, 4.6,  0, 0.10, -1.4));
+boat.add(part(THREE, ball, mHull,  1.2, 0.34, 1.9,  0, 0.10, -3.3));
+boat.add(part(THREE, box,  mHullS, 1.6, 0.10, 4.6,  0, -0.02, -1.4));
+boat.add(part(THREE, box,  mHull,  1.4, 0.12, 0.16, 0, 0.22, -2.6));
+// a small lamp on the bow: the reader's own light, lit from the start,
+// so the boat is never a silhouette with nothing in it
+const bowLamp = part(THREE, box, mWarm, 0.17, 0.24, 0.17, 0, 0.36, -3.5);
+boat.add(bowLamp);
+
+const figure = new THREE.Group();
+const chest = part(THREE, ball, mFig,  0.66, 0.70, 0.54, 0, 0.56, -1.0);
+const head  = part(THREE, ball, mFig,  0.36, 0.40, 0.34, 0, 1.02, -1.02);
+const lap   = part(THREE, ball, mFigS, 0.86, 0.30, 0.74, 0, 0.22, -0.86);
+figure.add(lap, chest, head);
+boat.add(figure);
+scene.add(boat);
+
+/* ------------------------------------------------------------------
+   7. WAKE — a few hard lozenges off the bow, present in proportion to
+   how fast the hull is settling. Not spray: the river is slow and this
+   is the sleepy chapter. It is here so the boat is visibly ON something
+   rather than hovering.
+   ------------------------------------------------------------------ */
+const wake = particles(THREE, {
+  n: 60, renderOrder: 6,
+  material: posterMat(THREE, {
+    uniforms:{ uPale:{value:C(R.at(MID))}, uGlowCol:{value:C(NIGHT.glow)}, uAmb },
+    transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    vertex:`
+      attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
+      varying vec2 vC; varying float vSize; varying float vKind;
+      void main(){
+        vC = aCorner; vSize = aSize; vKind = aKind;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        mv.xy += aCorner * aSize;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragment:`
+      varying vec2 vC; varying float vSize; varying float vKind;
+      uniform vec3 uPale, uGlowCol; uniform float uAmb;
+      void main(){
+        if(vSize <= 0.0) discard;
+        if(abs(vC.x) + abs(vC.y) > 1.0) discard;
+        vec3 col = mix(uPale, uGlowCol, vKind * 0.5);
+        gl_FragColor = vec4(col * mix(0.5, 1.0, uAmb), 0.5);
+      }
+    `
+  })
+});
+scene.add(wake.mesh);
+let wakeAccum = 0;
+const ripple = (y, kind) => wake.spawn(p => {
+  p.kind = kind;
+  p.x = (Math.random() - 0.5) * 2.2;
+  p.y = SURFACE + 0.03;
+  p.z = -3.6 - Math.random() * 1.4;
+  p.r = 0.05 + Math.random() * 0.07;
+  p.vx = (Math.random() - 0.5) * 0.5;
+  p.vy = 0;
+  p.vz = 1.4 + Math.random() * 1.2;
+  void y;
+});
+function stepWake(dt){
+  wake.step(dt, (p, d) => {
+    p.x += p.vx*d; p.z += p.vz*d;
+    p.r *= 1.0 - d * 0.55;
+    return p.z < 6.0 && p.r > 0.012;
+  });
+}
+
+/* ------------------------------------------------------------------
+   8. THE DARKENING. §6 row 4: "the screen dims across the session and
+   ends dark." It is a schedule, not an effect: uAmb falls from 1 to
+   END_LIGHT with session progress and nothing the reader does touches
+   it. The lanterns do not dim with it, which is the entire point —
+   the later it gets, the more the ones you lit are the only light.
+   ------------------------------------------------------------------ */
+const dusk = overlayQuad(THREE, {
+  uniforms:{ uAmb, uDeepCol:{value:C(NIGHT.shadowDeep)} },
+  fragment:`
+    varying vec2 vUv;
+    uniform float uAmb; uniform vec3 uDeepCol;
+    void main(){
+      float a = (1.0 - uAmb) * 0.5;
+      if(a < 0.02) discard;
+      // heavier at the edges, three hard steps, nothing central: the
+      // view of the river stays clear however dark it gets
+      float d = max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0;
+      float e = 0.45 + floor(clamp((d - 0.45) / 0.55, 0.0, 0.999) * 3.0) / 3.0 * 0.55;
+      gl_FragColor = vec4(uDeepCol, a * e);
+    }
+  `
+});
+scene.add(dusk);
+
+/* ------------------------------------------------------------------
+   THE CONTROL. Rest a finger anywhere.
+   ------------------------------------------------------------------ */
+let touching = false;
+(function(){
+  const el = $('touch');
+  const on  = e => { e.preventDefault(); touching = true;  };
+  const off = e => { if(e) e.preventDefault(); touching = false; };
+  el.addEventListener('pointerdown', on);
+  el.addEventListener('pointerup', off);
+  el.addEventListener('pointercancel', off);
+  el.addEventListener('pointerleave', off);
+  window.addEventListener('blur', () => off());
+})();
+
+/* ------------------------------------------------------------------
+   The loop
+   ------------------------------------------------------------------ */
+let t = 0;
+let started = false;
+let camLook = 0.5, camTilt = 0;
+let litAccum = 0;
+let RATE = ratesOf(PROTOCOLS.drift);
+
+/* The hull is the kit's body — js/course.js — with THE SCHEDULE holding
+   the control instead of the reader. Same spring, same clamp, same lag:
+   the only difference from Long Air is who is pressing. tools/regress.mjs
+   drives the same object and checks it never reaches the waterline. */
+let HULL = body({ corridor: CORRIDOR, rates: RATE, fill: 0 });
+
+let subShown = '', hintDone = false;
+const vHz = new THREE.Vector3();
+
+const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
+
+/** Where lantern i appears in world z right now, given the strip's own
+ *  wrap. The inverse of the vertex shader's modulo, so the thing the
+ *  reader taps and the thing that is drawn cannot disagree about where
+ *  a lantern is — the same discipline as Long Air's gateAt(). */
+function lanternZ(L, period){
+  const s = ((L.z - uDist.value) % period + period) % period;
+  return period * BEHIND - s;
+}
+
+const loop = clock((dt, now, running) => {
+  if(!running){ fpsTick(now, true); return; }
+  if(started) t += dt;
+
+  const st = B.at(t);
+  const ph = st.p;
+  const prog = B.progress(t);
+  const period = WORLD.period;
+
+  uDist.value = SPEED * t;
+  uPeriod.value = period;
+
+  /* --- THE HULL. The schedule drives it; the spring gives it mass, so
+     the boat is always a beat behind the breath, which is what a loaded
+     boat on slow water does. It cannot reach the waterline: both
+     corridor walls are above it (§1.6a, by construction). --- */
+  HULL.follow(dt, ph.k);
+  const lift = HULL.value;
+  uLift.value = lift;
+
+  /* --- THE DARKENING, on the schedule and nothing else. --- */
+  const amb = 1 - (1 - END_LIGHT) * prog;
+  uAmb.value = amb;
+
+  /* --- lighting a lantern. A finger resting lights the nearest unlit
+     one AHEAD, no faster than a few a breath, so a palm left on the
+     glass does not light the whole river at once — that would spend the
+     chapter in four seconds. Nothing is counted; this is a rate, not a
+     budget. --- */
+  if(touching && started){
+    litAccum += dt;
+    if(litAccum > 0.55){
+      litAccum = 0;
+      let best = -1, bestZ = Infinity;
+      for(let i = 0; i < WORLD.lanterns.length; i++){
+        const L = WORLD.lanterns[i];
+        if(L.lit) continue;
+        const z = lanternZ(L, period);
+        // ahead of the bow, and near enough to be on screen
+        if(z < -70 || z > -5) continue;
+        if(z < bestZ){ bestZ = z; best = i; }
+      }
+      if(best >= 0){ lightLantern(WORLD, best); hintDone = true; }
+    }
+  } else litAccum = 0.55;      // the first touch lights one immediately
+
+  /* --- the three nearest lit lanterns, for the water and the reeds.
+     Nearest by absolute distance, not by "ahead", because the pool a
+     lantern throws behind you is the one that makes the session
+     visible as a line of lights going back up the river. --- */
+  const near = [];
+  for(const L of WORLD.lanterns){
+    if(!L.lit) continue;
+    const z = lanternZ(L, period);
+    if(z < -90 || z > 40) continue;
+    near.push({ x:L.x, z, d:Math.abs(z) });
+  }
+  near.sort((a, b) => a.d - b.d);
+  for(let i = 0; i < GLOWS; i++){
+    const g = uGlow.value[i], n = near[i];
+    if(n) g.set(n.x, SURFACE, n.z, 1 - Math.min(0.55, n.d / 120));
+    else  g.set(0, 0, 0, 0);
+  }
+
+  /* --- the figure. Her chest carries the phase's own curve; the bow
+     lamp breathes with her, which is the one light in the frame that is
+     hers rather than the river's. --- */
+  const full = B.scalar(t);
+  uBreath.value = full;
+  chest.scale.set(0.66 + full * 0.09, 0.70 + full * 0.07, 0.54 + full * 0.08);
+  chest.position.y = 0.56 + full * 0.03;
+  head.position.y  = 1.02 + full * 0.05;
+  head.rotation.x  = -0.06 + full * 0.10;
+  bowLamp.scale.set(0.17 + full * 0.035, 0.24 + full * 0.03, 0.17 + full * 0.035);
+
+  /* --- the boat itself: it rides the hull's height, pitches with its
+     vertical speed and rolls a little on the current. --- */
+  boat.position.y = lift;
+  boat.rotation.x = -HULL.v * 0.10;
+  boat.rotation.z = Math.sin(t * 0.52) * 0.022;
+
+  /* --- wake off the bow, in proportion to how fast the hull is
+     settling. The exhale makes the water in front of you move. --- */
+  const settling = Math.max(0, -HULL.v);
+  if(settling > 0.02){
+    wakeAccum += dt * (6 + settling * 60);
+    while(wakeAccum >= 1){ wakeAccum -= 1; ripple(lift, near.length ? 1 : 0); }
+  } else wakeAccum = 0;
+  stepWake(dt);
+
+  /* --- THE CAMERA RIDES THE HULL, so the breath moves the horizon:
+     every lift and settle is the reader's own breath raising and
+     lowering the whole view. It sits just behind and above the stern
+     rather than at her eye — low enough that two thirds of a metre is
+     a visible change, far enough back that her head is not the
+     picture. It looks further down the river on the exhale, which is
+     where the lanterns she has not lit yet are. --- */
+  const wantLook = (ph.cam === 'lift') ? 1.20 : 0.55;
+  const wantTilt = (ph.cam === 'lift') ? 0.055 : -0.02;
+  camLook += (wantLook - camLook) * Math.min(1, dt * 1.6);
+  camTilt += (wantTilt - camTilt) * Math.min(1, dt * 1.6);
+  camera.position.set(0, lift + 1.42, 1.75);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0, lift + camLook + camTilt * 2.0, -26);
+
+  vHz.set(camera.position.x, SURFACE, camera.position.z - 320).project(camera);
+  uHorizon.value = vHz.y * 0.5 + 0.5;
+
+  uTime.value = t;
+
+  /* --- cue text. The countdown points at the next breath, never at
+     elapsed time (§2.4). Nothing here is a score. --- */
+  const cue = B.cue(t);
+  if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
+  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
+  elHint.classList.toggle('on', started && !hintDone && t > 6);
+  elBar.style.width = (100 * prog).toFixed(2) + '%';
+
+  renderer.render(scene, camera);
+  fpsTick(now, false);
+});
+
+/* ---------- the pace choice ---------- */
+const picked = choice({ key:'bor.lantern.pace.v1', valid: validChoice });
+
+function beginWith(which, remember){
+  const id = CHOICE[which];
+  B.use(PROTOCOLS[id]);
+  RATE = ratesOf(PROTOCOLS[id]);
+  HULL = body({ corridor: CORRIDOR, rates: RATE, fill: 0 });
+  WORLD = worlds[id];
+  uPeriod.value = WORLD.period;
+  for(const kk of Object.keys(worlds)){
+    for(const m of worlds[kk].meshes) m.visible = (kk === id);
+  }
+  // a new session starts on a dark river: the lanterns you lit last
+  // time are not a record and are not carried over
+  for(let i = 0; i < WORLD.lanterns.length; i++){
+    WORLD.lanterns[i].lit = 0;
+    for(let v = 0; v < LANTERN_VERTS; v++) WORLD.aLit.array[i * LANTERN_VERTS + v] = 0;
+  }
+  WORLD.aLit.needsUpdate = true;
+  $('proto').textContent = B.proto.name;
+  if(remember) picked.write(which);
+  elGate.classList.remove('on');
+  started = true;
+  t = 0; subShown = ''; hintDone = false; litAccum = 0.55;
+  loop.resync();
+}
+$('gateDrift').addEventListener('click',  () => beginWith('drift', true));
+$('gateSlower').addEventListener('click', () => beginWith('slower', true));
+
+$('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
+$('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
+$('rescreen').addEventListener('click', () => {
+  picked.clear();
+  elHalt.classList.remove('on');
+  elGate.classList.add('on');
+  started = false; loop.running = true; t = 0;
+});
+
+/* Something has to be on screen behind the gate, or the first frame is
+   an empty night. Show the drift river without starting the clock. */
+for(const m of worlds.drift.meshes) m.visible = true;
+uPeriod.value = worlds.drift.period;
+
+const ack = picked.read();
+enter(requireScroll, () => {
+  if(ack) beginWith(ack.choice, false); else elGate.classList.add('on');
+});
+
+/* ---------- context loss ---------- */
+contextGuard(canvas, {
+  onLost(){
+    loop.stop();
+    elPhase.textContent = 'paused';
+    elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+  },
+  onRestored(){ resize(); loop.resync(); loop.start(); }
+});
+
+/* ---------- inspection hook ----------
+   A hidden browser pane gets NO rAF callbacks at all, so the frame body
+   is otherwise unreachable from a tool call and a throw in there is
+   indistinguishable from a stalled loop. See clock().pump in js/stage.js. */
+window.__lantern = {
+  begin(which){ beginWith(which === 'slower' ? 'slower' : 'drift', false); },
+  ack: () => picked.read(),
+  scene, camera, THREE,
+  pump(dt, n){ return loop.pump(dt, n); },
+  touch(down){ touching = !!down; return touching; },
+  seek(v){ t = v; uDist.value = SPEED * v; },
+  now(){
+    const s = B.at(t);
+    let lit = 0;
+    for(const L of WORLD.lanterns) if(L.lit) lit++;
+    return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t:+t.toFixed(3),
+             phase:s.p.k, cam:s.p.cam, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
+             schedule:+B.value(t).toFixed(3),
+             lift:+HULL.value.toFixed(3), hullV:+HULL.v.toFixed(3),
+             aboveWaterline:+(HULL.value - SURFACE).toFixed(3),
+             error:+(HULL.value - B.value(t)).toFixed(3),
+             amb:+uAmb.value.toFixed(3), progress:+B.progress(t).toFixed(3),
+             dist:+uDist.value.toFixed(1), period:+WORLD.period.toFixed(1),
+             /* `lit` is here and ONLY here, in a tool hook, because a
+                number on screen would be a score. It is a debugging
+                readout, not a feature, and nothing in the page reads it. */
+             litForDebug: lit, breath:+B.scalar(t).toFixed(3),
+             liveWake: wake.live(), touching };
+  },
+  /* §1.6a, asked of the running page rather than only of the data: fly a
+     whole session through the real controller and report the lowest the
+     hull ever gets. It must never reach the waterline. */
+  proveAfloat(){
+    const h = body({ corridor: CORRIDOR, rates: RATE, fill: 0 });
+    const dt = 1/120; let lowest = Infinity, inhaleLowest = Infinity;
+    for(let tt = 0; tt < B.session; tt += dt){
+      const kind = B.at(tt).p.k;
+      h.follow(dt, kind);
+      lowest = Math.min(lowest, h.value);
+      if(kind === 'in') inhaleLowest = Math.min(inhaleLowest, h.value);
+    }
+    return { surface: SURFACE, walls:[WALL_LOW, WALL_HIGH],
+             lowest:+lowest.toFixed(4), lowestDuringInhale:+inhaleLowest.toFixed(4),
+             clear: lowest > SURFACE && inhaleLowest > SURFACE };
+  },
+  lanterns(){
+    const period = WORLD.period;
+    return WORLD.lanterns.map((L, i) => ({ i, x:+L.x.toFixed(2), lit:!!L.lit,
+      z:+lanternZ(L, period).toFixed(1) }));
+  },
+  bench(n){
+    const gl = renderer.getContext();
+    renderer.render(scene, camera); gl.finish();
+    const s = performance.now();
+    for(let i = 0; i < n; i++) renderer.render(scene, camera);
+    gl.finish();
+    return { msPerRender:(performance.now()-s)/n, n,
+             drawCalls: renderer.info.render.calls,
+             triangles: renderer.info.render.triangles };
+  },
+  where(){
+    const put = o => {
+      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
+               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
+    };
+    return { figure:put(chest), bowLamp:put(bowLamp),
+             horizonUv:+uHorizon.value.toFixed(3), viewport:[size.W, size.H] };
+  }
+};
+
+loop.start();
+}
+</script>
+</body>
+</html>

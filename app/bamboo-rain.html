@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Book of Rates — Chapter eight: Bamboo Rain (3-D)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#2A2740;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  /* THE PRESS TARGET IS THE WHOLE SCREEN. §6 row 5 names no control
+     surface, and the gesture is "push" — which wants a palm, not a
+     button. It sits under the stop button and over everything else. */
+  #push{position:fixed;inset:0;z-index:15;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(42,39,64,.56);backdrop-filter:blur(6px);
+    color:#FFF2A8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(255,242,168,.4)}
+  #stop i{width:11px;height:11px;background:#FFF2A8;display:block;border-radius:2px}
+
+  #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
+    font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+    color:rgba(226,230,240,.78);background:rgba(42,39,64,.5);border-radius:6px;
+    padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
+  #fps.off{opacity:0;pointer-events:none}
+  #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
+    width:22px;height:22px;border-radius:50%;display:none}
+  #fpsdot.on{display:block}
+
+  #cue{position:fixed;left:0;right:0;bottom:max(104px,calc(env(safe-area-inset-bottom) + 96px));
+    z-index:20;text-align:center;pointer-events:none;color:#F2F4FA}
+  #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 18px rgba(20,18,34,.95)}
+  #sub{margin-top:8px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    opacity:.84;text-transform:uppercase;text-shadow:0 2px 12px rgba(20,18,34,.95)}
+  #hint{margin-top:14px;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    text-transform:uppercase;color:rgba(255,242,168,.0);transition:color .5s ease}
+  #hint.on{color:rgba(255,242,168,.78)}
+  #bar{position:fixed;left:0;right:0;bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));
+    z-index:20;height:2px;margin:0 36px;background:rgba(242,244,250,.24);pointer-events:none}
+  #barfill{height:100%;width:0;background:rgba(255,242,168,.85)}
+  #note{position:fixed;left:0;right:0;bottom:max(22px,calc(env(safe-area-inset-bottom) + 14px));
+    z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
+    color:rgba(242,244,250,.6);letter-spacing:.06em;padding:0 20px;pointer-events:none;
+    text-shadow:0 1px 8px rgba(20,18,34,.95)}
+
+  .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(28,26,44,.93);backdrop-filter:blur(3px);text-align:center;padding:28px;
+    overflow-y:auto}
+  .sheet.on{display:grid}
+  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#FFF2A8;letter-spacing:.06em}
+  .sheet p{margin:0 0 14px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(242,244,250,.82);max-width:320px}
+  .sheet .fine{font-size:11.5px;line-height:1.55;color:rgba(242,244,250,.64)}
+  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
+    background:#FFF2A8;color:#2A2740;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    display:block;width:100%;max-width:320px}
+  .sheet button.alt{background:transparent;color:#FFF2A8;
+    box-shadow:inset 0 0 0 1.5px rgba(255,242,168,.5);font-weight:500}
+  .sheet button.link,.sheet a.link{background:transparent;color:rgba(242,244,250,.6);
+    box-shadow:none;font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
+    text-decoration:underline;padding:8px;margin-top:14px;display:block;text-align:center}
+  .sheet a.link{margin-top:4px}
+  .sheet strong{color:#FFF2A8;font-weight:600}
+  .sheet .own{border-left:2px solid rgba(255,242,168,.34);padding-left:12px;text-align:left;
+    margin-bottom:16px}
+  .sheet .how{text-align:left;max-width:320px;margin:0 auto 16px;
+    font:400 12px/1.6 ui-sans-serif;color:rgba(242,244,250,.78)}
+  .sheet .how b{color:#FFF2A8}
+  .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(242,244,250,.5);margin-top:16px}
+  .sheet .sub2{display:block;margin-top:5px;font:400 9.5px/1.3 ui-sans-serif,sans-serif;
+    letter-spacing:.06em;text-transform:none;opacity:.64}
+
+  #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
+    text-align:center;
+    background:linear-gradient(#5B4B7A 0%,#6E6391 30%,#B7C0D8 56%,#66638E 74%,#2F3E4D 100%)}
+  #fallback.on{display:grid}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#211E33;letter-spacing:.05em}
+  #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
+    color:rgba(33,30,51,.86);max-width:300px}
+  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(242,244,250,.92)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="push" aria-label="Press and hold to push the rain away"></div>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="fpsdot" aria-hidden="true"></div>
+<div id="fps" role="status" title="Tap to hide">—</div>
+
+<div id="cue">
+  <div id="phase">breathe in</div>
+  <div id="sub">through the nose</div>
+  <div id="hint">hold anywhere to push</div>
+</div>
+<div id="bar"><div id="barfill"></div></div>
+<div id="note"><span id="proto">The sigh · 2 in, 1 more on top / 6 out · 6.7 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
+
+<!-- A CHOICE, not a screening gate. No breath is held anywhere in this
+     chapter and there is no fast breathing in it: the quickest protocol
+     here is 6.7 breaths a minute, which is slower than ordinary resting
+     breathing. The blocking step is the warning scroll (js/scroll.js),
+     which discloses what the practice asks for and gets out of the way:
+     design doc §1.6. -->
+<div id="gate" class="sheet"><div>
+  <h2>Wait out the rain</h2>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols, one storm.</p>
+  <div class="how">
+    <p><b>Hold anywhere</b> on the screen as you breathe out, and the rain is driven back across the clearing. Let go as you breathe in and it comes in again.</p>
+    <p>The storm clears on its own schedule. Press for all of it or none of it — it clears at the same moment either way, and there is nothing you can do to be late.</p>
+    <p>Nothing here is timed, scored, counted or compared.</p>
+  </div>
+  <button id="gateSigh">THE SIGH · 2 IN, 1 ON TOP / 6 OUT<br><span class="sub2">a double nasal inhale and a long exhale · 6.7 a minute</span></button>
+  <button id="gateSettled" class="alt">SETTLED · 5 IN / 6 OUT<br><span class="sub2">the steady half of the same chapter · 5.45 a minute</span></button>
+  <p class="fine tiny">There is lightning in this chapter and it lights the whole screen for a moment. It only ever strikes while you are breathing out, never while you are breathing in. No breath is held anywhere here and nothing in it is fast breathing. Your choice is remembered on this device and can be changed from the stop screen.</p>
+</div></div>
+
+<div id="halt" class="sheet"><div>
+  <h2>Stopped</h2>
+  <p>Let your breathing go back to whatever it wants to do. The rain carries on without you.</p>
+  <button id="resume">RESUME</button>
+  <button id="rescreen" class="link">Choose a different protocol</button>
+  <a class="link" href="./">Back to the book</a>
+</div></div>
+
+<div id="fallback"><div>
+  <h2>Bamboo Rain needs WebGL</h2>
+  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
+  <p>The 2-D prototypes do the same job without it.</p>
+  <p><code>prototypes/01-long-shore.html · 02-still-pool.html · 03-the-tide.html</code></p>
+</div></div>
+
+<script type="module">
+/* ============================================================
+   BOOK OF RATES — Chapter eight: BAMBOO RAIN
+   A 3-D treatment of design doc §6 row 5. Settled, after distress.
+
+   WHY THIS ONE IS IN THREE DIMENSIONS. Because the rain is a VOLUME
+   with a near face, and the interaction the row names — "each exhale
+   pushes the rain band further off" — is pushing that face away from
+   you through depth. Flat, "further off" can only mean smaller or
+   fainter. Here it means the near slivers stop existing while the far
+   ones stay, the splash line retreats across the ground in front of
+   you, and a lightning stroke behind the curtain shows you how deep the
+   gap you opened now is. The depth IS the mechanic.
+
+   THREE SCALARS, kept apart, exactly as in Long Air:
+
+     SCHEDULE   B.value(t) — where the protocol says the curtain is.
+                Unaffected by the reader.
+     FILL       0..1, integrated from the press at the protocol's own
+                rates, SWAPPED so the exhale is what drives it out.
+     FRONT      springs towards fill, with mass, because a wall of water
+                does not stop the instant you stop pushing.
+
+   And a fourth that no control touches at all: CLEARING, a function of
+   session progress, which lifts the whole band away and thins the rain.
+   §6: the interaction guarantees success. Press for all of it or none
+   of it and the storm clears at the same moment.
+
+   THE FIGURE DOES NOT MOVE. This is the first chapter where the breath
+   moves the world and leaves the body sitting still, which is what
+   "settled, after distress" should feel like. What the world does in
+   response to her is the whole of the feedback: the curtain's distance,
+   the gust through the grove on every exhale, the splash line, and the
+   light.
+
+   §1.6a is not applicable and that is a judgement, written down in
+   js/bamboo-rain-breath.js rather than assumed. Nobody is submerged and
+   there is no surface to be under; the rule binds water themes and the
+   design doc's own list of those does not include this row. If a figure
+   is ever put in the water here, the chapter joins the WATER list in
+   tools/regress.mjs in the same commit.
+
+   SILENT. No AudioContext, no media elements — in the chapter most
+   tempting to put thunder in.
+   ============================================================ */
+
+import { requireScroll } from './js/scroll.js';
+import { breath } from './js/breath.js';
+import { PROTOCOLS, CHOICE, validChoice, CORRIDOR, RANGE,
+         RAIN_NEAR, RAIN_FAR, WALL_NEAR, WALL_FAR, normOf, distOf,
+         CLEAR_SHIFT, clearingAt, pushRates, pushes, SPRING,
+         stemAt, strokeAt } from './js/bamboo-rain-breath.js';
+import { body } from './js/course.js';
+import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
+         PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
+import { builder, bands, particles,
+         posterMat, screenQuad, overlayQuad, part } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
+
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+/* ---------- the storm family. Six steps, palest first, hand-assigned
+   per surface: the wet ground takes the dark end because it is a mirror
+   of a dark sky, the bamboo leaves take mid because they are the thing
+   the gust has to be legible against, and the stems take the pale end
+   because wet bamboo catches what little light there is. Decisions
+   about what each thing IS. Never a function of distance (§4.2 rule 5,
+   and Deep Light's first pass got exactly this wrong). ---------- */
+const R = ramp([0xE2E6F0, 0xB7C0D8, 0x8D96B4, 0x66638E, 0x44405F, 0x2A2740]);
+
+/* §4.3 settled-storm row: sky #5B4B7A → #B7C0D8, shadow #2F3E4D,
+   accent #FFF2A8. The shadow is a HUE SHIFT into slate, not a
+   darkening — §4.2 rule 2. */
+const STORM = {
+  shadow:0x2F3E4D, shadowDeep:0x1E2433,
+  accent:0xFFF2A8, wet:0x56627A, splash:0xCBD6E8
+};
+const AIR = {
+  skyHigh:0x5B4B7A, skyLow:0xB7C0D8,
+  cloud:0x4A4066, cloudLo:0x332C49,
+  rain:0xC8D4E6, haze:0x8D96B4, flash:0xFFF8D8,
+  leaf:0x6E7F82, leafLo:0x44535A, cleared:0xD9D3E8
+};
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill'), elHint = $('hint');
+const elFps = $('fps'), elFpsDot = $('fpsdot');
+const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
+
+function fallback(why){
+  if(why) $('fbwhy').textContent = why;
+  elGate.classList.remove('on');
+  elFall.classList.add('on');
+  $('cue').style.display = $('bar').style.display = $('push').style.display = 'none';
+  elFps.classList.add('off');
+}
+
+boot({ cdn:CDN, fallback, start });
+
+/* ============================================================ */
+function start(THREE){
+
+const canvas = $('c');
+const B = breath(PROTOCOLS.sigh);
+
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const C = h => new THREE.Color(h);
+const ramp6 = R.steps.map(C);
+
+/* shared uniforms */
+const uTime   = { value: 0 };
+const uFront  = { value: RAIN_FAR };   // the curtain's near face, metres out
+const uFill   = { value: 0 };          // the reader's own push, 0..1
+const uClear  = { value: 0 };          // session progress, 0..1
+const uGust   = { value: 0 };          // how hard the exhale is blowing
+const uFlash  = { value: 0 };          // lightning, 0..1
+const uBreath = { value: 0 };          // the figure's own fullness, 0..1
+const uFog    = { value: C(AIR.haze) };
+const uRamp   = { value: ramp6 };
+const uHorizon= { value: 0.5 };
+
+const FOG = fogGlsl({ near: 8, rate: 0.026, steps: 5, max: 0.52 });
+/* STEP_GLSL is in here and is not in Long Air's prelude, because the
+   ground shader posterises its own wet sheen. A prelude that is missing
+   a function the shader calls does not throw anything a tool call can
+   see: the program simply fails to link, the draw call is still counted,
+   the frame still renders and the surface is just gone. That is how Long
+   Air shipped a kite with no sail for an afternoon. The console says so
+   plainly; nothing else does. */
+const PRE = RAMP_GLSL + STEP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
+
+const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
+  canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 64 : 54, far: 300
+});
+
+/* ------------------------------------------------------------------
+   1. SKY — hard bands, a low cloud deck, and a band of clear light that
+   opens at the horizon as the session goes on. §4.2 rule 4: choose the
+   sky first and let it be the loudest thing. Here it is also the clock:
+   the storm clearing is mostly this.
+   ------------------------------------------------------------------ */
+const skyU = {
+  uTime, uAspect:{value:1}, uHorizon, uRamp, uClear, uFlash,
+  uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
+  uCloud:{value:C(AIR.cloud)}, uCloudLo:{value:C(AIR.cloudLo)},
+  uHaze:{value:C(AIR.haze)}, uClearCol:{value:C(AIR.cleared)},
+  uFlashCol:{value:C(AIR.flash)}
+};
+onFit(() => { skyU.uAspect.value = camera.aspect; });
+scene.add(screenQuad(THREE, {
+  uniforms: skyU, prelude: RAMP_GLSL + GRAIN_GLSL,
+  fragment:`
+    varying vec2 vUv;
+    uniform float uTime, uAspect, uHorizon, uClear, uFlash;
+    uniform vec3 uSkyHigh, uSkyLow, uCloud, uCloudLo, uHaze, uClearCol, uFlashCol;
+    void main(){
+      float h = vUv.y - uHorizon;
+      float b = floor(clamp(h / 0.9, 0.0, 0.999) * 5.0) / 4.0;
+      vec3 col = mix(uSkyLow, uSkyHigh, b);
+
+      // the cloud deck: flat lobes drifting, lifting as the storm clears
+      float deck = uHorizon + 0.10 + uClear * 0.26;
+      float cl = 0.0;
+      for(int i = 0; i < 4; i++){
+        float fi = float(i);
+        float cx = fract(0.13 + fi * 0.27 + uTime * 0.0042) * 1.9 - 0.45;
+        vec2 cc = vec2(cx, deck + fi * 0.055);
+        vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.20, vUv.y - cc.y);
+        cl = max(cl, step(length(d2), 0.030 + fi * 0.004));
+      }
+      // one hard band of underside shadow along the bottom of the deck
+      float under = step(h, 0.10 + uClear * 0.26) * step(0.0, h);
+      col = mix(col, uCloudLo, under * 0.55);
+      col = mix(col, uCloud, cl * step(0.03, h) * (1.0 - uClear * 0.45));
+
+      // THE CLEARING: a band of pale light opening along the horizon.
+      // Hard-edged and stepped, like everything else (§4.2 rule 5) —
+      // this is a gap in the weather, not a glow.
+      float gap = floor(clamp(uClear * 1.15, 0.0, 0.999) * 4.0) / 3.0;
+      float lit = step(abs(h - 0.035), 0.012 + gap * 0.085);
+      col = mix(col, uClearCol, lit * gap * 0.85);
+
+      col = mix(col, uHaze, (1.0 - step(0.0, h)) * 0.55);
+      col = mix(col, uFlashCol, uFlash * 0.55);
+      col += (grainAt(vUv * 620.0) - 0.5) * 0.024;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+}));
+
+/* ------------------------------------------------------------------
+   2. THE FAR SIDE OF THE CLEARING — the kit's parallax band pattern,
+   hand-assigned tiers, deliberately not following the breath.
+   ------------------------------------------------------------------ */
+const hills = new THREE.Mesh(bands(THREE, [
+  { z:-190, base: 26, amp:11, step:4.5, seed:3,  tier:2 },
+  { z:-120, base: 17, amp: 7, step:3.5, seed:19, tier:3 },
+  { z: -74, base: 10, amp: 4, step:2.5, seed:31, tier:4 }
+], { n: 36, span: 420, skirt: -30 }), posterMat(THREE, {
+  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)}, uClear }, prelude: RAMP_GLSL,
+  vertex:`
+    attribute float aTier; varying float vTier;
+    void main(){ vTier = aTier;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying float vTier; uniform vec3 uHaze; uniform float uClear;
+    void main(){
+      vec3 col = rampPick((vTier + 0.5) / 6.0);
+      // clamped well short of the haze colour so the layers stay
+      // distinguishable from each other — that is the point of them.
+      // They come FORWARD out of the murk as the storm clears, which is
+      // the cheapest honest way to show the air getting clearer.
+      float murk = (5.0 - vTier) / 3.0 * (0.62 - uClear * 0.34);
+      gl_FragColor = vec4(mix(col, uHaze, clamp(murk, 0.0, 0.8)), 1.0);
+    }
+  `
+}));
+scene.add(hills);
+
+/* ------------------------------------------------------------------
+   3. THE GROVE. One merged mesh: stems and leaf blades together, with
+   aSway carrying how much each vertex answers the gust. The gust is the
+   exhale, so the grove leans away from the figure every time she pushes
+   — the most legible thing in the frame and the only part of the
+   scenery that answers her at all.
+   ------------------------------------------------------------------ */
+const STEMS = 42;
+function groveGeometry(){
+  const b = builder(THREE, { aSway:1, aTone:1, aSun:1, aSeed:1, aLeaf:1 });
+  for(let i = 0; i < STEMS; i++){
+    const u = i / STEMS;
+    const a = u * Math.PI * 2;
+    // a ring of stems around the clearing, pushed out of the near lane
+    const rad = 9.0 + ((i * 7919) % 53) / 53 * 16.0;
+    const x = Math.sin(a * 1.0 + ((i * 31) % 7)) * rad * 0.9;
+    const z = -6.0 - Math.abs(Math.cos(a)) * rad * 1.6 - ((i * 6367) % 29) / 29 * 9.0;
+    const h = stemAt(u);
+    const w = 0.085 + ((i * 5281) % 17) / 17 * 0.05;
+    const seed = ((i * 2311) % 101) / 101;
+    const lean = (seed - 0.5) * 0.5;
+    const tone = (i % 3 === 0) ? LIGHT : (i % 3 === 1 ? PALE : MID);
+
+    // the stem: one tall ribbon in SEG segments, sway growing with height
+    const SEG = 5;
+    for(let s = 0; s <= SEG; s++){
+      const f = s / SEG;
+      const y = f * h;
+      const dx = lean * f * f * 1.4;
+      const sway = f * f;                      // a stem bends at the top
+      b.vertex(x + dx - w, y, z, { aSway:sway, aTone:tone, aSun:1, aSeed:seed, aLeaf:0 });
+      b.vertex(x + dx + w, y, z, { aSway:sway, aTone:tone, aSun:0, aSeed:seed, aLeaf:0 });
+    }
+    b.strip(SEG, false);
+
+    // three leaf blades near the top: flat triangles, hard-edged
+    for(let k = 0; k < 3; k++){
+      const f = 0.62 + k * 0.13;
+      const y = f * h, dx = lean * f * f * 1.4;
+      const side = (k % 2) ? 1 : -1;
+      const L = 0.9 + ((i * 97 + k * 13) % 11) / 11 * 0.7;
+      const base = b.count;
+      const at = { aSway: f * f, aTone: BODY, aSun: side > 0 ? 1 : 0, aSeed: seed, aLeaf: 1 };
+      b.vertex(x + dx,                y,            z,        at);
+      b.vertex(x + dx + side * L,     y + L * 0.30, z - 0.22, at);
+      b.vertex(x + dx + side * L*0.5, y - L * 0.26, z + 0.12, at);
+      b.tri(base, base+1, base+2);
+    }
+  }
+  return b.geometry();
+}
+const grove = new THREE.Mesh(groveGeometry(), posterMat(THREE, {
+  uniforms:{ uRamp, uFog, uGust, uTime, uClear,
+             uShadow:{value:C(STORM.shadow)}, uDeep:{value:C(STORM.shadowDeep)},
+             uLeaf:{value:C(AIR.leaf)}, uLeafLo:{value:C(AIR.leafLo)} },
+  side: THREE.DoubleSide, prelude: PRE,
+  vertex:`
+    attribute float aSway; attribute float aTone; attribute float aSun;
+    attribute float aSeed; attribute float aLeaf;
+    uniform float uGust, uTime;
+    varying float vTone; varying float vSun; varying float vSeed;
+    varying float vLeaf; varying float vDist; varying float vY;
+    void main(){
+      vec3 p = position;
+      // the gust: a lean away from the figure, plus a fast flutter that
+      // only exists while it is blowing. Both scale with aSway, so the
+      // bases stay planted and the tops do the moving.
+      float g = uGust * aSway;
+      p.z -= g * 1.5;
+      p.x += g * 0.7 + sin(uTime * 7.0 + aSeed * 11.0) * g * 0.35;
+      p.y -= g * aSway * 0.45;
+      vTone = aTone; vSun = aSun; vSeed = aSeed; vLeaf = aLeaf; vY = p.y;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vTone; varying float vSun; varying float vSeed;
+    varying float vLeaf; varying float vDist; varying float vY;
+    uniform vec3 uShadow, uDeep, uLeaf, uLeafLo;
+    uniform float uClear;
+    void main(){
+      vec3 col = rampPick((vTone + 0.5) / 6.0);
+      col = mix(col, uLeaf, vLeaf);
+      float sh = 1.0 - step(0.5, vSun);
+      col = mix(col, mix(uShadow, uLeafLo, vLeaf), sh * 0.55);
+      col = mix(col, uDeep, sh * (1.0 - vLeaf) * 0.25);
+      // wet bamboo catches a hard highlight down one side as it clears
+      col *= 1.0 + (chipAt(vec2(floor(vY * 2.2), floor(vSeed * 37.0))) - 0.5) * 0.10;
+      col = mix(col, vec3(1.0), step(0.5, vSun) * uClear * 0.06);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+    }
+  `
+}));
+grove.frustumCulled = false;
+scene.add(grove);
+
+/* ------------------------------------------------------------------
+   4. THE RAIN — ONE MESH, AND THE WHOLE MECHANIC IS IN ITS VERTEX
+   SHADER.
+   ------------------------------------------------------------------
+   A slab of slivers filling the clearing from the far wall to the
+   figure. Each sliver knows its own distance out, `aOut`. The shader
+   kills every sliver NEARER than uFront — not fades it, kills it — so
+   pushing the curtain back genuinely empties the near volume rather
+   than making the picture fainter. That difference is the chapter.
+
+   Falling is a modulo on height, so there is no particle system and no
+   per-frame buffer write for eleven hundred slivers: one draw call,
+   one uniform.
+   ------------------------------------------------------------------ */
+const DROPS = 1100;
+const RAIN_H = 17.0;
+/* The slab has to be deeper than the furthest the front can ever get,
+   or the storm runs out of rain before it runs out of session: the
+   front reaches the far wall PLUS the whole clearing shift, and a slab
+   built only to the wall would be completely empty halfway through. */
+const RAIN_DEPTH = WALL_FAR + CLEAR_SHIFT + 12.0;
+function rainGeometry(n){
+  const b = builder(THREE, { aOut:1, aEnd:1, aSeed:1, aLen:1, aNear:1 });
+  for(let i = 0; i < n; i++){
+    // distance out is biased towards the far end, so a curtain pushed
+    // halfway back still has most of its slivers
+    const f = Math.pow(i / n, 0.78);
+    const out = 1.2 + f * RAIN_DEPTH;
+    const across = (((i * 7919) % 211) / 211 - 0.5) * (6.0 + out * 1.15);
+    const y0 = ((i * 6367) % 173) / 173 * RAIN_H;
+    const len = 0.55 + ((i * 5281) % 59) / 59 * 1.15;
+    const hw = 0.016 + ((i * 2311) % 23) / 23 * 0.016;
+    const seed = ((i * 1933) % 97) / 97;
+    const base = b.count;
+    const at = { aOut: out, aSeed: seed, aLen: len, aNear: 1.0 - f };
+    b.vertex(across - hw, y0, -out, { ...at, aEnd:0 });
+    b.vertex(across + hw, y0, -out, { ...at, aEnd:0 });
+    b.vertex(across - hw, y0, -out, { ...at, aEnd:1 });
+    b.vertex(across + hw, y0, -out, { ...at, aEnd:1 });
+    b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
+  }
+  return b.geometry();
+}
+const rain = new THREE.Mesh(rainGeometry(DROPS), posterMat(THREE, {
+  uniforms:{ uTime, uFront, uClear, uGust, uFlash, uFog,
+             uRain:{value:C(AIR.rain)}, uFlashCol:{value:C(AIR.flash)} },
+  transparent:true, depthWrite:false, side:THREE.DoubleSide, prelude: FOG,
+  vertex:`
+    attribute float aOut; attribute float aEnd; attribute float aSeed;
+    attribute float aLen; attribute float aNear;
+    uniform float uTime, uFront, uClear, uGust;
+    varying float vA; varying float vDist; varying float vNear;
+    void main(){
+      vec3 p = position;
+      // fall: a modulo on height, so every sliver is always falling and
+      // nothing is ever spawned or retired
+      float fall = mod(p.y - uTime * (13.0 + aSeed * 5.0) - aSeed * 29.0, ${RAIN_H.toFixed(1)});
+      p.y = fall - aEnd * aLen;
+      // slanted by the gust, and the slant is the thing that makes the
+      // exhale visible in the rain itself and not only in its distance
+      p.x += uGust * (3.0 - fall * 0.06) * 0.6;
+      p.z -= uGust * 0.8;
+
+      // THE CURTAIN'S NEAR FACE. A sliver nearer than the front is not
+      // drawn at all. One hard step, with a one-metre lip so the edge
+      // of the curtain is an edge rather than a saw.
+      float beyond = smoothstep(uFront - 1.0, uFront + 0.2, aOut);
+      // and it thins as the storm clears, from the near side outwards
+      float thinned = step(aNear * 0.85, 1.0 - uClear * 0.72);
+      vA = beyond * thinned * (0.30 + aNear * 0.42);
+
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z; vNear = aNear;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vA; varying float vDist; varying float vNear;
+    uniform vec3 uRain, uFlashCol; uniform float uFlash;
+    void main(){
+      if(vA < 0.03) discard;
+      // two values only: near rain reads paler than far rain, and that
+      // is the whole of its shading. No gradient down a sliver.
+      vec3 col = mix(uRain * 0.72, uRain, step(0.45, vNear));
+      col = mix(col, uFlashCol, uFlash * 0.8);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.6), vA);
+    }
+  `
+}));
+rain.frustumCulled = false;
+rain.renderOrder = 5;
+scene.add(rain);
+
+/* ------------------------------------------------------------------
+   5. THE GROUND — wet, and a mirror of a dark sky, with the splash line
+   drawn where the curtain is actually standing. The ring ripples exist
+   only BEYOND the front, so the dry ground in front of you grows as you
+   push, which is the second place the mechanic is legible.
+   ------------------------------------------------------------------ */
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat(THREE, {
+  uniforms:{ uTime, uFront, uClear, uRamp, uFog, uFlash,
+             uWet:{value:C(STORM.wet)}, uSplash:{value:C(STORM.splash)},
+             uAccent:{value:C(STORM.accent)}, uDeep:{value:C(STORM.shadowDeep)} },
+  prelude: PRE,
+  vertex:`
+    varying vec3 vW; varying float vDist;
+    void main(){
+      vec4 w = modelMatrix * vec4(position, 1.0);
+      vW = w.xyz;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying vec3 vW; varying float vDist;
+    uniform float uTime, uFront, uClear, uFlash;
+    uniform vec3 uWet, uSplash, uAccent, uDeep;
+    void main(){
+      float out = -vW.z;
+      vec3 col = rampPick(4.3 / 6.0);
+      // wet sheen in hard terraces, not a gradient
+      float sheen = posterise(clamp(out / 46.0, 0.0, 1.0), 5.0);
+      col = mix(col, uWet, sheen * 0.55);
+      col = mix(col, uDeep, (1.0 - sheen) * 0.30);
+
+      // RIPPLES, only beyond the curtain's near face. Hard rings in
+      // quantised cells — §4.2 rule 5 applies to water too.
+      float wet = step(uFront, out);
+      vec2 cell = floor(vec2(vW.x, vW.z) * 0.55);
+      float ph = chipAt(cell) * 6.283;
+      float r = fract(uTime * 0.9 + ph);
+      vec2 q = fract(vec2(vW.x, vW.z) * 0.55) - 0.5;
+      float d = length(q) * 2.0;
+      float ring = step(abs(d - r), 0.14) * (1.0 - r);
+      col = mix(col, uSplash, wet * ring * 0.42);
+
+      // THE SPLASH LINE: one hard accent band standing exactly where the
+      // curtain meets the ground, so the reader can see where the thing
+      // they are pushing actually is.
+      float line = step(abs(out - uFront), 0.55);
+      col = mix(col, uAccent, line * 0.40);
+
+      col = mix(col, vec3(1.0), uFlash * 0.35);
+      col *= 1.0 + (grainAt(vW.xz * 7.0) - 0.5) * 0.07;
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+    }
+  `
+}));
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(0, 0, -60);
+ground.renderOrder = 1;
+scene.add(ground);
+
+/* ------------------------------------------------------------------
+   6. THE SHELTER AND THE FIGURE. A dozen stretched primitives sharing
+   three flat materials (§4.2 rule 1: no lighting, no lines). She sits
+   still; her chest and shoulders carry the breath, and nothing else
+   about her moves.
+   ------------------------------------------------------------------ */
+const matOf = hex => new THREE.MeshBasicMaterial({ color: hex });
+const mFig   = matOf(R.at(LIGHT));
+const mFigSh = matOf(STORM.shadow);
+const mWood  = matOf(0x4A3F46);
+const mRoof  = matOf(R.at(DEEP));
+const mLamp  = matOf(STORM.accent);
+
+const box = new THREE.BoxGeometry(1, 1, 1);
+const ball = new THREE.SphereGeometry(0.5, 10, 7);
+
+const shelter = new THREE.Group();
+shelter.add(part(THREE, box, mRoof, 4.6, 0.16, 3.0,  0, 2.30, -1.0, 0.07));
+shelter.add(part(THREE, box, mRoof, 4.2, 0.10, 0.5,  0, 2.16,  0.4, 0.07));
+shelter.add(part(THREE, box, mWood, 0.14, 2.30, 0.14, -2.00, 1.15, -0.2));
+shelter.add(part(THREE, box, mWood, 0.14, 2.30, 0.14,  2.00, 1.15, -0.2));
+shelter.add(part(THREE, box, mWood, 4.3, 0.09, 0.09,  0, 2.02, -0.2));
+scene.add(shelter);
+
+/* the lamp hanging from the roof: the one warm thing in the frame, and
+   the only place the accent appears besides the splash line */
+const lamp = part(THREE, box, mLamp, 0.26, 0.34, 0.26, 1.55, 1.72, -0.2);
+scene.add(lamp);
+
+const figure = new THREE.Group();
+const chest = part(THREE, ball, mFig, 0.76, 0.80, 0.62, 0, 0.76, -0.4);
+const head  = part(THREE, ball, mFig, 0.42, 0.46, 0.40, 0, 1.30, -0.42);
+const lapL  = part(THREE, ball, mFigSh, 0.95, 0.34, 0.80, -0.03, 0.34, -0.26);
+const armL  = part(THREE, ball, mFigSh, 0.26, 0.60, 0.26, -0.46, 0.70, -0.34, 0.18);
+const armR  = part(THREE, ball, mFigSh, 0.26, 0.60, 0.26,  0.46, 0.70, -0.34, -0.18);
+figure.add(lapL, chest, armL, armR, head);
+scene.add(figure);
+
+/* ------------------------------------------------------------------
+   7. SPLASH — a pool of hard lozenges kicked up along the curtain's
+   foot. They spawn ON the splash line, so when the line moves away the
+   splashes move away with it, and the ground in front of the figure
+   goes quiet.
+   ------------------------------------------------------------------ */
+const splash = particles(THREE, {
+  n: 120, renderOrder: 6,
+  material: posterMat(THREE, {
+    uniforms:{ uSplash:{value:C(STORM.splash)}, uPale:{value:C(R.at(PALE))},
+               uAccent:{value:C(STORM.accent)} },
+    transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    vertex:`
+      attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
+      varying vec2 vC; varying float vSize; varying float vKind;
+      void main(){
+        vC = aCorner; vSize = aSize; vKind = aKind;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        mv.xy += aCorner * aSize;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragment:`
+      varying vec2 vC; varying float vSize; varying float vKind;
+      uniform vec3 uSplash, uPale, uAccent;
+      void main(){
+        if(vSize <= 0.0) discard;
+        if(abs(vC.x) + abs(vC.y) > 1.0) discard;   // a hard lozenge
+        vec3 col = mix(uSplash, uPale, step(0.0, vC.y) * 0.5);
+        col = mix(col, uAccent, vKind * 0.35);
+        gl_FragColor = vec4(col, mix(0.42, 0.8, vKind));
+      }
+    `
+  })
+});
+scene.add(splash.mesh);
+let splashAccum = 0;
+const drop = (front, kind) => splash.spawn(p => {
+  p.kind = kind;
+  const spread = 3.0 + front * 0.7;
+  p.x = (Math.random() - 0.5) * spread;
+  p.y = 0.03;
+  p.z = -front + (Math.random() - 0.5) * 1.1;
+  p.r = 0.035 + Math.random() * 0.055;
+  p.vx = (Math.random() - 0.5) * 1.1;
+  p.vy = 1.1 + Math.random() * 1.9;
+  p.vz = (Math.random() - 0.5) * 1.1;
+});
+function stepSplash(dt){
+  splash.step(dt, (p, d) => {
+    p.vy -= d * 7.5;
+    p.x += p.vx*d; p.y += p.vy*d; p.z += p.vz*d;
+    p.r *= 1.0 - d * 0.9;
+    return p.y > 0.0 && p.r > 0.010;
+  });
+}
+
+/* ------------------------------------------------------------------
+   8. THE FLASH. §6 row 5 asks for a full-frame flash, and it is the one
+   thing in this chapter that could startle, so it is constrained rather
+   than softened: it is struck ONLY on the exhale (js/bamboo-rain-breath.js
+   decides, tools/regress.mjs checks), it is short, it is warm rather
+   than white, and it never lands while the reader is being asked to
+   breathe in.
+   ------------------------------------------------------------------ */
+const flashQuad = overlayQuad(THREE, {
+  uniforms:{ uFlash, uFlashCol:{value:C(AIR.flash)} },
+  fragment:`
+    varying vec2 vUv;
+    uniform float uFlash; uniform vec3 uFlashCol;
+    void main(){
+      float a = uFlash * 0.40;
+      if(a < 0.02) discard;
+      // brighter at the top, where the sky is, in three hard steps
+      float v = floor(clamp(vUv.y, 0.0, 0.999) * 3.0) / 2.0;
+      gl_FragColor = vec4(uFlashCol, a * (0.45 + v * 0.55));
+    }
+  `
+});
+scene.add(flashQuad);
+
+/* ------------------------------------------------------------------
+   THE CONTROL. One press target, the whole screen.
+   ------------------------------------------------------------------ */
+let pressing = false;
+(function(){
+  const el = $('push');
+  const on  = e => { e.preventDefault(); pressing = true;  };
+  const off = e => { if(e) e.preventDefault(); pressing = false; };
+  el.addEventListener('pointerdown', on);
+  el.addEventListener('pointerup', off);
+  el.addEventListener('pointercancel', off);
+  el.addEventListener('pointerleave', off);
+  // a pointer that leaves the window entirely never delivers pointerup
+  window.addEventListener('blur', () => off());
+})();
+
+/* ------------------------------------------------------------------
+   The loop
+   ------------------------------------------------------------------ */
+let t = 0;
+let started = false;
+let camZ = 3.4, camY = 1.95, camLook = 0.9;
+let gust = 0;
+let RATE = pushRates(PROTOCOLS.sigh);
+
+/* The curtain's body is the kit's — js/course.js. tools/regress.mjs
+   flies THE SAME OBJECT with the same corridor and the same stiffness. */
+let CURTAIN = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
+
+let subShown = '', hintShown = false;
+const vHz = new THREE.Vector3();
+const cHaze = C(AIR.haze), cCleared = C(AIR.cleared);
+
+const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
+
+const loop = clock((dt, now, running) => {
+  if(!running){ fpsTick(now, true); return; }
+  if(started) t += dt;
+
+  const st = B.at(t);
+  const ph = st.p;
+  const prog = B.progress(t);
+
+  /* --- THE PUSH. Integrated at the protocol's own rates, swapped so
+     the exhale is what drives the curtain out, and capped: a full
+     exhale of pressing crosses the band exactly once and nothing
+     presses it further. Releasing lets it come back in at the inhale's
+     own rate. Both at once cannot happen — there is one control. --- */
+  CURTAIN.drive(dt, pressing, !pressing);
+  const fill = CURTAIN.fill;
+
+  /* --- THE CLEARING. A function of elapsed time and nothing else. The
+     reader cannot hurry it and cannot miss it. --- */
+  const clearing = clearingAt(prog);
+  uClear.value = prog;
+  uFill.value = fill;
+  uFront.value = CURTAIN.value + clearing;
+
+  /* --- the gust: present while the exhale is actually blowing, and
+     stronger when the reader is pushing with it. This is the one place
+     the press changes something other than the distance, and it is what
+     makes a press feel like a push rather than a slider. --- */
+  const blowing = pushes(ph.k) ? 1 : 0;
+  const wantGust = blowing * (0.35 + (pressing ? 0.65 : 0.0));
+  gust += (wantGust - gust) * Math.min(1, dt * 3.2);
+  uGust.value = gust;
+
+  /* --- lightning. Decided in the protocol file, never here, so the
+     "exhale only" guarantee is one function the harness can sample. --- */
+  uFlash.value = started ? strokeAt(t, B.cycle) : 0;
+
+  /* --- the figure. Her chest and shoulders carry the phase's own
+     expressive curve and nothing else about her moves. --- */
+  const full = B.scalar(t);
+  uBreath.value = full;
+  chest.scale.set(0.76 + full * 0.10, 0.80 + full * 0.07, 0.62 + full * 0.09);
+  chest.position.y = 0.76 + full * 0.035;
+  head.position.y  = 1.30 + full * 0.055;
+  head.rotation.x  = -full * 0.10;
+  armL.position.y = armR.position.y = 0.70 + full * 0.045;
+  lamp.scale.set(0.26 + full * 0.05, 0.34, 0.26 + full * 0.05);
+  // the lamp swings a little in the gust, because it is under the roof
+  lamp.rotation.z = gust * 0.22 + Math.sin(t * 1.6) * 0.03;
+
+  /* --- splash along the foot of the curtain. Its rate falls with the
+     clearing, so the ground quietens as the storm goes. --- */
+  const front = uFront.value;
+  if(front < WALL_FAR + 6){
+    splashAccum += dt * (26 * (1 - prog * 0.75));
+    while(splashAccum >= 1){ splashAccum -= 1; drop(front, Math.random() < 0.12 ? 1 : 0); }
+  }
+  stepSplash(dt);
+
+  /* --- THE CAMERA. Behind her shoulder, leaning in as the rain closes
+     and back as it goes, and rising a little as the sky opens. The
+     breath drives it; the reader's press does not, because a camera
+     that answered the control would hide what the control does. --- */
+  let wantZ, wantY, wantLook;
+  if(ph.cam === 'push'){ wantZ = 4.3; wantY = 2.10; wantLook = 1.25; }
+  else                 { wantZ = 3.0; wantY = 1.82; wantLook = 0.80; }
+  camZ    += (wantZ    - camZ)    * Math.min(1, dt * 1.5);
+  camY    += (wantY    - camY)    * Math.min(1, dt * 1.8);
+  camLook += (wantLook - camLook) * Math.min(1, dt * 1.8);
+  const back = camZ * (camera.aspect < 0.75 ? 1.0 : 1.35);
+  camera.position.set(0.55, camY + prog * 0.30, back);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0.12, camLook + full * 0.10, -14 - front * 0.25);
+
+  vHz.set(camera.position.x, 0.0, camera.position.z - 240).project(camera);
+  uHorizon.value = vHz.y * 0.5 + 0.5;
+
+  uTime.value = t;
+  uFog.value.copy(cHaze).lerp(cCleared, prog * 0.55);
+
+  /* --- cue text. The countdown points at the next breath, never at
+     elapsed time (§2.4). Nothing here is a score. --- */
+  const cue = B.cue(t);
+  if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
+  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
+  // the hint appears on the exhale, and only until the reader has
+  // pressed once. It is an instruction, not a prompt to perform.
+  const wantHint = started && !hintShown && blowing === 1;
+  elHint.classList.toggle('on', wantHint);
+  if(pressing) hintShown = true;
+  elBar.style.width = (100 * prog).toFixed(2) + '%';
+
+  renderer.render(scene, camera);
+  fpsTick(now, false);
+});
+
+/* ---------- the protocol choice ---------- */
+const picked = choice({ key:'bor.bamboo.protocol.v1', valid: validChoice });
+
+function beginWith(which, remember){
+  const id = CHOICE[which];
+  B.use(PROTOCOLS[id]);
+  RATE = pushRates(PROTOCOLS[id]);
+  // a fresh body for the new protocol: its rate cap is derived from the
+  // protocol's own durations and cannot be carried over from the other
+  CURTAIN = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
+  $('proto').textContent = B.proto.name;
+  if(remember) picked.write(which);
+  elGate.classList.remove('on');
+  started = true;
+  t = 0; gust = 0; subShown = ''; hintShown = false;
+  loop.resync();
+}
+$('gateSigh').addEventListener('click',    () => beginWith('sigh', true));
+$('gateSettled').addEventListener('click', () => beginWith('settled', true));
+
+$('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
+$('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
+$('rescreen').addEventListener('click', () => {
+  picked.clear();
+  elHalt.classList.remove('on');
+  elGate.classList.add('on');
+  started = false; loop.running = true; t = 0;
+});
+
+const ack = picked.read();
+enter(requireScroll, () => {
+  if(ack) beginWith(ack.choice, false); else elGate.classList.add('on');
+});
+
+/* ---------- context loss ---------- */
+contextGuard(canvas, {
+  onLost(){
+    loop.stop();
+    elPhase.textContent = 'paused';
+    elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+  },
+  onRestored(){ resize(); loop.resync(); loop.start(); }
+});
+
+/* ---------- inspection hook ----------
+   A hidden browser pane gets NO rAF callbacks at all, so the frame body
+   is otherwise unreachable from a tool call and a throw in there is
+   indistinguishable from a stalled loop. See clock().pump in js/stage.js. */
+window.__bamboo = {
+  begin(which){ beginWith(which === 'settled' ? 'settled' : 'sigh', false); },
+  ack: () => picked.read(),
+  scene, camera, THREE,
+  pump(dt, n){ return loop.pump(dt, n); },
+  press(down){ pressing = !!down; return pressing; },
+  seek(v){ t = v; },
+  now(){
+    const s = B.at(t);
+    return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t:+t.toFixed(3),
+             phase:s.p.k, cam:s.p.cam, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
+             schedule:+B.value(t).toFixed(2),
+             fill:+CURTAIN.fill.toFixed(3),
+             curtain:+CURTAIN.value.toFixed(2),
+             clearing:+clearingAt(B.progress(t)).toFixed(2),
+             front:+uFront.value.toFixed(2),
+             error:+(CURTAIN.value - B.value(t)).toFixed(2),
+             gust:+gust.toFixed(3), flash:+uFlash.value.toFixed(2),
+             breath:+B.scalar(t).toFixed(3),
+             progress:+B.progress(t).toFixed(3),
+             liveSplash: splash.live(), pressing };
+  },
+  /* The claim the chapter rests on, in one call: the storm clears on the
+     schedule and not on the effort. Run a whole session twice, once
+     never pressing and once always pressing, and the clearing must be
+     the same both times — while the curtain's own position must not. */
+  provePassiveClears(){
+    const was = { t, fill: CURTAIN.fill, v: CURTAIN.v, value: CURTAIN.value };
+    const run = (press) => {
+      const c = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
+      const dt = 1/60; let spread = 0;
+      for(let tt = 0; tt < B.session; tt += dt){
+        c.drive(dt, press, !press);
+        spread = Math.max(spread, c.value);
+      }
+      return { endClearing:+clearingAt(1).toFixed(3), furthestCurtain:+spread.toFixed(2) };
+    };
+    const idle = run(false), hard = run(true);
+    t = was.t; CURTAIN.fill = was.fill; CURTAIN.v = was.v; CURTAIN.value = was.value;
+    return { idle, hard,
+             clearingIdentical: idle.endClearing === hard.endClearing,
+             curtainDiffers: idle.furthestCurtain !== hard.furthestCurtain };
+  },
+  bench(n){
+    const gl = renderer.getContext();
+    renderer.render(scene, camera); gl.finish();
+    const s = performance.now();
+    for(let i = 0; i < n; i++) renderer.render(scene, camera);
+    gl.finish();
+    return { msPerRender:(performance.now()-s)/n, n,
+             drawCalls: renderer.info.render.calls,
+             triangles: renderer.info.render.triangles };
+  },
+  where(){
+    const put = o => {
+      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
+               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
+    };
+    return { figure:put(chest), lamp:put(lamp), horizonUv:+uHorizon.value.toFixed(3),
+             viewport:[size.W, size.H] };
+  }
+};
+
+loop.start();
+}
+</script>
+</body>
+</html>

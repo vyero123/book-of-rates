@@ -142,6 +142,34 @@ export function bands(THREE, layers, { n = 34, span = 150, skirt = -46, profile 
 }
 
 /* ------------------------------------------------------------------
+   The endless strip
+   ------------------------------------------------------------------ */
+
+/** Every scrolled mesh in a travelling chapter shares this: geometry is
+ *  baked once over one strip period and wrapped by a modulo in the
+ *  vertex shader, so the world is endless for one draw call per mesh,
+ *  with no streaming and no seam.
+ *
+ *  `behind` is the fraction of the strip that stays behind the lens.
+ *  It is baked into the string rather than passed as a uniform because
+ *  it is a layout constant the course arithmetic also depends on: a
+ *  version of it that could be changed at runtime would be a second
+ *  source of truth for where things are.
+ *
+ *  Declares `uniform float uDist, uPeriod;` and `vec3 scrolled(vec3)`.
+ *  Everything the strip bakes must be PERIODIC IN uPeriod or the wrap
+ *  leaves a visible step once every twenty-odd seconds.
+ */
+export const scrollGlsl = (behind) => `
+  uniform float uDist, uPeriod;
+  vec3 scrolled(vec3 p){
+    float s = mod(p.z - uDist, uPeriod);
+    p.z = uPeriod * ${behind.toFixed(4)} - s;
+    return p;
+  }
+`;
+
+/* ------------------------------------------------------------------
    Billboards
    ------------------------------------------------------------------ */
 

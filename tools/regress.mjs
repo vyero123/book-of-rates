@@ -36,9 +36,18 @@ import * as before from './fixtures/deep-light-breath-before.mjs';
 import { breath } from '../app/js/breath.js';
 import * as deepLight from '../app/js/deep-light-breath.js';
 import * as longAir from '../app/js/long-air-breath.js';
+import * as bamboo from '../app/js/bamboo-rain-breath.js';
+import * as lantern from '../app/js/lantern-breath.js';
+import { body, ratesOf } from '../app/js/course.js';
 
 const STEP = 0.05;          // 20 samples a second
 const EPS  = 1e-12;
+
+/** The real controller, built from the chapter's own corridor and the
+ *  protocol's own derived rates. Not a reproduction of the page's loop —
+ *  the same object the page drives. */
+const kiteBody = proto =>
+  body({ corridor: longAir.CORRIDOR, rates: longAir.rates(proto) });
 
 let failures = 0, samples = 0;
 const fail = m => { if(failures < 12) console.log('    ' + m); failures++; };
@@ -144,7 +153,14 @@ for(const [id, p] of Object.entries(longAir.PROTOCOLS)){
  *  this list is not covered by the rule check, so adding one without
  *  adding it here is the obvious way to lose the guarantee. */
 const WATER = [
-  { chapter:'deep light', surface: deepLight.SURFACE, protocols: deepLight.PROTOCOLS }
+  { chapter:'deep light', surface: deepLight.SURFACE, protocols: deepLight.PROTOCOLS },
+  /* Lantern Current, added 24 Oct with the chapter itself. §6 row 4 is on
+     the design doc's own list of water themes, so the rule binds it: the
+     travelled scalar is the hull's height above the waterline and every
+     anchor of every phase is above SURFACE, so the inhale is never under
+     it by the SHAPE of the mapping. That is the claim; this is where it
+     stops being a claim. */
+  { chapter:'lantern current', surface: lantern.SURFACE, protocols: lantern.PROTOCOLS }
 ];
 
 /** Sample one protocol across a cycle at a fine step and return every
@@ -359,30 +375,29 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
    Nothing in the gate could see it, and in a screenshot it looks like a
    kite near a rock.
 
-   So the control loop is reproduced here — fill integration, the spring,
-   the clamp — and an on-pace player is flown through a whole session.
-   The kite must clear every gate on the BASE gap, with forgiveness left
-   completely unspent, because forgiveness is there for players who are
-   off pace and not to cover for a course that cannot be flown.
+   So an on-pace player is flown through a whole session. The kite must
+   clear every gate on the BASE gap, with forgiveness left completely
+   unspent, because forgiveness is there for players who are off pace and
+   not to cover for a course that cannot be flown.
+
+   24 Oct: this used to carry its OWN copy of the control loop — fill
+   integration, spring, clamp — written to match the page's. Two pieces
+   of code that merely agreed on the day they were written is not a
+   proof of anything, and this project has four separate entries in
+   CLAUDE.md about a reported bug turning out to be the instrument. The
+   loop now lives in js/course.js and BOTH the page and this harness
+   drive the same object, so what is checked here is what ships.
    ------------------------------------------------------------------ */
 function flyOnPace(proto){
   const b = breath(proto);
   const course = longAir.courseOf(proto, t => b.value(t));
-  const r = longAir.rates(proto);
+  const kite = kiteBody(proto);
   const dt = 1 / 120;
-  const k = 64.0, damp = 2.0 * Math.sqrt(k) * 0.9;
-  let fill = 0, y = longAir.ALT_LOW, v = 0;
   let worstMargin = Infinity, worstAt = null, minRidge = Infinity;
   for(let t = 0; t < proto.session; t += dt){
     // press exactly what the cue says — nothing cleverer
-    const kind = b.at(t).p.k;
-    if(kind === 'in')       fill = Math.min(1, fill + r.fillPerSec * dt);
-    else if(kind === 'out')  fill = Math.max(0, fill - r.emptyPerSec * dt);
-    const want = longAir.altOf(fill);
-    v += ((want - y) * k - v * damp) * dt;
-    y += v * dt;
-    if(y < longAir.CORR_LO){ y = longAir.CORR_LO; v = Math.max(0, v); }
-    if(y > longAir.CORR_HI){ y = longAir.CORR_HI; v = Math.min(0, v); }
+    kite.follow(dt, b.at(t).p.k);
+    const y = kite.value;
 
     const dist = longAir.SPEED * t;
     minRidge = Math.min(minRidge, y - longAir.ridgeAt(dist, course.period));
@@ -428,9 +443,9 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
    ------------------------------------------------------------------ */
 function flyAt(proto, m){
   const b = breath(proto);
-  const r = longAir.rates(proto);
+  const kite = kiteBody(proto);
   const dt = 1 / 120;
-  let fill = 0, lo = 1, hi = 0, se = 0, n = 0;
+  let lo = 1, hi = 0, se = 0, n = 0;
   /* The player follows the protocol's OWN phase sequence with every
      duration divided by m — which is what "breathing m times faster"
      actually means. An earlier version alternated in/out on a fixed
@@ -440,9 +455,8 @@ function flyAt(proto, m){
      omission. Four times before, a bug in this project turned out to be
      the instrument. */
   for(let t = 0; t < proto.session; t += dt){
-    const kind = b.at(t * m).p.k;
-    if(kind === 'in')      fill = Math.min(1, fill + r.fillPerSec * dt);
-    else if(kind === 'out') fill = Math.max(0, fill - r.emptyPerSec * dt);
+    kite.follow(dt, b.at(t * m).p.k);
+    const fill = kite.fill;
     if(t > proto.cycle){                 // let the first cycle settle
       lo = Math.min(lo, fill); hi = Math.max(hi, fill);
       const want = longAir.normOf(b.value(t));
@@ -470,7 +484,256 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
 }
 
 /* ------------------------------------------------------------------
-   5. prove both instruments can fail
+   5. EVERY CHAPTER, EVERY PROTOCOL — the claims that are not special
+   ------------------------------------------------------------------
+   Three things are true of every mapping in the project and none of
+   them was being checked, because each chapter checked its own things.
+   They are cheap, they are universal, and the first is a real class of
+   bug rather than a tidiness rule:
+
+     (a) THE SCHEDULE MUST CLOSE AT THE CYCLE WRAP. The last phase's `to`
+         is the next cycle's first `from`. If they differ, the figure
+         teleports once a breath — which, in a scene where the figure
+         SPRINGS towards the schedule rather than sitting on it, does not
+         look like a jump. It looks like a kick, or like the spring being
+         badly tuned, and it would be chased in the wrong file.
+     (b) THE SCHEDULE MUST STAY INSIDE THE CORRIDOR. The whole
+         no-clipping guarantee is that the hard walls lie outside the
+         band the schedule sweeps; a phase anchored outside them would
+         have the clamp fighting the schedule for ever.
+     (c) The session cap, and protocol() not eating the chapter's `id`.
+   ------------------------------------------------------------------ */
+const CHAPTERS = [
+  { name:'long air',        mod: longAir,   corridor: longAir.CORRIDOR },
+  { name:'bamboo rain',     mod: bamboo,    corridor: bamboo.CORRIDOR  },
+  { name:'lantern current', mod: lantern,   corridor: lantern.CORRIDOR },
+  /* Deep Light predates the corridor helper and anchors its heights
+     directly, so it joins (a) and (c) and not (b). */
+  { name:'deep light',      mod: deepLight, corridor: null }
+];
+
+for(const ch of CHAPTERS){
+  for(const [id, proto] of Object.entries(ch.mod.PROTOCOLS)){
+    if(proto.id !== id) fail(`${ch.name}/${id}: protocol() dropped or changed \`id\` (got ${proto.id})`);
+
+    const ph = proto.phases;
+    if(Math.abs(ph[ph.length - 1].to - ph[0].from) > 1e-9)
+      fail(`${ch.name}/${id}: the schedule does not close at the cycle wrap — ` +
+           `last phase ends at ${ph[ph.length-1].to}, first begins at ${ph[0].from}`);
+    for(let i = 0; i + 1 < ph.length; i++){
+      if(Math.abs(ph[i].to - ph[i+1].from) > 1e-9)
+        fail(`${ch.name}/${id}: phase ${i} (${ph[i].k}) ends at ${ph[i].to} and phase ` +
+             `${i+1} (${ph[i+1].k}) begins at ${ph[i+1].from}`);
+    }
+
+    if(ch.corridor){
+      const C = ch.corridor;
+      for(const q of ph){
+        for(const v of [q.from, q.to]){
+          if(v < C.lo || v > C.hi)
+            fail(`${ch.name}/${id}: a ${q.k} phase is anchored at ${v}, outside the ` +
+                 `corridor walls [${C.lo}, ${C.hi}]`);
+        }
+      }
+    }
+
+    const cap = ch.mod.SESSION_CAP;
+    if(cap !== undefined && proto.session > cap + 1e-9)
+      fail(`${ch.name}/${id}: session is ${proto.session}s, past the ${cap}s cap`);
+  }
+  if(failures === 0)
+    console.log(`    ok    ${ch.name}: schedule closes at every seam, inside the corridor, under the cap`);
+}
+
+/* ------------------------------------------------------------------
+   5a. BAMBOO RAIN — the claims the chapter's own comments make
+   ------------------------------------------------------------------ */
+for(const [id, proto] of Object.entries(bamboo.PROTOCOLS)){
+  const b = breath(proto);
+
+  /* (a) THE RATE CAP, SWAPPED AND STILL EXACT. This chapter drives its
+         scalar on the EXHALE, so it swaps the kit's two rates. A full
+         exhale of pressing must cross the band exactly once — no more,
+         which is the cap, and no less, or somebody breathing correctly
+         could not reach the far wall. */
+  const r = bamboo.pushRates(proto);
+  const plain = ratesOf(proto);
+  if(Math.abs(r.fillPerSec * r.dout - 1) > 1e-12)
+    fail(`bamboo/${id}: a full exhale pushes the curtain ${(r.fillPerSec*r.dout).toFixed(3)} ` +
+         `times across the band, not once`);
+  if(Math.abs(r.emptyPerSec * r.din - 1) > 1e-12)
+    fail(`bamboo/${id}: a full inhale lets it back ${(r.emptyPerSec*r.din).toFixed(3)} times, not once`);
+  if(r.fillPerSec !== plain.emptyPerSec || r.emptyPerSec !== plain.fillPerSec)
+    fail(`bamboo/${id}: pushRates() is not the kit's rates swapped, so the two can drift apart`);
+
+  /* (b) THE DOUBLE INHALE, which is the reason ratesOf() sums rather
+         than finds. If this ever stops being two phases the sum equals
+         the find and the check above stops meaning anything, so the
+         structure is asserted rather than assumed. */
+  if(id === 'sigh'){
+    const ins = proto.phases.filter(q => q.k === 'in');
+    if(ins.length !== 2)
+      fail(`bamboo/sigh: the physiological sigh needs two inhale phases, found ${ins.length}`);
+    else if(!(ins[1].d < ins[0].d))
+      fail(`bamboo/sigh: the second inhale (${ins[1].d}s) is not shorter than the first ` +
+           `(${ins[0].d}s) — it is a sip on top, not a second breath`);
+    const wouldFind = proto.phases.find(q => q.k === 'in').d;
+    if(Math.abs(wouldFind - plain.din) < 1e-12)
+      fail('bamboo/sigh: summing the inhales gives the same answer finding the first one ' +
+           'would, so this protocol no longer exercises the difference');
+  }
+
+  /* (c) A READER PRESSING EXACTLY ON THE CUE must track the schedule.
+         Same controller as Long Air, same corridor helper, driven by the
+         phase kind — and here what drives it OUT is the exhale, so
+         getting the swap backwards would be a curtain moving the
+         opposite way to the cue for a whole session. Checked, not
+         eyeballed: in a screenshot it is just rain. */
+  const curtain = body({ corridor: bamboo.CORRIDOR, rates: r, k: bamboo.SPRING });
+  const dt = 1 / 120;
+  let se = 0, n = 0, worst = 0, nearest = Infinity;
+  for(let t = 0; t < proto.session; t += dt){
+    const kind = b.at(t).p.k;
+    curtain.drive(dt, bamboo.pushes(kind), kind === 'in');
+    nearest = Math.min(nearest, curtain.value);
+    if(t > proto.cycle){
+      const e = curtain.value - b.value(t);
+      se += e * e; n++;
+      worst = Math.max(worst, Math.abs(e));
+    }
+  }
+  /* The tolerance is DERIVED, not guessed. The only error a cue-perfect
+     reader can have is the spring's own lag behind a ramp, which is
+     about 2·slope/sqrt(k) — so the bar is the steepest phase's predicted
+     lag, taken from the controller's own constants. A guessed number
+     here would either pass a chapter whose rates were backwards or fail
+     one whose curtain is simply heavy, and in both cases nobody could
+     say which. The first draft used 1.2 m and failed the sigh, whose
+     first inhale sweeps 19 m in two seconds; the lag that explains was
+     2.4 m and the MEASUREMENT WAS RIGHT — the spring was too soft for a
+     schedule with one-second phases in it, which is why the chapter now
+     names its own stiffness and this reads it from there.
+
+     The worst-case bound is twice the steady lag, not equal to it,
+     because the sigh's phases are shorter than the spring's settling
+     time: the schedule reverses while the body is still catching up, so
+     the turnaround error is roughly lag out plus lag back. */
+  const rms = Math.sqrt(se / n);
+  let steepest = 0;
+  for(const q of proto.phases) steepest = Math.max(steepest, Math.abs(q.to - q.from) / q.d);
+  const allow = curtain.lag(steepest);
+  if(rms > allow)
+    fail(`bamboo/${id}: pressing exactly on the cue tracks the schedule to ${rms.toFixed(2)} m ` +
+         `rms, more than the ${allow.toFixed(2)} m the spring's lag explains — the rates are ` +
+         `not the schedule's`);
+  if(worst > allow * 2.0)
+    fail(`bamboo/${id}: worst tracking error ${worst.toFixed(2)} m against a predicted lag of ` +
+         `${allow.toFixed(2)} m`);
+  if(nearest < bamboo.WALL_NEAR - 1e-9)
+    fail(`bamboo/${id}: the curtain reached ${nearest.toFixed(2)} m, inside the near wall`);
+
+  /* (d) THE STORM CLEARS ON SCHEDULE, NOT ON EFFORT. The clearing term
+         is a function of elapsed time alone: it starts at nothing, ends
+         at the full shift and never goes backwards. A reader who never
+         touches the screen gets all of it. */
+  if(bamboo.clearingAt(0) !== 0)
+    fail('bamboo: the clearing does not start at zero');
+  if(Math.abs(bamboo.clearingAt(1) - bamboo.CLEAR_SHIFT) > 1e-9)
+    fail('bamboo: the clearing does not reach the full shift by the end of the session');
+  let prev = -1;
+  for(let p = 0; p <= 1.0001; p += 0.01){
+    const c = bamboo.clearingAt(p);
+    if(c < prev - 1e-12) fail(`bamboo: the clearing goes backwards at progress ${p.toFixed(2)}`);
+    prev = c;
+  }
+
+  /* (e) LIGHTNING ONLY ON THE EXHALE. A flash is what shows you how far
+         back the curtain has gone, so it is worth nothing at the moment
+         the curtain is closest — and a full-frame flash landing in an
+         inhale is a startle at the one moment in this chapter where a
+         startle does not belong. */
+  let offPhase = 0, strokes = 0;
+  for(let t = 0; t < proto.session; t += 0.01){
+    if(bamboo.strokeAt(t, proto.cycle) <= 0) continue;
+    strokes++;
+    if(b.at(t).p.k !== 'out') offPhase++;
+  }
+  if(offPhase) fail(`bamboo/${id}: ${offPhase} lightning samples land outside an exhale`);
+  if(!strokes) fail(`bamboo/${id}: no lightning at all in a whole session`);
+
+  if(failures === 0)
+    console.log(`    ok    bamboo/${id}: push rate exact and swapped, cue-perfect play tracks to ` +
+                `${rms.toFixed(2)} m rms inside a predicted ${allow.toFixed(2)} m of lag ` +
+                `(worst ${worst.toFixed(2)}), nearest ${nearest.toFixed(1)} m, ` +
+                `clearing monotone to ${bamboo.CLEAR_SHIFT} m, ${strokes} lightning samples, all on exhales`);
+}
+
+/* ------------------------------------------------------------------
+   5b. LANTERN CURRENT — §1.6a BY CONSTRUCTION, and the river's seams
+   ------------------------------------------------------------------
+   The §1.6a sampling is done in section 3 above with the other water
+   chapters. What is checked here is the STRUCTURAL claim the chapter
+   makes about why it passes: not that the samples happen to come out
+   above the line, but that both walls the controller clamps to are above
+   it, so no clamp, overshoot or contact can put the hull under water at
+   all. That is the difference between satisfying the rule and being
+   unable to break it — §1.6a's own wording: satisfy it with the shape of
+   the mapping, not with a number tuned until it just clears.
+   ------------------------------------------------------------------ */
+if(!(lantern.WALL_LOW > lantern.SURFACE))
+  fail(`lantern current: the lower corridor wall is at ${lantern.WALL_LOW}, not above ` +
+       `the waterline — the hull could be clamped under water`);
+
+for(const [id, proto] of Object.entries(lantern.PROTOCOLS)){
+  const b = breath(proto);
+  const period = lantern.periodOf(proto);
+
+  /* the river's seams, same discipline as Long Air's strip */
+  const seams = {
+    bankL: [lantern.bankAt(0, period, -1), lantern.bankAt(period, period, -1)],
+    bankR: [lantern.bankAt(0, period,  1), lantern.bankAt(period, period,  1)],
+    treeL: [lantern.treeAt(0, period, -1), lantern.treeAt(period, period, -1)],
+    treeR: [lantern.treeAt(0, period,  1), lantern.treeAt(period, period,  1)]
+  };
+  for(const [what, [x, y]] of Object.entries(seams)){
+    if(Math.abs(x - y) > 1e-9)
+      fail(`lantern/${id}: the ${what} does not close at the seam (${Math.abs(x-y).toExponential(2)})`);
+  }
+
+  /* every lantern is off the boat's own lane and inside the bank, both
+     sides. There is no collision in this chapter, and this is the reason
+     there does not need to be one. */
+  let inLane = 0, pastBank = 0;
+  for(let i = 0; i < lantern.LANTERNS; i++){
+    const L = lantern.lanternAt(i, period);
+    if(Math.abs(L.x) < 1.0) inLane++;
+    if(Math.abs(L.x) > Math.abs(lantern.bankAt(L.z, period, Math.sign(L.x))) - 0.5) pastBank++;
+  }
+  if(inLane)   fail(`lantern/${id}: ${inLane} lantern(s) sit in the boat's own lane`);
+  if(pastBank) fail(`lantern/${id}: ${pastBank} lantern(s) sit in or past the bank`);
+
+  /* the boat follows the schedule with mass — the kit's controller with
+     the SCHEDULE holding the control instead of a reader — and must
+     still never go under. Driven, not asserted. */
+  const hull = body({ corridor: lantern.CORRIDOR, rates: ratesOf(proto) });
+  const dt = 1 / 120;
+  let lowest = Infinity, worst = 0;
+  for(let t = 0; t < proto.session; t += dt){
+    hull.follow(dt, b.at(t).p.k);
+    lowest = Math.min(lowest, hull.value);
+    if(t > proto.cycle) worst = Math.max(worst, Math.abs(hull.value - b.value(t)));
+  }
+  if(lowest <= lantern.SURFACE)
+    fail(`lantern/${id}: the hull reached ${lowest.toFixed(3)} m, at or below the waterline`);
+
+  if(failures === 0)
+    console.log(`    ok    lantern/${id}: hull stays ${lowest.toFixed(2)} m clear of the waterline ` +
+                `(walls ${lantern.WALL_LOW}/${lantern.WALL_HIGH}), lag ${worst.toFixed(2)} m, ` +
+                `banks and treeline close at the seam, no lantern in the lane`);
+}
+
+/* ------------------------------------------------------------------
+   6. prove both instruments can fail
    ------------------------------------------------------------------
    Four times in this project a reported bug turned out to be the test
    rather than the app, so neither check is trusted until it has been

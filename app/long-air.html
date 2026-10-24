@@ -209,12 +209,13 @@ import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice,
          GROUND, RIDGE_TOP, CORR_LO, CORR_HI, ALT_LOW, ALT_HIGH, RANGE,
-         normOf, altOf, SPEED, BEHIND, periodOf, rates,
+         CORRIDOR, normOf, altOf, SPEED, BEHIND, periodOf, rates,
          courseOf, gateAt, forgiveness, GATE_HALF, FORGIVE_MAX,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
+import { body } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
-import { builder, bands, particles,
+import { builder, bands, particles, scrollGlsl,
          posterMat, screenQuad, overlayQuad, part } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
 
@@ -290,15 +291,8 @@ const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
   canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 66 : 55, far: 1200
 });
 
-/* The endless strip, shared by every scrolled mesh. */
-const SCROLL_GLSL = `
-  uniform float uDist, uPeriod;
-  vec3 scrolled(vec3 p){
-    float s = mod(p.z - uDist, uPeriod);
-    p.z = uPeriod * ${BEHIND} - s;
-    return p;
-  }
-`;
+/* The endless strip, shared by every scrolled mesh. The kit's now. */
+const SCROLL_GLSL = scrollGlsl(BEHIND);
 
 /* ------------------------------------------------------------------
    1. SKY — hard bands, a small hot noon sun, flat cloud lobes.
@@ -904,13 +898,20 @@ holdDown(elBR, v => { outDown = v; });
    ------------------------------------------------------------------ */
 let t = 0;
 let started = false;
-let fill = 0;              // the player's own breath, 0..1
-let kiteY = ALT_LOW;       // altitude, springing towards fill
-let kiteV = 0;
 let camY = ALT_LOW + 1.5;
 let camBack = 13;
 let hit = 0;
 let RATE = rates(PROTOCOLS.box);
+
+/* THE KITE'S BODY is the kit's, not this page's — js/course.js. It owns
+   the three scalars that used to be loose variables here: `fill` (the
+   player's own breath, integrated from the buttons at the protocol's own
+   capped rates), `value` (altitude, springing towards fill because a
+   kite has mass and a line) and `v`. tools/regress.mjs flies THE SAME
+   OBJECT. It used to fly a copy of this loop written to match, which
+   proves only that two pieces of code agreed on the day they were
+   written. */
+let KITE = body({ corridor: CORRIDOR, rates: RATE });
 let COURSE = null;
 let subShown = '';
 
@@ -928,36 +929,25 @@ const loop = clock((dt, now, running) => {
   const sched = B.value(t);             // what the protocol wants. The course.
   uDist.value = SPEED * t;
 
-  /* --- FILL: the player's breath, at the protocol's own rate and no
-     faster. This is the rate cap, and it is the whole reason breathing
-     quickly cannot be rewarded: a doubled rate buys half the swing, and
-     the gates were built from the full swing. --- */
+  /* --- FILL, then ALTITUDE, in the kit's controller.
+     FILL is the player's breath, integrated at the protocol's own rate
+     and no faster: that is the rate cap, and it is the whole reason
+     breathing quickly cannot be rewarded, since a doubled rate buys half
+     the swing and the gates were built from the full swing.
+     ALTITUDE springs towards it, because a kite has mass and a line, and
+     the lag is what makes the sail's shape independent of the height —
+     the sail fills before the kite lifts. The corridor clamp is what
+     makes clipping through the floor unreachable rather than unlikely.
+     Spring constant, damping and the clamp all live in course.js now. --- */
   const drive = (inDown ? 1 : 0) - (outDown ? 1 : 0);
-  if(drive > 0) fill = Math.min(1, fill + RATE.fillPerSec * dt);
-  else if(drive < 0) fill = Math.max(0, fill - RATE.emptyPerSec * dt);
+  KITE.drive(dt, inDown, outDown);
+  const fill = KITE.fill;
+  let kiteY = KITE.value;
   uFill.value = fill;
-
-  /* --- ALTITUDE: springs towards fill. The lag is the kite's mass, and
-     it is what makes the sail's shape independent of the height — the
-     sail fills before the kite lifts. --- */
-  const wantY = altOf(fill);
-  /* k was 26, which left a steady-state lag of about 2.2 m behind a
-     climbing ramp — on its own nearly two thirds of the half-gap, and
-     enough that an on-pace player clipped lips. Stiffer: the lag behind
-     a ramp of slope v is about 2v/sqrt(k), so k=64 puts it near 1.4 m,
-     which still reads as a kite with mass and leaves the sail visibly
-     ahead of the height, but fits inside the opening with room spare. */
-  const k = 64.0, damp = 2.0 * Math.sqrt(k) * 0.9;
-  kiteV += ((wantY - kiteY) * k - kiteV * damp) * dt;
-  kiteY += kiteV * dt;
-  // the clamp the first pass did not have. The figure clipped through
-  // the floor; this makes that unreachable rather than unlikely.
-  if(kiteY < CORR_LO){ kiteY = CORR_LO; kiteV = Math.max(0, kiteV); }
-  if(kiteY > CORR_HI){ kiteY = CORR_HI; kiteV = Math.min(0, kiteV); }
 
   const kiteX = Math.sin(t * 0.7) * 0.18;
   uKite.value.set(kiteX, kiteY, 0);
-  uRush.value = clamp01(-kiteV / 7.0);
+  uRush.value = clamp01(-KITE.v / 7.0);
 
   /* --- how far off pace, and therefore how much room the course makes.
      §6.1: the gap widens rather than the kite crashing. Measured against
@@ -968,16 +958,16 @@ const loop = clock((dt, now, running) => {
   const forg = forgiveness(kiteY, gate.centre);
   uForgive.value = forg.extra / FORGIVE_MAX;
 
-  /* --- contact. Soft, informative, and NOT COUNTED. --- */
+  /* --- contact. Soft, informative, and NOT COUNTED. The push-back is
+     the kit's `touch`; what it returns is how far past the lip the kite
+     was, which is only ever used to throw a little grit. --- */
   const half = gate.half + forg.extra;
   const KITE_HALF = 0.78;
   if(Math.abs(ahead) < SLAB_Z + 1.4){
     const off = kiteY - gate.centre;
-    const over = Math.abs(off) - (half - KITE_HALF);
+    const over = KITE.touch({ centre: gate.centre, half, bodyHalf: KITE_HALF, dt });
     if(over > 0){
-      // pushed back towards the opening, never stopped and never scored
-      kiteY -= Math.sign(off) * Math.min(over, 26 * dt);
-      kiteV += -Math.sign(off) * 9.0 * dt;
+      kiteY = KITE.value;
       hit = Math.min(1, hit + dt * 7);
       for(let i = 0; i < 2; i++){
         dust(kiteX + (Math.random()-0.5)*2.2, gate.centre + Math.sign(off) * half, 0.6, 1);
@@ -998,7 +988,7 @@ const loop = clock((dt, now, running) => {
   sail.position.set(kiteX, kiteY, 0);
   spars.position.copy(sail.position);
   // it pitches with its vertical speed and rolls a little with the luff
-  const pitch = clamp(-kiteV * 0.055, -0.5, 0.5);
+  const pitch = clamp(-KITE.v * 0.055, -0.5, 0.5);
   sail.rotation.x = pitch; spars.rotation.x = pitch;
   sail.rotation.z = Math.sin(t * 1.1) * 0.05 + drive * 0.04;
   spars.rotation.z = sail.rotation.z;
@@ -1059,7 +1049,10 @@ function beginWith(which, remember){
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
-  t = 0; fill = 0; kiteY = ALT_LOW; kiteV = 0; hit = 0; histN = 0; subShown = '';
+  // a fresh body for the new protocol: its rate cap is derived from the
+  // protocol's own durations, so it cannot be carried over from the other
+  KITE = body({ corridor: CORRIDOR, rates: RATE });
+  t = 0; hit = 0; histN = 0; subShown = '';
   loop.resync();
 }
 $('gateHolds').addEventListener('click', () => beginWith('holds', true));
@@ -1113,16 +1106,16 @@ window.__longAir = {
   seek(v){ t = v; uDist.value = SPEED * v; },
   now(){ const s = B.at(t);
     const g = gateAt(COURSE, uDist.value);
-    const f = forgiveness(kiteY, g.gate.centre);
+    const f = forgiveness(KITE.value, g.gate.centre);
     return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
              phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
              schedule:+B.value(t).toFixed(2),
-             fill:+fill.toFixed(3), kiteY:+kiteY.toFixed(2), kiteV:+kiteV.toFixed(2),
-             error:+(kiteY - B.value(t)).toFixed(2), offPace:+f.err.toFixed(3),
+             fill:+KITE.fill.toFixed(3), kiteY:+KITE.value.toFixed(2), kiteV:+KITE.v.toFixed(2),
+             error:+(KITE.value - B.value(t)).toFixed(2), offPace:+f.err.toFixed(3),
              forgiveExtra:+f.extra.toFixed(2),
              gapCentre:+g.gate.centre.toFixed(2), gapHalf:+(g.gate.half + f.extra).toFixed(2),
              gateAhead:+g.ahead.toFixed(2),
-             clearanceOverRidge:+(kiteY - ridgeAt(uDist.value, worlds[B.proto.id].period)).toFixed(2),
+             clearanceOverRidge:+(KITE.value - ridgeAt(uDist.value, worlds[B.proto.id].period)).toFixed(2),
              hit:+hit.toFixed(2), dist:+uDist.value.toFixed(1),
              camY:+camY.toFixed(2), liveGrit: grit.live(),
              inDown, outDown }; },

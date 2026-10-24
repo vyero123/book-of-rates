@@ -135,7 +135,18 @@
  * tools/regress.mjs.
  */
 
-import { protocol, clamp01 } from './breath.js';
+import { protocol } from './breath.js';
+import { corridor, ratesOf, courseOf as buildCourse, gateAt as findGate,
+         forgiveness as forgive, periodOf as stripPeriod,
+         gatesPerCycle as perCycle } from './course.js';
+
+/* THE CORRIDOR, THE RATE CAP, THE FILL/POSITION SPLIT AND THE COURSE ARE
+   NOW THE KIT'S, not this chapter's — js/course.js. Nothing about them
+   was kite-shaped, and two more 3-D chapters would have copied all four.
+   What is left in this file is what is genuinely Long Air's: the numbers,
+   the protocols, and the plateau. The thin wrappers below keep this
+   module's public surface exactly as it was, so the page and the harness
+   did not have to be rewritten around the move. */
 
 /* ------------------------------------------------------------------
    The corridor, in metres. Above zero is up.
@@ -158,10 +169,14 @@ export const CORR_HI = 27.0;
  *  overshoot into instead of hitting a hard stop. */
 export const ALT_LOW  =  7.5;
 export const ALT_HIGH = 24.5;
-export const RANGE    = ALT_HIGH - ALT_LOW;
 
-export const normOf = alt => clamp01((alt - ALT_LOW) / RANGE);
-export const altOf  = n   => ALT_LOW + clamp01(n) * RANGE;
+/** The kit's corridor object, which also checks the nesting the whole
+ *  no-clipping guarantee rests on: CORR_LO < ALT_LOW < ALT_HIGH < CORR_HI. */
+export const CORRIDOR = corridor({ lo: CORR_LO, hi: CORR_HI, low: ALT_LOW, high: ALT_HIGH });
+
+export const RANGE  = CORRIDOR.range;
+export const normOf = CORRIDOR.normOf;
+export const altOf  = CORRIDOR.atOf;
 
 /* THE SCHEDULE IS LINEAR, AND THAT IS FORCED, not a preference.
  *
@@ -257,13 +272,10 @@ export const PROTOCOLS = {
  *  exhale. Holding the inhale button for the length of the protocol's
  *  inhale fills it exactly once: that is the whole of the rate cap, and
  *  it is derived rather than tuned so it cannot drift away from the
- *  course when a duration is edited. */
-export function rates(proto){
-  const dur = k => { const p = proto.phases.find(q => q.k === k); return p ? p.d : null; };
-  const din = dur('in'), dout = dur('out');
-  if(!din || !dout) throw new Error('rates(): protocol needs an in and an out phase');
-  return { fillPerSec: 1 / din, emptyPerSec: 1 / dout, din, dout };
-}
+ *  course when a duration is edited. Now the kit's `ratesOf`, which sums
+ *  rather than finds — a chapter with a double inhale needs that and
+ *  this chapter is unaffected by it. */
+export const rates = ratesOf;
 
 /* ------------------------------------------------------------------
    Travel, and the strip
@@ -282,7 +294,8 @@ export const BEHIND = 0.09;
  *  which is correct and is the point — the breath repeats — but the
  *  scenery is keyed to the strip so it does not repeat every breath. */
 export const STRIP_CYCLES = 3;
-export const periodOf = proto => SPEED * proto.cycle * STRIP_CYCLES;
+export const periodOf = proto =>
+  stripPeriod({ speed: SPEED, cycle: proto.cycle, cycles: STRIP_CYCLES });
 
 /* ------------------------------------------------------------------
    THE COURSE
@@ -325,54 +338,28 @@ export const FORGIVE_MAX = 3.2;
 /** Gates roughly every 0.55 s of schedule, rounded so a whole number
  *  fits in a cycle — a fraction of a gate per cycle would break the
  *  strip's periodicity and put the course out of step with the breath. */
-export const gatesPerCycle = proto => Math.round(proto.cycle / 0.55);
+export const SPACING = 0.55;
+export const gatesPerCycle = proto => perCycle({ cycle: proto.cycle, spacing: SPACING });
 
 /** Build the gate list. `schedule(t)` is the protocol's own altitude
- *  curve — pass `breath(proto).value`. */
-export function courseOf(proto, schedule){
-  const period = periodOf(proto);
-  const back = period * BEHIND;
-  const perCycle = gatesPerCycle(proto);
-  const n = perCycle * STRIP_CYCLES;
-  const dz = period / n;
-  const gates = [];
-  for(let i = 0; i < n; i++){
-    const zb = i * dz;
-    const ta = zb / SPEED - back / SPEED;   // see the derivation above
-    gates.push({ i, zb, ta, centre: schedule(ta), half: GATE_HALF });
-  }
-  return { period, back, dz, perCycle, gates };
-}
+ *  curve — pass `breath(proto).value`. The layout and its derivation are
+ *  the kit's now; this supplies the plateau's own numbers. */
+export const courseOf = (proto, schedule) => buildCourse({
+  proto, schedule, speed: SPEED, stripCycles: STRIP_CYCLES,
+  behind: BEHIND, half: GATE_HALF, spacing: SPACING
+});
 
 /** Which gate is nearest the kite right now, given distance travelled.
- *  The inverse of the layout above, so the collision test and the drawn
+ *  The inverse of the layout, so the collision test and the drawn
  *  geometry cannot disagree about where a gate is. */
-export function gateAt(course, dist){
-  const { period, back, dz, gates } = course;
-  const zb = ((dist + back) % period + period) % period;
-  const i = Math.round(zb / dz) % gates.length;
-  const g = gates[i];
-  // signed distance from the kite to that gate's plane, +ve = still ahead
-  let ahead = g.zb - zb;
-  if(ahead >  period / 2) ahead -= period;
-  if(ahead < -period / 2) ahead += period;
-  return { gate: g, ahead };
-}
+export const gateAt = findGate;
 
 /** How far off pace the player is, 0 (on it) to 1 (hopeless), and the
  *  extra half-gap that earns them. Quantised into four steps so the
  *  course does not breathe in and out continuously with every wobble —
  *  it should feel like the world making room, not like rubber. */
-export function forgiveness(kiteY, targetY){
-  /* `targetY` is the centre of the gate the player is about to reach,
-     NOT the schedule right now. Those differ during a turnaround by
-     enough to matter: forgiveness measured against the instantaneous
-     schedule opened the wrong gate by the wrong amount, and the kite
-     went 1.47 m past a lip that the numbers said was wide open. */
-  const err = Math.abs(kiteY - targetY) / RANGE;
-  const stepped = Math.floor(clamp01(err / 0.55) * 4) / 3;
-  return { err: clamp01(err), extra: Math.min(1, stepped) * FORGIVE_MAX };
-}
+export const forgiveness = (kiteY, targetY) =>
+  forgive({ value: kiteY, target: targetY, range: RANGE, max: FORGIVE_MAX });
 
 /* ------------------------------------------------------------------
    Decoration — periodic in the strip, and deliberately NOT keyed to the
