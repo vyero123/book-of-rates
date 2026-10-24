@@ -424,7 +424,24 @@ export const V_MAX = 2.6 * (RANGE / 4);
 /** Gates roughly every 0.55 s of schedule, rounded so a whole number
  *  fits in a cycle — a fraction of a gate per cycle would break the
  *  strip's periodicity and put the course out of step with the breath. */
-export const SPACING = 0.55;
+/* HOW OFTEN A WALL SWEEPS THE LENS, in seconds of schedule.
+ *
+ * This was 0.55, which at 14 m/s is a gate every 7.7 m and 1.8 large
+ * opaque objects passing the camera every second. That is the reported
+ * fault: "a different theme flashes in every second or so". It is not a
+ * defect in any one layer — every candidate was measured and cleared,
+ * including a second render loop, the idle background, depth precision,
+ * the near field, the far stack, the lip accent and the forgiveness
+ * stepping — it is simply the rate at which the course throws a wall
+ * across the frame. Hiding the gate meshes takes the flash count to
+ * zero; nothing else does.
+ *
+ * 1.45 s is a gate every 20.3 m, 0.69 a second. Eleven gates a breath
+ * still samples the altitude curve far more finely than a reader can
+ * fly it — the course is no less the schedule, it just states it in
+ * fewer words. tools/regress.mjs proves that rather than assuming it:
+ * the gate-is-the-schedule check holds at any spacing. */
+export const SPACING = 1.45;
 export const gatesPerCycle = proto => perCycle({ cycle: proto.cycle, spacing: SPACING });
 
 /** Build the gate list. `schedule(t)` is the protocol's own altitude

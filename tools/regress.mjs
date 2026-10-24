@@ -371,8 +371,25 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
       const u = ((g.ta % proto.cycle) + proto.cycle) % proto.cycle;
       return u >= t0 && u < t0 + q.d;
     });
-    if(inside.length < 2)
-      fail(`long air/${id}: the ${q.k} phase produced ${inside.length} gate(s) — not a channel`);
+    /* A CHANNEL NEEDS TWO GATES TO BE A CHANNEL, and a phase shorter
+       than the gate spacing cannot have two — that is arithmetic, not a
+       defect, and it is stated here rather than worked around.
+
+       It became live when the spacing went from 0.55 s to 1.45 s to cut
+       how often a wall sweeps the lens: box breathing's four-second
+       holds still carry two gates each, and the no-holds protocol's
+       ONE-second rest at empty now carries none. What that protocol
+       gets instead is a longer level gap between the gate before it and
+       the gate after, both of which sit at the same altitude because
+       the phases either side of a rest at empty begin and end there.
+       The flat stretch is still flown; it is simply not marked.
+
+       The claim that survives at every spacing, and the one that
+       matters, is the second check: no gate inside a stationary phase
+       may open anywhere but level. */
+    if(q.d >= course.dz / longAir.SPEED * 2 && inside.length < 2)
+      fail(`long air/${id}: the ${q.k} phase is ${q.d}s, long enough for two gates at ` +
+           `${(course.dz / longAir.SPEED).toFixed(2)}s apart, but produced ${inside.length}`);
     for(const g of inside){
       if(Math.abs(g.centre - q.from) > 1e-9)
         fail(`long air/${id}: a gate inside the ${q.k} phase opens at ${g.centre.toFixed(2)}, ` +

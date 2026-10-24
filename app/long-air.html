@@ -482,7 +482,11 @@ function gateGeometry(course, which){
   const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
   for(const g of course.gates){
     const lip = g.centre + which * g.half;
-    const far = which < 0 ? GROUND - 12 : ceilAt(g.zb, course.period) + 8;
+    // Reach just past the corridor, not far beyond it. A lower slab
+    // running twelve metres under the ground is thirty-six metres of
+    // wall, most of it never seen except as the thing filling the frame
+    // as it goes by.
+    const far = which < 0 ? GROUND - 1.5 : ceilAt(g.zb, course.period) + 2.0;
     const seed = ((g.i * 7919) % 97) / 97;
     // the lip is level in the kite's own lane and steps away from it to
     // the sides, so the centre lane is visibly the route and the sides
