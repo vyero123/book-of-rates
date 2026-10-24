@@ -174,22 +174,32 @@ export function bands(THREE, layers, { n = 34, span = 150, skirt = -46, profile 
    figure. Getting that backwards would dissolve gates before they were
    flown, which is a worse bug than the one being fixed.
    ------------------------------------------------------------------ */
-export const nearFadeGlsl = ({ gone = 4.0, full = 11.0, terrace = 0.35 } = {}) => `
+/* IT TAKES A CELL, NOT A SCALAR, AND THAT IS THE WHOLE LESSON OF THE
+   FIRST VERSION.
+   The first one dissolved on one per-object scalar, and Long Air passed
+   it the slab's height. That is constant along a gate's LIP — a
+   horizontal strip at one height — so every lip fragment shared one
+   value and the entire lip appeared and vanished in a single frame
+   instead of coming apart. It traded a slab sweeping the lens for a
+   bright accent line popping across the frame: measurably better (the
+   flash count went 23 to 15) and still a strobe.
+   A vec2 cell cannot be constant across a surface unless the caller
+   passes something silly, so the mistake is now hard to repeat rather
+   than merely documented. */
+export const nearFadeGlsl = ({ gone = 4.0, full = 11.0, cell = 0.7 } = {}) => `
   float nearKeep(float dist){
     return clamp((dist - ${gone.toFixed(2)}) /
                  ${(full - gone).toFixed(2)}, 0.0, 1.0);
   }
-  // true when this fragment should be dropped. The band argument is any
-  // per-object scalar that varies across the surface -- a height, a seed
-  // -- so the terraces belong to the object and do not crawl in screen
-  // space. (No backticks in here: this string IS a template literal, and
-  // quoting an identifier that way closes it. Second time; the gate
-  // caught it both times.)
-  bool nearGone(float dist, float band){
+  // True when this fragment should be dropped. Pass OBJECT-SPACE
+  // coordinates that vary in two directions across the surface, so the
+  // cells belong to the object and do not crawl in screen space.
+  bool nearGone(float dist, vec2 at){
     float keep = nearKeep(dist);
     if(keep <= 0.0) return true;
     if(keep >= 1.0) return false;
-    return fract(band * ${terrace.toFixed(2)}) > keep;
+    vec2 c = floor(at * ${cell.toFixed(2)});
+    return fract(sin(dot(c, vec2(41.3, 289.1))) * 43758.5453) > keep;
   }
 `;
 
