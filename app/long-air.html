@@ -1067,6 +1067,12 @@ window.__longAir = {
              phaseOnArrival:B.at(arrive).p.k };
   },
   steer(v){ steerWant = v; return steerWant; },
+  /* Drive the real frame body without rAF. A hidden browser pane gets
+     no rAF callbacks at all, so the loop body — camera, uniform
+     writes, per-phase branches — is otherwise unreachable from a tool
+     call, and a throw in there is indistinguishable from a stalled
+     loop. See clock().pump in js/stage.js. */
+  pump(dt, n){ return loop.pump(dt, n); },
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();

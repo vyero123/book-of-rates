@@ -139,7 +139,29 @@ export function clock(frame){
     /** after any pause, so the first live frame is not a four-second dt */
     resync(){ last = performance.now(); },
     get running(){ return running; },
-    set running(v){ running = v; if(v) api.resync(); }
+    set running(v){ running = v; if(v) api.resync(); },
+
+    /** Run the frame body n times at a fixed dt, WITHOUT requestAnimationFrame.
+     *
+     *  This exists for one specific reason. These chapters are inspected
+     *  through a browser pane that is hidden between tool calls, and a
+     *  hidden pane gets NO rAF callbacks at all — a freshly registered
+     *  one fires zero times in a second, which is how you tell it is the
+     *  instrument and not the app. The consequence is that everything
+     *  inside the frame body — the camera, the uniform writes, the
+     *  per-phase branches — is the one part of a chapter that cannot be
+     *  reached from a tool call, and a throw in there is invisible,
+     *  because a dead control path behind a stalled loop looks exactly
+     *  like a stalled loop.
+     *
+     *  So: a way to execute the real frame body on demand, with a
+     *  deterministic dt. Not a test double — it calls the same function
+     *  rAF calls, so what it exercises is what ships.
+     */
+    pump(dt = 1/60, n = 1){
+      for(let i = 0; i < n; i++) frame(dt, performance.now(), running);
+      return n;
+    }
   };
 
   document.addEventListener('visibilitychange', () => {
