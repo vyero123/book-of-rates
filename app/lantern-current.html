@@ -607,18 +607,41 @@ function archGeometry(proto){
       b.strip(ARCH_SEG, side < 0);
     }
 
-    /* the lamps, and their reflections */
+    /* the lamps, and their reflections.
+       ------------------------------------------------------------
+       THE REFLECTION SITS ON THE WATERLINE AND HANGS DOWN THE SCREEN,
+       it is not the lamp mirrored to a negative height. The first
+       version was the mirror, at y = −(L.y)·0.55, and it was invisible:
+       the water is an opaque plane at y = 0 drawn first with depth
+       write on, so every reflection vertex failed the depth test and
+       none of them was ever drawn. Nothing errored, the draw call was
+       still counted, and the frame looked exactly like a river with no
+       reflections in it — which is also what a river with a bug in it
+       looks like.
+       Anchoring at the waterline and offsetting downward in VIEW space
+       gets the same picture with no geometry below the surface at all,
+       which is how this is normally faked and is why. */
     for(const L of lights){
-      for(const part of [1, 2]){
-        const y = part === 1 ? L.y : SURFACE - (L.y - SURFACE) * 0.55;
-        const r = (part === 1 ? 0.17 : 0.13) + L.a * 0.05;
+      // the lamp
+      {
+        const r = 0.17 + L.a * 0.05;
         const base = b.count;
-        const at = { aS:L.s, aPart:part, aSeed:seed, aSide:L.side };
+        const at = { aS:L.s, aPart:1, aSeed:seed, aSide:L.side };
         for(const [cx, cy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
-          // the reflection is stretched down the river, because that is
-          // what a light on moving water does
-          b.vertex(L.x, y, z0 + L.z,
-                   { ...at, aCorner:[cx * r, cy * r * (part === 1 ? 1 : 2.6)] });
+          b.vertex(L.x, L.y, z0 + L.z, { ...at, aCorner:[cx * r, cy * r] });
+        }
+        b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
+      }
+      // its reflection: anchored on the water directly below it, and
+      // stretched DOWN the screen from there, longer for a higher lamp
+      {
+        const r = 0.13 + L.a * 0.05;
+        const len = r * (2.2 + (L.y - SURFACE) * 0.5);
+        const base = b.count;
+        const at = { aS:L.s, aPart:2, aSeed:seed, aSide:L.side };
+        for(const [cx, cy] of [[-1,0],[1,0],[-1,1],[1,1]]){
+          b.vertex(L.x, SURFACE + 0.02, z0 + L.z,
+                   { ...at, aCorner:[cx * r, -cy * len] });
         }
         b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
       }
@@ -692,16 +715,24 @@ const archMat = posterMat(THREE, {
         gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 0.5 + 0.5 * vLit);
         return;
       }
-      // a hard lozenge, not a soft sprite
-      if(abs(vC.x) + abs(vC.y) > 1.0) discard;
       if(vPart > 1.5){
-        // the reflection: only exists when the lamp above it does
+        /* THE REFLECTION, and the lozenge test must NOT run before this
+           branch. It did, and the lozenge test is the right shape for a
+           lamp and the wrong shape for a streak, whose
+           corner runs well past 1 down the screen by construction — so
+           it discarded almost the whole reflection, the second bug in a
+           row that made this layer invisible without erroring. */
         if(vLit < 0.04) discard;
+        // hard bands down its length rather than a fade: a light on
+        // moving water is a broken streak, never a gradient
+        float band = step(0.45, fract(vC.y * 9.0));
         vec3 col = mix(uGlowCol, uPaper, 0.2);
         gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.5),
-                            vLit * 0.30 * mix(0.6, 1.0, uTight));
+                            vLit * 0.40 * band * mix(0.55, 1.0, uTight));
         return;
       }
+      // a hard lozenge, not a soft sprite — the lamp only
+      if(abs(vC.x) + abs(vC.y) > 1.0) discard;
       // the lamp: dark paper unlit, a two-value flame lit
       vec3 unlit = uDark * mix(0.35, 1.0, uAmb);
       vec3 on    = mix(uGlowCol, uPaper, step(0.0, vC.y) * 0.65);
