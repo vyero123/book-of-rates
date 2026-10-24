@@ -436,17 +436,22 @@ const deepLightHTML = `<a class="entry three" href="deep-light.html">
   </a>`;
 
 /* Long Air, the second 3-D chapter, in exactly the same idiom: it sits
-   directly after the flat Run rather than replacing it, because the point
-   is to be able to open both and compare them. Its thumb is a flat
+   directly after its flat twin rather than replacing it, because the
+   point is to be able to open both and compare them. Its thumb is a flat
    drawing for the same reason Deep Light's is — the live previews come
    from SCENES, and this chapter's scene is not one of them.
 
-   Of the nine themes left this is the one that gains most from three
+   RE-BADGED 24 October from chapter five to chapter four. The scene is a
+   kite on a plateau, which is chapter four's theme, and it was carrying
+   chapter five's protocols; it now carries box breathing. Only the
+   schedule and the number changed — the file and the URL are the same.
+
+   Of the themes left this is the one that gains most from three
    dimensions, because it is the only one that is actually ABOUT depth:
    the whole sensation is forward travel, and forward travel is parallax.
-   It also inherits Prototype 1's predictive property (§5.1) — the gorge
-   ahead of her is generated from the breath schedule at the moment she
-   will arrive there, so the shape of the canyon in front of you is the
+   It also inherits Prototype 1's predictive property (§5.1) — the course
+   ahead of you is generated from the breath schedule at the moment you
+   will arrive there, so the shape of the gates in front of you is the
    next three breaths. */
 const longAirHTML = `<a class="entry three" href="long-air.html">
     <div class="thumb">
@@ -474,24 +479,24 @@ const longAirHTML = `<a class="entry three" href="long-air.html">
       </svg>
     </div>
     <div class="body">
-      <div class="ch">Chapter five, again <span class="badge">3&#8209;D</span></div>
+      <div class="ch">Chapter four, again <span class="badge">3&#8209;D</span></div>
       <div class="ti">Long Air</div>
       <div class="bl">A kite, two buttons, and a course whose gaps are placed where your
         breath should have taken you — so flying it well and breathing on pace are the same
-        thing. It cannot crash and nothing is counted.</div>
+        thing. Box breathing, or the no-holds version. It cannot crash and nothing is counted.</div>
     </div>
-    <div class="pg">5<span style="opacity:.6">ii</span></div>
+    <div class="pg">4<span style="opacity:.6">ii</span></div>
   </a>`;
 
 /* Both 3-D chapters are inserted from the BOTTOM UP. Splicing after the
-   flat Run first would shift the Pearl Diver's index by one and put Deep
-   Light in the wrong place — the kind of off-by-one that looks like a
-   content decision rather than a bug. */
+   flat Kite Line first would shift the Pearl Diver's index by one and put
+   Deep Light in the wrong place — the kind of off-by-one that looks like
+   a content decision rather than a bug. */
 const rows = JOURNEYS.map(entryHTML);
 const pdIdx = JOURNEYS.findIndex(j => j.id === 'pearl-diver');
 rows.splice(pdIdx >= 0 ? pdIdx + 1 : rows.length, 0, deepLightHTML);
-const runIdx = JOURNEYS.findIndex(j => j.id === 'the-run');
-rows.splice(runIdx >= 0 ? runIdx + 1 : rows.length, 0, longAirHTML);
+const klIdx = JOURNEYS.findIndex(j => j.id === 'kite-line');
+rows.splice(klIdx >= 0 ? klIdx + 1 : rows.length, 0, longAirHTML);
 $('list').innerHTML = rows.join('') + (SHOW_LOCKED ? lockedHTML : '');
 // if the reader flagged a condition, say so on the locked chapter rather
 // than leaving them to wonder

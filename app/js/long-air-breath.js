@@ -1,7 +1,42 @@
 /* Long Air — the protocols, and THE COURSE THEY GENERATE.
  *
- * A 3-D treatment of level 6, The Run (design doc §6). The flat chapter
- * stays exactly as it is; this is its sibling.
+ * A 3-D treatment of CHAPTER FOUR, The Kite Line (design doc §6 row 3).
+ * The flat chapter stays exactly as it is; this is its sibling.
+ *
+ * ===================================================================
+ * RE-BADGED, 24 October 2026. It was chapter five's protocols.
+ * ===================================================================
+ *
+ * The chapter was built as a 3-D treatment of level 6, The Run — 3 in /
+ * 4.5 out, 8 breaths a minute, energised, no holds. That was a mistake
+ * about which level it is, not about what it is: the thing on screen is
+ * A KITE ON A PLATEAU, which is §6 row 3's theme ("high plateau, wind,
+ * one kite in an empty sky"), and row 3's protocol is box breathing at
+ * 3.75 a minute. Row 3's own §6.1 note is also the one that decided this
+ * chapter's collision rule, word for word, before anybody built it. The
+ * scene always belonged to chapter four; only the schedule was wrong.
+ *
+ * So the protocols are now box breathing and a no-holds alternative, and
+ * one structural thing falls out of the gate builder for free: BOX
+ * BREATHING'S HOLDS BECOME LEVEL CHANNELS. A hold phase has `from` equal
+ * to `to`, so every gate built across it opens at the same altitude, and
+ * a run of gates at one altitude is a flat corridor the kite holds height
+ * through. Nothing in courseOf() knows what a hold is; it just lays gates
+ * on the schedule, and a schedule that stops moving lays a straight
+ * corridor. A two-button control can express a hold perfectly — both
+ * buttons off — so this is the one protocol shape the mechanic suits
+ * best, which is a pleasant thing to discover after the fact rather than
+ * an argument made to justify the move.
+ *
+ * The chapter keeps its own name, its own URL and its own file. Only the
+ * number, the schedule and the copy changed.
+ *
+ * ONE DIVERGENCE FROM THE ROW, stated rather than hidden: row 3's
+ * interaction is a side slider, and this chapter has two buttons. The
+ * buttons are what the course was designed around and what the rate cap
+ * is derived from; a slider hands the player an absolute altitude
+ * instead of a rate, which would make the cap meaningless. The flat
+ * chapter four still has the slider, so both readings exist.
  *
  * ===================================================================
  * SECOND PASS, 24 October 2026. It is a game now.
@@ -55,17 +90,35 @@
  *
  * What this does NOT do, stated plainly: it cannot stop someone pressing
  * the buttons quickly while actually breathing quickly. No app can see a
- * chest. Two things limit the damage. Neither protocol here has a hold,
- * so the combination that actually kills people (§2.1 rule 3 —
- * hyperventilation followed by a breath-hold) is not reachable in this
- * chapter at all. And the cue text still names the pace the course was
- * built for, so the schedule remains visible even to a player ignoring it.
+ * chest. What limits the damage is that the cue text still names the pace
+ * the course was built for, so the schedule stays visible even to a
+ * player ignoring it, and that the pace named is 3.75 breaths a minute —
+ * slower than anything this app has ever shipped.
+ *
+ * ON THE HOLDS, since box breathing has two of them. §2.1 rule 3 is the
+ * one that matters: never hyperventilation followed by a breath-hold. Its
+ * blanket form was withdrawn by the author on 23 October and the
+ * prohibition moved onto rule 1, where the evidence sits — every death
+ * cited for that combination happened in water. This chapter is dry, the
+ * holds are four seconds, exactly equal to the other three phases, set by
+ * the app, never lengthening and never timed by the player, and the pace
+ * they sit in is 3.75 a minute. There is no fast breathing anywhere in
+ * the chapter for them to follow. §6.1 reached the same conclusion from
+ * the other direction: "box breathing's 4-second holds are low-risk and
+ * this is the only level with holds at all besides nothing."
+ *
+ * And the no-holds protocol below is fully built and offered beside it,
+ * neither withheld nor recommended, because §2.2 is explicit that an
+ * all-or-nothing gate trains people to lie to it.
  *
  * -------------------------------------------------------------------
  * COLLISION
  * -------------------------------------------------------------------
- * §6.1 already decided this for exactly this mechanic, and it is worth
- * quoting because it was decided before anybody tried to build it:
+ * §6.1's note on THIS level — row 3, Kite Line — decided this for exactly
+ * this mechanic, and it is worth quoting because it was decided before
+ * anybody tried to build it. (It was quoted here while the chapter
+ * carried chapter five's protocols too, which was the first clue that the
+ * scene belonged to row 3.)
  * "the cloud gaps are generated from the breath schedule, so following
  * the pacing always clears them — and when the user drifts off pace, the
  * gap widens rather than the kite crashing. The slider position is
@@ -132,31 +185,54 @@ export const altOf  = n   => ALT_LOW + clamp01(n) * RANGE;
 export const linear = x => x;
 
 /* ------------------------------------------------------------------
-   The protocols. §6 row 6: no holds anywhere, three-minute cap.
+   The protocols. §6 row 3: box breathing, 3.75 a minute.
    ------------------------------------------------------------------ */
+
+/** No session in this chapter runs past three minutes. Row 3 does not
+ *  impose a cap — row 6 did, and this chapter inherited the habit — but a
+ *  cap is worth keeping on a chapter with a control in it, and a named
+ *  constant is worth more than the number 180 appearing in a check. */
+export const SESSION_CAP = 180;
+
 export const PROTOCOLS = {
-  /* 3 / 4.5, 8 breaths a minute. 24 × 7.5 s = 180 s exactly. */
-  run: protocol({
-    id:'run', name:'The run · 3 in / 4.5 out · 8 breaths a minute', cycles:24,
+  /* BOX BREATHING, 4-4-4-4, 3.75 breaths a minute. 11 × 16 s = 176 s.
+     §6 row 3's own protocol.
+
+     The two holds are the interesting part, and nothing here implements
+     them: they are a phase whose `from` equals its `to`. courseOf() lays
+     gates on the schedule without caring why it is flat, so a hold comes
+     out as a LEVEL CHANNEL — a run of gates all at one altitude, which is
+     a straight corridor to hold height through with both buttons off.
+     `cam:'level'` already existed for the old slow protocol's rest, so
+     the scene needs no new branch either. */
+  box: protocol({
+    id:'box', name:'Box breathing · 4-4-4-4 · 3.75 breaths a minute', cycles:11,
     phases:[
-      { k:'in',  d:3,   label:'breathe in',  sub:'let it climb',
-        from:ALT_LOW, to:ALT_HIGH, ease:linear, cam:'rise',
+      { k:'in',      d:4, label:'breathe in',  sub:'let it climb',
+        from:ALT_LOW,  to:ALT_HIGH, ease:linear, cam:'rise',
         scalar:p => p },
-      { k:'out', d:4.5, label:'breathe out', sub:'let it fall',
-        from:ALT_HIGH, to:ALT_LOW, ease:linear, cam:'dive',
-        count:'breathe in in',
-        scalar:p => 1 - p }
+      { k:'hold',    d:4, label:'hold',        sub:'fly it level',
+        from:ALT_HIGH, to:ALT_HIGH, cam:'level', count:'breathe out in',
+        scalar:() => 1 },
+      { k:'out',     d:4, label:'breathe out', sub:'let it fall',
+        from:ALT_HIGH, to:ALT_LOW,  ease:linear, cam:'dive',
+        count:'level out in',
+        scalar:p => 1 - p },
+      { k:'holdout', d:4, label:'hold',        sub:'fly it level',
+        from:ALT_LOW,  to:ALT_LOW,  cam:'level', count:'breathe in in',
+        scalar:() => 0 }
     ]
   }),
 
-  /* The slower one, 6 a minute, same cap: 18 × 10 s = 180 s. It has a
-     third phase the brisk one lacks — a second at empty, low — and the
-     engine takes it without the scene knowing anything new. In the course
-     that second becomes a short LEVEL channel: the gates stop climbing or
-     falling and you fly straight, with both buttons off. A hold is the
-     one thing a two-button control can express perfectly. */
-  long: protocol({
-    id:'long', name:'The long glide · 4 in / 5 out / 1 at empty · 6 breaths a minute', cycles:18,
+  /* THE NO-HOLDS ALTERNATIVE, 4 in / 5 out / 1 at empty, 6 a minute.
+     18 × 10 s = 180 s. This is the protocol the chapter shipped as its
+     slow option, kept verbatim and re-cast as the no-holds choice, which
+     is what it always was — `rest` is a second at empty, not a breath
+     held against urge. It keeps one short level channel of its own, at
+     the bottom of the range, so the shape the box protocol is built
+     around is present in both. */
+  open: protocol({
+    id:'open', name:'No holds · 4 in / 5 out / 1 at empty · 6 breaths a minute', cycles:18,
     phases:[
       { k:'in',   d:4, label:'breathe in',  sub:'let it climb',
         from:ALT_LOW, to:ALT_HIGH, ease:linear, cam:'rise',
@@ -329,5 +405,8 @@ export function wanderAt(z, period){
   return Math.sin(u) * 5.0 + Math.sin(u * 3 + 2.1) * 2.0;
 }
 
-export const CHOICE = { brisk:'run', slow:'long' };
-export const validChoice = c => c === 'brisk' || c === 'slow';
+/** The gate's two buttons speak in these terms; the engine speaks in
+ *  protocol ids. One place to translate, and the same two words Deep
+ *  Light uses, because it is the same choice being offered. */
+export const CHOICE = { holds:'box', noholds:'open' };
+export const validChoice = c => c === 'holds' || c === 'noholds';

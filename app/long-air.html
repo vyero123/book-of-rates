@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="color-scheme" content="light">
-<title>Book of Rates — Prototype 6: Long Air (3-D)</title>
+<title>Book of Rates — Chapter four: Long Air (3-D)</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#173A44;
@@ -102,27 +102,29 @@
 
 <div id="cue"><div id="phase">breathe in</div><div id="sub">let it climb</div></div>
 <div id="bar"><div id="barfill"></div></div>
-<div id="note"><span id="proto">The run · 3 in / 4.5 out · 8 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
+<div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
 <button id="bL" class="hand" aria-label="Breathe in — the kite climbs">IN<span>let it climb</span></button>
 <button id="bR" class="hand" aria-label="Breathe out — the kite falls">OUT<span>let it fall</span></button>
 
-<!-- A CHOICE, not a screening gate. There are no holds in this chapter at
-     all, so there is nothing to be screened out of — the two options are
-     two paces. The blocking step is the warning scroll (js/scroll.js),
+<!-- A CHOICE, not a screening gate — the same choice Deep Light offers,
+     in the same words, because it is the same decision: one protocol
+     with two short holds and one with none, neither withheld and
+     neither recommended (§2.2: an all-or-nothing gate trains people to
+     lie to it). The blocking step is the warning scroll (js/scroll.js),
      which discloses what the practice asks for and gets out of the way:
      design doc §1.6. -->
 <div id="gate" class="sheet"><div>
   <h2>Fly the kite</h2>
-  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. No breath is held anywhere in this chapter.</p>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols fly the same course. Pick the one you want.</p>
   <div class="how">
-    <p><b>Hold IN</b> and the kite fills and climbs. <b>Hold OUT</b> and it empties and falls. Let go and it coasts.</p>
+    <p><b>Hold IN</b> and the kite fills and climbs. <b>Hold OUT</b> and it empties and falls. Let go of both and it flies level.</p>
     <p>The gaps in the course are placed where your breath should have taken you, so flying it well and breathing on pace are the same thing. You can see several breaths ahead of you.</p>
     <p>It cannot crash. Drift off pace and the gaps simply open wider. Nothing here is timed, scored, counted or compared — not between sessions and not within one.</p>
   </div>
-  <button id="gateBrisk">THE RUN · 3 IN / 4.5 OUT<br><span class="sub2">brisk · 8 breaths a minute</span></button>
-  <button id="gateSlow" class="alt">THE LONG GLIDE · 4 / 5 / 1<br><span class="sub2">a second flying level at the bottom · 6 a minute</span></button>
-  <p class="fine tiny">Eight breaths a minute is brisk, and it is deliberately not fast breathing — a round of the sort that causes blackouts would be thirty or forty breaths in under a minute. The kite will not go up faster than the pace allows, however hard you press. Your choice is remembered on this device and can be changed from the stop screen.</p>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">two short holds · 3.75 a minute · each one a level channel</span></button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 IN / 5 OUT / 1<br><span class="sub2">a second at empty instead · 6 a minute</span></button>
+  <p class="fine tiny">The holds are four seconds, exactly equal to the other three phases, set by the app — they never lengthen and nothing is timed by you. There is no fast breathing anywhere in this chapter: 3.75 breaths a minute is slower than anything else in the book. The kite will not go up faster than the pace allows, however hard you press. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
 <div id="halt" class="sheet"><div>
@@ -142,10 +144,25 @@
 
 <script type="module">
 /* ============================================================
-   BOOK OF RATES — Prototype 6: LONG AIR
-   A 3-D treatment of level 6, The Run (design doc §6).
+   BOOK OF RATES — Chapter four: LONG AIR
+   A 3-D treatment of The Kite Line (design doc §6 row 3).
 
-   -- SECOND PASS: it is a game now --
+   -- RE-BADGED, 24 Oct: it was chapter five's protocols --
+
+   The scene is a kite on a plateau, which is row 3's theme; the schedule
+   it carried was row 6's, The Run. Only the schedule was wrong, so only
+   the schedule changed: box breathing, 4-4-4-4, 3.75 a minute, with a
+   no-holds alternative beside it. Row 3's own §6.1 note is also the one
+   that decided this chapter's collision rule word for word.
+
+   The holds cost the scene nothing. A hold is a phase whose `from`
+   equals its `to`, courseOf() lays gates on the schedule without caring
+   why it is flat, so a hold arrives as a LEVEL CHANNEL — a straight
+   corridor of gates at one altitude, flown with both buttons off. The
+   camera's `level` branch already existed for the old slow protocol's
+   rest. Reasoning in js/long-air-breath.js; checked in tools/regress.mjs.
+
+   -- the pass before that: it is a game now --
 
    The first pass generated the terrain from the breath schedule and had
    the player watch it. The two buttons rolled the figure and slid her
@@ -246,7 +263,7 @@ boot({ cdn:CDN, fallback, start });
 function start(THREE){
 
 const canvas = $('c');
-const B = breath(PROTOCOLS.run);
+const B = breath(PROTOCOLS.box);
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -893,7 +910,7 @@ let kiteV = 0;
 let camY = ALT_LOW + 1.5;
 let camBack = 13;
 let hit = 0;
-let RATE = rates(PROTOCOLS.run);
+let RATE = rates(PROTOCOLS.box);
 let COURSE = null;
 let subShown = '';
 
@@ -1020,8 +1037,14 @@ const loop = clock((dt, now, running) => {
   fpsTick(now, false);
 });
 
-/* ---------- the pace choice ---------- */
-const picked = choice({ key:'bor.longair.pace.v2', valid: validChoice });
+/* ---------- the protocol choice ----------
+   The key is bumped to v3 because the stored VALUES changed meaning:
+   'brisk'/'slow' named two paces of the same no-holds structure, and
+   'holds'/'noholds' name two structures. A remembered 'brisk' would fail
+   validChoice and fall through to asking again, which is the safe
+   direction (stage.js choice()) — but silently reusing a key whose
+   vocabulary has changed is how a stale answer gets accepted one day. */
+const picked = choice({ key:'bor.longair.protocol.v3', valid: validChoice });
 
 function beginWith(which, remember){
   const id = CHOICE[which];
@@ -1039,8 +1062,8 @@ function beginWith(which, remember){
   t = 0; fill = 0; kiteY = ALT_LOW; kiteV = 0; hit = 0; histN = 0; subShown = '';
   loop.resync();
 }
-$('gateBrisk').addEventListener('click', () => beginWith('brisk', true));
-$('gateSlow').addEventListener('click',  () => beginWith('slow', true));
+$('gateHolds').addEventListener('click', () => beginWith('holds', true));
+$('gateNo').addEventListener('click',    () => beginWith('noholds', true));
 
 $('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
 $('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
@@ -1052,10 +1075,10 @@ $('rescreen').addEventListener('click', () => {
 });
 
 /* Something has to be on screen behind the gate, or the first frame is
-   an empty sky. Show the brisk course without starting the clock. */
-COURSE = worlds.run.course;
-uPeriod.value = worlds.run.period;
-for(const m of worlds.run.meshes) m.visible = true;
+   an empty sky. Show the box course without starting the clock. */
+COURSE = worlds.box.course;
+uPeriod.value = worlds.box.period;
+for(const m of worlds.box.meshes) m.visible = true;
 
 const ack = picked.read();
 enter(requireScroll, () => {
@@ -1074,7 +1097,7 @@ contextGuard(canvas, {
 
 /* ---------- inspection hook ---------- */
 window.__longAir = {
-  begin(which){ beginWith(which === 'slow' ? 'slow' : 'brisk', false); },
+  begin(which){ beginWith(which === 'noholds' ? 'noholds' : 'holds', false); },
   ack: () => picked.read(),
   scene, camera, THREE,
   /* Drive the real frame body without rAF. A hidden browser pane gets no

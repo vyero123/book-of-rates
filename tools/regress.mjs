@@ -287,14 +287,63 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
   if(Math.abs(r.emptyPerSec * r.dout - 1) > 1e-12)
     fail(`long air/${id}: a full exhale empties the kite ${(r.emptyPerSec*r.dout).toFixed(3)} times, not once`);
 
-  /* (f) §6 row 6 and §6.1: three-minute cap, and no holds anywhere. */
-  if(Math.abs(proto.session - 180) > 1e-9) fail(`long air/${id}: session is ${proto.session}s, not the 180s cap`);
-  for(const q of proto.phases)
-    if(q.k === 'hold') fail(`long air/${id}: a hold phase appeared; §6.1 says this level has none`);
+  /* (f) THE SHAPE OF EACH PROTOCOL, now that there are holds in one of
+         them. Re-badged to chapter four on 24 October: row 3 is box
+         breathing, so `box` is REQUIRED to have holds and `open` is
+         required to have none. The old check here simply banned the word
+         `hold`, which was right for row 6 and would now reject the
+         chapter's own protocol — so it is replaced by the two claims the
+         gate sheet actually makes to the reader:
+
+           - box breathing's holds are exactly equal to its other phases,
+             which is what "set by the app, never lengthening" means in
+             data rather than in copy;
+           - the no-holds option really holds nothing.
+
+         Plus the session cap, which is now a named constant in the
+         chapter rather than the literal 180 sitting in the harness. */
+  if(proto.session > longAir.SESSION_CAP + 1e-9)
+    fail(`long air/${id}: session is ${proto.session}s, past the ${longAir.SESSION_CAP}s cap`);
+
+  const holds = proto.phases.filter(q => q.k === 'hold' || q.k === 'holdout');
+  if(id === 'box'){
+    if(holds.length !== 2)
+      fail(`long air/box: box breathing has ${holds.length} hold phases, not 2`);
+    const ds = proto.phases.map(q => q.d);
+    if(ds.some(d => Math.abs(d - ds[0]) > 1e-12))
+      fail(`long air/box: the four sides of the box are ${ds.join('/')} — the holds must be ` +
+           `exactly equal to the other phases, which is what the gate sheet promises`);
+  } else if(holds.length){
+    fail(`long air/${id}: the no-holds protocol has ${holds.length} hold phase(s)`);
+  }
+
+  /* (g) THE LEVEL CHANNEL. The claim made in the re-badge is that a hold
+         falls out of the gate builder as a flat corridor, with nothing in
+         courseOf() knowing what a hold is. That is checkable: every gate
+         whose arrival lands inside a stationary phase must open at that
+         phase's own altitude, and there must be more than one of them or
+         it is a point rather than a channel. */
+  for(let pi = 0; pi < proto.phases.length; pi++){
+    const q = proto.phases[pi];
+    if(q.from !== q.to) continue;
+    const t0 = proto.phases.slice(0, pi).reduce((a, p) => a + p.d, 0);
+    const inside = course.gates.filter(g => {
+      const u = ((g.ta % proto.cycle) + proto.cycle) % proto.cycle;
+      return u >= t0 && u < t0 + q.d;
+    });
+    if(inside.length < 2)
+      fail(`long air/${id}: the ${q.k} phase produced ${inside.length} gate(s) — not a channel`);
+    for(const g of inside){
+      if(Math.abs(g.centre - q.from) > 1e-9)
+        fail(`long air/${id}: a gate inside the ${q.k} phase opens at ${g.centre.toFixed(2)}, ` +
+             `not level at ${q.from}`);
+    }
+  }
 
   if(failures === 0)
     console.log(`    ok    long air/${id}: course is the schedule to ${worst.toExponential(1)} m, ` +
-                `seams close, ${minRidgeGap.toFixed(1)} m under the corridor, 180 s, no holds`);
+                `seams close, ${minRidgeGap.toFixed(1)} m under the corridor, ` +
+                `${proto.session}s, ${holds.length} hold(s), level channels flat`);
 }
 
 /* ------------------------------------------------------------------
@@ -449,7 +498,7 @@ function instrumentsWork(){
   // (c) the terrain-is-the-breath check must reject a canyon that is one
   //     metre out of step. There is no real example of this to borrow, so
   //     the error is injected by hand.
-  const la = breath(longAir.PROTOCOLS.run);
+  const la = breath(longAir.PROTOCOLS.box);
   const drift = Math.abs(la.value(2.0) - (la.value(2.0) + 1.0)) > 1e-9;
   if(!drift) console.log('    FAIL  the terrain check cannot detect a one-metre drift');
 
