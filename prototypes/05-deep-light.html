@@ -600,7 +600,7 @@ let camY = TOP_Y + 2.0;
 const vBed  = new THREE.Vector3();
 const vHand = new THREE.Vector3();
 const cHigh = C(PAL.high), cDeep = C(PAL.deep), cInk = C(PAL.ink);
-const cBodyDeep = C(0x9FC2BC);
+const cBodyDeep = C(0xB8D4CE);
 
 function frame(now){
   rafId = requestAnimationFrame(frame);
@@ -647,7 +647,7 @@ function frame(now){
   // the fog is the water at this depth, so distant geometry dissolves into
   // the column behind it instead of ending in a hard black horizon
   fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.2);
-  inkMat.color.copy(cInk).lerp(cBodyDeep, Math.max(0, (dn - 0.25) / 0.6));
+  inkMat.color.copy(cInk).lerp(cBodyDeep, Math.min(1, Math.max(0, (dn - 0.15) / 0.45)));
 
   // --- cue text + session bar ---
   if(st.p.label !== elPhase.textContent){
