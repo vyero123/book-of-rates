@@ -154,7 +154,15 @@ export function norm(alt){ return clamp01((alt - ALT_LOW) / (ALT_HIGH - ALT_LOW)
  *  Floor and glider moving together would be a camera trick; floor and
  *  glider moving by different amounts is a dive. */
 export function floorOf(alt){
-  return Math.floor(((alt - ALT_LOW) * 0.55) / 1.2) * 1.2;
+  // Math.max(0, ...) is not belt-and-braces, it is a bug fix. At the exact
+  // bottom of the dive the eased altitude lands on ALT_LOW to within a
+  // rounding error, and (alt - ALT_LOW) comes out as about -1e-15. Floor
+  // of a hair below zero is -1, so the floor dropped a whole 1.2 m terrace
+  // — and because the canyon is BAKED from this function, that baked a
+  // one-slice-wide notch into the rock at the bottom of every single dive.
+  // Caught by pumping the frame body on the deployed page and reading a
+  // floor of -1.2 where it had to be 0.
+  return Math.floor((Math.max(0, alt - ALT_LOW) * 0.55) / 1.2) * 1.2;
 }
 
 /** Half the distance between the two rims. Narrow at the bottom of the

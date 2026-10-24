@@ -932,9 +932,16 @@ const loop = clock((dt, now, running) => {
   camY    += (wantY - camY) * Math.min(1, dt * ease);
   camBack += (wantBack - camBack) * Math.min(1, dt * 2.0);
   const back = camBack * (camera.aspect < 0.75 ? 1.0 : 1.3);
-  camera.position.set(lateral * 0.72 + Math.sin(t * 0.21) * 0.5, camY, back);
+  // The camera trails her laterally at very nearly 1:1, and AIMS at her.
+  // It used to sit at 0.72x her offset while looking at 0.5x it, and the
+  // 0.22x difference is a lateral offset that grows with how far the
+  // gorge has wandered — by nine metres of wander she was off the right
+  // edge of a 375 px frame entirely. Caught by where().inFrame on the
+  // deployed page. The small residual lag frames her INTO the turn,
+  // which is what the offset was reaching for; the wobble is life.
+  camera.position.set(lateral * 0.92 + Math.sin(t * 0.21) * 0.5, camY, back);
   camera.up.set(Math.sin(-roll * 0.62), Math.cos(-roll * 0.62), 0);
-  camera.lookAt(lateral * 0.5, lookY, lookZ);
+  camera.lookAt(lateral, lookY, lookZ);
 
   /* --- which world is the lens in --- */
   const rimHere = RIM + 1.0;
