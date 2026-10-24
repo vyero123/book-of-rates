@@ -818,6 +818,24 @@ function stopDeepBg(){
   if (!idle) return;
   idle.dispose();
   idle = null;
+  /* A CANVAS THAT HAS HAD forceContextLoss() CALLED ON IT IS DEAD FOR
+     GOOD. getContext() on it returns null for ever after, so switching
+     Background to Flat and back again brought up the WebGL check's
+     "could not give the page a context" path, silently fell back to the
+     2-D scene, and the column never returned. Nothing threw; the only
+     visible symptom was the setting not taking.
+
+     Found by switching it in a tool call rather than by reading the
+     code, which is the only way this one shows up. The dispose is still
+     right — holding a live context in the bfcache while a chapter
+     allocates its own is what gets a tab killed — so the fix is to hand
+     the next start a NEW canvas rather than to stop disposing. */
+  const old = $('bg3d');
+  if (old && old.parentNode){
+    const fresh = document.createElement('canvas');
+    fresh.id = 'bg3d';
+    old.parentNode.replaceChild(fresh, old);
+  }
   applyBg();
 }
 applyBg();
