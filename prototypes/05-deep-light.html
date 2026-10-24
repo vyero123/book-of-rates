@@ -7,57 +7,57 @@
 <title>Book of Rates — Prototype 5: Deep Light (3-D)</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#06181F;
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#08202C;
     font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
   canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
 
   #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
     appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
     display:flex;align-items:center;gap:8px;
-    background:rgba(6,24,31,.5);backdrop-filter:blur(6px);
+    background:rgba(8,32,44,.5);backdrop-filter:blur(6px);
     color:#F2E3C8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
     box-shadow:0 0 0 1.5px rgba(242,227,200,.4)}
   #stop i{width:11px;height:11px;background:#E8473C;display:block;border-radius:2px}
 
   #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
     font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
-    color:rgba(242,227,200,.42);background:rgba(6,24,31,.32);border-radius:6px;
+    color:rgba(242,227,200,.42);background:rgba(8,32,44,.32);border-radius:6px;
     padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
   #fps.off{opacity:0;pointer-events:none}
   #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
     width:22px;height:22px;border-radius:50%;display:none}
   #fpsdot.on{display:block}
 
-  #cue{position:fixed;left:0;right:0;bottom:max(58px,calc(env(safe-area-inset-bottom) + 50px));
+  #cue{position:fixed;left:0;right:0;bottom:max(64px,calc(env(safe-area-inset-bottom) + 56px));
     z-index:20;text-align:center;pointer-events:none;color:#F2E3C8}
   #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
-    text-shadow:0 2px 16px rgba(6,24,31,.8)}
+    text-shadow:0 2px 16px rgba(8,16,26,.85)}
   #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
-    opacity:.6;text-transform:uppercase}
-  #bar{position:fixed;left:0;right:0;bottom:max(28px,calc(env(safe-area-inset-bottom) + 20px));
+    opacity:.6;text-transform:uppercase;text-shadow:0 2px 12px rgba(8,16,26,.85)}
+  #bar{position:fixed;left:0;right:0;bottom:max(36px,calc(env(safe-area-inset-bottom) + 28px));
     z-index:20;height:2px;margin:0 36px;background:rgba(242,227,200,.18);pointer-events:none}
   #barfill{height:100%;width:0;background:rgba(242,227,200,.75)}
-  #note{position:fixed;left:0;right:0;bottom:max(8px,env(safe-area-inset-bottom));z-index:20;
-    text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;color:rgba(242,227,200,.4);
-    letter-spacing:.06em;padding:0 20px;pointer-events:none}
+  /* kept clear of the deploy badge that sits in the bottom-right corner */
+  #note{position:fixed;left:0;right:0;bottom:max(14px,calc(env(safe-area-inset-bottom) + 6px));
+    z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
+    color:rgba(242,227,200,.42);letter-spacing:.06em;padding:0 20px;pointer-events:none}
 
   #halt{position:fixed;inset:0;z-index:40;display:none;place-items:center;
-    background:rgba(6,24,31,.88);backdrop-filter:blur(3px);text-align:center;padding:30px}
+    background:rgba(8,20,30,.88);backdrop-filter:blur(3px);text-align:center;padding:30px}
   #halt.on{display:grid}
   #halt h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.06em}
   #halt p{margin:0 0 26px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(242,227,200,.72);max-width:290px}
   #halt button{appearance:none;border:0;border-radius:999px;padding:13px 26px;
-    background:#F2E3C8;color:#06181F;font:600 12px/1 ui-sans-serif,sans-serif;letter-spacing:.18em}
+    background:#F2E3C8;color:#08202C;font:600 12px/1 ui-sans-serif,sans-serif;letter-spacing:.18em}
 
-  /* graceful degradation: no WebGL, or three.js failed to load */
   #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
     text-align:center;
-    background:linear-gradient(#1B6A72 0%,#15555F 34%,#0E3E4C 62%,#0A2E3C 82%,#06181F 100%)}
+    background:linear-gradient(#D8F0E6 0%,#93CFC6 18%,#4E9C9E 40%,#246E78 62%,#103C4C 82%,#08202C 100%)}
   #fallback.on{display:grid}
-  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.05em}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#08202C;letter-spacing:.05em}
   #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
-    color:rgba(242,227,200,.78);max-width:300px}
-  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(242,227,200,.5)}
+    color:rgba(8,32,44,.8);max-width:300px}
+  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(242,227,200,.75)}
 </style>
 </head>
 <body>
@@ -69,7 +69,7 @@
 
 <div id="cue"><div id="phase">breathe out</div><div id="sub">she sinks</div></div>
 <div id="bar"><div id="barfill"></div></div>
-<div id="note">Prototype. Silent by design. Sit or lie down. Never practise breathing exercises in or near water. There is no breath-hold here — the pause is a rest at empty.</div>
+<div id="note">Prototype. Silent by design. Sit or lie down. Never practise breathing exercises in or near water. No breath-hold here — the pause is a rest at empty.</div>
 
 <div id="halt"><div>
   <h2>Stopped</h2>
@@ -90,17 +90,37 @@
    A 3-D treatment of level 7, Pearl Diver (design doc §6, §2.4).
 
    Protocol: 4 s exhale / 2 s rest at empty / 5 s inhale  =  5.45 / min.
-   There is NO breath retention. The pause is a rest at the bottom of an
-   exhale, which is physiologically trivial — see §2.4. Nothing is timed,
-   nothing is scored, and the scene is on a schedule the user cannot fail.
+   NO breath retention anywhere. The pause is a rest at the bottom of an
+   exhale (§2.4). Nothing is timed, nothing is scored, nothing can fail.
 
-   SILENT. This page creates no AudioContext and loads no media.
+   SILENT. No AudioContext, no media elements, nothing that makes sound.
 
-   Style: the seven rules in §4.2 ported to 3-D. No outlines; every
-   shader posterises its output into four to six discrete value bands
-   rather than shading smoothly; shadow shifts hue towards ink-teal
-   instead of simply darkening; grain lives in the background layer only;
-   the figure is a tiny generic silhouette in a lot of empty water.
+   -- Second pass, after the user looked at it on a phone --
+
+   The first version failed on legibility: every layer sat within about
+   one value step of every other, because a single graded teal column was
+   doing all the work and a depth fog was pulling everything that was
+   left back towards the same colour. Fixed by three changes:
+
+   1. An explicit six-step VALUE RAMP, and every layer is assigned an
+      index on it by hand. Adjacent layers never share an index. The fog
+      is now capped so it can tint distance but can no longer collapse
+      two layers into one.
+   2. HUE separation as well as value: the water family is teal, the
+      shadow family is indigo (§4.2 rule 2 asks for exactly this — shadow
+      shifts hue rather than darkening), and there are two accents, cream
+      and a muted rose.
+   3. The background is no longer a column. It is three parallax ridge
+      bands at distinct values, so there is something to see past.
+
+   And three new layers that respond to her, because parallax alone does
+   not tell you anything is moving:
+   -- BUBBLES leave her on the exhale and only on the exhale. They rise
+      as she sinks, so the two motions are opposite and both legible.
+   -- FISH flee from her: one uDiver uniform, a falloff, and they scatter
+      as she passes and re-form behind her.
+   -- CORAL occludes and reveals her — foreground clumps she passes
+      behind — and its polyps pull in when she comes close.
    ============================================================ */
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
@@ -111,9 +131,9 @@ const PHASES = [
   { k:'rest', d:2.0, label:'rest',        sub:'drifting at the bottom' },
   { k:'in',   d:5.0, label:'breathe in',  sub:'she rises' }
 ];
-const CYCLE   = PHASES.reduce((a,p)=>a+p.d, 0);     // 11 s
+const CYCLE   = PHASES.reduce((a,p)=>a+p.d, 0);
 const CYCLES  = 14;
-const SESSION = CYCLE * CYCLES;                      // ~2 min 34 s
+const SESSION = CYCLE * CYCLES;
 
 function phaseAt(t){
   let u = t % CYCLE; if(u < 0) u += CYCLE;
@@ -128,8 +148,6 @@ function level(t){
   if(s.p.k === 'rest') return 0;
   return smooth(s.pr);
 }
-/* how much of the pearl is in her hand: picked up at the rest, carried up,
-   let go near the surface and settling back down through the next exhale. */
 function carry(t){
   const s = phaseAt(t);
   if(s.p.k === 'rest') return smooth(Math.min(1, s.pr/0.6));
@@ -137,14 +155,31 @@ function carry(t){
   return 0;
 }
 
-/* ---------- palette: Composed / underwater (design doc §4.3) ---------- */
+/* ---------- THE VALUE RAMP ----------
+   Six steps, lightest to darkest, derived for this project. Every layer
+   below names the index it sits on. The whole point is that no two
+   touching layers may take the same one. */
+const RAMP = [
+  0xD8F0E6,  // 0  the lit surface
+  0x93CFC6,  // 1  shallow water, fish, bubbles
+  0x4E9C9E,  // 2  upper water, far ridge
+  0x246E78,  // 3  mid water
+  0x103C4C,  // 4  deep water, seabed
+  0x08202C   // 5  the bottom
+];
 const PAL = {
-  high : 0x1B6A72,   // sky, top of the water column
-  deep : 0x0A2E3C,   // sky, bottom
-  ink  : 0x06181F,   // shadow
-  warm : 0xF2E3C8,   // accent
-  pale : 0xBFE2D8,   // the surface seen from below, lit
-  mid  : 0x4E9C9A
+  indigo    : 0x1B1C3C,   // the shadow family — hue-shifted, not darkened
+  indigoDeep: 0x0C1026,
+  cream     : 0xF2E3C8,   // accent 1 — the pearl, the goggles, the shafts
+  rose      : 0xC9826E,   // accent 2 — coral tips, her wrap. Used sparingly.
+  ridgeFar  : 0x4E8E92,   // ramp 2, distant and desaturated
+  ridgeMid  : 0x27606C,   // between ramp 3 and 4
+  ridgeNear : 0x16203A,   // indigo family, so it separates by hue too
+  bodyUp    : 0x2E5056,   // her flat value near the surface (bright water)
+  bodyDown  : 0xA8CCC6,   // her flat value at the bottom (dark water)
+  fish      : 0xB4DCD2,
+  fishDark  : 0x2A5560,
+  bubble    : 0xDFF3EC
 };
 
 /* ---------- DOM ---------- */
@@ -158,8 +193,6 @@ function fallback(why){
   $('cue').style.display = $('bar').style.display = 'none';
   elFps.classList.add('off');
 }
-
-/* ---------- is WebGL even available? ---------- */
 function webglOk(){
   try{
     const c = document.createElement('canvas');
@@ -170,12 +203,8 @@ function webglOk(){
 (async function boot(){
   if(!webglOk()){ fallback('This browser could not give the page a WebGL context, so the 3-D scene cannot be drawn.'); return; }
   let THREE;
-  try{
-    THREE = await import(CDN);
-  }catch(e){
-    fallback('The 3-D library could not be loaded from the network, so the scene cannot be drawn.');
-    return;
-  }
+  try{ THREE = await import(CDN); }
+  catch(e){ fallback('The 3-D library could not be loaded from the network, so the scene cannot be drawn.'); return; }
   try{ start(THREE); }
   catch(e){
     fallback('The 3-D scene failed to start: ' + (e && e.message ? e.message : e));
@@ -191,47 +220,60 @@ const renderer = new THREE.WebGLRenderer({
   canvas, antialias:true, alpha:false, powerPreference:'high-performance',
   stencil:false, depth:true
 });
-/* Perf, iPhone Safari: cap the pixel ratio. A 3x retina phone would
-   otherwise be filling nine times the pixels for a scene whose cost is
-   almost entirely fill rate. No shadow maps, no postprocessing stack. */
+/* Perf envelope, iPhone Safari: pixel ratio capped, no shadow maps, no
+   postprocessing, loop paused when the page is hidden. */
 const DPR_CAP = 1.5;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
 renderer.shadowMap.enabled = false;
-renderer.setClearColor(PAL.ink, 1);
+renderer.setClearColor(RAMP[5], 1);
 
 const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 120);
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 160);
 
 const SURFACE_Y = 0;
 const BED_Y     = -17;
-const TOP_Y     = -4.2;    // where she floats at the top of the inhale
-const BOTTOM_Y  = -14.4;   // the seabed, where the pearl is
+const TOP_Y     = -4.2;
+const BOTTOM_Y  = -14.4;
 
 const C = h => new THREE.Color(h);
+const ramp = RAMP.map(C);
 
-/* Shared water fog. Without it every plane reads as a flat slab of its own
-   colour all the way to the horizon. Banded, not smooth, so distance still
-   resolves into discrete steps (§4.2 rule 5). uFog is re-tinted each frame
-   from the current depth, so the far water matches the column behind it. */
-const fogCol = C(PAL.high);
+/* Shared uniforms. uDiver is what makes the new layers interactive:
+   fish, coral and bubbles all read the same vector. */
+const uDiver = { value: new THREE.Vector3(0, TOP_Y, 0) };
+const uTime  = { value: 0 };
+const uFog   = { value: C(RAMP[3]) };
+
+/* Fog that can tint but not flatten. The first version let it run to 1.0
+   and everything in the distance became the same colour, which is most of
+   why the scene read as uniform. It is capped at 0.55 and starts late. */
 const FOG_GLSL = `
   uniform vec3 uFog;
   float fogAmount(float dist){
-    float f = 1.0 - exp(-max(dist - 3.0, 0.0) * 0.062);
-    return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0;
+    float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
+    return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
+  }
+`;
+/* Picks a ramp colour with a non-constant index, which GLSL ES 1.00 does
+   not allow directly in a fragment shader. A loop index is a legal
+   constant-index-expression, so step through instead. */
+const RAMP_GLSL = `
+  uniform vec3 uRamp[6];
+  vec3 rampPick(float x){
+    vec3 c = uRamp[0];
+    for(int i = 1; i < 6; i++){
+      c = mix(c, uRamp[i], step(float(i) / 6.0, clamp(x, 0.0, 0.999)));
+    }
+    return c;
   }
 `;
 
 /* ------------------------------------------------------------------
-   1. THE WATER COLUMN — one fullscreen quad, drawn first.
-   Banded depth gradient plus hard-edged shafts of light coming down
-   from the surface. Everything posterised: §4.2 rule 5 says depth is
-   four to six discrete bands, never a continuous gradient.
+   1. THE WATER COLUMN — ramp indices 0 to 5, in hard steps.
    ------------------------------------------------------------------ */
 const waterUniforms = {
-  uTime:{value:0}, uDepth:{value:0}, uAspect:{value:1},
-  uHigh:{value:C(PAL.high)}, uDeep:{value:C(PAL.deep)}, uInk:{value:C(PAL.ink)},
-  uWarm:{value:C(PAL.warm)}
+  uTime, uDepth:{value:0}, uAspect:{value:1},
+  uRamp:{value:ramp}, uCream:{value:C(PAL.cream)}
 };
 const waterMat = new THREE.ShaderMaterial({
   uniforms: waterUniforms,
@@ -244,38 +286,16 @@ const waterMat = new THREE.ShaderMaterial({
     precision mediump float;
     varying vec2 vUv;
     uniform float uTime, uDepth, uAspect;
-    uniform vec3 uHigh, uDeep, uInk, uWarm;
-
+    uniform vec3 uCream;
+    ${RAMP_GLSL}
     float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
-    float band(float x, float n){ return floor(x * n) / (n - 1.0); }
-
     void main(){
-      // uDepth 0 at the surface, 1 on the seabed. The whole column
-      // slides as the camera descends, so going down really does get
-      // darker rather than the gradient just sitting on the glass.
-      float y = clamp(vUv.y * 0.42 + (1.0 - uDepth) * 0.58, 0.0, 1.0);
-
-      float b = band(clamp(1.0 - y, 0.0, 0.999), 6.0);   // 6 discrete bands
-      vec3 col = mix(uHigh, uDeep, b);
-      col = mix(col, uInk, band(uDepth, 5.0) * 0.55);
-
-      // Shafts. Three tilted sine ridges, quantised to three steps so the
-      // edges are hard polygons rather than a soft glow.
-      float x = (vUv.x - 0.5) * uAspect;
-      float sh = 0.0;
-      sh += sin(x * 5.3 + vUv.y * 1.3 + uTime * 0.045) * 0.5 + 0.5;
-      sh += sin(x * 2.1 - vUv.y * 0.9 - uTime * 0.031 + 1.7) * 0.5 + 0.5;
-      sh += sin(x * 9.7 + vUv.y * 2.1 + uTime * 0.067 + 4.1) * 0.5 + 0.5;
-      sh /= 3.0;
-      sh = smoothstep(0.52, 0.92, sh);
-      sh = band(clamp(sh, 0.0, 0.999), 3.0);
-      // shafts fade with depth and towards the bottom of the frame
-      float reach = (1.0 - smoothstep(0.15, 0.85, uDepth)) * smoothstep(-0.1, 0.75, vUv.y);
-      col += uWarm * sh * reach * 0.105;
-
-      // §4.2 rule 7: texture lives in the background layer only.
+      // The column slides with the camera, so descending really does walk
+      // down the ramp instead of the gradient sitting on the glass.
+      float y = clamp((1.0 - vUv.y) * 0.45 + uDepth * 0.55, 0.0, 1.0);
+      vec3 col = rampPick(y);
+      // §4.2 rule 7: grain in the background layer only.
       col += (hash(floor(vUv * 620.0)) - 0.5) * 0.022;
-
       gl_FragColor = vec4(col, 1.0);
     }
   `
@@ -286,15 +306,74 @@ waterQuad.renderOrder = -10;
 scene.add(waterQuad);
 
 /* ------------------------------------------------------------------
-   2. THE SURFACE, FROM BELOW — a single faceted plane overhead.
-   Displacement is quantised in the vertex shader, so the water reads as
-   flat angular plates rather than a smooth swell: §4.4 says water is
-   flat bands with stylised crests.
+   2. RIDGE BANDS — the background, three parallax layers at three
+   distinct values. One merged mesh. This is what replaced the plain
+   graded column: there is now something behind the water.
+   ------------------------------------------------------------------ */
+function ridgeGeometry(){
+  const pos = [], tier = [], idx = [];
+  const LAYERS = [
+    { z:-62, base:-30, amp:11, step:9.0,  seed:3,  tierId:0 },
+    { z:-40, base:-26, amp:8,  step:6.5,  seed:11, tierId:1 },
+    { z:-24, base:-22, amp:6,  step:4.5,  seed:23, tierId:2 }
+  ];
+  let base = 0;
+  for(const L of LAYERS){
+    const n = 34, span = 150;
+    for(let i = 0; i <= n; i++){
+      const x = -span/2 + (i/n) * span;
+      // angular facets, not a smooth curve: hard peaks quantised in x
+      const q = Math.floor(i / 2) * 2;
+      const h = L.base
+        + Math.sin((q + L.seed) * 0.9) * L.amp
+        + Math.sin((q + L.seed) * 0.31) * L.amp * 0.7;
+      pos.push(x, Math.round(h / L.step) * L.step, L.z);  tier.push(L.tierId);
+      pos.push(x, -46, L.z);                               tier.push(L.tierId);
+    }
+    for(let i = 0; i < n; i++){
+      const a = base + i*2, b = a+1, c = a+2, d = a+3;
+      idx.push(a, b, c,  b, d, c);
+    }
+    base += (n + 1) * 2;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aTier',    new THREE.Float32BufferAttribute(tier, 1));
+  g.setIndex(idx);
+  return g;
+}
+const ridgeMat = new THREE.ShaderMaterial({
+  uniforms:{
+    uFar:{value:C(PAL.ridgeFar)}, uMid:{value:C(PAL.ridgeMid)}, uNear:{value:C(PAL.ridgeNear)}
+  },
+  vertexShader:`
+    attribute float aTier;
+    varying float vTier;
+    void main(){
+      vTier = aTier;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vTier;
+    uniform vec3 uFar, uMid, uNear;
+    void main(){
+      // deliberately NOT fogged: these are the value anchors of the frame
+      vec3 col = mix(uFar, uMid, step(0.5, vTier));
+      col = mix(col, uNear, step(1.5, vTier));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+scene.add(new THREE.Mesh(ridgeGeometry(), ridgeMat));
+
+/* ------------------------------------------------------------------
+   3. THE SURFACE, FROM BELOW — ramp 0 and 1, faceted.
    ------------------------------------------------------------------ */
 const surfUniforms = {
-  uTime:{value:0}, uCam:{value:new THREE.Vector3()}, uFog:{value:fogCol},
-  uPale:{value:C(PAL.pale)}, uMid:{value:C(PAL.mid)},
-  uHigh:{value:C(PAL.high)}, uDeep:{value:C(PAL.deep)}, uWarm:{value:C(PAL.warm)}
+  uTime, uCam:{value:new THREE.Vector3()}, uFog,
+  uRamp:{value:ramp}, uCream:{value:C(PAL.cream)}
 };
 const surfaceMat = new THREE.ShaderMaterial({
   uniforms: surfUniforms, side: THREE.DoubleSide,
@@ -309,7 +388,7 @@ const surfaceMat = new THREE.ShaderMaterial({
               + sin(p.y * 0.33 - uTime * 0.41) * 0.28
               + sin((p.x + p.y) * 0.19 + uTime * 0.23) * 0.22;
       vCrest = w;
-      w = floor(w / 0.17) * 0.17;          // quantised: facets, not swell
+      w = floor(w / 0.17) * 0.17;
       p.z += w;
       vec4 wp = modelMatrix * vec4(p, 1.0);
       vWorld = wp.xyz;
@@ -323,51 +402,36 @@ const surfaceMat = new THREE.ShaderMaterial({
     varying vec3 vWorld;
     varying float vCrest;
     varying float vDist;
-    uniform vec3 uCam, uPale, uMid, uHigh, uDeep, uWarm;
+    uniform vec3 uCam, uCream;
+    ${RAMP_GLSL}
     ${FOG_GLSL}
-    float band(float x, float n){ return floor(clamp(x,0.0,0.999) * n) / (n - 1.0); }
     void main(){
-      // Looking up, the world above is compressed into a bright disc
-      // more or less overhead; outside it the surface mirrors the dark
-      // water back down. Four hard bands, no gradient. The disc is kept
-      // deliberately small: a wide one fills the top of a phone screen
-      // with one flat slab of pale green and the frame dies.
-      // Centred on the camera — the window really is overhead — but sized
-      // from depth, so it opens as she goes down. Anchoring it to the dive
-      // site instead put the dark part of the ceiling directly above the
-      // lens, which read backwards.
       float r = length(vWorld.xz - uCam.xz);
-      float d = clamp(uCam.y * -1.0, 0.0, 20.0);
+      float d = clamp(-uCam.y, 0.0, 20.0);
       float win = 1.0 - smoothstep(1.2 + d * 0.22, 4.5 + d * 0.60, r);
-      float v = band(win, 4.0);
-      vec3 col = mix(uDeep, uHigh, v);
-      col = mix(col, uMid,  step(0.45, v));
-      col = mix(col, uPale, step(0.95, v));
-      // crests catch the light as their own hard-edged shapes
+      // walks UP the ramp towards the light: index 4 at the rim, 0 at centre
+      vec3 col = rampPick((1.0 - win) * 0.78);
       float c = step(0.52, vCrest) * step(0.2, win);
-      col = mix(col, uWarm, c * 0.45);
+      col = mix(col, uCream, c * 0.45);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
-// Big enough that its own edge is beyond the fog and never shows as a seam.
-const surface = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 56, 56), surfaceMat);
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 44, 44), surfaceMat);
 surface.rotation.x = -Math.PI / 2;
-surface.position.y = SURFACE_Y;
 scene.add(surface);
 
 /* ------------------------------------------------------------------
-   3. THE SEABED — one plane, faceted, two values.
+   4. THE SEABED — ramp 4, with facets stepping to indigo.
    ------------------------------------------------------------------ */
 const bedMat = new THREE.ShaderMaterial({
-  uniforms:{ uInk:{value:C(PAL.ink)}, uDeep:{value:C(PAL.deep)}, uFog:{value:fogCol} },
+  uniforms:{ uA:{value:C(RAMP[4])}, uB:{value:C(PAL.indigo)}, uC:{value:C(RAMP[3])}, uFog },
   vertexShader:`
     varying float vH;
     varying float vDist;
     void main(){
       vec3 p = position;
-      // Amplitude matters: at 4.5 the humps rose to y = -12.5, above the
-      // diver at -14.4, and buried her and the pearl inside the seabed.
+      // amplitude kept low: taller humps buried the diver inside the bed
       float h = sin(p.x * 0.21) * 0.5 + sin(p.y * 0.17 + 1.3) * 0.4 + sin((p.x - p.y) * 0.09) * 0.6;
       h = floor(h / 0.3) * 0.3;
       p.z += h; vH = h;
@@ -378,39 +442,69 @@ const bedMat = new THREE.ShaderMaterial({
   `,
   fragmentShader:`
     precision mediump float;
-    varying float vH;
-    varying float vDist;
-    uniform vec3 uInk, uDeep;
+    varying float vH; varying float vDist;
+    uniform vec3 uA, uB, uC;
     ${FOG_GLSL}
     void main(){
       float v = floor(clamp(vH * 0.45 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
-      vec3 col = mix(uInk, uDeep, v);
+      vec3 col = mix(uB, uA, v);
+      col = mix(col, uC, step(0.95, v) * 0.5);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
-const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 50, 50), bedMat);
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 40, 40), bedMat);
 bed.rotation.x = -Math.PI / 2;
 bed.position.y = BED_Y;
 scene.add(bed);
 
 /* ------------------------------------------------------------------
-   4. KELP — one merged mesh, 26 tapering ribbons, swayed in the vertex
-   shader. Built by hand into a single buffer rather than instanced, so
-   there is exactly one draw call and no dependence on how the library
-   wires instancing into a custom shader.
+   5. LIGHT SHAFTS — cream, the brightest thing in the water.
+   ------------------------------------------------------------------ */
+const shaftMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime, uCream:{value:C(PAL.cream)}, uPale:{value:C(RAMP[0])} },
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+  vertexShader:`
+    varying vec3 vW;
+    void main(){
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vW = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vW;
+    uniform float uTime;
+    uniform vec3 uCream, uPale;
+    void main(){
+      float x = vW.x + vW.y * 0.26;
+      float s = sin(x * 0.46 + uTime * 0.035) * 0.5 + 0.5;
+      s *= sin(x * 0.19 - uTime * 0.022 + 1.9) * 0.5 + 0.5;
+      s = smoothstep(0.30, 0.78, s);
+      s = floor(clamp(s, 0.0, 0.999) * 3.0) / 2.0;
+      float a = s * smoothstep(-15.0, -2.0, vW.y) * 0.20;
+      gl_FragColor = vec4(mix(uPale, uCream, 0.5) * a, a);
+    }
+  `
+});
+const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), shaftMat);
+shafts.position.set(0, -9, -9);
+shafts.renderOrder = 5;
+scene.add(shafts);
+
+/* ------------------------------------------------------------------
+   6. KELP — one merged mesh, behind her.
    ------------------------------------------------------------------ */
 function kelpGeometry(n, seg){
   const verts = [], aH = [], aPhase = [], aSide = [], idx = [];
   let base = 0;
   for(let i = 0; i < n; i++){
     const ang   = (i / n) * Math.PI * 2 + (i * 2.399);
-    const rad   = 5 + ((i * 7919) % 97) / 97 * 14;
+    const rad   = 6 + ((i * 7919) % 97) / 97 * 15;
     const cx    = Math.cos(ang) * rad;
-    // Keep every blade behind the diver's plane. Blades that landed
-    // between her and the lens filled the middle of the frame.
-    let cz = Math.sin(ang) * rad - 3;
-    if(cz > -0.5) cz = -1.0 - (cz + 0.5);
+    let   cz    = Math.sin(ang) * rad - 4;
+    if(cz > -1.5) cz = -2.0 - (cz + 1.5);     // keep it all behind her
     const h     = 5 + ((i * 6367) % 83) / 83 * 8.5;
     const wBase = 0.34 + ((i * 5281) % 61) / 61 * 0.5;
     const ph    = (i * 1.7) % 6.283;
@@ -437,8 +531,7 @@ function kelpGeometry(n, seg){
   return g;
 }
 const kelpMat = new THREE.ShaderMaterial({
-  uniforms:{ uTime:{value:0}, uInk:{value:C(PAL.ink)}, uMid:{value:C(PAL.mid)},
-             uDeep:{value:C(PAL.deep)}, uFog:{value:fogCol} },
+  uniforms:{ uTime, uFog, uA:{value:C(PAL.indigo)}, uB:{value:C(RAMP[3])}, uC:{value:C(RAMP[2])} },
   side: THREE.DoubleSide,
   vertexShader:`
     attribute float aH; attribute float aPhase; attribute float aSide;
@@ -446,7 +539,7 @@ const kelpMat = new THREE.ShaderMaterial({
     varying float vH; varying float vSide; varying float vDist;
     void main(){
       vec3 p = position;
-      float bend = aH * aH;                       // rooted at the bottom
+      float bend = aH * aH;
       p.x += sin(uTime * 0.42 + aPhase) * bend * 1.25;
       p.z += cos(uTime * 0.33 + aPhase * 1.7) * bend * 0.9;
       vH = aH; vSide = aSide;
@@ -458,93 +551,390 @@ const kelpMat = new THREE.ShaderMaterial({
   fragmentShader:`
     precision mediump float;
     varying float vH; varying float vSide; varying float vDist;
-    uniform vec3 uInk, uMid, uDeep;
+    uniform vec3 uA, uB, uC;
     ${FOG_GLSL}
     void main(){
-      // three values, hue-shifted towards teal rather than darkened
       float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
-      vec3 col = mix(uInk, uDeep, v);
-      col = mix(col, uMid, step(0.5, vSide) * 0.22 * v);
+      vec3 col = mix(uA, uB, v);
+      col = mix(col, uC, step(0.5, vSide) * 0.3 * v);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
-const kelp = new THREE.Mesh(kelpGeometry(26, 12), kelpMat);
-scene.add(kelp);
+scene.add(new THREE.Mesh(kelpGeometry(22, 10), kelpMat));
 
 /* ------------------------------------------------------------------
-   4b. LIGHT SHAFTS — one camera-facing plane hung in the water.
-   Painting them into the background quad did not work: the surface and
-   the bed cover most of that quad, so the shafts were never on screen.
-   They have to be an object standing in the water column. Hard-edged
-   wedges, three quantised steps, additive, no depth write.
+   7. CORAL — new layer, three depth tiers, one merged mesh.
+   Tier 0 sits BETWEEN her and the lens, so she passes behind it: that
+   occlude-and-reveal is a large part of why the descent reads as motion.
+   Tier 0 is near-black indigo, tier 1 mid teal with rose tips, tier 2
+   the lightest — three clear value steps against the water behind them.
+   The polyps pull in when she comes close (uDiver).
    ------------------------------------------------------------------ */
-const shaftMat = new THREE.ShaderMaterial({
-  uniforms:{ uTime:{value:0}, uWarm:{value:C(PAL.warm)}, uPale:{value:C(PAL.pale)} },
-  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+function coralGeometry(){
+  const pos = [], aH = [], aPhase = [], aTier = [], aRoot = [], idx = [];
+  let base = 0;
+  const clumps = [];
+  // tier 0: foreground columns, kept off-centre so the middle of a 375 px
+  // frame is never blocked, with a couple of fronds crossing inwards
+  for(let i = 0; i < 7; i++){
+    const side = i % 2 ? 1 : -1;
+    clumps.push({ x: side * (2.4 + (i % 3) * 1.5), z: 3.0 + (i % 3) * 1.4,
+                  y: -6 - i * 1.6, h: 4.0 + (i % 3), tier: 0, blades: 5, lean: -side * 0.5 });
+  }
+  // tier 1: mid-ground, around her
+  for(let i = 0; i < 11; i++){
+    const a = i * 2.399;
+    clumps.push({ x: Math.cos(a) * (4 + (i % 4) * 2.2), z: -3 - (i % 4) * 2.5,
+                  y: BED_Y + 1.0 + (i % 3) * 0.4, h: 2.2 + (i % 4) * 0.8,
+                  tier: 1, blades: 5, lean: Math.sin(a) * 0.4 });
+  }
+  // tier 2: far shelf
+  for(let i = 0; i < 9; i++){
+    const a = i * 1.7 + 0.6;
+    clumps.push({ x: Math.cos(a) * (11 + (i % 3) * 4), z: -14 - (i % 3) * 4,
+                  y: BED_Y + 1.0, h: 2.6 + (i % 3) * 1.1, tier: 2, blades: 4,
+                  lean: Math.cos(a) * 0.5 });
+  }
+  const SEG = 5;
+  for(let ci = 0; ci < clumps.length; ci++){
+    const cl = clumps[ci];
+    for(let b = 0; b < cl.blades; b++){
+      const spread = (b / (cl.blades - 1) - 0.5) * 1.5;
+      const ph = (ci * 2.1 + b * 0.8) % 6.283;
+      const w0 = 0.20 + (b % 2) * 0.12;
+      for(let s = 0; s <= SEG; s++){
+        const f = s / SEG;
+        const w = w0 * (1 - f * 0.65);
+        // a fan: blades splay outwards as they rise
+        const dx = cl.x + spread * f * 1.3 + cl.lean * f * f * 1.2;
+        const dy = cl.y + f * cl.h;
+        for(const sd of [-1, 1]){
+          pos.push(dx + sd * w, dy, cl.z + spread * f * 0.5);
+          aH.push(f); aPhase.push(ph); aTier.push(cl.tier);
+          aRoot.push(cl.x, cl.y, cl.z);
+        }
+      }
+      for(let s = 0; s < SEG; s++){
+        const a = base + s*2, bb = a+1, c = a+2, d = a+3;
+        idx.push(a, c, bb,  bb, c, d);
+      }
+      base += (SEG + 1) * 2;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aH',     new THREE.Float32BufferAttribute(aH, 1));
+  g.setAttribute('aPhase', new THREE.Float32BufferAttribute(aPhase, 1));
+  g.setAttribute('aTier',  new THREE.Float32BufferAttribute(aTier, 1));
+  g.setAttribute('aRoot',  new THREE.Float32BufferAttribute(aRoot, 3));
+  g.setIndex(idx);
+  return g;
+}
+const coralMat = new THREE.ShaderMaterial({
+  uniforms:{
+    uTime, uDiver, uFog,
+    uT0:{value:C(PAL.indigoDeep)}, uT1:{value:C(RAMP[3])}, uT2:{value:C(RAMP[2])},
+    uRose:{value:C(PAL.rose)}, uInd:{value:C(PAL.indigo)}
+  },
+  side: THREE.DoubleSide,
   vertexShader:`
-    varying vec3 vW;
+    attribute float aH; attribute float aPhase; attribute float aTier; attribute vec3 aRoot;
+    uniform float uTime; uniform vec3 uDiver;
+    varying float vH; varying float vTier; varying float vDist; varying float vShy;
     void main(){
-      vec4 wp = modelMatrix * vec4(position, 1.0);
-      vW = wp.xyz;
-      gl_Position = projectionMatrix * viewMatrix * wp;
+      vec3 p = position;
+      float bend = aH * aH;
+      p.x += sin(uTime * 0.5 + aPhase) * bend * 0.35;
+      p.z += cos(uTime * 0.4 + aPhase * 1.4) * bend * 0.25;
+      // polyps pull in as she passes: the clump shortens towards its root
+      float near = 1.0 - smoothstep(0.0, 3.2, distance(aRoot, uDiver));
+      vShy = near;
+      p = mix(p, aRoot, near * 0.42 * aH);
+      vH = aH; vTier = aTier;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
     }
   `,
   fragmentShader:`
     precision mediump float;
-    varying vec3 vW;
-    uniform float uTime;
-    uniform vec3 uWarm, uPale;
+    varying float vH; varying float vTier; varying float vDist; varying float vShy;
+    uniform vec3 uT0, uT1, uT2, uRose, uInd, uFog;
+    float fogA(float dist){
+      float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
+      return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
+    }
     void main(){
-      // the shafts lean, so x shifts as you go down
-      float x = vW.x + vW.y * 0.26;
-      float s = sin(x * 0.46 + uTime * 0.035) * 0.5 + 0.5;
-      s *= sin(x * 0.19 - uTime * 0.022 + 1.9) * 0.5 + 0.5;
-      s = smoothstep(0.30, 0.78, s);
-      s = floor(clamp(s, 0.0, 0.999) * 3.0) / 2.0;      // three hard steps
-      // strongest just under the surface, gone by the seabed
-      float fall = smoothstep(-15.0, -2.0, vW.y);
-      float a = s * fall * 0.17;
-      gl_FragColor = vec4(mix(uPale, uWarm, 0.5) * a, a);
+      vec3 bodyCol = mix(uT0, uT1, step(0.5, vTier));
+      bodyCol = mix(bodyCol, uT2, step(1.5, vTier));
+      // two values per clump: a hard shadow polygon at the base
+      float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
+      vec3 col = mix(uInd, bodyCol, max(v, 0.35));
+      // rose only at the tips, and only on the two back tiers
+      col = mix(col, uRose, step(0.9, v) * step(0.5, vTier) * 0.55);
+      // a tip that has pulled in goes dull
+      col = mix(col, uInd, vShy * 0.3);
+      // tier 0 is the foreground silhouette and is never fogged
+      float f = fogA(vDist) * step(0.5, vTier);
+      gl_FragColor = vec4(mix(col, uFog, f), 1.0);
     }
   `
 });
-// Fixed in the world, tall enough to cover the whole descent, so the
-// camera really does travel down past them.
-const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), shaftMat);
-shafts.position.set(0, -9, -9);
-shafts.renderOrder = 5;
-scene.add(shafts);
+scene.add(new THREE.Mesh(coralGeometry(), coralMat));
 
 /* ------------------------------------------------------------------
-   5. THE DIVER — a tiny generic silhouette, flat ink, no interior
-   detail. Deliberately featureless: §4.1 forbids anything that reads
-   as a specific character or costume.
+   8. FISH — new layer, one merged mesh, 44 of them.
+   Each is a flat body quad plus a tail triangle, facing the lens. They
+   swim a fixed lane and FLEE from uDiver: close to her they are pushed
+   outwards and their tails beat harder, so you can see her arrive.
    ------------------------------------------------------------------ */
-/* Flat, one value, no shading — but the value is not fixed. An ink
-   silhouette reads beautifully against the bright water near the surface
-   and vanishes completely at the bottom, where the water is ink too. So
-   the figure's single flat colour slides from ink to a pale sea-grey as
-   she descends, which is what a cel painter would do by hand. */
-const inkMat = new THREE.MeshBasicMaterial({ color: PAL.ink });
-const cBody  = new THREE.Color();
-const diver   = new THREE.Group();
-const sphere  = new THREE.SphereGeometry(1, 14, 10);
-const torso = new THREE.Mesh(sphere, inkMat); torso.scale.set(0.26, 0.60, 0.21);
-const head  = new THREE.Mesh(sphere, inkMat); head.scale.setScalar(0.165); head.position.y = 0.70;
-const legs  = new THREE.Mesh(sphere, inkMat); legs.scale.set(0.15, 0.52, 0.14); legs.position.y = -0.92;
-const armL  = new THREE.Mesh(sphere, inkMat); armL.scale.set(0.075, 0.42, 0.075);
-armL.position.set(-0.26, 0.34, 0); armL.rotation.z = 0.30;
-const armR  = armL.clone(); armR.position.x = 0.26; armR.rotation.z = -0.30;
-diver.add(torso, head, legs, armL, armR);
-diver.scale.setScalar(0.62);     // §4.2 rule 6: a tiny figure in a lot of water
+function fishGeometry(n){
+  const pos = [], aCorner = [], aSeed = [], aLane = [], aDark = [], idx = [];
+  let base = 0;
+  for(let i = 0; i < n; i++){
+    const size = 0.17 + ((i * 3779) % 53) / 53 * 0.16;
+    const lane = -2.5 - ((i * 6421) % 89) / 89 * 12.5;
+    const zz   = -1.5 - ((i * 8117) % 71) / 71 * 13;
+    const seed = (i * 1.37) % 6.283;
+    const dark = (i % 3 === 0) ? 1 : 0;
+    // body quad
+    const corners = [[-1,-0.55],[1,-0.45],[1,0.45],[-1,0.55]];
+    for(const [cx, cy] of corners){
+      pos.push(0, lane, zz);
+      aCorner.push(cx * size, cy * size);
+      aSeed.push(seed); aLane.push(lane); aDark.push(dark);
+    }
+    idx.push(base, base+1, base+2, base, base+2, base+3);
+    // tail triangle, behind the body
+    const tail = [[-1,0],[-1.9,0.6],[-1.9,-0.6]];
+    for(const [cx, cy] of tail){
+      pos.push(0, lane, zz);
+      aCorner.push(cx * size, cy * size);
+      aSeed.push(seed); aLane.push(lane); aDark.push(dark);
+    }
+    idx.push(base+4, base+5, base+6);
+    base += 7;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(aCorner, 2));
+  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(aSeed, 1));
+  g.setAttribute('aLane',    new THREE.Float32BufferAttribute(aLane, 1));
+  g.setAttribute('aDark',    new THREE.Float32BufferAttribute(aDark, 1));
+  g.setIndex(idx);
+  return g;
+}
+const fishMat = new THREE.ShaderMaterial({
+  uniforms:{
+    uTime, uDiver, uFog,
+    uLight:{value:C(PAL.fish)}, uDark:{value:C(PAL.fishDark)}, uCream:{value:C(PAL.cream)}
+  },
+  side: THREE.DoubleSide,
+  vertexShader:`
+    attribute vec2 aCorner; attribute float aSeed; attribute float aLane; attribute float aDark;
+    uniform float uTime; uniform vec3 uDiver;
+    varying float vDark; varying float vFlee; varying float vBelly; varying float vDist;
+    void main(){
+      vec3 c = position;
+      float dir  = mod(aSeed, 2.0) < 1.0 ? 1.0 : -1.0;
+      float span = 26.0;
+      // cruise along the lane, wrapping
+      float x = mod(aSeed * 4.1 + uTime * (0.9 + fract(aSeed) * 0.8) * dir, span) - span * 0.5;
+      c.x = x;
+      c.y += sin(uTime * 0.7 + aSeed * 3.0) * 0.35;
+
+      // --- the interaction: flee from her ---
+      float d = distance(c, uDiver);
+      float flee = 1.0 - smoothstep(0.0, 4.5, d);
+      vFlee = flee;
+      vec3 away = normalize(c - uDiver + vec3(0.001, 0.001, 0.0));
+      c += away * flee * 2.6;
+
+      // tail beat, harder when fleeing
+      float beat = sin(uTime * (7.0 + flee * 16.0) + aSeed * 5.0);
+      vec2 off = aCorner;
+      off.y += beat * 0.16 * step(aCorner.x, -0.0001) * (0.4 + flee);
+      off.x *= dir;
+
+      vBelly = aCorner.y;
+      vDark  = aDark;
+      // face the lens: offsets applied in view space
+      vec4 mv = modelViewMatrix * vec4(c, 1.0);
+      mv.xy += off;
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vDark; varying float vFlee; varying float vBelly; varying float vDist;
+    uniform vec3 uLight, uDark, uCream, uFog;
+    float fogA(float dist){
+      float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
+      return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
+    }
+    void main(){
+      // two flat values with a hard split along the body: back and belly
+      vec3 col = mix(uLight, uDark, vDark);
+      col = mix(col, uCream, step(0.0, -vBelly) * 0.35);
+      // a startled fish flashes its pale side
+      col = mix(col, uCream, vFlee * 0.35);
+      gl_FragColor = vec4(mix(col, uFog, fogA(vDist)), 1.0);
+    }
+  `
+});
+scene.add(new THREE.Mesh(fishGeometry(44), fishMat));
+
+/* ------------------------------------------------------------------
+   9. BUBBLES — new layer, emitted from HER on the exhale only.
+   CPU-updated: 110 quads in one mesh, centres written into an attribute
+   each frame. At this count the cost is nothing and it buys real
+   emission from a moving source, which a pure vertex shader cannot do
+   without storing state somewhere.
+   ------------------------------------------------------------------ */
+const NB = 110;
+const bubbles = [];
+for(let i = 0; i < NB; i++) bubbles.push({ x:0, y:0, z:0, r:0, vy:0, ph:0, live:false });
+
+function bubbleGeometry(n){
+  const pos = new Float32Array(n * 4 * 3);
+  const corner = [], seed = [], idx = [];
+  for(let i = 0; i < n; i++){
+    const cs = [[-1,-1],[1,-1],[1,1],[-1,1]];
+    for(const [cx, cy] of cs){ corner.push(cx, cy); seed.push((i * 1.91) % 6.283); }
+    const b = i * 4;
+    idx.push(b, b+1, b+2, b, b+2, b+3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(corner, 2));
+  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(seed, 1));
+  g.setAttribute('aSize',    new THREE.BufferAttribute(new Float32Array(n * 4), 1));
+  g.setIndex(idx);
+  g.frustumCulled = false;
+  return g;
+}
+const bubbleMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime, uPale:{value:C(PAL.bubble)}, uCream:{value:C(PAL.cream)} },
+  transparent:true, depthWrite:false, side:THREE.DoubleSide,
+  vertexShader:`
+    attribute vec2 aCorner; attribute float aSeed; attribute float aSize;
+    varying vec2 vC; varying float vSize;
+    void main(){
+      vC = aCorner; vSize = aSize;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      mv.xy += aCorner * aSize;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec2 vC; varying float vSize;
+    uniform vec3 uPale, uCream;
+    void main(){
+      if(vSize <= 0.0) discard;
+      float d = length(vC);
+      if(d > 1.0) discard;
+      // flat, lineless, two values: a ring and one hard highlight chip
+      float ring = step(0.62, d);
+      float chip = step(length(vC - vec2(-0.34, 0.34)), 0.24);
+      float a = ring * 0.55 + chip * 0.95;
+      if(a < 0.02) discard;
+      gl_FragColor = vec4(mix(uPale, uCream, chip), a);
+    }
+  `
+});
+const bubbleMesh = new THREE.Mesh(bubbleGeometry(NB), bubbleMat);
+bubbleMesh.renderOrder = 6;
+bubbleMesh.frustumCulled = false;
+scene.add(bubbleMesh);
+const bubPos  = bubbleMesh.geometry.getAttribute('position');
+const bubSize = bubbleMesh.geometry.getAttribute('aSize');
+let bubCursor = 0, bubAccum = 0;
+
+function spawnBubble(x, y, z){
+  const b = bubbles[bubCursor];
+  bubCursor = (bubCursor + 1) % NB;
+  b.x = x + (Math.random() - 0.5) * 0.22;
+  b.y = y;
+  b.z = z + (Math.random() - 0.5) * 0.2;
+  b.r = 0.035 + Math.random() * 0.075;
+  b.vy = 0.9 + Math.random() * 1.1;
+  b.ph = Math.random() * 6.283;
+  b.live = true;
+}
+function updateBubbles(dt, tt){
+  for(let i = 0; i < NB; i++){
+    const b = bubbles[i];
+    let s = 0;
+    if(b.live){
+      b.y += b.vy * dt;
+      b.vy = Math.min(2.4, b.vy + dt * 0.5);        // they accelerate as they expand
+      b.r += dt * 0.012;
+      b.x += Math.sin(tt * 2.0 + b.ph) * dt * 0.35;  // wobble
+      if(b.y > SURFACE_Y - 0.35){ b.live = false; }
+      else s = b.r;
+    }
+    const o = i * 12, so = i * 4;
+    for(let v = 0; v < 4; v++){
+      bubPos.array[o + v*3]     = b.x;
+      bubPos.array[o + v*3 + 1] = b.y;
+      bubPos.array[o + v*3 + 2] = b.z;
+      bubSize.array[so + v]     = s;
+    }
+  }
+  bubPos.needsUpdate = true;
+  bubSize.needsUpdate = true;
+}
+
+/* ------------------------------------------------------------------
+   10. THE DIVER — rebuilt in layers so she reads as a figure.
+   Still flat and lineless, still generic (§4.1: no character, no
+   costume that reads as anyone's), but no longer one silhouette: hair,
+   head, goggles, torso, wrap, arms, legs and a cord, on four distinct
+   values. She carries her own internal contrast, which is what lets her
+   read against both the bright water near the surface and the dark
+   water at the bottom.
+   ------------------------------------------------------------------ */
+const matBody = new THREE.MeshBasicMaterial({ color: PAL.bodyUp });     // re-valued by depth
+const matHair = new THREE.MeshBasicMaterial({ color: PAL.indigoDeep });
+const matWrap = new THREE.MeshBasicMaterial({ color: PAL.rose });
+const matLens = new THREE.MeshBasicMaterial({ color: PAL.cream });
+const matCord = new THREE.MeshBasicMaterial({ color: PAL.indigo });
+
+const SPH = new THREE.SphereGeometry(1, 12, 9);
+const BOX = new THREE.BoxGeometry(1, 1, 1);
+const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => {
+  const m = new THREE.Mesh(geo, mat);
+  m.scale.set(sx, sy, sz); m.position.set(px, py, pz);
+  if(rz) m.rotation.z = rz;
+  return m;
+};
+
+const diver = new THREE.Group();
+const torso = mk(SPH, matBody, 0.25, 0.46, 0.19,  0,  0.10, 0);
+const hips  = mk(SPH, matWrap, 0.24, 0.20, 0.19,  0, -0.32, 0);
+const head  = mk(SPH, matBody, 0.165, 0.185, 0.16, 0, 0.72, 0);
+const hair  = mk(SPH, matHair, 0.185, 0.165, 0.175, 0, 0.80, -0.03);
+const lensL = mk(SPH, matLens, 0.062, 0.050, 0.05, -0.065, 0.715, 0.125);
+const lensR = mk(SPH, matLens, 0.062, 0.050, 0.05,  0.065, 0.715, 0.125);
+const strap = mk(BOX, matHair, 0.30, 0.040, 0.20,  0, 0.725, 0);
+const armL  = mk(SPH, matBody, 0.062, 0.34, 0.062, -0.235, 0.26, 0,  0.34);
+const armR  = mk(SPH, matBody, 0.062, 0.34, 0.062,  0.235, 0.26, 0, -0.34);
+const legL  = mk(SPH, matBody, 0.072, 0.42, 0.070, -0.095, -0.86, 0, 0.05);
+const legR  = mk(SPH, matBody, 0.072, 0.42, 0.070,  0.095, -0.86, 0, -0.05);
+const finL  = mk(SPH, matWrap, 0.085, 0.16, 0.05, -0.105, -1.30, 0, 0.05);
+const finR  = mk(SPH, matWrap, 0.085, 0.16, 0.05,  0.105, -1.30, 0, -0.05);
+const cord  = mk(BOX, matCord, 0.018, 0.55, 0.018, 0.17, -0.18, 0.02, 0.12);
+diver.add(torso, hips, head, hair, lensL, lensR, strap,
+          armL, armR, legL, legR, finL, finR, cord);
+diver.scale.setScalar(0.95);
 scene.add(diver);
 
-/* ------------------------------------------------------------------
-   6. THE PEARL — the one warm thing in the frame, plus a soft halo.
-   ------------------------------------------------------------------ */
+/* ---------- the pearl ---------- */
 const pearlMat = new THREE.ShaderMaterial({
-  uniforms:{ uWarm:{value:C(PAL.warm)}, uMid:{value:C(PAL.mid)} },
+  uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(RAMP[2])} },
   vertexShader:`
     varying vec3 vN;
     void main(){ vN = normalize(normalMatrix * normal);
@@ -555,21 +945,16 @@ const pearlMat = new THREE.ShaderMaterial({
     varying vec3 vN;
     uniform vec3 uWarm, uMid;
     void main(){
-      // two values and a hard terminator — a flat highlight, not a sphere
       float l = dot(normalize(vN), normalize(vec3(-0.35, 0.8, 0.5)));
       gl_FragColor = vec4(mix(uMid, uWarm, step(0.12, l)), 1.0);
     }
   `
 });
-const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), pearlMat);
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), pearlMat);
 scene.add(pearl);
-/* There was an additive halo sphere here. On a flat, lineless scene it did
-   not read as a glow at all — it read as a hard-edged grey plate behind
-   her, because an additive sphere of constant colour has a sharp rim. The
-   idiom has no soft glows in it; the pearl is just the one warm shape. */
 
 /* ------------------------------------------------------------------
-   Layout / resize
+   Layout
    ------------------------------------------------------------------ */
 let W = 1, H = 1;
 function resize(){
@@ -578,8 +963,6 @@ function resize(){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
   renderer.setSize(W, H, false);
   camera.aspect = W / H;
-  // A narrow phone frame is tall and thin; pull back a little so the
-  // surface above and the bed below both stay in shot.
   camera.fov = camera.aspect < 0.75 ? 62 : 52;
   camera.updateProjectionMatrix();
   waterUniforms.uAspect.value = camera.aspect;
@@ -591,65 +974,86 @@ resize();
 /* ------------------------------------------------------------------
    The loop
    ------------------------------------------------------------------ */
-let t = 0;                 // session time, seconds
+let t = 0;
 let last = performance.now();
 let running = true;
 let rafId = 0;
-let camY = TOP_Y + 2.0;
+let camY = TOP_Y + 1.6;
 
 const vBed  = new THREE.Vector3();
 const vHand = new THREE.Vector3();
-const cHigh = C(PAL.high), cDeep = C(PAL.deep), cInk = C(PAL.ink);
-const cBodyDeep = C(0xB8D4CE);
+const cBodyUp = C(PAL.bodyUp), cBodyDown = C(PAL.bodyDown);
+const cR3 = C(RAMP[3]), cR4 = C(RAMP[4]), cInd = C(PAL.indigo);
 
 function frame(now){
   rafId = requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
-  if(dt > 0.05) dt = 0.05;            // a backgrounded tab must not jump
+  if(dt > 0.05) dt = 0.05;
   if(!running){ fpsTick(now, true); return; }
   t += dt;
 
-  const lv  = level(t);
-  const st  = phaseAt(t);
-  const cr  = carry(t);
+  const lv = level(t);
+  const st = phaseAt(t);
+  const cr = carry(t);
 
-  // --- the diver rides the breath down and up ---
+  /* --- the diver --- */
   const dy = BOTTOM_Y + (TOP_Y - BOTTOM_Y) * lv;
   diver.position.set(Math.sin(t * 0.21) * 0.35, dy, Math.cos(t * 0.17) * 0.3);
-  // face down on the way down, up on the way up
   const aim = st.p.k === 'out' ? 0.55 : st.p.k === 'in' ? -0.5 : 0.1;
   diver.rotation.x += (aim - diver.rotation.x) * Math.min(1, dt * 1.6);
   diver.rotation.y  = Math.sin(t * 0.13) * 0.4;
+  diver.rotation.z  = Math.sin(t * 0.31) * 0.06;
 
-  // --- the pearl: on the bed, then in her hand, then let go ---
+  /* a kick and an arm sweep, so the figure is doing the swimming */
+  const swim = st.p.k === 'rest' ? 0.25 : 1.0;
+  const kick = Math.sin(t * 3.4) * 0.5 * swim;
+  legL.rotation.x =  kick;  finL.rotation.x =  kick * 1.4;
+  legR.rotation.x = -kick;  finR.rotation.x = -kick * 1.4;
+  legL.position.z =  kick * 0.22; finL.position.z =  kick * 0.5;
+  legR.position.z = -kick * 0.22; finR.position.z = -kick * 0.5;
+  // arms reach down to pull herself under, and up towards the light
+  const reach = st.p.k === 'in' ? -0.9 : st.p.k === 'out' ? 0.5 : 0.1;
+  armL.rotation.z +=  (0.34 + reach - armL.rotation.z) * Math.min(1, dt * 2.2);
+  armR.rotation.z += (-0.34 - reach - armR.rotation.z) * Math.min(1, dt * 2.2);
+
+  uDiver.value.copy(diver.position);
+
+  /* --- the pearl --- */
   vBed.set(0.55, BOTTOM_Y + 0.22, -0.4);
   vHand.set(diver.position.x + 0.22, diver.position.y - 0.42, diver.position.z + 0.2);
   pearl.position.lerpVectors(vBed, vHand, cr);
 
-  // --- camera: trails her, with a lag, so the water moves past ---
+  /* --- bubbles: on the exhale, from her head, and nowhere else --- */
+  if(st.p.k === 'out'){
+    bubAccum += dt * (9 + 16 * (1 - st.pr));     // heaviest at the start of the breath
+    while(bubAccum >= 1){
+      bubAccum -= 1;
+      spawnBubble(diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12);
+    }
+  } else {
+    bubAccum = 0;
+  }
+  updateBubbles(dt, t);
+
+  /* --- camera: trails her, and the breath drives its pitch --- */
   const wantY = diver.position.y + 1.6;
   camY += (wantY - camY) * Math.min(1, dt * 1.5);
-  const back = camera.aspect < 0.75 ? 11.5 : 14.0;
+  const back = camera.aspect < 0.75 ? 9.0 : 11.5;
   camera.position.set(Math.sin(t * 0.055) * 1.1, camY, back + Math.cos(t * 0.04) * 0.6);
-  // The breath drives the camera's pitch: on the exhale it looks down into
-  // the dark it is sinking into, on the inhale it tilts up to the light.
-  // This is the thing the 3-D version can do that the flat ones cannot.
   camera.lookAt(diver.position.x * 0.5, diver.position.y - 1.0 + lv * 3.6, 0);
 
-  // --- uniforms ---
+  /* --- uniforms --- */
   const dn = Math.min(1, Math.max(0, (SURFACE_Y - camera.position.y) / (SURFACE_Y - BED_Y)));
-  waterUniforms.uTime.value  = t;
+  uTime.value = t;
   waterUniforms.uDepth.value = dn;
-  surfUniforms.uTime.value   = t;
   surfUniforms.uCam.value.copy(camera.position);
-  kelpMat.uniforms.uTime.value = t;
-  shaftMat.uniforms.uTime.value = t;
-  // the fog is the water at this depth, so distant geometry dissolves into
-  // the column behind it instead of ending in a hard black horizon
-  fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.2);
-  inkMat.color.copy(cInk).lerp(cBodyDeep, Math.min(1, Math.max(0, (dn - 0.15) / 0.45)));
+  // the fog tints towards the water at this depth, but only ever part way
+  uFog.value.copy(cR3).lerp(cR4, dn).lerp(cInd, dn * 0.35);
+  // her flat value crosses the water's: dark against the bright shallows,
+  // pale against the dark bottom, so she never matches her background
+  matBody.color.copy(cBodyUp).lerp(cBodyDown, Math.min(1, Math.max(0, (dn - 0.12) / 0.5)));
 
-  // --- cue text + session bar ---
+  /* --- cue text + session bar --- */
   if(st.p.label !== elPhase.textContent){
     elPhase.textContent = st.p.label;
     elSub.textContent   = st.p.sub;
@@ -660,7 +1064,7 @@ function frame(now){
   fpsTick(now, false);
 }
 
-/* ---------- FPS readout: rolling mean, refreshed twice a second ---------- */
+/* ---------- FPS readout ---------- */
 let fAcc = 0, fN = 0, fLast = performance.now(), fPrev = performance.now();
 function fpsTick(now, idle){
   const d = now - fPrev; fPrev = now;
@@ -690,7 +1094,7 @@ $('resume').addEventListener('click', () => {
 
 /* ---------- context loss ---------- */
 canvas.addEventListener('webglcontextlost', e => {
-  e.preventDefault();          // without this the context is never restored
+  e.preventDefault();
   stopLoop();
   elPhase.textContent = 'paused';
   elSub.textContent   = 'the graphics context was lost';
@@ -701,27 +1105,15 @@ canvas.addEventListener('webglcontextrestored', () => {
   startLoop();
 }, false);
 
-/* ---------- a small hook for inspecting this from outside ----------
+/* ---------- inspection hook ----------
    The page can only be looked at through a browser pane that is hidden
-   between tool calls, which throttles requestAnimationFrame to nothing:
-   the breath appears frozen and the fps readout reports single digits.
-   That is the instrument, not the scene. These let a specific moment in
-   the cycle be seeked to, and the render cost be timed without rAF. */
+   between tool calls, which throttles rAF to nothing: the breath looks
+   frozen and the fps readout reports single digits. That is the
+   instrument, not the scene. */
 window.__deepLight = {
   seek(v){ t = v; },
-  now(){ return { t, phase: phaseAt(t).p.k, level: level(t) }; },
-  // where things actually land on screen, in CSS pixels — so "I cannot
-  // see her" can be checked rather than guessed at
-  where(){
-    const put = o => {
-      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
-      return { x:+((v.x*0.5+0.5)*W).toFixed(0), y:+((-v.y*0.5+0.5)*H).toFixed(0),
-               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
-    };
-    return { diver:put(diver), pearl:put(pearl),
-             diverColor:'#'+inkMat.color.getHexString(),
-             camY:+camera.position.y.toFixed(2) };
-  },
+  now(){ return { t, phase: phaseAt(t).p.k, level: level(t),
+                  liveBubbles: bubbles.filter(b => b.live).length }; },
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();
@@ -731,6 +1123,16 @@ window.__deepLight = {
     return { msPerRender: (performance.now() - s) / n, n,
              drawCalls: renderer.info.render.calls,
              triangles: renderer.info.render.triangles };
+  },
+  where(){
+    const put = o => {
+      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x:+((v.x*0.5+0.5)*W).toFixed(0), y:+((-v.y*0.5+0.5)*H).toFixed(0),
+               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
+    };
+    return { diver:put(diver), pearl:put(pearl),
+             bodyColor:'#'+matBody.color.getHexString(),
+             camY:+camera.position.y.toFixed(2) };
   }
 };
 
