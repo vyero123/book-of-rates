@@ -117,6 +117,26 @@ if(openDiff.diffs === 0)
   fail('open: identical to the pre-rule baseline, which means the §1.6a remap is NOT applied');
 
 /* ------------------------------------------------------------------
+   2b. protocol() must not eat a chapter's own protocol-level fields
+   ------------------------------------------------------------------
+   Deep Light hangs the pearl's resting place on the protocol, because
+   the two protocols no longer go to the same depth. protocol() used to
+   rebuild the object from a fixed id/name/cycles list and silently drop
+   anything else, so the scene read undefined and threw inside the frame
+   body — where nothing in the gate can see it: valid syntax, resolved
+   imports, correct arithmetic. Phase descriptors always passed unknown
+   fields through; the protocol level now does too, and this is the check
+   that says so.
+   ------------------------------------------------------------------ */
+for(const [id, p] of Object.entries(deepLight.PROTOCOLS)){
+  if(!Array.isArray(p.pearl) || p.pearl.length !== 3)
+    fail(`deep light/${id}: protocol() dropped the chapter's \`pearl\` field`);
+}
+for(const [id, p] of Object.entries(longAir.PROTOCOLS)){
+  if(p.id !== id) fail(`long air/${id}: protocol() dropped or changed \`id\` (got ${p.id})`);
+}
+
+/* ------------------------------------------------------------------
    3. §1.6a, as an executable rule
    ------------------------------------------------------------------ */
 

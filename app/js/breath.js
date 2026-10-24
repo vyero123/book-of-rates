@@ -63,14 +63,21 @@ export const hold = (a, b) => x => smooth(clamp01((x - a) / Math.max(1e-6, b - a
  *  meaning requires. `cycle` and `session` are derived, never written by
  *  hand: a phase duration edited without the cycle length following it is
  *  a whole class of bug this removes. */
-export function protocol({ id, name, cycles, phases }){
+export function protocol({ phases, ...rest }){
   const list = phases.map(p => ({
     ease: smooth,
     scalar: () => 0,
     ...p
   }));
   const cycle = list.reduce((a, q) => a + q.d, 0);
-  return { id, name, cycles, phases: list, cycle, session: cycle * cycles };
+  // `...rest` rather than a fixed list of id/name/cycles. A phase
+  // descriptor has always passed a chapter's own fields through
+  // untouched, and this did not — so when Deep Light hung the pearl's
+  // resting place on the protocol, normalising silently DELETED it and
+  // the scene read undefined. Nothing in the gate can see that: it is
+  // valid syntax, a resolved import and correct arithmetic. The two
+  // levels should behave the same way, and now do.
+  return { ...rest, phases: list, cycle, session: cycle * rest.cycles };
 }
 
 /* ------------------------------------------------------------------

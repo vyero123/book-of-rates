@@ -999,7 +999,7 @@ const loop = clock((dt, now, running) => {
   diver.updateMatrixWorld(true);
 
   /* --- the pearl: on the bed, or held at her chest --- */
-  vBed.set(0.55, BED_Y + 1.42, -0.4);
+  vBed.fromArray(B.proto.pearl);
   vChest.copy(PEARL_CHEST); diver.localToWorld(vChest);
   pearl.position.lerpVectors(vBed, vChest, grip);
 

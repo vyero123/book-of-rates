@@ -65,6 +65,10 @@ export const SURFACE = 0;
 export const PROTOCOLS = {
   box: protocol({
     id:'box', name:'Box breathing · 4-4-4-4 · 3.75 breaths a minute', cycles:10,
+    // where the pearl lies when she is not holding it. It belongs to the
+    // PROTOCOL, not to the scene, because the two protocols no longer go
+    // to the same depth — see the §1.6a note below.
+    pearl:[0.55, -15.58, -0.4],
     phases:[
       { k:'in',   d:4, label:'breathe in',  sub:'at the surface',
         from:Y_AIR, to:Y_AIR, cam:'air', aim:-0.15,
@@ -116,6 +120,14 @@ export const PROTOCOLS = {
      ------------------------------------------------------------------ */
   open: protocol({
     id:'open', name:'No holds · 4 out / 2 at empty / 5 in · 5.45 breaths a minute', cycles:14,
+    // Just under the bottom of her reach. It used to inherit the box
+    // protocol's seabed, and once the remap stopped this protocol going
+    // to the seabed the pearl was visibly thrown fifteen metres straight
+    // down every time she stowed it at the surface — flying out of the
+    // bottom of the frame. Caught by where().pearl.inFrame on the
+    // deployed page, which is the kind of thing that is obvious in one
+    // reading and invisible in a screenshot of the right moment.
+    pearl:[0.55, Y_REACH - 0.55, -0.4],
     phases:[
       { k:'out',  d:4, label:'breathe out', sub:'reaching down',
         from:Y_AIR, to:Y_REACH, cam:'down', ease:drop, aim:0.60, bubbles:true,
