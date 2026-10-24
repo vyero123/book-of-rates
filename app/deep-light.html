@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Book of Rates — Prototype 5: Deep Light (3-D)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#08202C;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(8,32,44,.5);backdrop-filter:blur(6px);
+    color:#F2E3C8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(242,227,200,.4)}
+  #stop i{width:11px;height:11px;background:#E8473C;display:block;border-radius:2px}
+
+  #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
+    font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+    color:rgba(242,227,200,.42);background:rgba(8,32,44,.32);border-radius:6px;
+    padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
+  #fps.off{opacity:0;pointer-events:none}
+  #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
+    width:22px;height:22px;border-radius:50%;display:none}
+  #fpsdot.on{display:block}
+
+  #cue{position:fixed;left:0;right:0;bottom:max(64px,calc(env(safe-area-inset-bottom) + 56px));
+    z-index:20;text-align:center;pointer-events:none;color:#F2E3C8}
+  #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 16px rgba(20,10,14,.9)}
+  #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+    opacity:.7;text-transform:uppercase;text-shadow:0 2px 12px rgba(20,10,14,.9)}
+  #bar{position:fixed;left:0;right:0;bottom:max(36px,calc(env(safe-area-inset-bottom) + 28px));
+    z-index:20;height:2px;margin:0 36px;background:rgba(242,227,200,.18);pointer-events:none}
+  #barfill{height:100%;width:0;background:rgba(242,227,200,.75)}
+  #note{position:fixed;left:0;right:0;bottom:max(14px,calc(env(safe-area-inset-bottom) + 6px));
+    z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
+    color:rgba(242,227,200,.5);letter-spacing:.06em;padding:0 20px;pointer-events:none;
+    text-shadow:0 1px 8px rgba(20,10,14,.9)}
+
+  .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(8,20,30,.9);backdrop-filter:blur(3px);text-align:center;padding:28px;
+    overflow-y:auto}
+  .sheet.on{display:grid}
+  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.06em}
+  .sheet p{margin:0 0 14px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(242,227,200,.78);max-width:320px}
+  .sheet .fine{font-size:11.5px;line-height:1.55;color:rgba(242,227,200,.6)}
+  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
+    background:#F2E3C8;color:#08202C;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    display:block;width:100%;max-width:320px}
+  .sheet button.alt{background:transparent;color:#F2E3C8;
+    box-shadow:inset 0 0 0 1.5px rgba(242,227,200,.45);font-weight:500}
+  .sheet button.link,.sheet a.link{background:transparent;color:rgba(242,227,200,.55);
+    box-shadow:none;font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
+    text-decoration:underline;padding:8px;margin-top:14px;display:block;text-align:center}
+  .sheet a.link{margin-top:4px}
+  .sheet strong{color:#F2E3C8;font-weight:600}
+  .sheet .own{border-left:2px solid rgba(242,227,200,.3);padding-left:12px;text-align:left;
+    margin-bottom:18px}
+  .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(242,227,200,.45);margin-top:16px}
+  .sheet .sub2{display:block;margin-top:5px;font:400 9.5px/1.3 ui-sans-serif,sans-serif;
+    letter-spacing:.06em;text-transform:none;opacity:.6}
+
+  #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
+    text-align:center;
+    background:linear-gradient(#E07A4B 0%,#F0A862 22%,#FBE3B4 44%,#7A4A63 56%,#246E78 76%,#08202C 100%)}
+  #fallback.on{display:grid}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#2A1320;letter-spacing:.05em}
+  #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
+    color:rgba(42,19,32,.82);max-width:300px}
+  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(242,227,200,.8)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="fpsdot" aria-hidden="true"></div>
+<div id="fps" role="status" title="Tap to hide">—</div>
+
+<div id="cue"><div id="phase">breathe in</div><div id="sub">above the water</div></div>
+<div id="bar"><div id="barfill"></div></div>
+<div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Never hold your breath in or near water. Ease off at any light-headedness.</div>
+
+<!-- A CHOICE, not a screening gate. The circumstances this practice asks
+     for are disclosed by the warning scroll (js/scroll.js), which
+     opens first and is the only blocking step — design doc §1.6: the app
+     discloses the circumstances, the practitioner supplies them. What is
+     left here is which protocol you would rather breathe. -->
+<div id="gate" class="sheet"><div>
+  <h2>Which breath?</h2>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols drive the same dive. Neither is withheld from you and neither is better for you — pick the one you want.</p>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">with two short holds · 3.75 a minute</span></button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 / 2 / 5<br><span class="sub2">a rest at empty instead · 5.45 a minute</span></button>
+  <p class="fine tiny">The holds are short, exactly equal to the other phases, and set by the app — they never lengthen, and nothing is timed by you or scored. Your choice is remembered on this device and can be changed from the stop screen.</p>
+</div></div>
+
+<div id="halt" class="sheet"><div>
+  <h2>Stopped</h2>
+  <p>Let your breathing go back to whatever it wants to do. She keeps the pearl either way.</p>
+  <button id="resume">RESUME</button>
+  <button id="rescreen" class="link">Choose a different breath</button>
+  <a class="link" href="./">Back to the book</a>
+</div></div>
+
+<div id="fallback"><div>
+  <h2>Deep Light needs WebGL</h2>
+  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
+  <p>The 2-D prototypes do the same job without it.</p>
+  <p><code>prototypes/01-long-shore.html · 02-still-pool.html · 03-the-tide.html</code></p>
+</div></div>
+
+<script type="module">
+/* ============================================================
+   BOOK OF RATES — Prototype 5: DEEP LIGHT
+   A 3-D treatment of level 7, Pearl Diver (design doc §6).
+
+   -- Third pass --
+
+   PROTOCOL CHANGED TO BOX BREATHING, 4-4-4-4, 3.75 breaths/min, and the
+   four phases are mapped onto the dive so the mechanic and the breath
+   are one thing:
+
+       breathe in  (4 s)  — at the surface, head in the air
+       hold        (4 s)  — under, down for the pearl
+       breathe out (4 s)  — rising with it, bubbles going up
+       hold        (4 s)  — floating at the waterline, lungs empty
+
+   This introduces retention into the water level, which the design doc
+   originally decided against (§8 decision 2, §2.4). That decision was
+   AMENDED by the author on 23 October 2026 — see §1.5, §2.4 — on the
+   grounds that this is a personal project, built to one person's taste,
+   offered as-is to anyone else to use with their own judgement. The
+   original reasoning is preserved in the doc, not deleted: the §2.4
+   worry about teaching a breath-hold-underwater association to third
+   parties is now answered by FRAMING rather than by omission.
+
+   What that framing has to earn, and what this file implements:
+     - the app says what it is, in the gate and in the footer;
+     - it names the hazard instead of hiding it;
+     - it screens before the first hold (§2.2), and "not sure" counts
+       as yes;
+     - anybody who screens out gets the doc's original no-retention
+       protocol, fully built — §2.2 is explicit that an all-or-nothing
+       gate trains people to lie to it;
+     - nothing timed, scored or compared; the hold countdowns point
+       towards air and never show elapsed time (§2.4);
+     - no fast breathing anywhere. 3.75/min is SLOWER than the 5.45/min
+       this page used before, so §2.1 rule 3 — hyperventilation then a
+       hold, the combination that kills people — is not engaged.
+
+   SILENT. No AudioContext, no media elements.
+
+   TWO WORLDS. Below is close, dim, dense, teal and indigo, low-key,
+   everything swaying at the same slow rate. Above is the opposite on
+   every axis: far, bright, empty, amber and rose and violet, high-key,
+   almost nothing near the lens, a huge slow swell with a few fast tiny
+   marks crossing it. The surface plane is the hinge, and the crossing
+   gets a meniscus band at the lens line and a burst of spray.
+   ============================================================ */
+
+import { requireScroll } from './js/scroll.js';
+
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+/* ---------- the dive, in height terms. Above zero is out of the water. */
+const Y_AIR    =  0.52;
+const Y_FLOAT  = -0.42;
+const Y_BOTTOM = -14.4;
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const smooth  = x => x*x*(3-2*x);
+/* drops through the surface fast, then glides the rest of the way down */
+const drop    = x => smooth(Math.pow(x, 0.80));
+
+/* ---------- TWO PROTOCOLS ----------
+   The default is box breathing. The second is the design doc's original
+   no-retention version of this same level, and it is what the screening
+   gate hands anybody who should not be holding their breath — §2.2 is
+   explicit that an all-or-nothing gate trains people to lie to it, so
+   what sits behind the gate has to be a real exercise, not a refusal.
+   Each phase carries its own height anchors, camera mode and grip curve,
+   so both protocols drive the same scene without special cases. */
+const PROTOCOLS = {
+  box: {
+    id:'box', name:'Box breathing · 4-4-4-4 · 3.75 breaths a minute', cycles:10,
+    phases:[
+      { k:'in',   d:4, label:'breathe in',  sub:'above the water',
+        from:Y_FLOAT, to:Y_AIR, cam:'air',
+        grip:p => 1 - smooth(clamp01((p - 0.45) / 0.45)) },
+      { k:'hold', d:4, label:'hold',        sub:'down for the pearl',
+        from:Y_AIR, to:Y_BOTTOM, cam:'down', ease:drop, count:'rising in',
+        grip:p => smooth(clamp01((p - 0.70) / 0.30)) },
+      { k:'out',  d:4, label:'breathe out', sub:'rising with it',
+        from:Y_BOTTOM, to:Y_FLOAT, cam:'up', bubbles:true, grip:() => 1 },
+      { k:'hold', d:4, label:'hold',        sub:'floating, empty',
+        from:Y_FLOAT, to:Y_FLOAT * 0.45, cam:'line', count:'breathe in',
+        grip:() => 1 }
+    ]
+  },
+  open: {
+    id:'open', name:'No holds · 4 out / 2 at empty / 5 in · 5.45 breaths a minute', cycles:14,
+    phases:[
+      { k:'out',  d:4, label:'breathe out', sub:'she sinks',
+        from:Y_AIR, to:Y_BOTTOM, cam:'down', ease:drop, bubbles:true,
+        grip:p => 1 - smooth(clamp01(p / 0.35)) },
+      // a rest at empty, not a hold against urge: §2.4's version
+      { k:'rest', d:2, label:'rest',        sub:'drifting at the bottom',
+        from:Y_BOTTOM, to:Y_BOTTOM, cam:'down', count:'rising in',
+        grip:p => smooth(clamp01((p - 0.15) / 0.75)) },
+      { k:'in',   d:5, label:'breathe in',  sub:'rising into the air',
+        from:Y_BOTTOM, to:Y_AIR, cam:'up2air', grip:() => 1 }
+    ]
+  }
+};
+let PROTO = PROTOCOLS.box, CYCLE = 16, SESSION = 160;
+function useProtocol(p){
+  PROTO = p;
+  CYCLE = PROTO.phases.reduce((a, q) => a + q.d, 0);
+  SESSION = CYCLE * PROTO.cycles;
+}
+useProtocol(PROTOCOLS.box);
+
+function phaseAt(t){
+  let u = t % CYCLE; if(u < 0) u += CYCLE;
+  for(const p of PROTO.phases){ if(u < p.d) return { p, pr:u/p.d, left:p.d - u }; u -= p.d; }
+  const p = PROTO.phases[PROTO.phases.length-1]; return { p, pr:1, left:0 };
+}
+function diverY(t){
+  const s = phaseAt(t);
+  return s.p.from + (s.p.to - s.p.from) * (s.p.ease || smooth)(s.pr);
+}
+/* One scalar for both the grasp and the pearl: the pearl sits at her
+   chest exactly when both hands are on it. */
+function gripAmount(t){ const s = phaseAt(t); return clamp01(s.p.grip(s.pr)); }
+
+/* ---------- BELOW: the value ramp, teal into indigo ---------- */
+const RAMP = [0xD8F0E6, 0x93CFC6, 0x4E9C9E, 0x246E78, 0x103C4C, 0x08202C];
+const PAL = {
+  indigo:0x1B1C3C, indigoDeep:0x0C1026,
+  cream:0xF2E3C8, rose:0xC9826E,
+  ridgeFar:0x4E8E92, ridgeMid:0x27606C, ridgeNear:0x16203A,
+  bodyUp:0x2E5056, bodyDown:0xA8CCC6,
+  fish:0xB4DCD2, fishDark:0x2A5560, bubble:0xDFF3EC
+};
+/* ---------- ABOVE: a different hue family, and the values inverted.
+   Below, the frame is mostly dark with a small bright window. Above, the
+   frame is mostly bright with the water as the dark shape. ---------- */
+const AIR = {
+  skyHigh:0xE07A4B,   // amber, loudest thing in the frame (§4.2 rule 4)
+  skyLow :0xFBE3B4,   // pale haze down at the horizon
+  sun    :0xFFF6DE,
+  halo1  :0xFFD98E,
+  halo2  :0xFFC46A,
+  cloud  :0x8A5A6E,   // violet-rose: the shadow family up here
+  seaNear:0x7A4A63,   // violet water close to the lens
+  seaFar :0xE8A05E,   // amber where it reflects the sky
+  trough :0x3F2742,
+  glint  :0xFFF4D2,
+  stack  :0x4A2E47,
+  stack2 :0x6A4059,
+  bird   :0x3A2338,
+  spray  :0xFFF4E2
+};
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
+const elFps = $('fps'), elFpsDot = $('fpsdot');
+const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
+
+function fallback(why){
+  if(why) $('fbwhy').textContent = why;
+  elGate.classList.remove('on');
+  elFall.classList.add('on');
+  $('cue').style.display = $('bar').style.display = 'none';
+  elFps.classList.add('off');
+}
+function webglOk(){
+  try{
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'));
+  }catch(e){ return false; }
+}
+
+(async function boot(){
+  if(!webglOk()){ fallback('This browser could not give the page a WebGL context, so the 3-D scene cannot be drawn.'); return; }
+  let THREE;
+  try{ THREE = await import(CDN); }
+  catch(e){ fallback('The 3-D library could not be loaded from the network, so the scene cannot be drawn.'); return; }
+  try{ start(THREE); }
+  catch(e){
+    fallback('The 3-D scene failed to start: ' + (e && e.message ? e.message : e));
+    throw e;
+  }
+})();
+
+/* ============================================================ */
+function start(THREE){
+
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({
+  canvas, antialias:true, alpha:false, powerPreference:'high-performance',
+  stencil:false, depth:true
+});
+const DPR_CAP = 1.5;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
+renderer.shadowMap.enabled = false;
+renderer.setClearColor(RAMP[5], 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 400);
+
+const SURFACE_Y = 0;
+const BED_Y     = -17;
+
+const C = h => new THREE.Color(h);
+const ramp = RAMP.map(C);
+
+/* shared uniforms */
+const uDiver   = { value: new THREE.Vector3(0, Y_AIR, 0) };
+const uTime    = { value: 0 };
+const uFog     = { value: C(RAMP[3]) };
+const uAbove   = { value: 0 };     // 0 lens under water, 1 lens in the air
+const uHorizon = { value: 0.5 };   // where the horizon falls, in uv
+const uCamX    = { value: 0 };
+const uCamY    = { value: 0 };
+
+const FOG_GLSL = `
+  uniform vec3 uFog;
+  float fogAmount(float dist){
+    float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
+    return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
+  }
+`;
+const RAMP_GLSL = `
+  uniform vec3 uRamp[6];
+  vec3 rampPick(float x){
+    vec3 c = uRamp[0];
+    for(int i = 1; i < 6; i++){
+      c = mix(c, uRamp[i], step(float(i) / 6.0, clamp(x, 0.0, 0.999)));
+    }
+    return c;
+  }
+`;
+
+/* ------------------------------------------------------------------
+   1. BACKGROUND — one quad that is either the water column or the sky.
+   The two are not a tint of each other: different hue family, inverted
+   value structure, different furniture.
+   ------------------------------------------------------------------ */
+const waterUniforms = {
+  uTime, uDepth:{value:0}, uAspect:{value:1}, uAbove, uHorizon, uCamX,
+  uRamp:{value:ramp},
+  uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
+  uSun:{value:C(AIR.sun)}, uHalo1:{value:C(AIR.halo1)}, uHalo2:{value:C(AIR.halo2)},
+  uCloud:{value:C(AIR.cloud)}
+};
+const waterMat = new THREE.ShaderMaterial({
+  uniforms: waterUniforms,
+  depthTest:false, depthWrite:false,
+  vertexShader:`
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec2 vUv;
+    uniform float uTime, uDepth, uAspect, uAbove, uHorizon, uCamX;
+    uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo1, uHalo2, uCloud;
+    ${RAMP_GLSL}
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+
+    vec3 belowWater(){
+      float y = clamp((1.0 - vUv.y) * 0.45 + uDepth * 0.55, 0.0, 1.0);
+      return rampPick(y);
+    }
+
+    vec3 aboveWater(){
+      float h = vUv.y - uHorizon;                 // positive = sky
+      // five hard bands, pale at the horizon and hot at the top: the
+      // inverse of the column below, where the pale end is overhead
+      float b = floor(clamp(h / 0.85, 0.0, 0.999) * 5.0) / 4.0;
+      vec3 sky = mix(uSkyLow, uSkyHigh, b);
+
+      // a low sun, three hard steps, sitting just over the horizon on
+      // the same azimuth as the glitter path on the water
+      vec2 sp = vec2(0.5 - uCamX * 0.012, uHorizon + 0.085);
+      vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
+      float sd = length(q);
+      // kept small: at the first radii the three steps read as a
+      // bullseye rather than as a sun
+      float up = step(-0.004, h);
+      sky = mix(sky, uHalo2, step(sd, 0.092) * up);
+      sky = mix(sky, uHalo1, step(sd, 0.058) * up);
+      sky = mix(sky, uSun,   step(sd, 0.030) * up);
+
+      // three flat cloud lobes, wide and hard-edged, drifting slowly
+      float cl = 0.0;
+      for(int i = 0; i < 3; i++){
+        float fi = float(i);
+        float cx = fract(0.16 + fi * 0.31 + uTime * 0.0045) * 1.7 - 0.35;
+        vec2 cc = vec2(cx, uHorizon + 0.26 + fi * 0.075);
+        vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.30, vUv.y - cc.y);
+        cl = max(cl, step(length(d2), 0.030));
+      }
+      sky = mix(sky, uCloud, cl * step(0.03, h));
+      return sky;
+    }
+
+    void main(){
+      vec3 col = mix(belowWater(), aboveWater(), uAbove);
+      col += (hash(floor(vUv * 620.0)) - 0.5) * 0.022;   // §4.2 rule 7
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+const waterQuad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), waterMat);
+waterQuad.frustumCulled = false;
+waterQuad.renderOrder = -10;
+scene.add(waterQuad);
+
+/* ------------------------------------------------------------------
+   2. RIDGE BANDS — the underwater background, three parallax layers.
+   ------------------------------------------------------------------ */
+function ridgeGeometry(){
+  const pos = [], tier = [], idx = [];
+  const LAYERS = [
+    { z:-62, base:-30, amp:11, step:9.0,  seed:3,  tierId:0 },
+    { z:-40, base:-26, amp:8,  step:6.5,  seed:11, tierId:1 },
+    { z:-24, base:-22, amp:6,  step:4.5,  seed:23, tierId:2 }
+  ];
+  let base = 0;
+  for(const L of LAYERS){
+    const n = 34, span = 150;
+    for(let i = 0; i <= n; i++){
+      const x = -span/2 + (i/n) * span;
+      const q = Math.floor(i / 2) * 2;
+      const h = L.base + Math.sin((q + L.seed) * 0.9) * L.amp
+                       + Math.sin((q + L.seed) * 0.31) * L.amp * 0.7;
+      pos.push(x, Math.round(h / L.step) * L.step, L.z);  tier.push(L.tierId);
+      pos.push(x, -46, L.z);                               tier.push(L.tierId);
+    }
+    for(let i = 0; i < n; i++){
+      const a = base + i*2, b = a+1, c = a+2, d = a+3;
+      idx.push(a, b, c,  b, d, c);
+    }
+    base += (n + 1) * 2;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aTier',    new THREE.Float32BufferAttribute(tier, 1));
+  g.setIndex(idx);
+  return g;
+}
+const ridges = new THREE.Mesh(ridgeGeometry(), new THREE.ShaderMaterial({
+  uniforms:{ uFar:{value:C(PAL.ridgeFar)}, uMid:{value:C(PAL.ridgeMid)}, uNear:{value:C(PAL.ridgeNear)} },
+  vertexShader:`
+    attribute float aTier; varying float vTier;
+    void main(){ vTier = aTier;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vTier;
+    uniform vec3 uFar, uMid, uNear;
+    void main(){
+      vec3 col = mix(uFar, uMid, step(0.5, vTier));
+      col = mix(col, uNear, step(1.5, vTier));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+}));
+scene.add(ridges);
+
+/* ------------------------------------------------------------------
+   3. THE SURFACE PLANE — the hinge between the two worlds. One mesh,
+   two completely different treatments, chosen by which side the lens is.
+   ------------------------------------------------------------------ */
+const surfUniforms = {
+  uTime, uCam:{value:new THREE.Vector3()}, uFog, uAbove,
+  uRamp:{value:ramp}, uCream:{value:C(PAL.cream)},
+  uSeaNear:{value:C(AIR.seaNear)}, uSeaFar:{value:C(AIR.seaFar)},
+  uTrough:{value:C(AIR.trough)}, uGlint:{value:C(AIR.glint)}
+};
+const surfaceMat = new THREE.ShaderMaterial({
+  uniforms: surfUniforms, side: THREE.DoubleSide,
+  vertexShader:`
+    uniform float uTime;
+    varying vec3 vWorld; varying float vCrest; varying float vChop; varying float vDist;
+    void main(){
+      vec3 p = position;
+      // The long slow swell moves the geometry — above water the motion
+      // should read as huge and slow. But the SHADING must key off the
+      // short chop only: keyed off the sum, one swell trough turned the
+      // whole foreground into a single flat slab.
+      float chop = sin(p.x * 0.42 + uTime * 0.55) * 0.26
+                 + sin(p.y * 0.33 - uTime * 0.41) * 0.22
+                 + sin((p.x + p.y) * 0.19 + uTime * 0.23) * 0.18;
+      float swell = sin(p.y * 0.055 - uTime * 0.16) * 0.55;
+      float w = chop + swell;
+      vCrest = w; vChop = chop;
+      p.z += floor(w / 0.17) * 0.17;
+      vec4 wp = modelMatrix * vec4(p, 1.0);
+      vWorld = wp.xyz;
+      vec4 mv = viewMatrix * wp;
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vWorld; varying float vCrest; varying float vChop; varying float vDist;
+    uniform vec3 uCam, uCream, uSeaNear, uSeaFar, uTrough, uGlint;
+    uniform float uAbove;
+    ${RAMP_GLSL}
+    ${FOG_GLSL}
+    float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.98, 78.23))) * 43758.5453); }
+
+    void main(){
+      float r = length(vWorld.xz - uCam.xz);
+
+      // --- seen from underneath: a small bright window overhead ---
+      float d = clamp(-uCam.y, 0.0, 20.0);
+      float win = 1.0 - smoothstep(1.2 + d * 0.22, 4.5 + d * 0.60, r);
+      vec3 under = rampPick((1.0 - win) * 0.78);
+      under = mix(under, uCream, step(0.52, vCrest) * step(0.2, win) * 0.45);
+      under = mix(under, uFog, fogAmount(vDist));
+
+      // --- seen from above: dark violet close, amber to the horizon,
+      //     and a hard glitter path running out under the sun ---
+      float db = floor(clamp(1.0 - exp(-r * 0.065), 0.0, 0.999) * 5.0) / 4.0;
+      vec3 over = mix(uSeaNear, uSeaFar, db);
+      over = mix(over, uTrough, step(vChop, -0.22));
+      // A path, not a field. Widening it with distance and dropping the
+      // crest test turned the whole foreground into a checkerboard:
+      // keep it narrow, keep the cells small, and only let wave tops
+      // actually catch the light.
+      float path = 1.0 - smoothstep(0.8, 2.6 + r * 0.10, abs(vWorld.x));
+      float chip = step(0.76, hash1(vec2(floor(vWorld.x * 5.0), floor(vWorld.z * 5.0))));
+      over = mix(over, uGlint, path * chip * step(0.20, vChop));
+
+      gl_FragColor = vec4(mix(under, over, uAbove), 1.0);
+    }
+  `
+});
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 54, 54), surfaceMat);
+surface.rotation.x = -Math.PI / 2;
+scene.add(surface);
+
+/* ------------------------------------------------------------------
+   4. THE SEABED
+   ------------------------------------------------------------------ */
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 40, 40), new THREE.ShaderMaterial({
+  uniforms:{ uA:{value:C(RAMP[4])}, uB:{value:C(PAL.indigo)}, uC:{value:C(RAMP[3])}, uFog },
+  vertexShader:`
+    varying float vH; varying float vDist;
+    void main(){
+      vec3 p = position;
+      float h = sin(p.x * 0.21) * 0.5 + sin(p.y * 0.17 + 1.3) * 0.4 + sin((p.x - p.y) * 0.09) * 0.6;
+      h = floor(h / 0.3) * 0.3;
+      p.z += h; vH = h;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vH; varying float vDist;
+    uniform vec3 uA, uB, uC;
+    ${FOG_GLSL}
+    void main(){
+      float v = floor(clamp(vH * 0.45 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
+      vec3 col = mix(uB, uA, v);
+      col = mix(col, uC, step(0.95, v) * 0.5);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+    }
+  `
+}));
+bed.rotation.x = -Math.PI / 2;
+bed.position.y = BED_Y;
+scene.add(bed);
+
+/* ------------------------------------------------------------------
+   5. LIGHT SHAFTS (below only)
+   ------------------------------------------------------------------ */
+const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), new THREE.ShaderMaterial({
+  uniforms:{ uTime, uCream:{value:C(PAL.cream)}, uPale:{value:C(RAMP[0])} },
+  transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+  vertexShader:`
+    varying vec3 vW;
+    void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp; }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vW;
+    uniform float uTime;
+    uniform vec3 uCream, uPale;
+    void main(){
+      float x = vW.x + vW.y * 0.26;
+      float s = sin(x * 0.46 + uTime * 0.035) * 0.5 + 0.5;
+      s *= sin(x * 0.19 - uTime * 0.022 + 1.9) * 0.5 + 0.5;
+      s = smoothstep(0.30, 0.78, s);
+      s = floor(clamp(s, 0.0, 0.999) * 3.0) / 2.0;
+      // hard-stopped below the surface: the plane is tall enough that
+      // its top reached into the air, and an additive cream wedge was
+      // rendering in the sky
+      float a = s * smoothstep(-15.0, -2.0, vW.y) * 0.20 * (1.0 - step(-0.6, vW.y));
+      gl_FragColor = vec4(mix(uPale, uCream, 0.5) * a, a);
+    }
+  `
+}));
+shafts.position.set(0, -9, -9);
+shafts.renderOrder = 5;
+scene.add(shafts);
+
+/* ------------------------------------------------------------------
+   6. KELP
+   ------------------------------------------------------------------ */
+function kelpGeometry(n, seg){
+  const verts = [], aH = [], aPhase = [], aSide = [], idx = [];
+  let base = 0;
+  for(let i = 0; i < n; i++){
+    const ang = (i / n) * Math.PI * 2 + (i * 2.399);
+    const rad = 6 + ((i * 7919) % 97) / 97 * 15;
+    const cx = Math.cos(ang) * rad;
+    let   cz = Math.sin(ang) * rad - 4;
+    if(cz > -1.5) cz = -2.0 - (cz + 1.5);
+    const h = 5 + ((i * 6367) % 83) / 83 * 8.5;
+    const wBase = 0.34 + ((i * 5281) % 61) / 61 * 0.5;
+    const ph = (i * 1.7) % 6.283;
+    for(let s = 0; s <= seg; s++){
+      const f = s / seg, w = wBase * (1 - f * 0.88);
+      for(const side of [-1, 1]){
+        verts.push(cx + side * w, BED_Y + 1.1 + f * h, cz);
+        aH.push(f); aPhase.push(ph); aSide.push(side);
+      }
+    }
+    for(let s = 0; s < seg; s++){
+      const a = base + s*2, b = a+1, c = a+2, d = a+3;
+      idx.push(a, c, b,  b, c, d);
+    }
+    base += (seg + 1) * 2;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  g.setAttribute('aH',     new THREE.Float32BufferAttribute(aH, 1));
+  g.setAttribute('aPhase', new THREE.Float32BufferAttribute(aPhase, 1));
+  g.setAttribute('aSide',  new THREE.Float32BufferAttribute(aSide, 1));
+  g.setIndex(idx);
+  return g;
+}
+const kelpMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime, uFog, uA:{value:C(PAL.indigo)}, uB:{value:C(RAMP[3])}, uC:{value:C(RAMP[2])} },
+  side: THREE.DoubleSide,
+  vertexShader:`
+    attribute float aH; attribute float aPhase; attribute float aSide;
+    uniform float uTime;
+    varying float vH; varying float vSide; varying float vDist;
+    void main(){
+      vec3 p = position;
+      float bend = aH * aH;
+      p.x += sin(uTime * 0.42 + aPhase) * bend * 1.25;
+      p.z += cos(uTime * 0.33 + aPhase * 1.7) * bend * 0.9;
+      vH = aH; vSide = aSide;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vH; varying float vSide; varying float vDist;
+    uniform vec3 uA, uB, uC;
+    ${FOG_GLSL}
+    void main(){
+      float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
+      vec3 col = mix(uA, uB, v);
+      col = mix(col, uC, step(0.5, vSide) * 0.3 * v);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+    }
+  `
+});
+scene.add(new THREE.Mesh(kelpGeometry(22, 10), kelpMat));
+
+/* ------------------------------------------------------------------
+   7. CORAL — three tiers; tier 0 is between her and the lens.
+   ------------------------------------------------------------------ */
+function coralGeometry(){
+  const pos = [], aH = [], aPhase = [], aTier = [], aRoot = [], idx = [];
+  let base = 0;
+  const clumps = [];
+  for(let i = 0; i < 7; i++){
+    const side = i % 2 ? 1 : -1;
+    clumps.push({ x: side * (2.4 + (i % 3) * 1.5), z: 3.0 + (i % 3) * 1.4,
+                  y: -6 - i * 1.6, h: 4.0 + (i % 3), tier: 0, blades: 5, lean: -side * 0.5 });
+  }
+  for(let i = 0; i < 11; i++){
+    const a = i * 2.399;
+    clumps.push({ x: Math.cos(a) * (4 + (i % 4) * 2.2), z: -3 - (i % 4) * 2.5,
+                  y: BED_Y + 1.0 + (i % 3) * 0.4, h: 2.2 + (i % 4) * 0.8,
+                  tier: 1, blades: 5, lean: Math.sin(a) * 0.4 });
+  }
+  for(let i = 0; i < 9; i++){
+    const a = i * 1.7 + 0.6;
+    clumps.push({ x: Math.cos(a) * (11 + (i % 3) * 4), z: -14 - (i % 3) * 4,
+                  y: BED_Y + 1.0, h: 2.6 + (i % 3) * 1.1, tier: 2, blades: 4,
+                  lean: Math.cos(a) * 0.5 });
+  }
+  const SEG = 5;
+  for(let ci = 0; ci < clumps.length; ci++){
+    const cl = clumps[ci];
+    for(let b = 0; b < cl.blades; b++){
+      const spread = (b / (cl.blades - 1) - 0.5) * 1.5;
+      const ph = (ci * 2.1 + b * 0.8) % 6.283;
+      const w0 = 0.20 + (b % 2) * 0.12;
+      for(let s = 0; s <= SEG; s++){
+        const f = s / SEG, w = w0 * (1 - f * 0.65);
+        const dx = cl.x + spread * f * 1.3 + cl.lean * f * f * 1.2;
+        const dy = cl.y + f * cl.h;
+        for(const sd of [-1, 1]){
+          pos.push(dx + sd * w, dy, cl.z + spread * f * 0.5);
+          aH.push(f); aPhase.push(ph); aTier.push(cl.tier);
+          aRoot.push(cl.x, cl.y, cl.z);
+        }
+      }
+      for(let s = 0; s < SEG; s++){
+        const a = base + s*2, bb = a+1, c = a+2, d = a+3;
+        idx.push(a, c, bb,  bb, c, d);
+      }
+      base += (SEG + 1) * 2;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aH',     new THREE.Float32BufferAttribute(aH, 1));
+  g.setAttribute('aPhase', new THREE.Float32BufferAttribute(aPhase, 1));
+  g.setAttribute('aTier',  new THREE.Float32BufferAttribute(aTier, 1));
+  g.setAttribute('aRoot',  new THREE.Float32BufferAttribute(aRoot, 3));
+  g.setIndex(idx);
+  return g;
+}
+scene.add(new THREE.Mesh(coralGeometry(), new THREE.ShaderMaterial({
+  uniforms:{ uTime, uDiver, uFog,
+    uT0:{value:C(PAL.indigoDeep)}, uT1:{value:C(RAMP[3])}, uT2:{value:C(RAMP[2])},
+    uRose:{value:C(PAL.rose)}, uInd:{value:C(PAL.indigo)} },
+  side: THREE.DoubleSide,
+  vertexShader:`
+    attribute float aH; attribute float aPhase; attribute float aTier; attribute vec3 aRoot;
+    uniform float uTime; uniform vec3 uDiver;
+    varying float vH; varying float vTier; varying float vDist; varying float vShy;
+    void main(){
+      vec3 p = position;
+      float bend = aH * aH;
+      p.x += sin(uTime * 0.5 + aPhase) * bend * 0.35;
+      p.z += cos(uTime * 0.4 + aPhase * 1.4) * bend * 0.25;
+      float near = 1.0 - smoothstep(0.0, 3.2, distance(aRoot, uDiver));
+      vShy = near;
+      p = mix(p, aRoot, near * 0.42 * aH);
+      vH = aH; vTier = aTier;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vH; varying float vTier; varying float vDist; varying float vShy;
+    uniform vec3 uT0, uT1, uT2, uRose, uInd, uFog;
+    float fogA(float dist){
+      float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
+      return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
+    }
+    void main(){
+      vec3 bodyCol = mix(uT0, uT1, step(0.5, vTier));
+      bodyCol = mix(bodyCol, uT2, step(1.5, vTier));
+      float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
+      vec3 col = mix(uInd, bodyCol, max(v, 0.35));
+      col = mix(col, uRose, step(0.9, v) * step(0.5, vTier) * 0.55);
+      col = mix(col, uInd, vShy * 0.3);
+      gl_FragColor = vec4(mix(col, uFog, fogA(vDist) * step(0.5, vTier)), 1.0);
+    }
+  `
+})));
+
+/* ------------------------------------------------------------------
+   8. FISH — flee from uDiver
+   ------------------------------------------------------------------ */
+function fishGeometry(n){
+  const pos = [], aCorner = [], aSeed = [], aLane = [], aDark = [], idx = [];
+  let base = 0;
+  for(let i = 0; i < n; i++){
+    const size = 0.17 + ((i * 3779) % 53) / 53 * 0.16;
+    const lane = -2.5 - ((i * 6421) % 89) / 89 * 12.5;
+    const zz   = -1.5 - ((i * 8117) % 71) / 71 * 13;
+    const seed = (i * 1.37) % 6.283;
+    const dark = (i % 3 === 0) ? 0 : 1;
+    const outline = [[1.0,0],[0.4,0.40],[-0.4,0.36],[-1.0,0.12],
+                     [-1.0,-0.12],[-0.4,-0.36],[0.4,-0.40]];
+    const push = (cx, cy) => {
+      pos.push(0, lane, zz);
+      aCorner.push(cx * size, cy * size);
+      aSeed.push(seed); aLane.push(lane); aDark.push(dark);
+    };
+    push(0, 0);
+    for(const [cx, cy] of outline) push(cx, cy);
+    for(let k = 0; k < outline.length; k++){
+      idx.push(base, base + 1 + k, base + 1 + ((k + 1) % outline.length));
+    }
+    push(-0.95, 0.10); push(-1.75, 0.52); push(-1.75, -0.52);
+    const tb = base + 1 + outline.length;
+    idx.push(tb, tb+1, tb+2);
+    base += 1 + outline.length + 3;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(aCorner, 2));
+  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(aSeed, 1));
+  g.setAttribute('aLane',    new THREE.Float32BufferAttribute(aLane, 1));
+  g.setAttribute('aDark',    new THREE.Float32BufferAttribute(aDark, 1));
+  g.setIndex(idx);
+  return g;
+}
+scene.add(new THREE.Mesh(fishGeometry(28), new THREE.ShaderMaterial({
+  uniforms:{ uTime, uDiver, uFog,
+    uLight:{value:C(PAL.fish)}, uDark:{value:C(PAL.fishDark)}, uCream:{value:C(PAL.cream)} },
+  side: THREE.DoubleSide,
+  vertexShader:`
+    attribute vec2 aCorner; attribute float aSeed; attribute float aLane; attribute float aDark;
+    uniform float uTime; uniform vec3 uDiver;
+    varying float vDark; varying float vFlee; varying float vBelly; varying float vDist;
+    void main(){
+      vec3 c = position;
+      float dir  = mod(aSeed, 2.0) < 1.0 ? 1.0 : -1.0;
+      float span = 26.0;
+      c.x = mod(aSeed * 4.1 + uTime * (0.9 + fract(aSeed) * 0.8) * dir, span) - span * 0.5;
+      c.y += sin(uTime * 0.7 + aSeed * 3.0) * 0.35;
+      float d = distance(c, uDiver);
+      float flee = 1.0 - smoothstep(0.0, 4.5, d);
+      vFlee = flee;
+      c += normalize(c - uDiver + vec3(0.001, 0.001, 0.0)) * flee * 2.6;
+      float beat = sin(uTime * (7.0 + flee * 16.0) + aSeed * 5.0);
+      vec2 off = aCorner;
+      off.y += beat * 0.16 * step(aCorner.x, -0.0001) * (0.4 + flee);
+      off.x *= dir;
+      vBelly = aCorner.y; vDark = aDark;
+      vec4 mv = modelViewMatrix * vec4(c, 1.0);
+      mv.xy += off;
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vDark; varying float vFlee; varying float vBelly; varying float vDist;
+    uniform vec3 uLight, uDark, uCream, uFog;
+    float fogA(float dist){
+      float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
+      return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
+    }
+    void main(){
+      vec3 col = mix(uLight, uDark, vDark);
+      col = mix(col, uCream, step(0.0, -vBelly) * 0.20);
+      col = mix(col, uCream, vFlee * 0.30);
+      gl_FragColor = vec4(mix(col, uFog, fogA(vDist)), 1.0);
+    }
+  `
+})));
+
+/* ------------------------------------------------------------------
+   9. ABOVE-WATER FURNITURE — a far headland and two sea stacks, flat
+   violet, enormous and far away. This is the scale contrast: below,
+   the nearest shape is a metre from the lens; up here the nearest
+   shape is a hundred and twenty metres off.
+   ------------------------------------------------------------------ */
+function stackGeometry(){
+  const pos = [], tone = [], idx = [];
+  const forms = [
+    { x:-54, w:26, h:9.5,  z:-150, tone:0 },   // headland
+    { x: 38, w: 7, h:15.0, z:-132, tone:1 },   // stack
+    { x: 47, w: 4, h: 9.0, z:-128, tone:0 },
+    { x:-14, w: 5, h: 6.0, z:-142, tone:1 }
+  ];
+  let base = 0;
+  for(const f of forms){
+    // a hard angular profile: five quantised steps across the top
+    const n = 6;
+    for(let i = 0; i <= n; i++){
+      const u = i / n;
+      const x = f.x - f.w + u * f.w * 2;
+      const prof = Math.sin(u * 3.14159) * (0.55 + 0.45 * Math.cos(u * 7.0 + f.x));
+      const y = Math.round((prof * f.h) / 1.6) * 1.6;
+      pos.push(x, Math.max(0.4, y), f.z); tone.push(f.tone);
+      pos.push(x, -1.0, f.z);             tone.push(f.tone);
+    }
+    for(let i = 0; i < n; i++){
+      const a = base + i*2, b = a+1, c = a+2, d = a+3;
+      idx.push(a, b, c,  b, d, c);
+    }
+    base += (n + 1) * 2;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aTone',    new THREE.Float32BufferAttribute(tone, 1));
+  g.setIndex(idx);
+  return g;
+}
+const stacks = new THREE.Mesh(stackGeometry(), new THREE.ShaderMaterial({
+  uniforms:{ uA:{value:C(AIR.stack)}, uB:{value:C(AIR.stack2)} },
+  vertexShader:`
+    attribute float aTone; varying float vT;
+    void main(){ vT = aTone;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying float vT; uniform vec3 uA, uB;
+    void main(){ gl_FragColor = vec4(mix(uA, uB, step(0.5, vT)), 1.0); }
+  `
+}));
+scene.add(stacks);
+
+/* ------------------------------------------------------------------
+   10. BIRDS — the fast motion. Everything below sways at one slow rate;
+   up here a handful of tiny marks cross quickly against a still sky.
+   ------------------------------------------------------------------ */
+function birdGeometry(n){
+  const pos = [], aCorner = [], aSeed = [], idx = [];
+  let base = 0;
+  for(let i = 0; i < n; i++){
+    const s = 0.5 + (i % 3) * 0.22;
+    const y = 7 + ((i * 4451) % 59) / 59 * 13;
+    const z = -45 - ((i * 7331) % 67) / 67 * 45;
+    const seed = i * 1.91;
+    const pts = [[0,0],[-1,0.55],[-0.55,-0.1],[0,0],[1,0.55],[0.55,-0.1]];
+    for(const [cx, cy] of pts){ pos.push(0, y, z); aCorner.push(cx*s, cy*s); aSeed.push(seed); }
+    idx.push(base, base+1, base+2, base+3, base+4, base+5);
+    base += 6;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(aCorner, 2));
+  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(aSeed, 1));
+  g.setIndex(idx);
+  return g;
+}
+const birds = new THREE.Mesh(birdGeometry(9), new THREE.ShaderMaterial({
+  uniforms:{ uTime, uCol:{value:C(AIR.bird)} },
+  side:THREE.DoubleSide,
+  vertexShader:`
+    attribute vec2 aCorner; attribute float aSeed;
+    uniform float uTime;
+    void main(){
+      vec3 c = position;
+      float dir = mod(aSeed, 2.0) < 1.0 ? 1.0 : -1.0;
+      c.x = mod(aSeed * 13.0 + uTime * 3.4 * dir, 150.0) - 75.0;
+      c.y += sin(uTime * 0.5 + aSeed) * 1.1;
+      vec2 off = aCorner;
+      off.y *= 0.45 + 0.55 * abs(sin(uTime * 3.0 + aSeed * 2.0));   // wingbeat
+      vec4 mv = modelViewMatrix * vec4(c, 1.0);
+      mv.xy += off;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    uniform vec3 uCol;
+    void main(){ gl_FragColor = vec4(uCol, 1.0); }
+  `
+}));
+scene.add(birds);
+
+/* ------------------------------------------------------------------
+   11. PARTICLES — one mesh, two kinds. Bubbles leave her on the exhale
+   and rise; spray is thrown when she breaks the surface, and falls.
+   ------------------------------------------------------------------ */
+const NP = 130;
+const parts = [];
+for(let i = 0; i < NP; i++) parts.push({ x:0,y:0,z:0,r:0,vx:0,vy:0,vz:0,ph:0,live:false,kind:0 });
+
+function particleGeometry(n){
+  const corner = [], seed = [], idx = [];
+  for(let i = 0; i < n; i++){
+    for(const [cx, cy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){ corner.push(cx, cy); seed.push((i*1.91)%6.283); }
+    const b = i * 4;
+    idx.push(b, b+1, b+2, b, b+2, b+3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*4*3), 3));
+  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(corner, 2));
+  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(seed, 1));
+  g.setAttribute('aSize',    new THREE.BufferAttribute(new Float32Array(n*4), 1));
+  g.setAttribute('aKind',    new THREE.BufferAttribute(new Float32Array(n*4), 1));
+  g.setIndex(idx);
+  return g;
+}
+const partMesh = new THREE.Mesh(particleGeometry(NP), new THREE.ShaderMaterial({
+  uniforms:{ uPale:{value:C(PAL.bubble)}, uCream:{value:C(PAL.cream)}, uSpray:{value:C(AIR.spray)} },
+  transparent:true, depthWrite:false, side:THREE.DoubleSide,
+  vertexShader:`
+    attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
+    varying vec2 vC; varying float vSize; varying float vKind;
+    void main(){
+      vC = aCorner; vSize = aSize; vKind = aKind;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      mv.xy += aCorner * aSize;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec2 vC; varying float vSize; varying float vKind;
+    uniform vec3 uPale, uCream, uSpray;
+    void main(){
+      if(vSize <= 0.0) discard;
+      float d = length(vC);
+      if(d > 1.0) discard;
+      float rim  = step(0.76, d);
+      float chip = step(length(vC - vec2(-0.33, 0.33)), 0.26);
+      vec3 col = mix(mix(uPale, uCream, chip), uSpray, vKind);
+      float a = mix(0.40 + rim * 0.22 + chip * 0.33, 0.9, vKind);
+      gl_FragColor = vec4(col, a);
+    }
+  `
+}));
+partMesh.renderOrder = 6;
+partMesh.frustumCulled = false;
+scene.add(partMesh);
+const pPos = partMesh.geometry.getAttribute('position');
+const pSize = partMesh.geometry.getAttribute('aSize');
+const pKind = partMesh.geometry.getAttribute('aKind');
+let pCursor = 0, bubAccum = 0;
+
+function spawn(kind, x, y, z){
+  const b = parts[pCursor];
+  pCursor = (pCursor + 1) % NP;
+  b.kind = kind; b.live = true; b.ph = Math.random() * 6.283;
+  if(kind === 0){                                  // bubble
+    b.x = x + (Math.random()-0.5)*0.22; b.y = y; b.z = z + (Math.random()-0.5)*0.2;
+    b.r = 0.085 + Math.random()*0.16;
+    b.vx = 0; b.vy = 0.9 + Math.random()*1.1; b.vz = 0;
+  } else {                                         // spray
+    const a = Math.random() * 6.283, sp = 0.7 + Math.random()*1.9;
+    b.x = x + Math.cos(a)*0.25; b.y = y; b.z = z + Math.sin(a)*0.25;
+    b.r = 0.045 + Math.random()*0.085;
+    b.vx = Math.cos(a)*sp*0.55; b.vy = 1.6 + Math.random()*2.6; b.vz = Math.sin(a)*sp*0.4;
+  }
+}
+function updateParticles(dt, tt){
+  for(let i = 0; i < NP; i++){
+    const b = parts[i];
+    let s = 0;
+    if(b.live){
+      if(b.kind === 0){
+        b.y += b.vy * dt;
+        b.vy = Math.min(2.4, b.vy + dt*0.5);
+        b.r += dt * 0.012;
+        b.x += Math.sin(tt*2.0 + b.ph) * dt * 0.35;
+        if(b.y > SURFACE_Y - 0.35) b.live = false; else s = b.r;
+      } else {
+        b.vy -= dt * 7.0;                       // thrown up, falls back
+        b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+        if(b.y < SURFACE_Y - 0.05 && b.vy < 0) b.live = false; else s = b.r;
+      }
+    }
+    const o = i*12, so = i*4;
+    for(let v = 0; v < 4; v++){
+      pPos.array[o+v*3] = b.x; pPos.array[o+v*3+1] = b.y; pPos.array[o+v*3+2] = b.z;
+      pSize.array[so+v] = s; pKind.array[so+v] = b.kind;
+    }
+  }
+  pPos.needsUpdate = true; pSize.needsUpdate = true; pKind.needsUpdate = true;
+}
+
+/* ------------------------------------------------------------------
+   12. THE MENISCUS — a cream band drawn across the lens line when the
+   camera is near the waterline. This is the bit that sells the
+   crossing: the moment the lens is in both worlds at once.
+   ------------------------------------------------------------------ */
+const meniscus = new THREE.Mesh(new THREE.PlaneGeometry(2,2), new THREE.ShaderMaterial({
+  uniforms:{ uHorizon, uCamY, uCream:{value:C(PAL.cream)}, uPale:{value:C(RAMP[0])} },
+  transparent:true, depthTest:false, depthWrite:false,
+  vertexShader:`
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec2 vUv;
+    uniform float uHorizon, uCamY;
+    uniform vec3 uCream, uPale;
+    void main(){
+      float near = 1.0 - smoothstep(0.0, 0.95, abs(uCamY));
+      if(near <= 0.01) discard;
+      float d = abs(vUv.y - uHorizon);
+      float core = step(d, 0.004 + near * 0.013);
+      float edge = step(d, 0.010 + near * 0.030);
+      float a = (core * 0.85 + (edge - core) * 0.30) * near;
+      if(a < 0.02) discard;
+      gl_FragColor = vec4(mix(uPale, uCream, core), a);
+    }
+  `
+}));
+meniscus.frustumCulled = false;
+meniscus.renderOrder = 20;
+scene.add(meniscus);
+
+/* ------------------------------------------------------------------
+   13. THE DIVER
+   ------------------------------------------------------------------ */
+const matBody = new THREE.MeshBasicMaterial({ color: PAL.bodyUp });
+const matHair = new THREE.MeshBasicMaterial({ color: PAL.indigoDeep });
+const matWrap = new THREE.MeshBasicMaterial({ color: PAL.rose });
+const matLens = new THREE.MeshBasicMaterial({ color: PAL.cream });
+const matCord = new THREE.MeshBasicMaterial({ color: PAL.indigo });
+
+const SPH = new THREE.SphereGeometry(1, 12, 9);
+const BOX = new THREE.BoxGeometry(1, 1, 1);
+const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => {
+  const m = new THREE.Mesh(geo, mat);
+  m.scale.set(sx, sy, sz); m.position.set(px, py, pz);
+  if(rz) m.rotation.z = rz;
+  return m;
+};
+
+const diver = new THREE.Group();
+const torso = mk(SPH, matBody, 0.25, 0.46, 0.19,  0,  0.10, 0);
+const hips  = mk(SPH, matWrap, 0.24, 0.20, 0.19,  0, -0.32, 0);
+const head  = mk(SPH, matBody, 0.165, 0.185, 0.16, 0, 0.72, 0);
+const hair  = mk(SPH, matHair, 0.185, 0.165, 0.175, 0, 0.80, -0.03);
+const lensL = mk(SPH, matLens, 0.062, 0.050, 0.05, -0.065, 0.715, 0.125);
+const lensR = mk(SPH, matLens, 0.062, 0.050, 0.05,  0.065, 0.715, 0.125);
+const strap = mk(BOX, matHair, 0.30, 0.040, 0.20,  0, 0.725, 0);
+const armL  = mk(SPH, matBody, 0.062, 0.34, 0.062, -0.235, 0.26, 0,  0.34);
+const armR  = mk(SPH, matBody, 0.062, 0.34, 0.062,  0.235, 0.26, 0, -0.34);
+const handL = mk(SPH, matBody, 0.072, 0.072, 0.072, -0.300, 0.00, 0);
+const handR = mk(SPH, matBody, 0.072, 0.072, 0.072,  0.300, 0.00, 0);
+const legL  = mk(SPH, matBody, 0.072, 0.42, 0.070, -0.095, -0.86, 0, 0.05);
+const legR  = mk(SPH, matBody, 0.072, 0.42, 0.070,  0.095, -0.86, 0, -0.05);
+const finL  = mk(SPH, matWrap, 0.085, 0.16, 0.05, -0.105, -1.30, 0, 0.05);
+const finR  = mk(SPH, matWrap, 0.085, 0.16, 0.05,  0.105, -1.30, 0, -0.05);
+const cord  = mk(BOX, matCord, 0.018, 0.55, 0.018, 0.17, -0.18, 0.02, 0.12);
+diver.add(torso, hips, head, hair, lensL, lensR, strap,
+          armL, armR, handL, handR, legL, legR, finL, finR, cord);
+diver.scale.setScalar(0.95);
+scene.add(diver);
+
+/* where the pearl sits when she has both hands on it: in front of the
+   chest, in her own frame, so it rolls and pitches with her */
+const PEARL_CHEST = new THREE.Vector3(0, 0.16, 0.30);
+
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), new THREE.ShaderMaterial({
+  uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(RAMP[2])} },
+  vertexShader:`
+    varying vec3 vN;
+    void main(){ vN = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+  `,
+  fragmentShader:`
+    precision mediump float;
+    varying vec3 vN;
+    uniform vec3 uWarm, uMid;
+    void main(){
+      float l = dot(normalize(vN), normalize(vec3(-0.35, 0.8, 0.5)));
+      gl_FragColor = vec4(mix(uMid, uWarm, step(0.12, l)), 1.0);
+    }
+  `
+}));
+scene.add(pearl);
+
+/* ------------------------------------------------------------------
+   Layout
+   ------------------------------------------------------------------ */
+let W = 1, H = 1;
+function resize(){
+  W = Math.max(1, window.innerWidth);
+  H = Math.max(1, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
+  renderer.setSize(W, H, false);
+  camera.aspect = W / H;
+  camera.fov = camera.aspect < 0.75 ? 62 : 52;
+  camera.updateProjectionMatrix();
+  waterUniforms.uAspect.value = camera.aspect;
+}
+window.addEventListener('resize', resize, { passive:true });
+window.addEventListener('orientationchange', () => setTimeout(resize, 120), { passive:true });
+resize();
+
+/* ------------------------------------------------------------------
+   The loop
+   ------------------------------------------------------------------ */
+let t = 0;
+let last = performance.now();
+let running = true;
+let started = false;
+let rafId = 0;
+let camY = Y_AIR + 0.9;
+let camBack = 9;
+let prevY = Y_AIR;
+
+const vBed   = new THREE.Vector3();
+const vChest = new THREE.Vector3();
+const vH     = new THREE.Vector3();
+const cBodyUp = C(PAL.bodyUp), cBodyDown = C(PAL.bodyDown);
+const cR3 = C(RAMP[3]), cR4 = C(RAMP[4]), cInd = C(PAL.indigo);
+let subShown = '';
+
+function frame(now){
+  rafId = requestAnimationFrame(frame);
+  let dt = (now - last) / 1000; last = now;
+  if(dt > 0.05) dt = 0.05;
+  if(!running){ fpsTick(now, true); return; }
+  if(started) t += dt;
+
+  const st = phaseAt(t);
+  const ph = st.p;
+  const dyNow = diverY(t);
+  const cr = gripAmount(t);
+  const grip = cr;
+  const travel = ph.to - ph.from;          // <0 descending, >0 rising, 0 still
+
+  /* --- the diver --- */
+  diver.position.set(Math.sin(t * 0.21) * 0.30, dyNow, Math.cos(t * 0.17) * 0.26);
+  const aim = ph.cam === 'air'  ? -0.15
+            : ph.cam === 'line' ?  0.06
+            : travel < 0 ? 0.60 : -0.45;
+  diver.rotation.x += (aim - diver.rotation.x) * Math.min(1, dt * 1.8);
+  diver.rotation.y  = Math.sin(t * 0.13) * 0.35;
+  diver.rotation.z  = Math.sin(t * 0.31) * 0.06;
+
+  /* kick: she swims when she is going somewhere, idles when she is not */
+  const swim = Math.abs(travel) > 2 ? 1.0 : 0.22;
+  const kick = Math.sin(t * 3.4) * 0.5 * swim;
+  legL.rotation.x =  kick;  finL.rotation.x =  kick * 1.4;
+  legR.rotation.x = -kick;  finR.rotation.x = -kick * 1.4;
+  legL.position.z =  kick * 0.22; finL.position.z =  kick * 0.5;
+  legR.position.z = -kick * 0.22; finR.position.z = -kick * 0.5;
+
+  /* arms: open and sweeping when free, closed on the pearl when gripped */
+  const searching = travel < 0 || ph.k === 'rest';
+  const freeZL = 0.34 + (searching ? 0.42 : -0.55);
+  const armZL = freeZL * (1 - grip) + (-0.78) * grip;
+  armL.rotation.z +=  (armZL - armL.rotation.z) * Math.min(1, dt * 3.0);
+  armR.rotation.z += (-armZL - armR.rotation.z) * Math.min(1, dt * 3.0);
+  armL.rotation.x += ((grip * 1.05) - armL.rotation.x) * Math.min(1, dt * 3.0);
+  armR.rotation.x += ((grip * 1.05) - armR.rotation.x) * Math.min(1, dt * 3.0);
+  armL.position.x = -0.235 + grip * 0.105;
+  armR.position.x =  0.235 - grip * 0.105;
+  armL.position.y =  0.26  - grip * 0.02;
+  armR.position.y =  0.26  - grip * 0.02;
+  armL.position.z =  grip * 0.14;
+  armR.position.z =  grip * 0.14;
+  /* the hands meet on the pearl */
+  handL.position.set(-0.300 + grip * 0.215, -0.02 + grip * 0.20, grip * 0.30);
+  handR.position.set( 0.300 - grip * 0.215, -0.02 + grip * 0.20, grip * 0.30);
+
+  uDiver.value.copy(diver.position);
+  diver.updateMatrixWorld(true);
+
+  /* --- the pearl: on the bed, or held at her chest --- */
+  vBed.set(0.55, BED_Y + 1.42, -0.4);
+  vChest.copy(PEARL_CHEST); diver.localToWorld(vChest);
+  pearl.position.lerpVectors(vBed, vChest, cr);
+
+  /* --- bubbles on the exhale only; the hold is silent and still --- */
+  if(ph.bubbles){
+    bubAccum += dt * (10 + 14 * (1 - st.pr));
+    while(bubAccum >= 1){ bubAccum -= 1; spawn(0, diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12); }
+  } else bubAccum = 0;
+
+  /* --- spray when she crosses the surface, in either direction --- */
+  if((prevY < 0 && dyNow >= 0) || (prevY > 0 && dyNow <= 0)){
+    const n = dyNow >= 0 ? 20 : 26;
+    for(let i = 0; i < n; i++) spawn(1, diver.position.x, 0.04, diver.position.z);
+  }
+  prevY = dyNow;
+  updateParticles(dt, t);
+
+  /* --- the camera. Height, distance and pitch are all set per phase,
+     because the above-water shot is a different shot, not the same one
+     from higher up: further back, level with the horizon, wide open. --- */
+  let wantY, lookY, wantBack, ease;
+  if(ph.cam === 'air'){
+    wantY = Math.max(dyNow + 0.78, 0.95); lookY = 0.62;  wantBack = 12.5; ease = 2.4;
+  } else if(ph.cam === 'down'){
+    wantY = dyNow + 1.60; lookY = dyNow - 1.30; wantBack = 9.0;  ease = 5.0;
+  } else if(ph.cam === 'up'){
+    wantY = dyNow + 1.60; lookY = dyNow + 2.40; wantBack = 9.0;  ease = 5.0;
+  } else if(ph.cam === 'up2air'){
+    // the no-holds protocol rises all the way into the air on one breath,
+    // so the shot has to become the above-water shot on the way
+    const f = clamp01((dyNow + 3.2) / 3.4);
+    wantY = (dyNow + 1.60) * (1 - f) + Math.max(dyNow + 0.78, 0.95) * f;
+    lookY = (dyNow + 2.40) * (1 - f) + 0.62 * f;
+    wantBack = 9.0 * (1 - f) + 12.5 * f;  ease = 4.0;
+  } else {
+    wantY = 0.42;         lookY = 0.22;        wantBack = 11.5; ease = 2.2;
+  }
+  camY    += (wantY - camY) * Math.min(1, dt * ease);
+  camBack += (wantBack - camBack) * Math.min(1, dt * 2.0);
+  const back = camBack * (camera.aspect < 0.75 ? 1.0 : 1.25);
+  camera.position.set(Math.sin(t * 0.055) * 1.1, camY, back + Math.cos(t * 0.04) * 0.6);
+  camera.lookAt(diver.position.x * 0.4, lookY, 0);
+
+  /* --- which world are we in --- */
+  const above = Math.min(1, Math.max(0, (camY + 0.10) / 0.20));
+  uAbove.value = above;
+  uCamX.value  = camera.position.x;
+  uCamY.value  = camY;
+  stacks.visible = camY > -1.1;
+  birds.visible  = camY > -0.6;
+  shafts.visible = camY < 0.3;
+
+  /* where the horizon falls on screen, so the sun and the meniscus can
+     be placed against it rather than at a fixed height */
+  vH.set(camera.position.x, 0, camera.position.z - 600).project(camera);
+  uHorizon.value = vH.y * 0.5 + 0.5;
+
+  const dn = Math.min(1, Math.max(0, (SURFACE_Y - camera.position.y) / (SURFACE_Y - BED_Y)));
+  uTime.value = t;
+  waterUniforms.uDepth.value = dn;
+  surfUniforms.uCam.value.copy(camera.position);
+  uFog.value.copy(cR3).lerp(cR4, dn).lerp(cInd, dn * 0.35);
+  matBody.color.copy(cBodyUp).lerp(cBodyDown, Math.min(1, Math.max(0, (dn - 0.12) / 0.5)));
+
+  /* --- cue text. §2.4: the holds count towards air, never elapsed. --- */
+  if(ph.label !== elPhase.textContent) elPhase.textContent = ph.label;
+  const sub = ph.count ? (ph.count + ' ' + Math.max(1, Math.ceil(st.left))) : ph.sub;
+  if(sub !== subShown){ elSub.textContent = sub; subShown = sub; }
+  elBar.style.width = (100 * Math.min(1, t / SESSION)).toFixed(2) + '%';
+
+  renderer.render(scene, camera);
+  fpsTick(now, false);
+}
+
+/* ---------- FPS readout ---------- */
+let fAcc = 0, fN = 0, fLast = performance.now(), fPrev = performance.now();
+function fpsTick(now, idle){
+  const d = now - fPrev; fPrev = now;
+  if(!idle && d > 0){ fAcc += d; fN++; }
+  if(now - fLast > 500){
+    const fps = fN ? (1000 / (fAcc / fN)) : 0;
+    elFps.textContent = (idle ? 'paused' : fps.toFixed(0) + ' fps')
+      + '\n' + W + '×' + H + ' @' + renderer.getPixelRatio().toFixed(2);
+    fAcc = 0; fN = 0; fLast = now;
+  }
+}
+elFps.addEventListener('click', () => { elFps.classList.add('off'); elFpsDot.classList.add('on'); });
+elFpsDot.addEventListener('click', () => { elFps.classList.remove('off'); elFpsDot.classList.remove('on'); });
+
+/* ---------- pause when the page is not being looked at ---------- */
+function stopLoop(){ if(rafId){ cancelAnimationFrame(rafId); rafId = 0; } }
+function startLoop(){ if(!rafId){ last = fPrev = performance.now(); rafId = requestAnimationFrame(frame); } }
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) stopLoop(); else startLoop();
+});
+
+/* ---------- the protocol choice ----------
+   This was a screening gate. It is now a choice, because the blocking
+   step moved to the warning scroll, which discloses the circumstances
+   the practice asks for and then gets out of the way (design doc §1.6).
+   Both protocols stay built; neither is withheld. The choice persists
+   on the device and can be changed from the stop screen. */
+const ACK_KEY = 'bor.deeplight.protocol.v1';
+function readAck(){
+  try{
+    const raw = localStorage.getItem(ACK_KEY);
+    const v = raw ? JSON.parse(raw) : null;
+    return (v && (v.choice === 'holds' || v.choice === 'noholds')) ? v : null;
+  }catch(e){ return null; }         // private browsing throws; just ask again
+}
+function writeAck(choice){
+  try{ localStorage.setItem(ACK_KEY, JSON.stringify({ choice, at:new Date().toISOString() })); }
+  catch(e){ /* not persisted; the gate will ask next time, which is the safe way to fail */ }
+}
+function beginWith(choice, remember){
+  useProtocol(choice === 'holds' ? PROTOCOLS.box : PROTOCOLS.open);
+  $('proto').textContent = PROTO.name;
+  if(remember) writeAck(choice);
+  elGate.classList.remove('on');
+  started = true;
+  t = 0; prevY = diverY(0); subShown = '';
+  last = fPrev = performance.now();
+}
+$('gateHolds').addEventListener('click', () => beginWith('holds', true));
+$('gateNo').addEventListener('click',    () => beginWith('noholds', true));
+
+$('stop').addEventListener('click', () => { running = false; elHalt.classList.add('on'); });
+$('resume').addEventListener('click', () => {
+  elHalt.classList.remove('on'); running = true; last = fPrev = performance.now();
+});
+$('rescreen').addEventListener('click', () => {
+  try{ localStorage.removeItem(ACK_KEY); }catch(e){}
+  elHalt.classList.remove('on');
+  elGate.classList.add('on');
+  started = false; running = true; t = 0;
+  last = fPrev = performance.now();
+});
+
+/* The scroll first, once, then the choice — or straight in if the choice
+   is already remembered. requireScroll returns true when it has opened
+   and runs `next` on dismissal; false when it has been seen, in which
+   case we call `next` ourselves. It must never do both. */
+const ack = readAck();
+const next = () => { if(ack) beginWith(ack.choice, false); else elGate.classList.add('on'); };
+if(!requireScroll(next)) next();
+
+/* ---------- context loss ---------- */
+canvas.addEventListener('webglcontextlost', e => {
+  e.preventDefault(); stopLoop();
+  elPhase.textContent = 'paused';
+  elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+}, false);
+canvas.addEventListener('webglcontextrestored', () => {
+  resize(); last = fPrev = performance.now(); startLoop();
+}, false);
+
+/* ---------- inspection hook ----------
+   Through a browser pane that is hidden between tool calls, rAF is
+   throttled to two or three frames per call: the breath looks frozen,
+   the fps readout reports single digits, and a four-second exhale's
+   worth of bubbles can never accumulate. That is the instrument. */
+window.__deepLight = {
+  begin(which){ beginWith(which === 'noholds' ? 'noholds' : 'holds', false); },
+  ack: () => readAck(),
+  scene, camera, THREE,   // so a stray shape can be identified by toggling
+  // hide one named mesh type to find out what something on screen is
+  only(hide){ scene.traverse(o => { if(o.isMesh && hide.indexOf(o.name) >= 0) o.visible = false; }); },
+  seek(v){ t = v; prevY = diverY(v); },
+  now(){ const s = phaseAt(t);
+    return { protocol:PROTO.id, cycle:CYCLE, session:SESSION,
+             t, phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
+             y:+diverY(t).toFixed(2), camY:+camY.toFixed(2),
+             above:+uAbove.value.toFixed(2), grip:+gripAmount(t).toFixed(2),
+             liveParticles: parts.filter(p => p.live).length }; },
+  puff(n, kind){
+    for(let i = 0; i < (n || 30); i++){
+      if(kind === 1) spawn(1, diver.position.x, 0.04, diver.position.z);
+      else spawn(0, diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12);
+      for(let j = 0; j < 3; j++) updateParticles(0.045, t);
+    }
+    return parts.filter(p => p.live).length;
+  },
+  bench(n){
+    const gl = renderer.getContext();
+    renderer.render(scene, camera); gl.finish();
+    const s = performance.now();
+    for(let i = 0; i < n; i++) renderer.render(scene, camera);
+    gl.finish();
+    return { msPerRender:(performance.now()-s)/n, n,
+             drawCalls: renderer.info.render.calls,
+             triangles: renderer.info.render.triangles };
+  },
+  where(){
+    const put = o => {
+      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x:+((v.x*0.5+0.5)*W).toFixed(0), y:+((-v.y*0.5+0.5)*H).toFixed(0),
+               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
+    };
+    return { diver:put(diver), pearl:put(pearl), horizonUv:+uHorizon.value.toFixed(3),
+             bodyColor:'#'+matBody.color.getHexString() };
+  }
+};
+
+startLoop();
+}
+</script>
+</body>
+</html>
