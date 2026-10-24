@@ -697,24 +697,27 @@ function fishGeometry(n){
     const lane = -2.5 - ((i * 6421) % 89) / 89 * 12.5;
     const zz   = -1.5 - ((i * 8117) % 71) / 71 * 13;
     const seed = (i * 1.37) % 6.283;
-    const dark = (i % 3 === 0) ? 1 : 0;
-    // body quad
-    const corners = [[-1,-0.55],[1,-0.45],[1,0.45],[-1,0.55]];
-    for(const [cx, cy] of corners){
+    const dark = (i % 3 === 0) ? 0 : 1;    // most of them are the darker value
+    // A leaf-shaped body as a triangle fan. The first version used a
+    // rectangle with a loose triangle behind it and they read as paper
+    // slips, not fish.
+    const outline = [[1.0,0],[0.4,0.40],[-0.4,0.36],[-1.0,0.12],
+                     [-1.0,-0.12],[-0.4,-0.36],[0.4,-0.40]];
+    const push = (cx, cy) => {
       pos.push(0, lane, zz);
       aCorner.push(cx * size, cy * size);
       aSeed.push(seed); aLane.push(lane); aDark.push(dark);
+    };
+    push(0, 0);                              // fan centre
+    for(const [cx, cy] of outline) push(cx, cy);
+    for(let k = 0; k < outline.length; k++){
+      idx.push(base, base + 1 + k, base + 1 + ((k + 1) % outline.length));
     }
-    idx.push(base, base+1, base+2, base, base+2, base+3);
-    // tail triangle, behind the body
-    const tail = [[-1,0],[-1.9,0.6],[-1.9,-0.6]];
-    for(const [cx, cy] of tail){
-      pos.push(0, lane, zz);
-      aCorner.push(cx * size, cy * size);
-      aSeed.push(seed); aLane.push(lane); aDark.push(dark);
-    }
-    idx.push(base+4, base+5, base+6);
-    base += 7;
+    // tail, joined to the body's back edge
+    push(-0.95, 0.10); push(-1.75, 0.52); push(-1.75, -0.52);
+    const tb = base + 1 + outline.length;
+    idx.push(tb, tb+1, tb+2);
+    base += 1 + outline.length + 3;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -777,14 +780,14 @@ const fishMat = new THREE.ShaderMaterial({
     void main(){
       // two flat values with a hard split along the body: back and belly
       vec3 col = mix(uLight, uDark, vDark);
-      col = mix(col, uCream, step(0.0, -vBelly) * 0.35);
+      col = mix(col, uCream, step(0.0, -vBelly) * 0.20);
       // a startled fish flashes its pale side
-      col = mix(col, uCream, vFlee * 0.35);
+      col = mix(col, uCream, vFlee * 0.30);
       gl_FragColor = vec4(mix(col, uFog, fogA(vDist)), 1.0);
     }
   `
 });
-scene.add(new THREE.Mesh(fishGeometry(44), fishMat));
+scene.add(new THREE.Mesh(fishGeometry(28), fishMat));
 
 /* ------------------------------------------------------------------
    9. BUBBLES — new layer, emitted from HER on the exhale only.
@@ -836,11 +839,12 @@ const bubbleMat = new THREE.ShaderMaterial({
       if(vSize <= 0.0) discard;
       float d = length(vC);
       if(d > 1.0) discard;
-      // flat, lineless, two values: a ring and one hard highlight chip
-      float ring = step(0.62, d);
-      float chip = step(length(vC - vec2(-0.34, 0.34)), 0.24);
-      float a = ring * 0.55 + chip * 0.95;
-      if(a < 0.02) discard;
+      // Filled, not a ring. The first version drew only the outline, and
+      // at a bubble's size on a phone that outline was about two pixels
+      // wide — present in the buffer, invisible on the screen.
+      float rim  = step(0.76, d);
+      float chip = step(length(vC - vec2(-0.33, 0.33)), 0.26);
+      float a = 0.40 + rim * 0.22 + chip * 0.33;
       gl_FragColor = vec4(mix(uPale, uCream, chip), a);
     }
   `
@@ -859,7 +863,7 @@ function spawnBubble(x, y, z){
   b.x = x + (Math.random() - 0.5) * 0.22;
   b.y = y;
   b.z = z + (Math.random() - 0.5) * 0.2;
-  b.r = 0.035 + Math.random() * 0.075;
+  b.r = 0.085 + Math.random() * 0.16;
   b.vy = 0.9 + Math.random() * 1.1;
   b.ph = Math.random() * 6.283;
   b.live = true;
