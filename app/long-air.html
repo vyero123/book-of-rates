@@ -479,7 +479,7 @@ const NEAR_FADE = nearFadeGlsl({ gone: CAM_BACK_MIN - 7.0, full: CAM_BACK_MIN - 
 
 function gateGeometry(course, which){
   // which: -1 rock from below, +1 cloud from above
-  const b = builder(THREE, { aLip:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
+  const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
   for(const g of course.gates){
     const lip = g.centre + which * g.half;
     const far = which < 0 ? GROUND - 12 : ceilAt(g.zb, course.period) + 8;
@@ -495,16 +495,20 @@ function gateGeometry(course, which){
     const base = b.count;
     for(let k = 0; k < GX.length; k++){
       b.vertex(GX[k], lipAt(k), g.zb,
-               { aLip:1, aTone: which < 0 ? MID : LIGHT, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
+               { aLip:1, aLedge:0, aTone: which < 0 ? MID : LIGHT, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
     }
     for(let k = 0; k < GX.length; k++){
       b.vertex(GX[k], far, g.zb,
-               { aLip:0, aTone: which < 0 ? BODY : MID, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
+               { aLip:0, aLedge:0, aTone: which < 0 ? BODY : MID, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
     }
     // the back face, offset in z, so a slab reads as solid as it passes
     for(let k = 0; k < GX.length; k++){
+      // the back of the lip: same height, SLAB_Z further down the course.
+      // aLedge marks it, because the triangles between this row and the
+      // front lip row form a HORIZONTAL SHELF thirty metres wide, and a
+      // shelf is not an edge however much it shares an attribute with one.
       b.vertex(GX[k], lipAt(k), g.zb - SLAB_Z,
-               { aLip:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed });
+               { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed });
     }
     const N = GX.length;
     for(let k = 0; k < N - 1; k++){
@@ -527,10 +531,10 @@ const gateMatFor = kind => posterMat(THREE, {
              uIsCloud:{value: kind === 'cloud' ? 1 : 0} },
   side: THREE.DoubleSide, prelude: PRE + NEAR_FADE,
   vertex: SCROLL_GLSL + `
-    attribute float aLip; attribute float aTone; attribute float aSun;
+    attribute float aLip; attribute float aLedge; attribute float aTone; attribute float aSun;
     attribute float aSide; attribute float aSeed;
     uniform float uForgive;
-    varying float vTone; varying float vSun; varying float vLip;
+    varying float vTone; varying float vSun; varying float vLip; varying float vLedge;
     varying float vDist; varying float vSide; varying float vSeed;
     varying float vY; varying float vX;
     void main(){
@@ -539,7 +543,7 @@ const gateMatFor = kind => posterMat(THREE, {
       // the kite crashing. Only the lip moves; the far end stays anchored.
       p.y += aSide * uForgive * ${FORGIVE_MAX.toFixed(1)} * aLip;
       p = scrolled(p);
-      vTone = aTone; vSun = aSun; vLip = aLip; vSide = aSide; vSeed = aSeed;
+      vTone = aTone; vSun = aSun; vLip = aLip; vLedge = aLedge; vSide = aSide; vSeed = aSeed;
       vY = p.y; vX = position.x;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
@@ -547,7 +551,7 @@ const gateMatFor = kind => posterMat(THREE, {
     }
   `,
   fragment:`
-    varying float vTone; varying float vSun; varying float vLip;
+    varying float vTone; varying float vSun; varying float vLip; varying float vLedge;
     varying float vDist; varying float vSide; varying float vSeed;
     varying float vY; varying float vX;
     uniform vec3 uShadow, uDeep, uAccent;
@@ -567,10 +571,25 @@ const gateMatFor = kind => posterMat(THREE, {
       col = mix(col, uShadow, uIsCloud * 0.55);
       float sh = 1.0 - step(0.5, vSun);
       col = mix(col, uDeep, sh * 0.45);
-      // a hard accent line along the lip — the one place colour appears
-      // besides the kite, and it is there because the lip is the thing
-      // you actually have to read
-      col = mix(col, uAccent, step(0.96, vLip) * 0.30);
+      /* THE ACCENT IS AN EDGE, NOT A SHELF. It used to be painted
+         wherever vLip was high, and the back-of-lip row shares that
+         value with the front one — so the thirty-metre horizontal shelf
+         BETWEEN them was full accent too. Edge-on that is an orange
+         line, which is what it was meant to be; but the lens trails the
+         kite by twelve metres and therefore meets each gate several
+         metres off its centre, so the shelf swings broadside as it
+         passes and fills a wide band of the frame with saturated
+         orange, in one frame, about twice a second.
+
+         Measured at the jump: a band across the lower middle went from
+         e0d687 (pale sand) to 92421a (burnt orange) in a single frame,
+         a delta of 337 out of 765. That is the reported flash.
+
+         So: accent only in the first slice of the shelf's depth, which
+         is the edge itself, and the rest of the shelf is shaded as the
+         cut face it actually is. */
+      col = mix(col, uDeep, vLedge * 0.55);
+      col = mix(col, uAccent, step(0.96, vLip) * (1.0 - step(0.22, vLedge)) * 0.30);
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5) * 0.08;
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
