@@ -561,14 +561,12 @@ const pearlMat = new THREE.ShaderMaterial({
     }
   `
 });
-const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), pearlMat);
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), pearlMat);
 scene.add(pearl);
-const halo = new THREE.Mesh(
-  new THREE.SphereGeometry(0.85, 12, 10),
-  new THREE.MeshBasicMaterial({ color:PAL.warm, transparent:true, opacity:0.1,
-                                depthWrite:false, blending:THREE.AdditiveBlending })
-);
-scene.add(halo);
+/* There was an additive halo sphere here. On a flat, lineless scene it did
+   not read as a glow at all — it read as a hard-edged grey plate behind
+   her, because an additive sphere of constant colour has a sharp rim. The
+   idiom has no soft glows in it; the pearl is just the one warm shape. */
 
 /* ------------------------------------------------------------------
    Layout / resize
@@ -627,8 +625,6 @@ function frame(now){
   vBed.set(0.55, BOTTOM_Y + 0.22, -0.4);
   vHand.set(diver.position.x + 0.22, diver.position.y - 0.42, diver.position.z + 0.2);
   pearl.position.lerpVectors(vBed, vHand, cr);
-  halo.position.copy(pearl.position);
-  halo.material.opacity = 0.10 + cr * 0.12;
 
   // --- camera: trails her, with a lag, so the water moves past ---
   const wantY = diver.position.y + 1.6;
