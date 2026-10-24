@@ -255,11 +255,36 @@ export function particles(THREE, { n, material, renderOrder = 6, extra = {} }){
  *  is how Deep Light ended up with four hand-copied `fogA` functions that
  *  had to be kept in agreement by hand.
  */
+/* The precision qualifier goes on BOTH stages, and it has to.
+ *
+ * three.js already prepends `precision highp float;` to each shader. This
+ * used to add `precision mediump float;` to the FRAGMENT only, which
+ * overrode three's line there and left the vertex stage at highp. Any
+ * uniform declared in both stages then had two different precisions, and
+ * GLSL treats that as a link error — not a warning:
+ *
+ *   Precisions of uniform 'uFill' differ between VERTEX and FRAGMENT
+ *
+ * Long Air's sail is the first shader in the project to read the same
+ * uniform in both stages, so it was the first to hit it, and it simply
+ * did not compile: the kite had no sail. Nothing throws, the draw call
+ * is still counted, the frame still renders, and the pump cannot see it
+ * because the failure is in the GPU rather than in JavaScript. The
+ * console said so plainly; nothing else did.
+ *
+ * highp rather than mediump, deliberately. The scenes carry coordinates
+ * in the hundreds and strip periods in the hundreds, and mediump in a
+ * VERTEX shader is a half float — about three decimal digits, which is
+ * visible wobble on geometry that size. three's own default is highp and
+ * agreeing with it is free.
+ */
+const PRECISION = 'precision highp float;\n';
+
 export function posterMat(THREE, { uniforms = {}, vertex, fragment, prelude = '', ...opts }){
   return new THREE.ShaderMaterial({
     uniforms,
-    vertexShader: vertex,
-    fragmentShader: 'precision mediump float;\n' + prelude + '\n' + fragment,
+    vertexShader:   PRECISION + vertex,
+    fragmentShader: PRECISION + prelude + '\n' + fragment,
     ...opts
   });
 }
