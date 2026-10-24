@@ -41,8 +41,24 @@
 # ---------------------------------------------------------------------
 set -eu
 
-MSG="${1:?usage: sh tools/push.sh \"commit message\" [source-root]}"
-SRC="${2:-}"
+# The message may be given inline or, far better, read from a file:
+#
+#     sh tools/push.sh -F /path/to/message.txt [source-root]
+#
+# Inline is a shell argument, so backticks and $ in it are substituted by
+# the shell before this script ever sees them. On 24 October a message
+# describing a bug in a field called `pearl` had the word silently
+# removed and printed "pearl: command not found" — harmless that time,
+# but the same mechanism would happily run whatever is in the backticks.
+# -F reads the bytes as they are. Prefer it for anything long.
+if [ "${1:-}" = "-F" ]; then
+  [ -f "${2:-}" ] || { echo "PUSH ABORTED — no message file at ${2:-}"; exit 4; }
+  MSG=$(cat "$2")
+  SRC="${3:-}"
+else
+  MSG="${1:?usage: sh tools/push.sh \"message\" [src] | -F <file> [src]}"
+  SRC="${2:-}"
+fi
 if [ -z "$SRC" ]; then
   SRC=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 fi
