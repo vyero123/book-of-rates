@@ -435,9 +435,60 @@ const deepLightHTML = `<a class="entry three" href="deep-light.html">
     <div class="pg">6<span style="opacity:.6">ii</span></div>
   </a>`;
 
+/* Long Air, the second 3-D chapter, in exactly the same idiom: it sits
+   directly after the flat Run rather than replacing it, because the point
+   is to be able to open both and compare them. Its thumb is a flat
+   drawing for the same reason Deep Light's is — the live previews come
+   from SCENES, and this chapter's scene is not one of them.
+
+   Of the nine themes left this is the one that gains most from three
+   dimensions, because it is the only one that is actually ABOUT depth:
+   the whole sensation is forward travel, and forward travel is parallax.
+   It also inherits Prototype 1's predictive property (§5.1) — the gorge
+   ahead of her is generated from the breath schedule at the moment she
+   will arrive there, so the shape of the canyon in front of you is the
+   next three breaths. */
+const longAirHTML = `<a class="entry three" href="long-air.html">
+    <div class="thumb">
+      <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
+        <rect width="96" height="66" fill="#F2E6A0"/>
+        <rect y="16" width="96" height="10" fill="#DCE7AE"/>
+        <rect y="26" width="96" height="8" fill="#BFE3B4"/>
+        <circle cx="30" cy="11" r="5" fill="#FFFDF0"/>
+        <polygon points="0,30 18,27 34,31 52,26 72,30 96,27 96,34 0,34" fill="#A8C49E"/>
+        <polygon points="0,34 0,66 30,66 34,40 18,34" fill="#F4ECC2"/>
+        <polygon points="18,34 34,40 30,66 44,66 46,44 30,34" fill="#D9C98E"/>
+        <polygon points="96,34 96,66 66,66 62,40 78,34" fill="#1E4C52"/>
+        <polygon points="78,34 62,40 66,66 52,66 50,44 66,34" fill="#3C4A48"/>
+        <polygon points="44,66 52,66 50,48 46,48" fill="#173A44"/>
+        <polygon points="34,44 40,46 34,48" fill="#5E5A44"/>
+        <polygon points="62,46 56,48 62,50" fill="#1E4C52"/>
+        <rect x="33" y="22" width="30" height="2.2" fill="#F4ECC2"/>
+        <polygon points="40,24.2 56,24.2 48,27" fill="#E4572E"/>
+        <ellipse cx="48" cy="27.6" rx="1.5" ry="2" fill="#7E6B4E"/>
+        <rect x="70" y="18" width="7" height="1" fill="#3C4A48"/>
+        <rect x="80" y="13" width="5" height="1" fill="#3C4A48"/>
+      </svg>
+    </div>
+    <div class="body">
+      <div class="ch">Chapter five, again <span class="badge">3&#8209;D</span></div>
+      <div class="ti">Long Air</div>
+      <div class="bl">The same run built as a canyon you fly down instead of a picture of one.
+        The gorge ahead of you is the breath you are about to take. Brisk, or the long glide
+        — you choose at the start.</div>
+    </div>
+    <div class="pg">5<span style="opacity:.6">ii</span></div>
+  </a>`;
+
+/* Both 3-D chapters are inserted from the BOTTOM UP. Splicing after the
+   flat Run first would shift the Pearl Diver's index by one and put Deep
+   Light in the wrong place — the kind of off-by-one that looks like a
+   content decision rather than a bug. */
 const rows = JOURNEYS.map(entryHTML);
 const pdIdx = JOURNEYS.findIndex(j => j.id === 'pearl-diver');
 rows.splice(pdIdx >= 0 ? pdIdx + 1 : rows.length, 0, deepLightHTML);
+const runIdx = JOURNEYS.findIndex(j => j.id === 'the-run');
+rows.splice(runIdx >= 0 ? runIdx + 1 : rows.length, 0, longAirHTML);
 $('list').innerHTML = rows.join('') + (SHOW_LOCKED ? lockedHTML : '');
 // if the reader flagged a condition, say so on the locked chapter rather
 // than leaving them to wonder

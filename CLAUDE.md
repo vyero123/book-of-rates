@@ -114,6 +114,35 @@ the idle loop, so it looked exactly like a stuck breath. A render loop
 that keeps running can disguise a control path that is completely dead —
 when something looks frozen, check whether the thing driving it ever ran.
 
+## No inhale is ever depicted underwater
+
+Design doc **§1.6a**, added by the user on 23 October 2026. A standing protocol rule, not a
+note on any one level, and it binds every water-set theme including the ones not yet built.
+
+> In any water theme the inhale happens above the surface and nowhere else. A figure may
+> descend, rest, reach, exhale or travel while submerged. A figure may not breathe in while
+> submerged, at any depth, for any part of the phase.
+
+The reason is reflex: the user's own diaphragm follows the picture, so an inhale cued over a
+submerged body is a rehearsal of inhaling underwater. Note that this is **not** in tension
+with §1.6's disclosure-not-gatekeeping principle — §1.6 is about *practices*, which the app
+cannot see; this is about *depiction*, which is entirely the app's doing. Disclosure is not
+available as a defence, because the user does not read the picture, they breathe along with it.
+
+Practical consequences, learned doing the Deep Light remap:
+
+- **The mapping yields to the rule, never the other way round.** If a protocol's structure
+  cannot get the figure back to the surface before the inhale starts, it does not get a
+  descent — it gets a shallower one or none. Deep Light's no-holds protocol lost the seabed.
+- An ascent that finishes *during* the inhale is a violation, not a near-miss.
+- Do not satisfy it with a number tuned until it just clears the line. Satisfy it with the
+  shape of the mapping: hold the inhale stationary at the surface.
+- It is **checked mechanically** by `tools/regress.mjs`, which samples every protocol of
+  every water chapter and fails the build on any inhale sample at or below the waterline. New
+  water chapters must be added to its `WATER` list or they are not covered. The pre-rule
+  mapping is kept in `tools/fixtures` as the negative control, so the check is known to be
+  able to fail.
+
 ## Other standing constraints for this project
 
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an

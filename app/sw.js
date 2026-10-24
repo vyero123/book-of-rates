@@ -7,13 +7,17 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v7';
+const CACHE = 'bor-v8';
 const SHELL = [
-  './', './index.html', './journey.html', './deep-light.html',
+  './', './index.html', './journey.html', './deep-light.html', './long-air.html',
   './manifest.webmanifest', './icon.svg',
   './js/protocols.js', './js/engine.js', './js/audio.js', './js/art.js',
   './js/scenes.js', './js/levels.js', './js/pageturn.js', './js/gate.js',
-  './js/scroll.js', './js/surface.js', './js/blackbox.js'
+  './js/scroll.js', './js/surface.js', './js/blackbox.js',
+  // the 3-D kit, shared by every three-dimensional chapter
+  './js/breath.js', './js/palette.js', './js/mesh.js', './js/stage.js',
+  // and each chapter's own protocol table
+  './js/deep-light-breath.js', './js/long-air-breath.js'
 ];
 
 self.addEventListener('install', e => {

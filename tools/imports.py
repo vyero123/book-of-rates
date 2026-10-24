@@ -14,6 +14,12 @@ if not app.is_dir():
 EXPORT_RE = re.compile(
     r'^\s*export\s+(?:async\s+)?(?:function\*?|class|const|let|var)\s+([A-Za-z_$][\w$]*)', re.M)
 EXPORT_LIST_RE = re.compile(r'^\s*export\s*\{([^}]*)\}', re.M)
+# `export const PALE = 0, LIGHT = 1, MID = 2;` declares three names, and the
+# regex above sees only the first. The checker reported four phantom missing
+# exports for a file that was correct, which is exactly the kind of false
+# alarm that teaches people to ignore a gate. Only single-line declaration
+# lists are handled, which is all the project writes.
+EXPORT_MULTI_RE = re.compile(r'^\s*export\s+(?:const|let|var)\s+(.+)$', re.M)
 IMPORT_RE = re.compile(r'import\s*\{([^}]*)\}\s*from\s*[\'"]([^\'"]+)[\'"]', re.S)
 
 def exports_of(path):
@@ -22,6 +28,21 @@ def exports_of(path):
     except Exception:
         return None
     names = set(EXPORT_RE.findall(src))
+    for decls in EXPORT_MULTI_RE.findall(src):
+        depth = 0
+        part = ''
+        for ch in decls + ',':
+            if ch in '([{':
+                depth += 1
+            elif ch in ')]}':
+                depth -= 1
+            if ch == ',' and depth == 0:
+                name = part.split('=')[0].strip()
+                if re.fullmatch(r'[A-Za-z_$][\w$]*', name):
+                    names.add(name)
+                part = ''
+            else:
+                part += ch
     for group in EXPORT_LIST_RE.findall(src):
         for part in group.split(','):
             part = part.strip()

@@ -203,6 +203,51 @@ What this principle does **not** license:
   point towards air; nothing is scored. Disclosure is the part the app is actually
   responsible for, so it is the part that must be good.
 
+### 1.6a The depiction rule — no inhale underwater, ever
+
+*Added 23 October 2026, by the author. A standing protocol rule, not a note on any one
+level. It binds every water-set theme in the book, including the nine not yet built, and it
+is not subject to a per-level exception.*
+
+> **An inhale is never depicted underwater. In any water-set theme, the inhale happens above
+> the surface and nowhere else. A figure may descend, rest, reach, exhale or travel while
+> submerged; a figure may not breathe in while submerged, in any scene, at any depth, for
+> any part of the phase.**
+
+The reason is reflex, not risk-of-the-moment. A breathing app's whole mechanism is that the
+user's own breath follows what is on the screen — that is why the pacing works at all. An
+inhale cued over a picture of a submerged body is therefore not neutral imagery: it is a
+rehearsal, with the user's actual diaphragm, of inhaling underwater. The association is the
+hazard, and it is the one association in the project that nobody should be practising. It
+costs nothing to forbid and it would be absurd to have paid even a small price for.
+
+**How this sits with §1.6, which it does not contradict.** §1.6 draws its line around
+*practices*: the app's job is disclosure rather than gatekeeping, because what a practitioner
+does with their own body in their own room is at their discretion and genuinely outside the
+app's control. This rule is about *depiction*, which is entirely inside the app's control and
+is therefore squarely its responsibility. The two are the same principle applied to the two
+sides of that line: the app does not presume to gate what it cannot see, and it does not
+disclaim what it draws. Disclosure is not available as a defence here. There is no wording
+that makes an inhale underwater acceptable, because the user does not *read* the picture,
+they breathe along with it.
+
+Consequences, recorded so no future chapter has to rediscover them:
+
+- Any protocol whose structure cannot bring a figure back to the surface before the inhale
+  begins does not get a descent. It gets a shallower one, or none. **The mapping yields to
+  the rule; the rule does not yield to the mapping.** The worked example, and the awkwardness
+  it caused, is the §2.4 amendment of 23 October.
+- An ascent that finishes *during* the inhale is a violation, not a near-miss. The surface
+  must be broken before the inhale phase starts.
+- "Submerged" means the figure's head. A figure floating at the waterline with its head in
+  the air, breathing in, is compliant and is the shape every water theme should reach for.
+- Nothing about this rule is a claim that an inhale underwater is physically possible or
+  that anybody would attempt it. It is about what the app rehearses.
+- It is checked mechanically, not by review. `tools/regress.mjs` samples every protocol in
+  every water chapter and fails the build if any sample inside an inhale phase is at or below
+  the surface. The pre-rule mapping is kept as the negative case, so the check is known to be
+  able to fail.
+
 ---
 
 ## 2. Safety: the architecture, not the disclaimer
@@ -356,6 +401,52 @@ five-second inhale. You keep the whole image: the descent, the light going green
 pearl, the surfacing. You lose nothing visually and you remove the entire hazard class. If we
 later decide a real retention is worth having, it should go in a level with no water in it at
 all, so the app never associates holding your breath with being in water.
+
+> **AMENDED 23 October 2026, by the author — the mapping only.** The paragraph above
+> specifies an ascent taken *on the five-second inhale*, from the seabed. **That is now
+> disallowed by §1.6a:** an inhale is never depicted underwater, and an ascent that finishes
+> during the inhale is a violation rather than a near-miss. The original is left standing
+> above, as the rest of this section's history is.
+>
+> The rule arrived *after* this mapping shipped, and it invalidated it. The rule is right and
+> the mapping was wrong; this is the mapping changing.
+>
+> **The remap is genuinely awkward**, because 4 / 2 / 5 has no phase left to ascend in once
+> the inhale is ruled out. Three ways out were considered:
+>
+> 1. **Ascend during the two-second rest at empty, from the seabed.** Rejected. Fourteen
+>    metres in two seconds is about seven metres a second, which is not something a body
+>    does; and the usual justification for it — empty lungs, so she floats up — is backwards.
+>    Emptying the lungs makes a diver *less* buoyant, not more. This satisfies §1.6a on paper
+>    by making the picture a lie, which is the failure mode §1.6a's own text warns about.
+> 2. **Give this protocol a different, non-diving water scene.** Rejected. It abandons the
+>    one property this chapter actually demonstrated — two protocols driving one scene with
+>    no special-casing — for nothing the rule requires, and the no-holds version stops being
+>    *the same dive at a different pace*, which is the whole reason it is offered beside the
+>    other rather than instead of it.
+> 3. **Adopted: the descent becomes a reach, not a dive.** She tips down and reaches on the
+>    four-second exhale, to about three and a half metres — snorkel depth, not seabed. She
+>    turns and comes back up through the two-second rest at empty, kicking, which is what a
+>    diver with empty lungs actually has to do, and **breaks the surface before the rest
+>    ends.** The five-second inhale is then taken at the surface with her head in the air,
+>    stationary — structurally identical to the box protocol's inhale.
+>
+> Why (3) is the honest one: the only thing it gives up is the seabed, for this protocol
+> only, and giving that up is the true consequence of the breath structure rather than a
+> workaround for it. A four-second exhale and a two-second rest can honestly account for a
+> three-and-a-half-metre reach and the kick back up; they cannot honestly account for
+> fourteen metres. It also means §1.6a is satisfied by the *shape* of the mapping — both
+> protocols now hold the inhale stationary at the surface — rather than by a number tuned
+> until it just clears the line.
+>
+> **The box protocol was checked against §1.6a rather than assumed to comply, and it
+> complies.** Its inhale is flat at the surface: height anchors equal, both at +0.52, head
+> and shoulders in the air, no travel at all during the phase. The dive sits inside the first
+> hold, the exhale is on the seabed, and the ascent is inside the second hold. No inhale is
+> below the waterline at any sample. This was the mapping's original point — breathe in at
+> the surface, hold down, empty on the floor of the sea, hold back up — so §1.6a costs the
+> box protocol nothing and is, in retrospect, the rule that mapping was already following
+> without having been told to.
 
 I'd also note a second-order point: even a dry-land hold game teaches a habit. The user who
 enjoys the pearl diver is being trained that holding their breath is pleasant and rewarded.
@@ -873,6 +964,15 @@ Levels 3, 6 and 7 are your three.
 > gate offers anybody for whom holds are contraindicated or who is unsure. The reasoning
 > for the change, and the original reasoning against it, are both at §2.4; the authorial
 > grounds are at §1.5.
+>
+> **Second table note, 23 Oct 2026, later the same day.** §1.6a — no inhale depicted
+> underwater, ever — now binds every water theme in this table, so rows 1, 2, 4, 7 and 9 are
+> all subject to it and so is anything that replaces them. Its first consequence is to row 7:
+> the 4 / 2 at empty / 5 protocol no longer rises on the inhale, because it is no longer
+> allowed to. It now reaches to about three and a half metres on the exhale, kicks back up
+> through the rest at empty, and takes the whole inhale at the surface. That protocol
+> therefore no longer visits the seabed; the box protocol still does. Worked reasoning at
+> §2.4.
 
 ### 6.1 Notes on the three you specified
 

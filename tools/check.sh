@@ -84,7 +84,20 @@ else
   say "  ok    imports resolve"
 fi
 
-# --- 4. no credential may ever reach the index ---
+# --- 4. the breath mapping must not have drifted ---
+# The 3-D chapters' machinery was pulled out of deep-light.html into a
+# shared kit on 23 October. The extraction was claimed to be
+# behaviour-preserving; this is where that claim is checked rather than
+# believed. tools/regress.mjs samples phase, cue, countdown, height and
+# the expressive curve every 50 ms across a full session plus a cycle,
+# for both protocols, and diffs them against a frozen verbatim copy of
+# the pre-kit code. A regression in the breath is worse than no kit.
+if ! node "$ROOT/tools/regress.mjs"; then
+  say "  FAIL  the breath mapping differs from the frozen baseline"
+  FAIL=1
+fi
+
+# --- 5. no credential may ever reach the index ---
 PAT="github""_pat_"
 if [ -d "$ROOT/.git" ]; then
   if git -C "$ROOT" grep --cached -lE "$PAT" >/dev/null 2>&1; then

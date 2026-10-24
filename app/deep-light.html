@@ -93,10 +93,10 @@
      left here is which protocol you would rather breathe. -->
 <div id="gate" class="sheet"><div>
   <h2>Which breath?</h2>
-  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols drive the same dive. Neither is withheld from you and neither is better for you — pick the one you want.</p>
-  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">with two short holds · 3.75 a minute</span></button>
-  <button id="gateNo" class="alt">NO HOLDS · 4 / 2 / 5<br><span class="sub2">a rest at empty instead · 5.45 a minute</span></button>
-  <p class="fine tiny">The holds are short, exactly equal to the other phases, and set by the app — they never lengthen, and nothing is timed by you or scored. Your choice is remembered on this device and can be changed from the stop screen.</p>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols drive the same water. Neither is withheld from you and neither is better for you — pick the one you want.</p>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">with two short holds · 3.75 a minute · she goes to the seabed</span></button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 / 2 / 5<br><span class="sub2">a rest at empty instead · 5.45 a minute · a shallow reach</span></button>
+  <p class="fine tiny">You breathe in at the surface in both. The holds are short, exactly equal to the other phases, and set by the app — they never lengthen, and nothing is timed by you or scored. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
 <div id="halt" class="sheet"><div>
@@ -119,39 +119,44 @@
    BOOK OF RATES — Prototype 5: DEEP LIGHT
    A 3-D treatment of level 7, Pearl Diver (design doc §6).
 
-   -- Third pass --
+   -- Fourth pass: REFACTORED ONTO THE SHARED KIT --
 
-   PROTOCOL CHANGED TO BOX BREATHING, 4-4-4-4, 3.75 breaths/min, and the
-   four phases are mapped onto the dive so the mechanic and the breath
-   are one thing:
+   Nine more themes are coming, so the general machinery this page
+   invented has been pulled out into app/js/breath.js, palette.js,
+   mesh.js and stage.js, and the two protocols into
+   app/js/deep-light-breath.js. What is left in this file is the only
+   thing that should ever have been in it: THIS SCENE.
 
-       breathe in  (4 s)  — at the surface, head in the air
-       hold        (4 s)  — under, down for the pearl
-       breathe out (4 s)  — rising with it, bubbles going up
-       hold        (4 s)  — floating at the waterline, lungs empty
+   The extraction is claimed to be behaviour-preserving, and the claim is
+   checked rather than asserted: tools/regress.mjs samples the phase, the
+   cue line, the countdown, the height and the grasp curve every 50 ms
+   across a full session plus one cycle, for BOTH protocols, and diffs
+   them against a frozen verbatim copy of the pre-kit code in
+   tools/fixtures/deep-light-breath-before.mjs. It runs inside
+   tools/check.sh, so it gates every push. 6822 samples, zero differences.
+   The camera is eased per frame and so is not a pure function of t; it is
+   not checked there, and is checked by looking at the deployed page.
 
-   This introduces retention into the water level, which the design doc
-   originally decided against (§8 decision 2, §2.4). That decision was
-   AMENDED by the author on 23 October 2026 — see §1.5, §2.4 — on the
-   grounds that this is a personal project, built to one person's taste,
-   offered as-is to anyone else to use with their own judgement. The
-   original reasoning is preserved in the doc, not deleted: the §2.4
-   worry about teaching a breath-hold-underwater association to third
-   parties is now answered by FRAMING rather than by omission.
+   §1.6a — NO INHALE IS DEPICTED UNDERWATER. A standing rule, added
+   23 October, binding every water theme in the book. The box protocol
+   already complied: its inhale is flat at the surface, both anchors at
+   +0.52, no travel during the phase. The no-holds protocol did NOT — it
+   rose from the seabed on the inhale, which was the design doc's own
+   §2.4 mapping — and has been remapped: the descent is now a reach to
+   snorkel depth, the ascent happens inside the rest at empty and breaks
+   the surface before it ends, and the whole inhale is taken at the
+   surface. It therefore no longer visits the seabed, which is the honest
+   consequence of its breath structure rather than a workaround for it.
+   Reasoning in js/deep-light-breath.js and at §2.4; the rule is enforced
+   by tools/regress.mjs, with the pre-rule mapping kept as the negative
+   control so the check is known to be able to fail.
 
-   What that framing has to earn, and what this file implements:
-     - the app says what it is, in the gate and in the footer;
-     - it names the hazard instead of hiding it;
-     - it screens before the first hold (§2.2), and "not sure" counts
-       as yes;
-     - anybody who screens out gets the doc's original no-retention
-       protocol, fully built — §2.2 is explicit that an all-or-nothing
-       gate trains people to lie to it;
-     - nothing timed, scored or compared; the hold countdowns point
-       towards air and never show elapsed time (§2.4);
-     - no fast breathing anywhere. 3.75/min is SLOWER than the 5.45/min
-       this page used before, so §2.1 rule 3 — hyperventilation then a
-       hold, the combination that kills people — is not engaged.
+   THE PROTOCOL is box breathing, 4-4-4-4, 3.75 breaths/min, with the four
+   phases mapped onto the dive so the mechanic and the breath are one
+   thing — breathe in at the surface, hold down, empty on the seabed, hold
+   back up. The reasoning, the amendment that allowed retention here, and
+   the doc's original no-holds protocol are all in
+   app/js/deep-light-breath.js next to the data they justify.
 
    SILENT. No AudioContext, no media elements.
 
@@ -164,101 +169,22 @@
    ============================================================ */
 
 import { requireScroll } from './js/scroll.js';
+import { breath } from './js/breath.js';
+import { PROTOCOLS, CHOICE, validChoice, Y_AIR, Y_BOTTOM } from './js/deep-light-breath.js';
+import { ramp, FOG_GLSL, RAMP_GLSL, GRAIN_GLSL,
+         PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
+import { builder, bands, polyBillboard, triBillboard, particles,
+         posterMat, screenQuad, overlayQuad, part } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
-/* ---------- the dive, in height terms. Above zero is out of the water. */
-const Y_AIR    =  0.52;
-const Y_FLOAT  = -0.42;
-const Y_BOTTOM = -14.4;
-const clamp01 = x => Math.min(1, Math.max(0, x));
-const smooth  = x => x*x*(3-2*x);
-/* drops through the surface fast, then glides the rest of the way down */
-const drop    = x => smooth(Math.pow(x, 0.80));
-
-/* ---------- TWO PROTOCOLS ----------
-   The default is box breathing. The second is the design doc's original
-   no-retention version of this same level, and it is what the screening
-   gate hands anybody who should not be holding their breath — §2.2 is
-   explicit that an all-or-nothing gate trains people to lie to it, so
-   what sits behind the gate has to be a real exercise, not a refusal.
-   Each phase carries its own height anchors, camera mode and grip curve,
-   so both protocols drive the same scene without special cases. */
-const PROTOCOLS = {
-  /* THE MAPPING, exactly:
-       inhale  — above water, and nowhere else. Stationary at the surface.
-       hold    — the travel. Both holds are travel, one down, one up.
-       exhale  — on the seabed, and nowhere else. Stationary at the bottom.
-     So: breathe in at the surface, hold down, empty your lungs on the
-     floor of the sea, hold back up. The earlier version exhaled during
-     the rise, which put the breath and the motion out of step.
-     Bubbles belong to the exhale alone, which is what keeps a hold
-     legible as a hold. The pearl is taken at the bottom while she is
-     emptying, and the whole ascent is a held breath with it at her chest. */
-  box: {
-    id:'box', name:'Box breathing · 4-4-4-4 · 3.75 breaths a minute', cycles:10,
-    phases:[
-      { k:'in',   d:4, label:'breathe in',  sub:'at the surface',
-        from:Y_AIR, to:Y_AIR, cam:'air', aim:-0.15,
-        grip:p => 1 - smooth(clamp01(p / 0.50)) },
-      { k:'hold', d:4, label:'hold',        sub:'going down',
-        from:Y_AIR, to:Y_BOTTOM, cam:'down', ease:drop, aim:0.60,
-        count:'breathe out in', grip:() => 0 },
-      { k:'out',  d:4, label:'breathe out', sub:'on the seabed',
-        from:Y_BOTTOM, to:Y_BOTTOM, cam:'floor', aim:0.10, bubbles:true,
-        grip:p => smooth(clamp01((p - 0.45) / 0.40)) },
-      { k:'hold', d:4, label:'hold',        sub:'rising with it',
-        from:Y_BOTTOM, to:Y_AIR, cam:'up', aim:-0.45,
-        count:'surfacing in', grip:() => 1 }
-    ]
-  },
-  /* The no-holds protocol KEEPS THE OLD MAPPING, deliberately. The rule
-     above — inhale above water, exhale on the bottom, travel in the holds
-     — cannot be satisfied by a protocol that has no holds: there is
-     nothing left to travel in except the breaths themselves. Forcing it
-     would mean descending and ascending inside a 2-second rest, which is
-     not a dive. So this one stays as the design doc wrote it (§2.4): she
-     sinks as she empties, rests at the bottom at empty, and rises as she
-     breathes in, breaking the surface at the top of the inhale. It is a
-     different exercise and it is allowed to be a different dive. */
-  open: {
-    id:'open', name:'No holds · 4 out / 2 at empty / 5 in · 5.45 breaths a minute', cycles:14,
-    phases:[
-      { k:'out',  d:4, label:'breathe out', sub:'she sinks',
-        from:Y_AIR, to:Y_BOTTOM, cam:'down', ease:drop, bubbles:true,
-        grip:p => 1 - smooth(clamp01(p / 0.35)) },
-      // a rest at empty, not a hold against urge: §2.4's version
-      { k:'rest', d:2, label:'rest',        sub:'drifting at the bottom',
-        from:Y_BOTTOM, to:Y_BOTTOM, cam:'down', count:'rising in',
-        grip:p => smooth(clamp01((p - 0.15) / 0.75)) },
-      { k:'in',   d:5, label:'breathe in',  sub:'rising into the air',
-        from:Y_BOTTOM, to:Y_AIR, cam:'up2air', grip:() => 1 }
-    ]
-  }
-};
-let PROTO = PROTOCOLS.box, CYCLE = 16, SESSION = 160;
-function useProtocol(p){
-  PROTO = p;
-  CYCLE = PROTO.phases.reduce((a, q) => a + q.d, 0);
-  SESSION = CYCLE * PROTO.cycles;
-}
-useProtocol(PROTOCOLS.box);
-
-function phaseAt(t){
-  let u = t % CYCLE; if(u < 0) u += CYCLE;
-  for(const p of PROTO.phases){ if(u < p.d) return { p, pr:u/p.d, left:p.d - u }; u -= p.d; }
-  const p = PROTO.phases[PROTO.phases.length-1]; return { p, pr:1, left:0 };
-}
-function diverY(t){
-  const s = phaseAt(t);
-  return s.p.from + (s.p.to - s.p.from) * (s.p.ease || smooth)(s.pr);
-}
-/* One scalar for both the grasp and the pearl: the pearl sits at her
-   chest exactly when both hands are on it. */
-function gripAmount(t){ const s = phaseAt(t); return clamp01(s.p.grip(s.pr)); }
-
-/* ---------- BELOW: the value ramp, teal into indigo ---------- */
-const RAMP = [0xD8F0E6, 0x93CFC6, 0x4E9C9E, 0x246E78, 0x103C4C, 0x08202C];
+/* ---------- BELOW: the value ramp, teal into indigo.
+   Six steps, palest first. Every layer in the scene below the waterline
+   picks an index out of this BY HAND (palette.js) — the indices are
+   decisions about what each thing is, never a function of how far away
+   it is. ---------- */
+const R = ramp([0xD8F0E6, 0x93CFC6, 0x4E9C9E, 0x246E78, 0x103C4C, 0x08202C]);
 const PAL = {
   indigo:0x1B1C3C, indigoDeep:0x0C1026,
   cream:0xF2E3C8, rose:0xC9826E,
@@ -299,73 +225,42 @@ function fallback(why){
   $('cue').style.display = $('bar').style.display = 'none';
   elFps.classList.add('off');
 }
-function webglOk(){
-  try{
-    const c = document.createElement('canvas');
-    return !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'));
-  }catch(e){ return false; }
-}
 
-(async function boot(){
-  if(!webglOk()){ fallback('This browser could not give the page a WebGL context, so the 3-D scene cannot be drawn.'); return; }
-  let THREE;
-  try{ THREE = await import(CDN); }
-  catch(e){ fallback('The 3-D library could not be loaded from the network, so the scene cannot be drawn.'); return; }
-  try{ start(THREE); }
-  catch(e){
-    fallback('The 3-D scene failed to start: ' + (e && e.message ? e.message : e));
-    throw e;
-  }
-})();
+boot({ cdn:CDN, fallback, start });
 
 /* ============================================================ */
 function start(THREE){
 
 const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({
-  canvas, antialias:true, alpha:false, powerPreference:'high-performance',
-  stencil:false, depth:true
-});
-const DPR_CAP = 1.5;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
-renderer.shadowMap.enabled = false;
-renderer.setClearColor(RAMP[5], 1);
-
-const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 400);
+const B = breath(PROTOCOLS.box);
 
 const SURFACE_Y = 0;
 const BED_Y     = -17;
 
 const C = h => new THREE.Color(h);
-const ramp = RAMP.map(C);
+const ramp6 = R.steps.map(C);
 
 /* shared uniforms */
 const uDiver   = { value: new THREE.Vector3(0, Y_AIR, 0) };
 const uTime    = { value: 0 };
-const uFog     = { value: C(RAMP[3]) };
+const uFog     = { value: C(R.at(BODY)) };
 const uAbove   = { value: 0 };     // 0 lens under water, 1 lens in the air
 const uHorizon = { value: 0.5 };   // where the horizon falls, in uv
 const uCamX    = { value: 0 };
 const uCamY    = { value: 0 };
+const uRamp    = { value: ramp6 };
 
-const FOG_GLSL = `
-  uniform vec3 uFog;
-  float fogAmount(float dist){
-    float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
-    return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
-  }
-`;
-const RAMP_GLSL = `
-  uniform vec3 uRamp[6];
-  vec3 rampPick(float x){
-    vec3 c = uRamp[0];
-    for(int i = 1; i < 6; i++){
-      c = mix(c, uRamp[i], step(float(i) / 6.0, clamp(x, 0.0, 0.999)));
-    }
-    return c;
-  }
-`;
+/* the posterised prelude, from palette.js: rampPick(), fogAmount(),
+   posterise(), grainAt(). Deep Light's third pass had four hand-copied
+   fog functions in four shaders, kept in agreement by hand. */
+const PRE = RAMP_GLSL + FOG_GLSL + GRAIN_GLSL;
+
+const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
+  canvas,
+  clear: R.at(DARK),
+  fov: a => a < 0.75 ? 62 : 52,
+  far: 400
+});
 
 /* ------------------------------------------------------------------
    1. BACKGROUND — one quad that is either the water column or the sky.
@@ -373,26 +268,19 @@ const RAMP_GLSL = `
    value structure, different furniture.
    ------------------------------------------------------------------ */
 const waterUniforms = {
-  uTime, uDepth:{value:0}, uAspect:{value:1}, uAbove, uHorizon, uCamX,
-  uRamp:{value:ramp},
+  uTime, uDepth:{value:0}, uAspect:{value:1}, uAbove, uHorizon, uCamX, uRamp,
   uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
   uSun:{value:C(AIR.sun)}, uHalo1:{value:C(AIR.halo1)}, uHalo2:{value:C(AIR.halo2)},
   uCloud:{value:C(AIR.cloud)}
 };
-const waterMat = new THREE.ShaderMaterial({
+onFit(() => { waterUniforms.uAspect.value = camera.aspect; });
+const waterQuad = screenQuad(THREE, {
   uniforms: waterUniforms,
-  depthTest:false, depthWrite:false,
-  vertexShader:`
-    varying vec2 vUv;
-    void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }
-  `,
-  fragmentShader:`
-    precision mediump float;
+  prelude: RAMP_GLSL + GRAIN_GLSL,
+  fragment:`
     varying vec2 vUv;
     uniform float uTime, uDepth, uAspect, uAbove, uHorizon, uCamX;
     uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo1, uHalo2, uCloud;
-    ${RAMP_GLSL}
-    float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
 
     vec3 belowWater(){
       float y = clamp((1.0 - vUv.y) * 0.45 + uDepth * 0.55, 0.0, 1.0);
@@ -433,58 +321,30 @@ const waterMat = new THREE.ShaderMaterial({
 
     void main(){
       vec3 col = mix(belowWater(), aboveWater(), uAbove);
-      col += (hash(floor(vUv * 620.0)) - 0.5) * 0.022;   // §4.2 rule 7
+      col += (grainAt(vUv * 620.0) - 0.5) * 0.022;   // §4.2 rule 7
       gl_FragColor = vec4(col, 1.0);
     }
   `
 });
-const waterQuad = new THREE.Mesh(new THREE.PlaneGeometry(2,2), waterMat);
-waterQuad.frustumCulled = false;
-waterQuad.renderOrder = -10;
 scene.add(waterQuad);
 
 /* ------------------------------------------------------------------
    2. RIDGE BANDS — the underwater background, three parallax layers.
+   The tier is the HAND-ASSIGNED value index, and the layers deliberately
+   do not follow the breath: fixed geology drifting past.
    ------------------------------------------------------------------ */
-function ridgeGeometry(){
-  const pos = [], tier = [], idx = [];
-  const LAYERS = [
-    { z:-62, base:-30, amp:11, step:9.0,  seed:3,  tierId:0 },
-    { z:-40, base:-26, amp:8,  step:6.5,  seed:11, tierId:1 },
-    { z:-24, base:-22, amp:6,  step:4.5,  seed:23, tierId:2 }
-  ];
-  let base = 0;
-  for(const L of LAYERS){
-    const n = 34, span = 150;
-    for(let i = 0; i <= n; i++){
-      const x = -span/2 + (i/n) * span;
-      const q = Math.floor(i / 2) * 2;
-      const h = L.base + Math.sin((q + L.seed) * 0.9) * L.amp
-                       + Math.sin((q + L.seed) * 0.31) * L.amp * 0.7;
-      pos.push(x, Math.round(h / L.step) * L.step, L.z);  tier.push(L.tierId);
-      pos.push(x, -46, L.z);                               tier.push(L.tierId);
-    }
-    for(let i = 0; i < n; i++){
-      const a = base + i*2, b = a+1, c = a+2, d = a+3;
-      idx.push(a, b, c,  b, d, c);
-    }
-    base += (n + 1) * 2;
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aTier',    new THREE.Float32BufferAttribute(tier, 1));
-  g.setIndex(idx);
-  return g;
-}
-const ridges = new THREE.Mesh(ridgeGeometry(), new THREE.ShaderMaterial({
+const ridges = new THREE.Mesh(bands(THREE, [
+  { z:-62, base:-30, amp:11, step:9.0, seed:3,  tier:0 },
+  { z:-40, base:-26, amp:8,  step:6.5, seed:11, tier:1 },
+  { z:-24, base:-22, amp:6,  step:4.5, seed:23, tier:2 }
+]), posterMat(THREE, {
   uniforms:{ uFar:{value:C(PAL.ridgeFar)}, uMid:{value:C(PAL.ridgeMid)}, uNear:{value:C(PAL.ridgeNear)} },
-  vertexShader:`
+  vertex:`
     attribute float aTier; varying float vTier;
     void main(){ vTier = aTier;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying float vTier;
     uniform vec3 uFar, uMid, uNear;
     void main(){
@@ -501,14 +361,14 @@ scene.add(ridges);
    two completely different treatments, chosen by which side the lens is.
    ------------------------------------------------------------------ */
 const surfUniforms = {
-  uTime, uCam:{value:new THREE.Vector3()}, uFog, uAbove,
-  uRamp:{value:ramp}, uCream:{value:C(PAL.cream)},
+  uTime, uCam:{value:new THREE.Vector3()}, uFog, uAbove, uRamp,
+  uCream:{value:C(PAL.cream)},
   uSeaNear:{value:C(AIR.seaNear)}, uSeaFar:{value:C(AIR.seaFar)},
   uTrough:{value:C(AIR.trough)}, uGlint:{value:C(AIR.glint)}
 };
-const surfaceMat = new THREE.ShaderMaterial({
-  uniforms: surfUniforms, side: THREE.DoubleSide,
-  vertexShader:`
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 54, 54), posterMat(THREE, {
+  uniforms: surfUniforms, side: THREE.DoubleSide, prelude: PRE,
+  vertex:`
     uniform float uTime;
     varying vec3 vWorld; varying float vCrest; varying float vChop; varying float vDist;
     void main(){
@@ -531,13 +391,10 @@ const surfaceMat = new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * mv;
     }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying vec3 vWorld; varying float vCrest; varying float vChop; varying float vDist;
     uniform vec3 uCam, uCream, uSeaNear, uSeaFar, uTrough, uGlint;
     uniform float uAbove;
-    ${RAMP_GLSL}
-    ${FOG_GLSL}
     float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.98, 78.23))) * 43758.5453); }
 
     void main(){
@@ -566,17 +423,17 @@ const surfaceMat = new THREE.ShaderMaterial({
       gl_FragColor = vec4(mix(under, over, uAbove), 1.0);
     }
   `
-});
-const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 54, 54), surfaceMat);
+}));
 surface.rotation.x = -Math.PI / 2;
 scene.add(surface);
 
 /* ------------------------------------------------------------------
    4. THE SEABED
    ------------------------------------------------------------------ */
-const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 40, 40), new THREE.ShaderMaterial({
-  uniforms:{ uA:{value:C(RAMP[4])}, uB:{value:C(PAL.indigo)}, uC:{value:C(RAMP[3])}, uFog },
-  vertexShader:`
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 40, 40), posterMat(THREE, {
+  uniforms:{ uA:{value:C(R.at(DEEP))}, uB:{value:C(PAL.indigo)}, uC:{value:C(R.at(BODY))}, uFog },
+  prelude: FOG_GLSL,
+  vertex:`
     varying float vH; varying float vDist;
     void main(){
       vec3 p = position;
@@ -588,11 +445,9 @@ const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 40, 40), new THREE.
       gl_Position = projectionMatrix * mv;
     }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying float vH; varying float vDist;
     uniform vec3 uA, uB, uC;
-    ${FOG_GLSL}
     void main(){
       float v = floor(clamp(vH * 0.45 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
       vec3 col = mix(uB, uA, v);
@@ -608,16 +463,15 @@ scene.add(bed);
 /* ------------------------------------------------------------------
    5. LIGHT SHAFTS (below only)
    ------------------------------------------------------------------ */
-const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), new THREE.ShaderMaterial({
-  uniforms:{ uTime, uCream:{value:C(PAL.cream)}, uPale:{value:C(RAMP[0])} },
+const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), posterMat(THREE, {
+  uniforms:{ uTime, uCream:{value:C(PAL.cream)}, uPale:{value:C(R.at(PALE))} },
   transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
-  vertexShader:`
+  vertex:`
     varying vec3 vW;
     void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
       gl_Position = projectionMatrix * viewMatrix * wp; }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying vec3 vW;
     uniform float uTime;
     uniform vec3 uCream, uPale;
@@ -640,45 +494,35 @@ shafts.renderOrder = 5;
 scene.add(shafts);
 
 /* ------------------------------------------------------------------
-   6. KELP
+   6. KELP — one merged mesh, twenty-two strands, swaying in the vertex
+   shader. Twenty-two meshes would be twenty-two draw calls for about
+   four hundred triangles.
    ------------------------------------------------------------------ */
 function kelpGeometry(n, seg){
-  const verts = [], aH = [], aPhase = [], aSide = [], idx = [];
-  let base = 0;
+  const b = builder(THREE, { aH:1, aPhase:1, aSide:1 });
   for(let i = 0; i < n; i++){
     const ang = (i / n) * Math.PI * 2 + (i * 2.399);
     const rad = 6 + ((i * 7919) % 97) / 97 * 15;
     const cx = Math.cos(ang) * rad;
     let   cz = Math.sin(ang) * rad - 4;
-    if(cz > -1.5) cz = -2.0 - (cz + 1.5);
+    if(cz > -1.5) cz = -2.0 - (cz + 1.5);       // keep them off the lens
     const h = 5 + ((i * 6367) % 83) / 83 * 8.5;
     const wBase = 0.34 + ((i * 5281) % 61) / 61 * 0.5;
     const ph = (i * 1.7) % 6.283;
     for(let s = 0; s <= seg; s++){
       const f = s / seg, w = wBase * (1 - f * 0.88);
       for(const side of [-1, 1]){
-        verts.push(cx + side * w, BED_Y + 1.1 + f * h, cz);
-        aH.push(f); aPhase.push(ph); aSide.push(side);
+        b.vertex(cx + side * w, BED_Y + 1.1 + f * h, cz, { aH:f, aPhase:ph, aSide:side });
       }
     }
-    for(let s = 0; s < seg; s++){
-      const a = base + s*2, b = a+1, c = a+2, d = a+3;
-      idx.push(a, c, b,  b, c, d);
-    }
-    base += (seg + 1) * 2;
+    b.strip(seg, true);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-  g.setAttribute('aH',     new THREE.Float32BufferAttribute(aH, 1));
-  g.setAttribute('aPhase', new THREE.Float32BufferAttribute(aPhase, 1));
-  g.setAttribute('aSide',  new THREE.Float32BufferAttribute(aSide, 1));
-  g.setIndex(idx);
-  return g;
+  return b.geometry();
 }
-const kelpMat = new THREE.ShaderMaterial({
-  uniforms:{ uTime, uFog, uA:{value:C(PAL.indigo)}, uB:{value:C(RAMP[3])}, uC:{value:C(RAMP[2])} },
-  side: THREE.DoubleSide,
-  vertexShader:`
+scene.add(new THREE.Mesh(kelpGeometry(22, 10), posterMat(THREE, {
+  uniforms:{ uTime, uFog, uA:{value:C(PAL.indigo)}, uB:{value:C(R.at(BODY))}, uC:{value:C(R.at(MID))} },
+  side: THREE.DoubleSide, prelude: FOG_GLSL,
+  vertex:`
     attribute float aH; attribute float aPhase; attribute float aSide;
     uniform float uTime;
     varying float vH; varying float vSide; varying float vDist;
@@ -693,11 +537,9 @@ const kelpMat = new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * mv;
     }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying float vH; varying float vSide; varying float vDist;
     uniform vec3 uA, uB, uC;
-    ${FOG_GLSL}
     void main(){
       float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
       vec3 col = mix(uA, uB, v);
@@ -705,15 +547,16 @@ const kelpMat = new THREE.ShaderMaterial({
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
-});
-scene.add(new THREE.Mesh(kelpGeometry(22, 10), kelpMat));
+})));
 
 /* ------------------------------------------------------------------
-   7. CORAL — three tiers; tier 0 is between her and the lens.
+   7. CORAL — three tiers; tier 0 is between her and the lens, and it
+   SHRINKS BACK TOWARDS ITS ROOT when she comes near. That is the world
+   answering the figure, and it is the thing that makes her position in
+   depth legible at all.
    ------------------------------------------------------------------ */
 function coralGeometry(){
-  const pos = [], aH = [], aPhase = [], aTier = [], aRoot = [], idx = [];
-  let base = 0;
+  const b = builder(THREE, { aH:1, aPhase:1, aTier:1, aRoot:3 });
   const clumps = [];
   for(let i = 0; i < 7; i++){
     const side = i % 2 ? 1 : -1;
@@ -735,42 +578,31 @@ function coralGeometry(){
   const SEG = 5;
   for(let ci = 0; ci < clumps.length; ci++){
     const cl = clumps[ci];
-    for(let b = 0; b < cl.blades; b++){
-      const spread = (b / (cl.blades - 1) - 0.5) * 1.5;
-      const ph = (ci * 2.1 + b * 0.8) % 6.283;
-      const w0 = 0.20 + (b % 2) * 0.12;
+    const root = [cl.x, cl.y, cl.z];
+    for(let bl = 0; bl < cl.blades; bl++){
+      const spread = (bl / (cl.blades - 1) - 0.5) * 1.5;
+      const ph = (ci * 2.1 + bl * 0.8) % 6.283;
+      const w0 = 0.20 + (bl % 2) * 0.12;
       for(let s = 0; s <= SEG; s++){
         const f = s / SEG, w = w0 * (1 - f * 0.65);
         const dx = cl.x + spread * f * 1.3 + cl.lean * f * f * 1.2;
         const dy = cl.y + f * cl.h;
         for(const sd of [-1, 1]){
-          pos.push(dx + sd * w, dy, cl.z + spread * f * 0.5);
-          aH.push(f); aPhase.push(ph); aTier.push(cl.tier);
-          aRoot.push(cl.x, cl.y, cl.z);
+          b.vertex(dx + sd * w, dy, cl.z + spread * f * 0.5,
+                   { aH:f, aPhase:ph, aTier:cl.tier, aRoot:root });
         }
       }
-      for(let s = 0; s < SEG; s++){
-        const a = base + s*2, bb = a+1, c = a+2, d = a+3;
-        idx.push(a, c, bb,  bb, c, d);
-      }
-      base += (SEG + 1) * 2;
+      b.strip(SEG, true);
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aH',     new THREE.Float32BufferAttribute(aH, 1));
-  g.setAttribute('aPhase', new THREE.Float32BufferAttribute(aPhase, 1));
-  g.setAttribute('aTier',  new THREE.Float32BufferAttribute(aTier, 1));
-  g.setAttribute('aRoot',  new THREE.Float32BufferAttribute(aRoot, 3));
-  g.setIndex(idx);
-  return g;
+  return b.geometry();
 }
-scene.add(new THREE.Mesh(coralGeometry(), new THREE.ShaderMaterial({
+scene.add(new THREE.Mesh(coralGeometry(), posterMat(THREE, {
   uniforms:{ uTime, uDiver, uFog,
-    uT0:{value:C(PAL.indigoDeep)}, uT1:{value:C(RAMP[3])}, uT2:{value:C(RAMP[2])},
+    uT0:{value:C(PAL.indigoDeep)}, uT1:{value:C(R.at(BODY))}, uT2:{value:C(R.at(MID))},
     uRose:{value:C(PAL.rose)}, uInd:{value:C(PAL.indigo)} },
-  side: THREE.DoubleSide,
-  vertexShader:`
+  side: THREE.DoubleSide, prelude: FOG_GLSL,
+  vertex:`
     attribute float aH; attribute float aPhase; attribute float aTier; attribute vec3 aRoot;
     uniform float uTime; uniform vec3 uDiver;
     varying float vH; varying float vTier; varying float vDist; varying float vShy;
@@ -788,14 +620,9 @@ scene.add(new THREE.Mesh(coralGeometry(), new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * mv;
     }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying float vH; varying float vTier; varying float vDist; varying float vShy;
-    uniform vec3 uT0, uT1, uT2, uRose, uInd, uFog;
-    float fogA(float dist){
-      float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
-      return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
-    }
+    uniform vec3 uT0, uT1, uT2, uRose, uInd;
     void main(){
       vec3 bodyCol = mix(uT0, uT1, step(0.5, vTier));
       bodyCol = mix(bodyCol, uT2, step(1.5, vTier));
@@ -803,54 +630,36 @@ scene.add(new THREE.Mesh(coralGeometry(), new THREE.ShaderMaterial({
       vec3 col = mix(uInd, bodyCol, max(v, 0.35));
       col = mix(col, uRose, step(0.9, v) * step(0.5, vTier) * 0.55);
       col = mix(col, uInd, vShy * 0.3);
-      gl_FragColor = vec4(mix(col, uFog, fogA(vDist) * step(0.5, vTier)), 1.0);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * step(0.5, vTier)), 1.0);
     }
   `
 })));
 
 /* ------------------------------------------------------------------
-   8. FISH — flee from uDiver
+   8. FISH — one merged mesh of view-space billboards, fleeing uDiver.
+   The flee is the other half of the world answering her.
    ------------------------------------------------------------------ */
 function fishGeometry(n){
-  const pos = [], aCorner = [], aSeed = [], aLane = [], aDark = [], idx = [];
-  let base = 0;
+  const b = builder(THREE, { aCorner:2, aSeed:1, aLane:1, aDark:1 });
+  const outline = [[1.0,0],[0.4,0.40],[-0.4,0.36],[-1.0,0.12],
+                   [-1.0,-0.12],[-0.4,-0.36],[0.4,-0.40]];
   for(let i = 0; i < n; i++){
     const size = 0.17 + ((i * 3779) % 53) / 53 * 0.16;
     const lane = -2.5 - ((i * 6421) % 89) / 89 * 12.5;
     const zz   = -1.5 - ((i * 8117) % 71) / 71 * 13;
     const seed = (i * 1.37) % 6.283;
     const dark = (i % 3 === 0) ? 0 : 1;
-    const outline = [[1.0,0],[0.4,0.40],[-0.4,0.36],[-1.0,0.12],
-                     [-1.0,-0.12],[-0.4,-0.36],[0.4,-0.40]];
-    const push = (cx, cy) => {
-      pos.push(0, lane, zz);
-      aCorner.push(cx * size, cy * size);
-      aSeed.push(seed); aLane.push(lane); aDark.push(dark);
-    };
-    push(0, 0);
-    for(const [cx, cy] of outline) push(cx, cy);
-    for(let k = 0; k < outline.length; k++){
-      idx.push(base, base + 1 + k, base + 1 + ((k + 1) % outline.length));
-    }
-    push(-0.95, 0.10); push(-1.75, 0.52); push(-1.75, -0.52);
-    const tb = base + 1 + outline.length;
-    idx.push(tb, tb+1, tb+2);
-    base += 1 + outline.length + 3;
+    const at = [0, lane, zz], attrs = { aSeed:seed, aLane:lane, aDark:dark };
+    polyBillboard(b, at, outline, attrs, size);
+    triBillboard(b, at, [[-0.95,0.10],[-1.75,0.52],[-1.75,-0.52]], attrs, size);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(aCorner, 2));
-  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(aSeed, 1));
-  g.setAttribute('aLane',    new THREE.Float32BufferAttribute(aLane, 1));
-  g.setAttribute('aDark',    new THREE.Float32BufferAttribute(aDark, 1));
-  g.setIndex(idx);
-  return g;
+  return b.geometry();
 }
-scene.add(new THREE.Mesh(fishGeometry(28), new THREE.ShaderMaterial({
+scene.add(new THREE.Mesh(fishGeometry(28), posterMat(THREE, {
   uniforms:{ uTime, uDiver, uFog,
     uLight:{value:C(PAL.fish)}, uDark:{value:C(PAL.fishDark)}, uCream:{value:C(PAL.cream)} },
-  side: THREE.DoubleSide,
-  vertexShader:`
+  side: THREE.DoubleSide, prelude: FOG_GLSL,
+  vertex:`
     attribute vec2 aCorner; attribute float aSeed; attribute float aLane; attribute float aDark;
     uniform float uTime; uniform vec3 uDiver;
     varying float vDark; varying float vFlee; varying float vBelly; varying float vDist;
@@ -875,19 +684,14 @@ scene.add(new THREE.Mesh(fishGeometry(28), new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * mv;
     }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying float vDark; varying float vFlee; varying float vBelly; varying float vDist;
-    uniform vec3 uLight, uDark, uCream, uFog;
-    float fogA(float dist){
-      float f = 1.0 - exp(-max(dist - 10.0, 0.0) * 0.030);
-      return floor(clamp(f, 0.0, 0.999) * 5.0) / 4.0 * 0.55;
-    }
+    uniform vec3 uLight, uDark, uCream;
     void main(){
       vec3 col = mix(uLight, uDark, vDark);
       col = mix(col, uCream, step(0.0, -vBelly) * 0.20);
       col = mix(col, uCream, vFlee * 0.30);
-      gl_FragColor = vec4(mix(col, uFog, fogA(vDist)), 1.0);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 })));
@@ -899,14 +703,13 @@ scene.add(new THREE.Mesh(fishGeometry(28), new THREE.ShaderMaterial({
    shape is a hundred and twenty metres off.
    ------------------------------------------------------------------ */
 function stackGeometry(){
-  const pos = [], tone = [], idx = [];
+  const b = builder(THREE, { aTone:1 });
   const forms = [
     { x:-54, w:26, h:9.5,  z:-150, tone:0 },   // headland
     { x: 38, w: 7, h:15.0, z:-132, tone:1 },   // stack
     { x: 47, w: 4, h: 9.0, z:-128, tone:0 },
     { x:-14, w: 5, h: 6.0, z:-142, tone:1 }
   ];
-  let base = 0;
   for(const f of forms){
     // a hard angular profile: five quantised steps across the top
     const n = 6;
@@ -915,30 +718,21 @@ function stackGeometry(){
       const x = f.x - f.w + u * f.w * 2;
       const prof = Math.sin(u * 3.14159) * (0.55 + 0.45 * Math.cos(u * 7.0 + f.x));
       const y = Math.round((prof * f.h) / 1.6) * 1.6;
-      pos.push(x, Math.max(0.4, y), f.z); tone.push(f.tone);
-      pos.push(x, -1.0, f.z);             tone.push(f.tone);
+      b.vertex(x, Math.max(0.4, y), f.z, { aTone:f.tone });
+      b.vertex(x, -1.0,             f.z, { aTone:f.tone });
     }
-    for(let i = 0; i < n; i++){
-      const a = base + i*2, b = a+1, c = a+2, d = a+3;
-      idx.push(a, b, c,  b, d, c);
-    }
-    base += (n + 1) * 2;
+    b.strip(n, false);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aTone',    new THREE.Float32BufferAttribute(tone, 1));
-  g.setIndex(idx);
-  return g;
+  return b.geometry();
 }
-const stacks = new THREE.Mesh(stackGeometry(), new THREE.ShaderMaterial({
+const stacks = new THREE.Mesh(stackGeometry(), posterMat(THREE, {
   uniforms:{ uA:{value:C(AIR.stack)}, uB:{value:C(AIR.stack2)} },
-  vertexShader:`
+  vertex:`
     attribute float aTone; varying float vT;
     void main(){ vT = aTone;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying float vT; uniform vec3 uA, uB;
     void main(){ gl_FragColor = vec4(mix(uA, uB, step(0.5, vT)), 1.0); }
   `
@@ -950,29 +744,20 @@ scene.add(stacks);
    up here a handful of tiny marks cross quickly against a still sky.
    ------------------------------------------------------------------ */
 function birdGeometry(n){
-  const pos = [], aCorner = [], aSeed = [], idx = [];
-  let base = 0;
+  const b = builder(THREE, { aCorner:2, aSeed:1 });
+  const pts = [[0,0],[-1,0.55],[-0.55,-0.1],[0,0],[1,0.55],[0.55,-0.1]];
   for(let i = 0; i < n; i++){
     const s = 0.5 + (i % 3) * 0.22;
     const y = 7 + ((i * 4451) % 59) / 59 * 13;
     const z = -45 - ((i * 7331) % 67) / 67 * 45;
-    const seed = i * 1.91;
-    const pts = [[0,0],[-1,0.55],[-0.55,-0.1],[0,0],[1,0.55],[0.55,-0.1]];
-    for(const [cx, cy] of pts){ pos.push(0, y, z); aCorner.push(cx*s, cy*s); aSeed.push(seed); }
-    idx.push(base, base+1, base+2, base+3, base+4, base+5);
-    base += 6;
+    triBillboard(b, [0, y, z], pts, { aSeed: i * 1.91 }, s);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(aCorner, 2));
-  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(aSeed, 1));
-  g.setIndex(idx);
-  return g;
+  return b.geometry();
 }
-const birds = new THREE.Mesh(birdGeometry(9), new THREE.ShaderMaterial({
+const birds = new THREE.Mesh(birdGeometry(9), posterMat(THREE, {
   uniforms:{ uTime, uCol:{value:C(AIR.bird)} },
   side:THREE.DoubleSide,
-  vertexShader:`
+  vertex:`
     attribute vec2 aCorner; attribute float aSeed;
     uniform float uTime;
     void main(){
@@ -987,8 +772,7 @@ const birds = new THREE.Mesh(birdGeometry(9), new THREE.ShaderMaterial({
       gl_Position = projectionMatrix * mv;
     }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     uniform vec3 uCol;
     void main(){ gl_FragColor = vec4(uCol, 1.0); }
   `
@@ -1000,101 +784,66 @@ scene.add(birds);
    and rise; spray is thrown when she breaks the surface, and falls.
    ------------------------------------------------------------------ */
 const NP = 130;
-const parts = [];
-for(let i = 0; i < NP; i++) parts.push({ x:0,y:0,z:0,r:0,vx:0,vy:0,vz:0,ph:0,live:false,kind:0 });
-
-function particleGeometry(n){
-  const corner = [], seed = [], idx = [];
-  for(let i = 0; i < n; i++){
-    for(const [cx, cy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){ corner.push(cx, cy); seed.push((i*1.91)%6.283); }
-    const b = i * 4;
-    idx.push(b, b+1, b+2, b, b+2, b+3);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*4*3), 3));
-  g.setAttribute('aCorner',  new THREE.Float32BufferAttribute(corner, 2));
-  g.setAttribute('aSeed',    new THREE.Float32BufferAttribute(seed, 1));
-  g.setAttribute('aSize',    new THREE.BufferAttribute(new Float32Array(n*4), 1));
-  g.setAttribute('aKind',    new THREE.BufferAttribute(new Float32Array(n*4), 1));
-  g.setIndex(idx);
-  return g;
-}
-const partMesh = new THREE.Mesh(particleGeometry(NP), new THREE.ShaderMaterial({
-  uniforms:{ uPale:{value:C(PAL.bubble)}, uCream:{value:C(PAL.cream)}, uSpray:{value:C(AIR.spray)} },
-  transparent:true, depthWrite:false, side:THREE.DoubleSide,
-  vertexShader:`
-    attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
-    varying vec2 vC; varying float vSize; varying float vKind;
-    void main(){
-      vC = aCorner; vSize = aSize; vKind = aKind;
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      mv.xy += aCorner * aSize;
-      gl_Position = projectionMatrix * mv;
-    }
-  `,
-  fragmentShader:`
-    precision mediump float;
-    varying vec2 vC; varying float vSize; varying float vKind;
-    uniform vec3 uPale, uCream, uSpray;
-    void main(){
-      if(vSize <= 0.0) discard;
-      float d = length(vC);
-      if(d > 1.0) discard;
-      float rim  = step(0.76, d);
-      float chip = step(length(vC - vec2(-0.33, 0.33)), 0.26);
-      vec3 col = mix(mix(uPale, uCream, chip), uSpray, vKind);
-      float a = mix(0.40 + rim * 0.22 + chip * 0.33, 0.9, vKind);
-      gl_FragColor = vec4(col, a);
-    }
-  `
-}));
-partMesh.renderOrder = 6;
-partMesh.frustumCulled = false;
-scene.add(partMesh);
-const pPos = partMesh.geometry.getAttribute('position');
-const pSize = partMesh.geometry.getAttribute('aSize');
-const pKind = partMesh.geometry.getAttribute('aKind');
-let pCursor = 0, bubAccum = 0;
-
-function spawn(kind, x, y, z){
-  const b = parts[pCursor];
-  pCursor = (pCursor + 1) % NP;
-  b.kind = kind; b.live = true; b.ph = Math.random() * 6.283;
-  if(kind === 0){                                  // bubble
-    b.x = x + (Math.random()-0.5)*0.22; b.y = y; b.z = z + (Math.random()-0.5)*0.2;
-    b.r = 0.085 + Math.random()*0.16;
-    b.vx = 0; b.vy = 0.9 + Math.random()*1.1; b.vz = 0;
-  } else {                                         // spray
-    const a = Math.random() * 6.283, sp = 0.7 + Math.random()*1.9;
-    b.x = x + Math.cos(a)*0.25; b.y = y; b.z = z + Math.sin(a)*0.25;
-    b.r = 0.045 + Math.random()*0.085;
-    b.vx = Math.cos(a)*sp*0.55; b.vy = 1.6 + Math.random()*2.6; b.vz = Math.sin(a)*sp*0.4;
-  }
-}
-function updateParticles(dt, tt){
-  for(let i = 0; i < NP; i++){
-    const b = parts[i];
-    let s = 0;
-    if(b.live){
-      if(b.kind === 0){
-        b.y += b.vy * dt;
-        b.vy = Math.min(2.4, b.vy + dt*0.5);
-        b.r += dt * 0.012;
-        b.x += Math.sin(tt*2.0 + b.ph) * dt * 0.35;
-        if(b.y > SURFACE_Y - 0.35) b.live = false; else s = b.r;
-      } else {
-        b.vy -= dt * 7.0;                       // thrown up, falls back
-        b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
-        if(b.y < SURFACE_Y - 0.05 && b.vy < 0) b.live = false; else s = b.r;
+const puffs = particles(THREE, {
+  n: NP, renderOrder: 6,
+  material: posterMat(THREE, {
+    uniforms:{ uPale:{value:C(PAL.bubble)}, uCream:{value:C(PAL.cream)}, uSpray:{value:C(AIR.spray)} },
+    transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    vertex:`
+      attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
+      varying vec2 vC; varying float vSize; varying float vKind;
+      void main(){
+        vC = aCorner; vSize = aSize; vKind = aKind;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        mv.xy += aCorner * aSize;
+        gl_Position = projectionMatrix * mv;
       }
+    `,
+    fragment:`
+      varying vec2 vC; varying float vSize; varying float vKind;
+      uniform vec3 uPale, uCream, uSpray;
+      void main(){
+        if(vSize <= 0.0) discard;
+        float d = length(vC);
+        if(d > 1.0) discard;
+        float rim  = step(0.76, d);
+        float chip = step(length(vC - vec2(-0.33, 0.33)), 0.26);
+        vec3 col = mix(mix(uPale, uCream, chip), uSpray, vKind);
+        float a = mix(0.40 + rim * 0.22 + chip * 0.33, 0.9, vKind);
+        gl_FragColor = vec4(col, a);
+      }
+    `
+  })
+});
+scene.add(puffs.mesh);
+let bubAccum = 0;
+
+const bubble = (x, y, z) => puffs.spawn(p => {
+  p.kind = 0;
+  p.x = x + (Math.random()-0.5)*0.22; p.y = y; p.z = z + (Math.random()-0.5)*0.2;
+  p.r = 0.085 + Math.random()*0.16;
+  p.vy = 0.9 + Math.random()*1.1;
+});
+const sprayDrop = (x, y, z) => puffs.spawn(p => {
+  const a = Math.random() * 6.283, sp = 0.7 + Math.random()*1.9;
+  p.kind = 1;
+  p.x = x + Math.cos(a)*0.25; p.y = y; p.z = z + Math.sin(a)*0.25;
+  p.r = 0.045 + Math.random()*0.085;
+  p.vx = Math.cos(a)*sp*0.55; p.vy = 1.6 + Math.random()*2.6; p.vz = Math.sin(a)*sp*0.4;
+});
+function stepPuffs(dt, tt){
+  puffs.step(dt, (p, d) => {
+    if(p.kind === 0){
+      p.y += p.vy * d;
+      p.vy = Math.min(2.4, p.vy + d*0.5);
+      p.r += d * 0.012;
+      p.x += Math.sin(tt*2.0 + p.ph) * d * 0.35;
+      return !(p.y > SURFACE_Y - 0.35);
     }
-    const o = i*12, so = i*4;
-    for(let v = 0; v < 4; v++){
-      pPos.array[o+v*3] = b.x; pPos.array[o+v*3+1] = b.y; pPos.array[o+v*3+2] = b.z;
-      pSize.array[so+v] = s; pKind.array[so+v] = b.kind;
-    }
-  }
-  pPos.needsUpdate = true; pSize.needsUpdate = true; pKind.needsUpdate = true;
+    p.vy -= d * 7.0;                       // thrown up, falls back
+    p.x += p.vx * d; p.y += p.vy * d; p.z += p.vz * d;
+    return !(p.y < SURFACE_Y - 0.05 && p.vy < 0);
+  });
 }
 
 /* ------------------------------------------------------------------
@@ -1102,15 +851,9 @@ function updateParticles(dt, tt){
    camera is near the waterline. This is the bit that sells the
    crossing: the moment the lens is in both worlds at once.
    ------------------------------------------------------------------ */
-const meniscus = new THREE.Mesh(new THREE.PlaneGeometry(2,2), new THREE.ShaderMaterial({
-  uniforms:{ uHorizon, uCamY, uCream:{value:C(PAL.cream)}, uPale:{value:C(RAMP[0])} },
-  transparent:true, depthTest:false, depthWrite:false,
-  vertexShader:`
-    varying vec2 vUv;
-    void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }
-  `,
-  fragmentShader:`
-    precision mediump float;
+const meniscus = overlayQuad(THREE, {
+  uniforms:{ uHorizon, uCamY, uCream:{value:C(PAL.cream)}, uPale:{value:C(R.at(PALE))} },
+  fragment:`
     varying vec2 vUv;
     uniform float uHorizon, uCamY;
     uniform vec3 uCream, uPale;
@@ -1125,13 +868,13 @@ const meniscus = new THREE.Mesh(new THREE.PlaneGeometry(2,2), new THREE.ShaderMa
       gl_FragColor = vec4(mix(uPale, uCream, core), a);
     }
   `
-}));
-meniscus.frustumCulled = false;
-meniscus.renderOrder = 20;
+});
 scene.add(meniscus);
 
 /* ------------------------------------------------------------------
-   13. THE DIVER
+   13. THE DIVER — a dozen stretched primitives sharing five flat
+   materials. §4.2 rule 1: figures are crisp, clean-edged flat colour
+   with minimal interior detail, and there is no lighting model at all.
    ------------------------------------------------------------------ */
 const matBody = new THREE.MeshBasicMaterial({ color: PAL.bodyUp });
 const matHair = new THREE.MeshBasicMaterial({ color: PAL.indigoDeep });
@@ -1141,12 +884,7 @@ const matCord = new THREE.MeshBasicMaterial({ color: PAL.indigo });
 
 const SPH = new THREE.SphereGeometry(1, 12, 9);
 const BOX = new THREE.BoxGeometry(1, 1, 1);
-const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => {
-  const m = new THREE.Mesh(geo, mat);
-  m.scale.set(sx, sy, sz); m.position.set(px, py, pz);
-  if(rz) m.rotation.z = rz;
-  return m;
-};
+const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => part(THREE, geo, mat, sx, sy, sz, px, py, pz, rz);
 
 const diver = new THREE.Group();
 const torso = mk(SPH, matBody, 0.25, 0.46, 0.19,  0,  0.10, 0);
@@ -1174,15 +912,14 @@ scene.add(diver);
    chest, in her own frame, so it rolls and pitches with her */
 const PEARL_CHEST = new THREE.Vector3(0, 0.16, 0.30);
 
-const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), new THREE.ShaderMaterial({
-  uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(RAMP[2])} },
-  vertexShader:`
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), posterMat(THREE, {
+  uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(R.at(MID))} },
+  vertex:`
     varying vec3 vN;
     void main(){ vN = normalize(normalMatrix * normal);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
   `,
-  fragmentShader:`
-    precision mediump float;
+  fragment:`
     varying vec3 vN;
     uniform vec3 uWarm, uMid;
     void main(){
@@ -1194,31 +931,10 @@ const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), new THREE.S
 scene.add(pearl);
 
 /* ------------------------------------------------------------------
-   Layout
-   ------------------------------------------------------------------ */
-let W = 1, H = 1;
-function resize(){
-  W = Math.max(1, window.innerWidth);
-  H = Math.max(1, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
-  renderer.setSize(W, H, false);
-  camera.aspect = W / H;
-  camera.fov = camera.aspect < 0.75 ? 62 : 52;
-  camera.updateProjectionMatrix();
-  waterUniforms.uAspect.value = camera.aspect;
-}
-window.addEventListener('resize', resize, { passive:true });
-window.addEventListener('orientationchange', () => setTimeout(resize, 120), { passive:true });
-resize();
-
-/* ------------------------------------------------------------------
    The loop
    ------------------------------------------------------------------ */
 let t = 0;
-let last = performance.now();
-let running = true;
 let started = false;
-let rafId = 0;
 let camY = Y_AIR + 0.9;
 let camBack = 9;
 let prevY = Y_AIR;
@@ -1227,22 +943,20 @@ const vBed   = new THREE.Vector3();
 const vChest = new THREE.Vector3();
 const vH     = new THREE.Vector3();
 const cBodyUp = C(PAL.bodyUp), cBodyDown = C(PAL.bodyDown);
-const cR3 = C(RAMP[3]), cR4 = C(RAMP[4]), cInd = C(PAL.indigo);
+const cBody = C(R.at(BODY)), cDeep = C(R.at(DEEP)), cInd = C(PAL.indigo);
 let subShown = '';
 
-function frame(now){
-  rafId = requestAnimationFrame(frame);
-  let dt = (now - last) / 1000; last = now;
-  if(dt > 0.05) dt = 0.05;
+const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
+
+const loop = clock((dt, now, running) => {
   if(!running){ fpsTick(now, true); return; }
   if(started) t += dt;
 
-  const st = phaseAt(t);
+  const st = B.at(t);
   const ph = st.p;
-  const dyNow = diverY(t);
-  const cr = gripAmount(t);
-  const grip = cr;
-  const travel = ph.to - ph.from;          // <0 descending, >0 rising, 0 still
+  const dyNow = B.value(t);
+  const grip = B.scalar(t);
+  const travel = B.travel(t);          // <0 descending, >0 rising, 0 still
 
   /* --- the diver --- */
   diver.position.set(Math.sin(t * 0.21) * 0.30, dyNow, Math.cos(t * 0.17) * 0.26);
@@ -1262,7 +976,6 @@ function frame(now){
   legL.position.z =  kick * 0.22; finL.position.z =  kick * 0.5;
   legR.position.z = -kick * 0.22; finR.position.z = -kick * 0.5;
 
-  /* arms: open and sweeping when free, closed on the pearl when gripped */
   /* arms wide while she is going down or hunting on the bottom; the grip
      curve closes them onto the pearl from there */
   const searching = travel < 0 || ph.k === 'rest' || ph.k === 'out';
@@ -1288,21 +1001,21 @@ function frame(now){
   /* --- the pearl: on the bed, or held at her chest --- */
   vBed.set(0.55, BED_Y + 1.42, -0.4);
   vChest.copy(PEARL_CHEST); diver.localToWorld(vChest);
-  pearl.position.lerpVectors(vBed, vChest, cr);
+  pearl.position.lerpVectors(vBed, vChest, grip);
 
   /* --- bubbles on the exhale only; the hold is silent and still --- */
   if(ph.bubbles){
     bubAccum += dt * (10 + 14 * (1 - st.pr));
-    while(bubAccum >= 1){ bubAccum -= 1; spawn(0, diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12); }
+    while(bubAccum >= 1){ bubAccum -= 1; bubble(diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12); }
   } else bubAccum = 0;
 
   /* --- spray when she crosses the surface, in either direction --- */
   if((prevY < 0 && dyNow >= 0) || (prevY > 0 && dyNow <= 0)){
     const n = dyNow >= 0 ? 20 : 26;
-    for(let i = 0; i < n; i++) spawn(1, diver.position.x, 0.04, diver.position.z);
+    for(let i = 0; i < n; i++) sprayDrop(diver.position.x, 0.04, diver.position.z);
   }
   prevY = dyNow;
-  updateParticles(dt, t);
+  stepPuffs(dt, t);
 
   /* --- the camera. Height, distance and pitch are all set per phase,
      because the above-water shot is a different shot, not the same one
@@ -1319,9 +1032,10 @@ function frame(now){
     // cycle — emptying, and taking the pearl — so come in a little closer
     wantY = dyNow + 1.45; lookY = dyNow + 0.15; wantBack = 8.2;  ease = 3.2;
   } else if(ph.cam === 'up2air'){
-    // the no-holds protocol rises all the way into the air on one breath,
-    // so the shot has to become the above-water shot on the way
-    const f = clamp01((dyNow + 3.2) / 3.4);
+    // the no-holds protocol does its whole ascent inside the rest at
+    // empty and has to be out of the water before the inhale starts
+    // (§1.6a), so this shot has to become the above-water shot on the way
+    const f = Math.min(1, Math.max(0, (dyNow + 3.2) / 3.4));
     wantY = (dyNow + 1.60) * (1 - f) + Math.max(dyNow + 0.78, 0.95) * f;
     lookY = (dyNow + 2.40) * (1 - f) + 0.62 * f;
     wantBack = 9.0 * (1 - f) + 12.5 * f;  ease = 4.0;
@@ -1352,39 +1066,17 @@ function frame(now){
   uTime.value = t;
   waterUniforms.uDepth.value = dn;
   surfUniforms.uCam.value.copy(camera.position);
-  uFog.value.copy(cR3).lerp(cR4, dn).lerp(cInd, dn * 0.35);
+  uFog.value.copy(cBody).lerp(cDeep, dn).lerp(cInd, dn * 0.35);
   matBody.color.copy(cBodyUp).lerp(cBodyDown, Math.min(1, Math.max(0, (dn - 0.12) / 0.5)));
 
   /* --- cue text. §2.4: the holds count towards air, never elapsed. --- */
-  if(ph.label !== elPhase.textContent) elPhase.textContent = ph.label;
-  const sub = ph.count ? (ph.count + ' ' + Math.max(1, Math.ceil(st.left))) : ph.sub;
-  if(sub !== subShown){ elSub.textContent = sub; subShown = sub; }
-  elBar.style.width = (100 * Math.min(1, t / SESSION)).toFixed(2) + '%';
+  const cue = B.cue(t);
+  if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
+  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
+  elBar.style.width = (100 * B.progress(t)).toFixed(2) + '%';
 
   renderer.render(scene, camera);
   fpsTick(now, false);
-}
-
-/* ---------- FPS readout ---------- */
-let fAcc = 0, fN = 0, fLast = performance.now(), fPrev = performance.now();
-function fpsTick(now, idle){
-  const d = now - fPrev; fPrev = now;
-  if(!idle && d > 0){ fAcc += d; fN++; }
-  if(now - fLast > 500){
-    const fps = fN ? (1000 / (fAcc / fN)) : 0;
-    elFps.textContent = (idle ? 'paused' : fps.toFixed(0) + ' fps')
-      + '\n' + W + '×' + H + ' @' + renderer.getPixelRatio().toFixed(2);
-    fAcc = 0; fN = 0; fLast = now;
-  }
-}
-elFps.addEventListener('click', () => { elFps.classList.add('off'); elFpsDot.classList.add('on'); });
-elFpsDot.addEventListener('click', () => { elFps.classList.remove('off'); elFpsDot.classList.remove('on'); });
-
-/* ---------- pause when the page is not being looked at ---------- */
-function stopLoop(){ if(rafId){ cancelAnimationFrame(rafId); rafId = 0; } }
-function startLoop(){ if(!rafId){ last = fPrev = performance.now(); rafId = requestAnimationFrame(frame); } }
-document.addEventListener('visibilitychange', () => {
-  if(document.hidden) stopLoop(); else startLoop();
 });
 
 /* ---------- the protocol choice ----------
@@ -1393,59 +1085,49 @@ document.addEventListener('visibilitychange', () => {
    the practice asks for and then gets out of the way (design doc §1.6).
    Both protocols stay built; neither is withheld. The choice persists
    on the device and can be changed from the stop screen. */
-const ACK_KEY = 'bor.deeplight.protocol.v1';
-function readAck(){
-  try{
-    const raw = localStorage.getItem(ACK_KEY);
-    const v = raw ? JSON.parse(raw) : null;
-    return (v && (v.choice === 'holds' || v.choice === 'noholds')) ? v : null;
-  }catch(e){ return null; }         // private browsing throws; just ask again
-}
-function writeAck(choice){
-  try{ localStorage.setItem(ACK_KEY, JSON.stringify({ choice, at:new Date().toISOString() })); }
-  catch(e){ /* not persisted; the gate will ask next time, which is the safe way to fail */ }
-}
-function beginWith(choice, remember){
-  useProtocol(choice === 'holds' ? PROTOCOLS.box : PROTOCOLS.open);
-  $('proto').textContent = PROTO.name;
-  if(remember) writeAck(choice);
+const picked = choice({ key:'bor.deeplight.protocol.v1', valid: validChoice });
+
+function beginWith(which, remember){
+  B.use(PROTOCOLS[CHOICE[which]]);
+  $('proto').textContent = B.proto.name;
+  if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
-  t = 0; prevY = diverY(0); subShown = '';
-  last = fPrev = performance.now();
+  t = 0; prevY = B.value(0); subShown = '';
+  loop.resync();
 }
 $('gateHolds').addEventListener('click', () => beginWith('holds', true));
 $('gateNo').addEventListener('click',    () => beginWith('noholds', true));
 
-$('stop').addEventListener('click', () => { running = false; elHalt.classList.add('on'); });
+$('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
 $('resume').addEventListener('click', () => {
-  elHalt.classList.remove('on'); running = true; last = fPrev = performance.now();
+  elHalt.classList.remove('on'); loop.running = true;
 });
 $('rescreen').addEventListener('click', () => {
-  try{ localStorage.removeItem(ACK_KEY); }catch(e){}
+  picked.clear();
   elHalt.classList.remove('on');
   elGate.classList.add('on');
-  started = false; running = true; t = 0;
-  last = fPrev = performance.now();
+  started = false; loop.running = true; t = 0;
 });
 
 /* The scroll first, once, then the choice — or straight in if the choice
-   is already remembered. requireScroll returns true when it has opened
-   and runs `next` on dismissal; false when it has been seen, in which
-   case we call `next` ourselves. It must never do both. */
-const ack = readAck();
-const next = () => { if(ack) beginWith(ack.choice, false); else elGate.classList.add('on'); };
-if(!requireScroll(next)) next();
+   is already remembered. stage.js's enter() owns the one contract that
+   matters here: requireScroll must never both return false AND run the
+   callback. */
+const ack = picked.read();
+enter(requireScroll, () => {
+  if(ack) beginWith(ack.choice, false); else elGate.classList.add('on');
+});
 
 /* ---------- context loss ---------- */
-canvas.addEventListener('webglcontextlost', e => {
-  e.preventDefault(); stopLoop();
-  elPhase.textContent = 'paused';
-  elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
-}, false);
-canvas.addEventListener('webglcontextrestored', () => {
-  resize(); last = fPrev = performance.now(); startLoop();
-}, false);
+contextGuard(canvas, {
+  onLost(){
+    loop.stop();
+    elPhase.textContent = 'paused';
+    elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+  },
+  onRestored(){ resize(); loop.resync(); loop.start(); }
+});
 
 /* ---------- inspection hook ----------
    Through a browser pane that is hidden between tool calls, rAF is
@@ -1454,24 +1136,23 @@ canvas.addEventListener('webglcontextrestored', () => {
    worth of bubbles can never accumulate. That is the instrument. */
 window.__deepLight = {
   begin(which){ beginWith(which === 'noholds' ? 'noholds' : 'holds', false); },
-  ack: () => readAck(),
+  ack: () => picked.read(),
   scene, camera, THREE,   // so a stray shape can be identified by toggling
-  // hide one named mesh type to find out what something on screen is
   only(hide){ scene.traverse(o => { if(o.isMesh && hide.indexOf(o.name) >= 0) o.visible = false; }); },
-  seek(v){ t = v; prevY = diverY(v); },
-  now(){ const s = phaseAt(t);
-    return { protocol:PROTO.id, cycle:CYCLE, session:SESSION,
+  seek(v){ t = v; prevY = B.value(v); },
+  now(){ const s = B.at(t);
+    return { protocol:B.proto.id, cycle:B.cycle, session:B.session,
              t, phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
-             y:+diverY(t).toFixed(2), camY:+camY.toFixed(2),
-             above:+uAbove.value.toFixed(2), grip:+gripAmount(t).toFixed(2),
-             liveParticles: parts.filter(p => p.live).length }; },
+             y:+B.value(t).toFixed(2), camY:+camY.toFixed(2),
+             above:+uAbove.value.toFixed(2), grip:+B.scalar(t).toFixed(2),
+             liveParticles: puffs.live() }; },
   puff(n, kind){
     for(let i = 0; i < (n || 30); i++){
-      if(kind === 1) spawn(1, diver.position.x, 0.04, diver.position.z);
-      else spawn(0, diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12);
-      for(let j = 0; j < 3; j++) updateParticles(0.045, t);
+      if(kind === 1) sprayDrop(diver.position.x, 0.04, diver.position.z);
+      else bubble(diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12);
+      for(let j = 0; j < 3; j++) stepPuffs(0.045, t);
     }
-    return parts.filter(p => p.live).length;
+    return puffs.live();
   },
   bench(n){
     const gl = renderer.getContext();
@@ -1486,7 +1167,7 @@ window.__deepLight = {
   where(){
     const put = o => {
       const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
-      return { x:+((v.x*0.5+0.5)*W).toFixed(0), y:+((-v.y*0.5+0.5)*H).toFixed(0),
+      return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
                inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
     };
     return { diver:put(diver), pearl:put(pearl), horizonUv:+uHorizon.value.toFixed(3),
@@ -1494,7 +1175,7 @@ window.__deepLight = {
   }
 };
 
-startLoop();
+loop.start();
 }
 </script>
 </body>
