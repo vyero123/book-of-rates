@@ -177,9 +177,10 @@
 import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice, CORRIDOR, SURFACE,
-         HULL_LOW, HULL_HIGH, WALL_LOW, WALL_HIGH, normOf, liftOf,
+         HULL_LOW, HULL_MID, HULL_HIGH, WALL_LOW, WALL_HIGH, normOf, liftOf,
          SPEED, BEHIND, STRIP_CYCLES, periodOf, LANTERNS, lanternAt,
-         bankAt, treeAt, END_LIGHT } from './js/lantern-breath.js';
+         bankAt, treeAt, END_LIGHT,
+         FOCUS, attention, REACH_NEAR, REACH_FULL } from './js/lantern-breath.js';
 import { body, ratesOf } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
@@ -252,6 +253,15 @@ const uHorizon= { value: 0.5 };
 const GLOWS = 3;
 const uGlow = { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] };
 
+/* ATTENTION, AS A NUMBER THE SHADERS READ.
+   uTight is 0 when nothing is gathered and 1 when it is all on one
+   thing. It does NOT dim anything: the same light is either
+   concentrated into a short hard pool or spread thin across the whole
+   river. Conservation of light as attention — a release that simply
+   faded out would be the scene going away, which is the opposite of
+   relaxing into it. */
+const uTight = { value: 0 };
+
 const FOG = fogGlsl({ near: 6, rate: 0.045, steps: 5, max: 0.62 });
 const PRE = RAMP_GLSL + STEP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
 
@@ -260,7 +270,22 @@ const PRE = RAMP_GLSL + STEP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
    and §4.2 rule 5 applies to light as much as to depth. */
 const GLOW_GLSL = `
   uniform vec4 uGlow[${GLOWS}];
+  uniform float uTight;
   float glowAt(vec3 w){
+    /* THE RELEASE IS IN HERE, and it is the reason this function takes
+       uTight at all. Gathered (uTight 1) the pool is short, bright and
+       hard-edged, and only the lights nearest you have one. Released
+       (uTight 0) the SAME light is spread over several times the
+       distance at a fraction of the intensity, and the far ones carry
+       as much of it as the near ones — so during the exhale nothing in
+       the frame is singled out and nothing has gone dark either.
+
+       The two radii differ by about four times, which is a lot; it has
+       to be, because the thing being shown is attention letting go and
+       a subtle version of that is indistinguishable from the renderer
+       being slightly different. */
+    float spread = mix(4.2, 1.0, uTight);
+    float gain   = mix(0.30, 1.0, uTight);
     float g = 0.0;
     for(int i = 0; i < ${GLOWS}; i++){
       vec4 L = uGlow[i];
@@ -268,8 +293,11 @@ const GLOW_GLSL = `
       // elongated along z, because a reflection on moving water is a
       // streak pointing at you, never a disc
       vec2 d = vec2((w.x - L.x) * 1.0, (w.z - L.z) * 0.26);
-      float r = length(d) / (3.4 + L.w * 1.6);
-      g = max(g, L.w * (1.0 - floor(clamp(r, 0.0, 0.999) * 4.0) / 3.0));
+      float r = length(d) / ((3.4 + L.w * 1.6) * spread);
+      // one fewer hard step when it is spread, so the released state
+      // reads as soft without ever becoming a gradient (§4.2 rule 5)
+      float steps = mix(2.0, 4.0, uTight);
+      g = max(g, L.w * gain * (1.0 - floor(clamp(r, 0.0, 0.999) * steps) / (steps - 1.0)));
     }
     return g;
   }
@@ -363,7 +391,7 @@ scene.add(far);
    lantern pools and a stepped ripple. Everything hard-edged.
    ------------------------------------------------------------------ */
 const water = new THREE.Mesh(new THREE.PlaneGeometry(400, 400, 1, 1), posterMat(THREE, {
-  uniforms:{ uTime, uDist, uAmb, uRamp, uFog, uGlow, uLift,
+  uniforms:{ uTime, uDist, uAmb, uRamp, uFog, uGlow, uTight, uLift,
              uWater:{value:C(NIGHT.water)}, uWaterLo:{value:C(NIGHT.waterLo)},
              uGlowCol:{value:C(NIGHT.glow)}, uMoon:{value:C(0xEFE4CC)} },
   prelude: PRE + GLOW_GLSL,
@@ -460,7 +488,7 @@ function bankGeometry(proto){
 }
 
 const bankMat = posterMat(THREE, {
-  uniforms:{ uDist, uPeriod, uRamp, uFog, uAmb, uGlow, uTime,
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uAmb, uGlow, uTight, uTime,
              uShadow:{value:C(NIGHT.shadow)}, uDeep:{value:C(NIGHT.shadowDeep)},
              uReed:{value:C(NIGHT.reed)}, uReedLo:{value:C(NIGHT.reedLo)},
              uGlowCol:{value:C(NIGHT.glow)} },
@@ -805,6 +833,19 @@ const loop = clock((dt, now, running) => {
   const amb = 1 - (1 - END_LIGHT) * prog;
   uAmb.value = amb;
 
+  /* --- ATTENTION. Two objects across the double inhale, then nothing.
+     `tight` is how gathered the light is and drives the shaders; `reach`
+     is how far up the arch the illumination has got and is what the
+     next pass builds the arches on. They are separate on purpose: there
+     is a moment at the top of the second sip where both are 1, and then
+     a long exhale where the front comes back down the path while the
+     gathering dissolves. Collapsed into one scalar the release read as
+     the lights simply switching off. --- */
+  const att = attention(B, t);
+  // eased towards, not snapped to, so the gathering has the same mass
+  // as everything else in this chapter
+  uTight.value += (att.tight - uTight.value) * Math.min(1, dt * 4.0);
+
   /* --- lighting a lantern. A finger resting lights the nearest unlit
      one AHEAD, no faster than a few a breath, so a palm left on the
      glass does not light the whole river at once — that would spend the
@@ -878,8 +919,12 @@ const loop = clock((dt, now, running) => {
      a visible change, far enough back that her head is not the
      picture. It looks further down the river on the exhale, which is
      where the lanterns she has not lit yet are. --- */
-  const wantLook = (ph.cam === 'lift') ? 1.20 : 0.55;
-  const wantTilt = (ph.cam === 'lift') ? 0.055 : -0.02;
+  /* Three branches now, not two, because there are three places
+     attention can be: on the near lights (lift), up through them
+     (rise — higher and further, which is the increase), and nowhere in
+     particular (settle, where the lens goes wide and level). */
+  const wantLook = ph.cam === 'rise' ? 1.85 : ph.cam === 'lift' ? 1.20 : 0.55;
+  const wantTilt = ph.cam === 'rise' ? 0.11  : ph.cam === 'lift' ? 0.055 : -0.02;
   camLook += (wantLook - camLook) * Math.min(1, dt * 1.6);
   camTilt += (wantTilt - camTilt) * Math.min(1, dt * 1.6);
   camera.position.set(0, lift + 1.42, 1.75);
@@ -975,6 +1020,7 @@ window.__lantern = {
   seek(v){ t = v; uDist.value = SPEED * v; },
   now(){
     const s = B.at(t);
+    const a = attention(B, t);
     let lit = 0;
     for(const L of WORLD.lanterns) if(L.lit) lit++;
     return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t:+t.toFixed(3),
@@ -984,6 +1030,8 @@ window.__lantern = {
              aboveWaterline:+(HULL.value - SURFACE).toFixed(3),
              error:+(HULL.value - B.value(t)).toFixed(3),
              amb:+uAmb.value.toFixed(3), progress:+B.progress(t).toFixed(3),
+             focus:a.focus, reach:+a.reach.toFixed(3), tightWanted:+a.tight.toFixed(3),
+             tightShown:+uTight.value.toFixed(3),
              dist:+uDist.value.toFixed(1), period:+WORLD.period.toFixed(1),
              /* `lit` is here and ONLY here, in a tool hook, because a
                 number on screen would be a score. It is a debugging

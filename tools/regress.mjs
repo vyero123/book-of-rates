@@ -49,6 +49,30 @@ const EPS  = 1e-12;
 const kiteBody = proto =>
   body({ corridor: longAir.CORRIDOR, rates: longAir.rates(proto) });
 
+/** HOW FAR A SPRUNG BODY MAY TRAIL A PIECEWISE-LINEAR SCHEDULE, derived
+ *  from the controller's own constants instead of guessed.
+ *
+ *  On a single ramp the steady lag is about 2·slope/sqrt(k), which the
+ *  kit exposes as body.lag(). The WORST error is not that: it is at a
+ *  turnaround, where the body is still trailing the ramp it was on when
+ *  the schedule reverses onto the next one, so the two lags add. The
+ *  1.5 is the spring's own overshoot on top of that.
+ *
+ *  This replaces two different hand-picked multipliers that were doing
+ *  the same job badly in two chapters — one of them within a millimetre
+ *  of failing a protocol that was perfectly correct, which is a check
+ *  about to start lying.
+ */
+function trailBound(ctrl, phases){
+  const slope = q => Math.abs(q.to - q.from) / q.d;
+  let worst = 0;
+  for(let i = 0; i < phases.length; i++){
+    const j = (i + 1) % phases.length;           // includes the cycle wrap
+    worst = Math.max(worst, ctrl.lag(slope(phases[i])) + ctrl.lag(slope(phases[j])));
+  }
+  return worst * 1.5;
+}
+
 let failures = 0, samples = 0;
 const fail = m => { if(failures < 12) console.log('    ' + m); failures++; };
 
@@ -622,13 +646,14 @@ for(const [id, proto] of Object.entries(bamboo.PROTOCOLS)){
   let steepest = 0;
   for(const q of proto.phases) steepest = Math.max(steepest, Math.abs(q.to - q.from) / q.d);
   const allow = curtain.lag(steepest);
+  const allowWorst = trailBound(curtain, proto.phases);
   if(rms > allow)
     fail(`bamboo/${id}: pressing exactly on the cue tracks the schedule to ${rms.toFixed(2)} m ` +
          `rms, more than the ${allow.toFixed(2)} m the spring's lag explains — the rates are ` +
          `not the schedule's`);
-  if(worst > allow * 2.0)
-    fail(`bamboo/${id}: worst tracking error ${worst.toFixed(2)} m against a predicted lag of ` +
-         `${allow.toFixed(2)} m`);
+  if(worst > allowWorst)
+    fail(`bamboo/${id}: worst tracking error ${worst.toFixed(2)} m against a turnaround bound ` +
+         `of ${allowWorst.toFixed(2)} m`);
   if(nearest < bamboo.WALL_NEAR - 1e-9)
     fail(`bamboo/${id}: the curtain reached ${nearest.toFixed(2)} m, inside the near wall`);
 
@@ -725,6 +750,141 @@ for(const [id, proto] of Object.entries(lantern.PROTOCOLS)){
   }
   if(lowest <= lantern.SURFACE)
     fail(`lantern/${id}: the hull reached ${lowest.toFixed(3)} m, at or below the waterline`);
+  /* and the lag must be the spring's own and nothing else — derived
+     from the controller's constants, never a number picked to pass */
+  const allowLag = trailBound(hull, proto.phases);
+  if(worst > allowLag)
+    fail(`lantern/${id}: the hull trails its schedule by ${worst.toFixed(3)} m, more than the ` +
+         `${allowLag.toFixed(3)} m the spring explains — the anchors are not what a ` +
+         `constant rate reaches`);
+
+  /* ---------------------------------------------------------------
+     THE ATTENTION ARC. The chapter's claim is: focus one, then focus
+     two HIGHER AND MORE, then all the way down to nothing gathered.
+     Each clause is checkable and none of them is visible in a
+     screenshot, so none of them is left to one.
+     --------------------------------------------------------------- */
+  const ins = proto.phases.filter(q => q.k === 'in');
+  if(ins.length !== 2)
+    fail(`lantern/${id}: a double breath needs two inhale phases, found ${ins.length}`);
+  else {
+    if(!(ins[1].d < ins[0].d))
+      fail(`lantern/${id}: the second inhale (${ins[1].d}s) is not shorter than the first`);
+    if(ins[0].focus !== lantern.FOCUS.NEAR || ins[1].focus !== lantern.FOCUS.FAR)
+      fail(`lantern/${id}: the two inhales do not name two different objects of focus ` +
+           `(${ins[0].focus} then ${ins[1].focus})`);
+    // the increase: the second object is HIGHER and the attention on it
+    // is TIGHTER, and the front gets there FASTER. "More", not "another
+    // one of the same".
+    if(!(ins[1].to > ins[0].to))
+      fail(`lantern/${id}: the second inhale does not rise above the first ` +
+           `(${ins[0].to} then ${ins[1].to}) — there is no increase`);
+    if(!(ins[1].tight(1) > ins[0].tight(1)))
+      fail(`lantern/${id}: attention is not tighter on the second object ` +
+           `(${ins[0].tight(1)} vs ${ins[1].tight(1)})`);
+    const rate = q => (q.reach[1] - q.reach[0]) / q.d;
+    if(!(rate(ins[1]) > rate(ins[0]) * 1.2))
+      fail(`lantern/${id}: the front does not speed up on the second sip ` +
+           `(${rate(ins[0]).toFixed(3)} then ${rate(ins[1]).toFixed(3)} of the arch a second) ` +
+           `— the increase has to be somewhere and this is where it lives`);
+
+    /* THE HULL'S OWN ANCHORS MUST BE WHAT A CONSTANT RATE REACHES.
+       The hull is the kit's body with the schedule holding the control,
+       and that integrates at one rate across the whole inhale, so the
+       only height it can be at when the first sip ends is the one that
+       rate gets to. A prettier number here does not move the boat; it
+       makes the boat lag its own schedule for the rest of the breath,
+       and the lag then looks like a badly tuned spring. */
+    const totalIn = ins.reduce((a, q) => a + q.d, 0);
+    const want = lantern.HULL_LOW +
+                 (lantern.HULL_HIGH - lantern.HULL_LOW) * (ins[0].d / totalIn);
+    if(Math.abs(ins[0].to - want) > 1e-9)
+      fail(`lantern/${id}: the first sip ends at ${ins[0].to.toFixed(3)} m but a constant-rate ` +
+           `inhale reaches ${want.toFixed(3)} m there`);
+  }
+
+  /* The exhale must reach NO FOCUS AT ALL, and must get there before it
+     ends rather than at the last instant: "all the way down to an
+     unfocused, general, relaxed state" is a place to arrive and rest in,
+     not a line to cross on the way to the next breath. */
+  const outs = proto.phases.filter(q => q.k === 'out');
+  for(const q of outs){
+    if(q.focus !== lantern.FOCUS.NONE)
+      fail(`lantern/${id}: the exhale still names a focus (${q.focus})`);
+    if(q.tight(1) > 1e-9)
+      fail(`lantern/${id}: attention is still ${q.tight(1).toFixed(3)} at the end of the exhale`);
+    let arrived = null;
+    for(let p = 0; p <= 1.0001; p += 0.005){
+      if(q.tight(p) <= 1e-9){ arrived = p; break; }
+    }
+    if(arrived === null || arrived > 0.9)
+      fail(`lantern/${id}: the exhale only lets go at ${(arrived === null ? 1 : arrived).toFixed(2)} ` +
+           `of the way through — there is no released state to rest in`);
+  }
+
+  /* REACH is continuous across the whole cycle and ends where it began,
+     or the illumination front teleports once a breath — which, against
+     an arch lighting from the feet up, would look like the arch
+     flickering rather than like a jump. */
+  let prevReach = null, reachHi = 0, reachLo = 1;
+  for(let t = 0; t <= proto.cycle + 1e-9; t += 0.01){
+    const a = lantern.attention(b, +t.toFixed(4));
+    reachHi = Math.max(reachHi, a.reach); reachLo = Math.min(reachLo, a.reach);
+    if(prevReach !== null && Math.abs(a.reach - prevReach) > 0.08)
+      fail(`lantern/${id}: the illumination front jumps ${Math.abs(a.reach-prevReach).toFixed(3)} ` +
+           `at t=${t.toFixed(2)}`);
+    prevReach = a.reach;
+  }
+  if(Math.abs(reachHi - lantern.REACH_FULL) > 1e-9)
+    fail(`lantern/${id}: the front only reaches ${reachHi.toFixed(3)}, never the apex`);
+  if(reachLo > 1e-9)
+    fail(`lantern/${id}: the front never comes back down to the feet (lowest ${reachLo.toFixed(3)})`);
+
+  /* ---------------------------------------------------------------
+     THE ARCH ITSELF. Its distance ordering is baked from a canonical
+     eye, and the two things that must be true of it are that the feet
+     really are nearest and the apex really is furthest — otherwise
+     "lights up from the sides and rushes upward" is just a claim.
+     --------------------------------------------------------------- */
+  const arch = lantern.archLights();
+  if(arch.length !== lantern.ARCH_LIGHTS * 2)
+    fail(`lantern: an arch has ${arch.length} lights, not ${lantern.ARCH_LIGHTS * 2}`);
+  if(Math.abs(arch[0].s) > 1e-9 || Math.abs(arch[arch.length-1].s - 1) > 1e-9)
+    fail('lantern: the arch ordering is not normalised to 0..1');
+  // nearest is a foot (a near 0), furthest is an apex (a near 1)
+  if(arch[0].a > 0.2)
+    fail(`lantern: the nearest light on the arch is at a=${arch[0].a.toFixed(2)}, not a foot`);
+  if(arch[arch.length-1].a < 0.8)
+    fail(`lantern: the furthest light is at a=${arch[arch.length-1].a.toFixed(2)}, not the apex`);
+  // both feet must light before anything above them: "the lights on
+  // either side closest to the person light up first"
+  const firstTwo = arch.slice(0, 2).map(L => L.side).sort();
+  if(firstTwo[0] !== -1 || firstTwo[1] !== 1)
+    fail('lantern: the first two lights of an arch are not one on each side');
+  // height must increase with the ordering, or "upward" is not what
+  // the front actually does
+  for(let i = 1; i < arch.length; i++){
+    if(arch[i].y < arch[i-1].y - 1e-9 && arch[i].side === arch[i-1].side)
+      fail(`lantern: the arch ordering goes DOWN at index ${i} ` +
+           `(${arch[i-1].y.toFixed(2)} -> ${arch[i].y.toFixed(2)})`);
+  }
+  // nothing in the boat's lane, at any height
+  const inLaneArch = arch.filter(L => Math.abs(L.x) < 1.0).length;
+  if(inLaneArch) fail(`lantern: ${inLaneArch} arch light(s) sit in the boat's own lane`);
+  // the arches must fit the strip a whole number of times
+  const nArch = lantern.archCount(period);
+  if(Math.abs(lantern.archZ(nArch, period) - period) > 1e-9)
+    fail('lantern: the arches do not close at the strip seam');
+
+  /* litAmount is the only thing that decides what is on, so it had
+     better be monotonic in the front and bounded. */
+  let prevLit = -1;
+  for(let f = 0; f <= 1.0001; f += 0.01){
+    const v = lantern.litAmount(0.5, f);
+    if(v < prevLit - 1e-12) fail('lantern: litAmount() is not monotonic in the front');
+    if(v < 0 || v > 1) fail(`lantern: litAmount() returned ${v}`);
+    prevLit = v;
+  }
 
   if(failures === 0)
     console.log(`    ok    lantern/${id}: hull stays ${lowest.toFixed(2)} m clear of the waterline ` +
