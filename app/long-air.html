@@ -214,7 +214,7 @@ import { PROTOCOLS, CHOICE, validChoice,
          CORRIDOR, normOf, altOf, SPEED, BEHIND, periodOf, rates,
          courseOf, gateAt, forgiveness, GATE_HALF, FORGIVE_MAX,
          DRAG_MAX_LOSS, DRAG_GAIN, DRAG_CLEAR,
-         AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M,
+         AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M, V_MAX,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
 import { body, drag } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
@@ -919,7 +919,7 @@ let RATE = rates(PROTOCOLS.box);
    OBJECT. It used to fly a copy of this loop written to match, which
    proves only that two pieces of code agreed on the day they were
    written. */
-let KITE = body({ corridor: CORRIDOR, rates: RATE });
+let KITE = body({ corridor: CORRIDOR, rates: RATE, vMax: V_MAX });
 
 /* FRICTION. Contact costs forward speed and breath is the only thing
    that returns it; there is no gravity term anywhere in this chapter.
@@ -1110,7 +1110,7 @@ function beginWith(which, remember){
   started = true;
   // a fresh body for the new protocol: its rate cap is derived from the
   // protocol's own durations, so it cannot be carried over from the other
-  KITE = body({ corridor: CORRIDOR, rates: RATE });
+  KITE = body({ corridor: CORRIDOR, rates: RATE, vMax: V_MAX });
   DRAG = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
   t = 0; dist = 0; hit = 0; histN = 0; subShown = '';
   skimming = 0; avoiding = 0;

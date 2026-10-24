@@ -121,7 +121,23 @@ export function ratesOf(proto){
  *  control, and a chapter with no control at all still wants a body with
  *  mass.
  */
-export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0 }){
+/** `vMax` caps how fast the body may travel, in its own units a second.
+ *
+ *  Optional, and Long Air is why it exists. Its avoidance pushes a
+ *  figure away from a surface it is near, which is exactly right for a
+ *  reader drifting towards a lip and much too strong for one who is not
+ *  breathing at all: that reader sits at the bottom of the corridor
+ *  while the schedule sweeps the whole of it, so they are ALWAYS
+ *  against a lip and always being herded. Measured on the page, the
+ *  kite reached 27.5 m/s. Being gathered back towards the opening is
+ *  the right behaviour; being snapped there is not.
+ *
+ *  A chapter should derive the cap from its own schedule — the figure
+ *  has no reason to move faster than the breath could ever ask it to,
+ *  with some margin for the spring's lead-in — rather than pick a
+ *  number that looks calm.
+ */
+export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0, vMax = Infinity }){
   const damp = 2.0 * Math.sqrt(k) * zeta;
   const b = {
     fill: 0, value: 0, v: 0,
@@ -160,6 +176,8 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0 }){
     settle(dt){
       const want = C.atOf(b.fill);
       b.v += ((want - b.value) * k - b.v * damp) * dt;
+      if(b.v >  vMax) b.v =  vMax;
+      if(b.v < -vMax) b.v = -vMax;
       b.value += b.v * dt;
       if(b.value < C.lo){ b.value = C.lo; b.v = Math.max(0, b.v); }
       if(b.value > C.hi){ b.value = C.hi; b.v = Math.min(0, b.v); }
@@ -201,6 +219,8 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0 }){
       if(room >= margin) return 0;
       const near = clamp01(1 - Math.max(0, room) / margin);
       b.v -= Math.sign(off || 1) * near * near * strength * dt;
+      if(b.v >  vMax) b.v =  vMax;
+      if(b.v < -vMax) b.v = -vMax;
       return near;
     },
 

@@ -47,7 +47,7 @@ const EPS  = 1e-12;
  *  protocol's own derived rates. Not a reproduction of the page's loop —
  *  the same object the page drives. */
 const kiteBody = proto =>
-  body({ corridor: longAir.CORRIDOR, rates: longAir.rates(proto) });
+  body({ corridor: longAir.CORRIDOR, rates: longAir.rates(proto), vMax: longAir.V_MAX });
 
 /** HOW FAR A SPRUNG BODY MAY TRAIL A PIECEWISE-LINEAR SCHEDULE, derived
  *  from the controller's own constants instead of guessed.
@@ -447,7 +447,7 @@ function fly(proto, press){
   const fric = drag({ maxLoss: longAir.DRAG_MAX_LOSS, gain: longAir.DRAG_GAIN,
                       clear: longAir.DRAG_CLEAR });
   const dt = 1 / 120;
-  let dist = 0, skims = 0, worstMargin = Infinity, worstAt = null;
+  let dist = 0, skims = 0, worstMargin = Infinity, worstAt = null, maxV = 0;
   let minRidge = Infinity, maxDrag = 0, minSpeed = Infinity, maxBehind = 0;
   for(let t = 0; t < proto.session; t += dt){
     const kind = b.at(t).p.k;
@@ -481,11 +481,12 @@ function fly(proto, press){
       if(margin < worstMargin){ worstMargin = margin; worstAt = +t.toFixed(2); }
     }
     minRidge = Math.min(minRidge, kite.value - longAir.ridgeAt(dist, course.period));
+    maxV = Math.max(maxV, Math.abs(kite.v));
   }
   return { skims, worstMargin:+worstMargin.toFixed(2), worstAt,
            minRidge:+minRidge.toFixed(2), maxDrag:+maxDrag.toFixed(3),
            minSpeed:+minSpeed.toFixed(2), maxBehind:+maxBehind.toFixed(2),
-           dist:+dist.toFixed(1) };
+           maxV:+maxV.toFixed(2), dist:+dist.toFixed(1) };
 }
 
 const ON_CUE  = (t, kind) => ({ inDown: kind === 'in', outDown: kind === 'out' });
@@ -530,6 +531,13 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
            `model's own maxLoss allows`);
     if(f.minRidge < 0)
       fail(`long air/${id}: a reader ${name} goes through the ridge (${f.minRidge} m)`);
+    /* and nobody, however they press, gets snapped about. The avoidance
+       is a bend, not a save: without the cap a reader who never
+       breathes sits permanently against a lip, is permanently herded,
+       and hit 27.5 m/s on the deployed page. */
+    if(f.maxV > longAir.V_MAX + 1e-6)
+      fail(`long air/${id}: a reader ${name} reaches ${f.maxV} m/s, past the ` +
+           `${longAir.V_MAX.toFixed(1)} m/s the schedule's own steepest sweep allows`);
   }
 
   /* (c) THE FEEDBACK LOOP IS OPEN. Friction slows the glider, so a

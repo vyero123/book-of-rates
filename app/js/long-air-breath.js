@@ -408,6 +408,19 @@ export const AVOID_STRENGTH = 30;
  *  feedback loop in the model and this is the number that opens it. */
 export const MAX_DESYNC_M = (DRAG_MAX_LOSS / DRAG_CLEAR) * (RANGE / 4);
 
+/** HOW FAST THE GLIDER MAY EVER TRAVEL, derived from the schedule.
+ *
+ *  The steepest the schedule ever moves is the whole range in one
+ *  phase; the glider has no reason to go faster than that with a margin
+ *  for the spring's lead-in. Without a cap the avoidance, which is
+ *  right for a reader drifting towards a lip, is far too strong for one
+ *  who is not breathing at all: that reader sits at the bottom of the
+ *  corridor while the schedule sweeps the whole of it, so they are
+ *  permanently against a lip and permanently being herded. Measured on
+ *  the deployed page, the kite reached 27.5 m/s. Gathered back towards
+ *  the opening is right; snapped there is not. */
+export const V_MAX = 2.6 * (RANGE / 4);
+
 /** Gates roughly every 0.55 s of schedule, rounded so a whole number
  *  fits in a cycle — a fraction of a gate per cycle would break the
  *  strip's periodicity and put the course out of step with the breath. */
