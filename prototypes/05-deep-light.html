@@ -1116,6 +1116,17 @@ canvas.addEventListener('webglcontextrestored', () => {
    instrument, not the scene. */
 window.__deepLight = {
   seek(v){ t = v; },
+  // Spawn and age a stream of bubbles without waiting on rAF. Through a
+  // browser pane that is hidden between calls only two or three frames
+  // ever run, so a four-second exhale's worth of bubbles can never
+  // accumulate and the layer cannot be seen at all otherwise.
+  puff(n){
+    for(let i = 0; i < (n || 30); i++){
+      spawnBubble(diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12);
+      for(let k = 0; k < 3; k++) updateBubbles(0.045, t);
+    }
+    return bubbles.filter(b => b.live).length;
+  },
   now(){ return { t, phase: phaseAt(t).p.k, level: level(t),
                   liveBubbles: bubbles.filter(b => b.live).length }; },
   bench(n){
