@@ -97,7 +97,7 @@
 <div id="cue">
   <div id="phase">breathe in</div>
   <div id="sub">the boat lifts</div>
-  <div id="hint">rest a finger to light a lantern</div>
+  <div id="hint">rest a finger as you breathe in</div>
 </div>
 <div id="bar"><div id="barfill"></div></div>
 <div id="note"><span id="proto">Drifting · 4 in / 8 out · 5 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
@@ -111,9 +111,10 @@
   <h2>Go down the river</h2>
   <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. The last chapter before sleep.</p>
   <div class="how">
-    <p><b>Rest a finger anywhere</b> and the nearest lantern ahead of you lights. It stays lit, and the river carries you past it.</p>
-    <p>The boat lifts as you breathe in and settles as you breathe out. You are not steering and there is nothing to avoid.</p>
-    <p>It gets darker as the session goes on, and ends dark — so the lanterns you lit become the only light on the water. Light all of them, or none. Nothing here is counted.</p>
+    <p><b>Rest a finger anywhere</b> as you breathe in. Light runs up the arches over the river — from the two lights nearest you, out and up, until it closes overhead on the second breath in.</p>
+    <p><b>Let go</b> as you breathe out and it goes back down the same path, from the top. The arches stay where they are, so you drift under them while they are going out.</p>
+    <p>A lantern on the water lights too, and that one stays. The boat lifts as you breathe in and settles as you breathe out. You are not steering and there is nothing to avoid.</p>
+    <p>It gets darker as the session goes on, and ends dark. Hold for all of it, or none. Nothing here is counted.</p>
   </div>
   <button id="gateDrift">DRIFTING · 4 IN / 8 OUT<br><span class="sub2">five breaths a minute</span></button>
   <button id="gateSlower" class="alt">SLOWER · 4 IN / 9.3 OUT<br><span class="sub2">a longer exhale · four and a half a minute</span></button>
@@ -180,8 +181,10 @@ import { PROTOCOLS, CHOICE, validChoice, CORRIDOR, SURFACE,
          HULL_LOW, HULL_MID, HULL_HIGH, WALL_LOW, WALL_HIGH, normOf, liftOf,
          SPEED, BEHIND, STRIP_CYCLES, periodOf, LANTERNS, lanternAt,
          bankAt, treeAt, END_LIGHT,
-         FOCUS, attention, REACH_NEAR, REACH_FULL } from './js/lantern-breath.js';
-import { body, ratesOf } from './js/course.js';
+         FOCUS, attention, REACH_NEAR, REACH_FULL,
+         ARCH_LIGHTS, ARCH_SPACING, archPoint, archLights, archCount, archZ,
+         litAmount, LIT_LIP } from './js/lantern-breath.js';
+import { body, ratesOf, corridor } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, particles, scrollGlsl,
@@ -244,6 +247,12 @@ const uBreath = { value: 0 };          // the figure's own fullness, 0..1
 const uFog    = { value: C(NIGHT.shadow) };
 const uRamp   = { value: ramp6 };
 const uHorizon= { value: 0.5 };
+
+/* HOW FAR UP THE ARCH THE ILLUMINATION HAS REACHED, 0..1. One scalar
+   for every arch in the river, because every arch has the same baked
+   distance ordering — that is what "at a fixed length" buys. A light is
+   lit when its own `s` is below this. */
+const uFront  = { value: 0 };
 
 /* THE THREE NEAREST LIT LANTERNS, in world space, with their brightness
    in w. Three and not more because the loop that reads them in the
@@ -541,6 +550,169 @@ const bankMat = posterMat(THREE, {
    reader taps is cheaper than finding that out on somebody's phone.
    It is the same trick the kit's particle pool uses on aSize.
    ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   THE ARCHES — the chapter's mechanic, as geometry.
+   ------------------------------------------------------------------
+   An arch stands across the river every ARCH_SPACING metres: two feet
+   on the water either side of the boat's lane, rising up and outward
+   and leaning back in overhead, and leaning away downriver so that
+   height and distance increase together. Lights are strung along it.
+
+   EVERY VERTEX CARRIES `aS`, the light's baked place in the arch's own
+   distance ordering, 0 at the feet and 1 at the apex. The whole
+   mechanic is then one uniform: a thing is lit when aS <= uFront. The
+   front rises while the reader holds and falls back when they let go,
+   so the illumination rushes up from the feet and later retreats from
+   the apex down, ALONG THE SAME FIXED PATH IN BOTH DIRECTIONS.
+
+   And because the path is fixed in the world while the boat travels
+   forward, the exhale is not a fade you watch. It is a fade you move
+   through: you come level with the feet of an arch whose apex is
+   already going out over your head.
+
+   Three things in one merged mesh, distinguished by aPart:
+     0  the cable, which makes the arch a shape when it is unlit
+     1  the lamps
+     2  the lamps' reflections, mirrored and squashed into the water
+   The reflection is why the water answers an arch without the water
+   shader having to know anything about arches: it is the same geometry
+   upside down in the same draw call.
+   ------------------------------------------------------------------ */
+const ARCH_SEG = 10;
+function archGeometry(proto){
+  const period = periodOf(proto);
+  const n = archCount(period);
+  const lights = archLights();
+  const b = builder(THREE, { aS:1, aPart:1, aSeed:1, aCorner:2, aSide:1 });
+
+  for(let k = 0; k < n; k++){
+    const z0 = archZ(k, period);
+    const seed = ((k * 7919) % 101) / 101;
+
+    /* the cable: one ribbon per side, aS interpolated along it so the
+       cable itself lights up ahead of each lamp — the light running up
+       the wire is what makes "rushes outward and upward" legible
+       between the lamps rather than only at them */
+    for(const side of [-1, 1]){
+      for(let i = 0; i <= ARCH_SEG; i++){
+        const a = i / ARCH_SEG;
+        const p = archPoint(a, side);
+        // `s` along the cable is the same normalised ordering the lamps
+        // use, recovered by interpolating the lights' own values
+        const s = cableS(lights, side, a);
+        const w = 0.035;
+        b.vertex(p.x, p.y - w, z0 + p.z, { aS:s, aPart:0, aSeed:seed, aCorner:[0,0], aSide:side });
+        b.vertex(p.x, p.y + w, z0 + p.z, { aS:s, aPart:0, aSeed:seed, aCorner:[0,1], aSide:side });
+      }
+      b.strip(ARCH_SEG, side < 0);
+    }
+
+    /* the lamps, and their reflections */
+    for(const L of lights){
+      for(const part of [1, 2]){
+        const y = part === 1 ? L.y : SURFACE - (L.y - SURFACE) * 0.55;
+        const r = (part === 1 ? 0.17 : 0.13) + L.a * 0.05;
+        const base = b.count;
+        const at = { aS:L.s, aPart:part, aSeed:seed, aSide:L.side };
+        for(const [cx, cy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
+          // the reflection is stretched down the river, because that is
+          // what a light on moving water does
+          b.vertex(L.x, y, z0 + L.z,
+                   { ...at, aCorner:[cx * r, cy * r * (part === 1 ? 1 : 2.6)] });
+        }
+        b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
+      }
+    }
+  }
+  return b.geometry();
+}
+
+/** The cable's own `s` at parameter a on one side: the lights' baked
+ *  values, linearly interpolated.
+ *
+ *  Recomputed rather than re-derived from distance, deliberately. If the
+ *  cable used its own distance formula it would drift from the lamps'
+ *  ordering at the belly of the arch, where the curve bulges out and
+ *  distance stops being monotonic in a — and the light would run up the
+ *  wire past a lamp that had not come on yet. */
+function cableS(lights, side, a){
+  const mine = lights.filter(L => L.side === side).sort((p, q) => p.a - q.a);
+  if(a <= mine[0].a) return mine[0].s;
+  for(let i = 1; i < mine.length; i++){
+    if(a <= mine[i].a){
+      const f = (a - mine[i-1].a) / Math.max(1e-6, mine[i].a - mine[i-1].a);
+      return mine[i-1].s + (mine[i].s - mine[i-1].s) * f;
+    }
+  }
+  return mine[mine.length-1].s;
+}
+
+const archMat = posterMat(THREE, {
+  uniforms:{ uDist, uPeriod, uFront, uTight, uAmb, uTime, uFog, uRamp,
+             uGlowCol:{value:C(NIGHT.glow)}, uPaper:{value:C(NIGHT.paper)},
+             uAccent:{value:C(NIGHT.accent)}, uDark:{value:C(NIGHT.reed)} },
+  side: THREE.DoubleSide, transparent:true, depthWrite:false, prelude: PRE,
+  vertex: SCROLL_GLSL + `
+    attribute float aS; attribute float aPart; attribute float aSeed;
+    attribute vec2 aCorner; attribute float aSide;
+    uniform float uFront, uTime;
+    varying float vLit; varying float vPart; varying vec2 vC;
+    varying float vDist; varying float vS;
+    void main(){
+      vec3 p = scrolled(position);
+      // THE MECHANIC, in one line: lit when the front has passed this
+      // light's own baked place in the arch's distance ordering. The
+      // lip is a tenth of the path, so a light comes up rather than
+      // snapping — and the same lip, run backwards, is the fade.
+      // litAmount() from js/lantern-breath.js, in GLSL. The lip runs
+      // AHEAD of the front so a light is full at the moment the front
+      // arrives — run the other way the apex could never light at all,
+      // because the front's travel stops exactly there.
+      float lit = clamp((uFront - aS) / ${LIT_LIP.toFixed(3)} + 1.0, 0.0, 1.0);
+      vLit = lit; vPart = aPart; vC = aCorner; vS = aS;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      // the lamps and their reflections are view-space billboards; the
+      // cable is real geometry and is not offset at all
+      if(aPart > 0.5) mv.xy += aCorner * (0.55 + 0.45 * lit);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vLit; varying float vPart; varying vec2 vC;
+    varying float vDist; varying float vS;
+    uniform vec3 uGlowCol, uPaper, uAccent, uDark;
+    uniform float uAmb, uTight;
+    void main(){
+      if(vPart < 0.5){
+        // the cable: a dark line when unlit, an accent line when lit.
+        // It is always there, so the arch is a shape before it is a
+        // light and the reader can see what is coming (§5.1).
+        vec3 col = mix(uDark * mix(0.5, 1.0, uAmb), uAccent, vLit);
+        gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 0.5 + 0.5 * vLit);
+        return;
+      }
+      // a hard lozenge, not a soft sprite
+      if(abs(vC.x) + abs(vC.y) > 1.0) discard;
+      if(vPart > 1.5){
+        // the reflection: only exists when the lamp above it does
+        if(vLit < 0.04) discard;
+        vec3 col = mix(uGlowCol, uPaper, 0.2);
+        gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.5),
+                            vLit * 0.30 * mix(0.6, 1.0, uTight));
+        return;
+      }
+      // the lamp: dark paper unlit, a two-value flame lit
+      vec3 unlit = uDark * mix(0.35, 1.0, uAmb);
+      vec3 on    = mix(uGlowCol, uPaper, step(0.0, vC.y) * 0.65);
+      vec3 col   = mix(unlit, on, vLit);
+      // a lit lamp does not take the fog: it is the light source
+      float f = fogAmount(vDist) * (1.0 - vLit * 0.85);
+      gl_FragColor = vec4(mix(col, uFog, f), mix(0.55, 1.0, vLit));
+    }
+  `
+});
+
 const LANTERN_VERTS = 12;      // 8 for the box, 4 for the flame card
 function lanternGeometry(proto){
   const period = periodOf(proto);
@@ -633,10 +805,12 @@ for(const id of Object.keys(PROTOCOLS)){
   const period = periodOf(proto);
   const banks = new THREE.Mesh(bankGeometry(proto), bankMat);
   const lamps = new THREE.Mesh(lanternGeometry(proto), lanternMat);
+  const arches = new THREE.Mesh(archGeometry(proto), archMat);
   lamps.renderOrder = 4;
-  for(const m of [banks, lamps]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
+  arches.renderOrder = 5;
+  for(const m of [banks, lamps, arches]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
   worlds[id] = {
-    period, meshes:[banks, lamps],
+    period, arches: archCount(period), meshes:[banks, lamps, arches],
     lanterns: Array.from({ length: LANTERNS }, (_, i) => ({ ...lanternAt(i, period), lit: 0 })),
     aLit: lamps.geometry.getAttribute('aLit')
   };
@@ -795,6 +969,66 @@ let RATE = ratesOf(PROTOCOLS.drift);
    drives the same object and checks it never reaches the waterline. */
 let HULL = body({ corridor: CORRIDOR, rates: RATE, fill: 0 });
 
+/* THE ILLUMINATION FRONT is the kit's body again, over a 0..1 path
+   instead of a height, with THE READER holding the control.
+   The rate cap is the chapter's own and is derived, not tuned: holding
+   through both inhales runs the front from the feet to the apex exactly
+   once, and holding harder or longer cannot push it past the apex. Let
+   go and it falls back at the exhale's rate — which is why the fade is
+   gradual rather than a switch, and why it takes the whole exhale.
+
+   Its walls sit just outside 0 and 1 so the corridor's nesting rule is
+   satisfied and the spring has somewhere to overshoot into rather than
+   slamming. */
+/* `high` is 1.05 and not 1.0, and that is load-bearing. The control's
+   own fill reaches exactly 1 at the end of the inhale; a sprung value
+   chasing a target of exactly 1 approaches it and never arrives, and
+   the exhale starts pulling back before it does. Measured, the front
+   topped out at 0.997 and THE APEX LAMP NEVER LIT. Giving the target a
+   little headroom means a fully held inhale carries the front past the
+   keystone rather than up to just short of it. It is not a cap being
+   loosened: the arch still has a top and nothing lights beyond it.
+
+   `low` is BELOW ZERO for the mirror-image reason, and that one is the
+   same bug again at the other end. With the lip running ahead of the
+   front, the feet are full at front = 0 and only dark at front = -LIP —
+   so a front that bottoms out at 0 leaves the feet permanently lit and
+   the arch never actually goes out. The fade has to be able to travel
+   one lip's width past the feet, so fill = 0 maps a little below them.
+   Found by the harness asking whether the feet were dark when the next
+   breath began; they were not, by a tenth. */
+const FRONT_CORRIDOR = corridor({ lo:-0.20, hi:1.14, low:-0.12, high:1.06 });
+function frontRates(proto){
+  const r = ratesOf(proto);
+  return { fillPerSec:r.fillPerSec, emptyPerSec:r.emptyPerSec, din:r.din, dout:r.dout };
+}
+/* Stiffer than the hull AND UNDERDAMPED, both for the same reason: a
+   boat has mass and light does not.
+
+   The damping is the part that was a bug before it was a decision. At
+   the kit's default 0.9 the front asymptotes towards the top of the
+   arch and never arrives: the control's own fill reaches exactly 1 at
+   the end of the inhale, the spring is still catching up, and the
+   exhale starts pulling it back down. Measured, it topped out at 0.986,
+   which means THE APEX LAMP NEVER LIT. An arch whose keystone never
+   comes on is not an arch, and nothing in a screenshot of the middle of
+   an inhale would have shown it.
+
+   At 0.55 the front overshoots the top by a little and the corridor's
+   own wall at 1.06 catches it, so the illumination arrives at the
+   keystone with a surge instead of creeping up to just short of it.
+   That is also the better picture: light rushing up a wire has no
+   damping to speak of.
+
+   tools/regress.mjs holds the control exactly on the cue for a whole
+   session and fails if the front does not reach the apex — and holds it
+   through the exhale as well and fails if that pushes it PAST the apex,
+   which is the rate cap and is what stops "hold more" being a strategy. */
+const FRONT_K = 140;
+const FRONT_ZETA = 0.55;
+let FRONT = body({ corridor: FRONT_CORRIDOR, rates: frontRates(PROTOCOLS.drift),
+                   k: FRONT_K, zeta: FRONT_ZETA });
+
 let subShown = '', hintDone = false;
 const vHz = new THREE.Vector3();
 
@@ -845,6 +1079,15 @@ const loop = clock((dt, now, running) => {
   // eased towards, not snapped to, so the gathering has the same mass
   // as everything else in this chapter
   uTight.value += (att.tight - uTight.value) * Math.min(1, dt * 4.0);
+
+  /* --- THE FRONT. Holding runs it up the arch at the protocol's own
+     inhale rate; letting go lets it fall back at the exhale's. The path
+     is the same in both directions and is fixed in the world, so the
+     retreat happens over the reader's head while the boat carries them
+     forward into it. That is the whole mechanic and it is three lines
+     because the kit already owns all of it. --- */
+  if(started) FRONT.drive(dt, touching, !touching);
+  uFront.value = FRONT.value;
 
   /* --- lighting a lantern. A finger resting lights the nearest unlit
      one AHEAD, no faster than a few a breath, so a palm left on the
@@ -956,6 +1199,8 @@ function beginWith(which, remember){
   B.use(PROTOCOLS[id]);
   RATE = ratesOf(PROTOCOLS[id]);
   HULL = body({ corridor: CORRIDOR, rates: RATE, fill: 0 });
+  FRONT = body({ corridor: FRONT_CORRIDOR, rates: frontRates(PROTOCOLS[id]),
+                 k: FRONT_K, zeta: FRONT_ZETA });
   WORLD = worlds[id];
   uPeriod.value = WORLD.period;
   for(const kk of Object.keys(worlds)){
@@ -1031,6 +1276,9 @@ window.__lantern = {
              error:+(HULL.value - B.value(t)).toFixed(3),
              amb:+uAmb.value.toFixed(3), progress:+B.progress(t).toFixed(3),
              focus:a.focus, reach:+a.reach.toFixed(3), tightWanted:+a.tight.toFixed(3),
+             front:+FRONT.value.toFixed(3), frontFill:+FRONT.fill.toFixed(3),
+             frontError:+(FRONT.value - a.reach).toFixed(3),
+             archesInStrip: WORLD.arches,
              tightShown:+uTight.value.toFixed(3),
              dist:+uDist.value.toFixed(1), period:+WORLD.period.toFixed(1),
              /* `lit` is here and ONLY here, in a tool hook, because a
@@ -1059,6 +1307,42 @@ window.__lantern = {
     const period = WORLD.period;
     return WORLD.lanterns.map((L, i) => ({ i, x:+L.x.toFixed(2), lit:!!L.lit,
       z:+lanternZ(L, period).toFixed(1) }));
+  },
+  /* The arch, as the reader would see it: every light's baked place in
+     the distance ordering and how lit it is right now. The claim this
+     chapter rests on is that the order never changes while the boat
+     moves, so `s` here must be identical from one call to the next
+     however far the river has carried us. */
+  arch(){
+    const f = FRONT.value;
+    return { front:+f.toFixed(3),
+             lights: archLights().map(L => ({
+               side:L.side, a:+L.a.toFixed(3), s:+L.s.toFixed(4),
+               y:+L.y.toFixed(2), x:+L.x.toFixed(2),
+               lit:+litAmount(L.s, f).toFixed(3) })) };
+  },
+  /* Drive a whole breath through the real controller and report what
+     the arch does at each stage — the thing a screenshot of one moment
+     cannot show. */
+  archSweep(){
+    const out = [];
+    const step = B.cycle / 24;
+    const save = { t, fill:FRONT.fill, v:FRONT.v, value:FRONT.value };
+    FRONT.reset(0);
+    for(let tt = 0; tt < B.cycle * 1.0; tt += 1/60){
+      const kind = B.at(tt).p.k;
+      FRONT.drive(1/60, kind === 'in', kind !== 'in');
+      if(Math.abs(tt % step) < 1/60){
+        const lights = archLights();
+        out.push({ t:+tt.toFixed(2), phase:kind, front:+FRONT.value.toFixed(3),
+                   lit: lights.filter(L => litAmount(L.s, FRONT.value) > 0.5).length,
+                   topLit: +Math.max(0, ...lights
+                     .filter(L => litAmount(L.s, FRONT.value) > 0.5)
+                     .map(L => L.y)).toFixed(2) });
+      }
+    }
+    t = save.t; FRONT.fill = save.fill; FRONT.v = save.v; FRONT.value = save.value;
+    return out;
   },
   bench(n){
     const gl = renderer.getContext();

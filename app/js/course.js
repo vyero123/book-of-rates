@@ -134,9 +134,16 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0 }){
        explains. Guessing a tolerance instead is how a check becomes a
        magic number nobody can defend. */
     k, damp, zeta,
-    /** steady-state lag behind a ramp of the given slope, in the
-     *  chapter's own units per second */
-    lag: slope => 2 * Math.abs(slope) / Math.sqrt(k),
+    /** Steady-state lag behind a ramp of the given slope, in the
+     *  chapter's own units per second.
+     *
+     *  2·zeta·v/sqrt(k), not 2·v/sqrt(k). The damping ratio is in there
+     *  and leaving it out silently assumed critical damping — which was
+     *  within 10% while every chapter used the default 0.9, and stopped
+     *  being within anything once a chapter wanted an underdamped front
+     *  that deliberately overshoots. A harness deriving its tolerance
+     *  from this needs it to be the real formula. */
+    lag: slope => 2 * zeta * Math.abs(slope) / Math.sqrt(k),
 
     reset(f = fill){ b.fill = clamp01(f); b.value = C.atOf(b.fill); b.v = 0; return b; },
 

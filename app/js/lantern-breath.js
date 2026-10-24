@@ -59,7 +59,7 @@
  * SILENT. No AudioContext, no media elements.
  */
 
-import { protocol, smooth, clamp01 } from './breath.js';
+import { protocol, smooth, clamp01, linear } from './breath.js';
 import { corridor } from './course.js';
 
 /* ------------------------------------------------------------------
@@ -70,6 +70,12 @@ import { corridor } from './course.js';
  *  zero is out of the water. Exported so tools/regress.mjs tests the
  *  same definition the chapter uses rather than its own copy of it. */
 export const SURFACE = 0;
+
+/** How the double inhale splits: the first sip is 2.4 s of a 4 s
+ *  inhale. Every anchor that a constant-rate control has to reach
+ *  partway through the breath is derived from this one number, so
+ *  they cannot drift apart from each other or from the durations. */
+export const SIP_SPLIT = 2.4 / 4.0;
 
 export const HULL_LOW  = 0.26;
 export const HULL_HIGH = 0.94;
@@ -91,7 +97,6 @@ export const HULL_HIGH = 0.94;
  *  rate, and the second object is higher, further and more tightly held.
  *  The boat rises steadily under all of that, which is what a loaded
  *  boat on slow water does. */
-const SIP_SPLIT = 2.4 / 4.0;
 export const HULL_MID = HULL_LOW + (HULL_HIGH - HULL_LOW) * SIP_SPLIT;
 
 /** The hard walls. Both are above the waterline, which is the structural
@@ -174,7 +179,24 @@ export const FOCUS = { NEAR:'near', FAR:'far', NONE:'none' };
  *  These are the anchors the scene's own front springs towards, and
  *  they are here rather than in the scene so tools/regress.mjs can
  *  check the arc without a browser. */
-export const REACH_NEAR = 0.46;
+/*  THE SAME LESSON AS HULL_MID, AND IT HAD TO BE LEARNED TWICE.
+ *
+ *  The front is integrated from the reader's hold at ONE constant rate
+ *  across the whole inhale, so the only place it can be when the first
+ *  sip ends is 2.4/4.0 of the way up. REACH_NEAR was written as 0.46
+ *  for a "the second sip is faster" effect, and the harness measured
+ *  the result: the front trailed its own schedule by 0.15 of the arch,
+ *  which on screen is the light running up the wire visibly behind the
+ *  cue that asked for it.
+ *
+ *  SO THE INCREASE IS NOT A SPEED, in the front any more than in the
+ *  boat. It is WHAT GETS LIT. The first sip's 0.6 of the distance range
+ *  is the lower, nearer part of the arch — the feet and the climb. The
+ *  last 0.4 is the span: the belly, the lean-in and the keystone, which
+ *  is the part that is overhead and the part that closes the arch. The
+ *  second sip is more because it finishes the shape, not because it
+ *  hurries. */
+export const REACH_NEAR = SIP_SPLIT;
 export const REACH_FULL = 1.00;
 
 export const PROTOCOLS = {
@@ -183,12 +205,12 @@ export const PROTOCOLS = {
     id:'drift', name:'Drifting · 2.4 + 1.6 in / 8 out · 5 breaths a minute', cycles:15,
     phases:[
       { k:'in',  d:2.4, label:'breathe in',  sub:'the near lights',
-        from:HULL_LOW, to:HULL_MID, cam:'lift',
+        from:HULL_LOW, to:HULL_MID, ease:linear, cam:'lift',
         focus:FOCUS.NEAR, reach:[0, REACH_NEAR],
         tight:p => 0.72 * p,
         scalar:p => p * 0.6 },
       { k:'in',  d:1.6, label:'and again',   sub:'up through them',
-        from:HULL_MID, to:HULL_HIGH, cam:'rise',
+        from:HULL_MID, to:HULL_HIGH, ease:linear, cam:'rise',
         focus:FOCUS.FAR, reach:[REACH_NEAR, REACH_FULL],
         count:'breathe out in',
         // the increase: attention is TIGHTER on the second object, not
@@ -196,7 +218,7 @@ export const PROTOCOLS = {
         tight:p => 0.72 + 0.28 * p,
         scalar:p => 0.6 + 0.4 * p },
       { k:'out', d:8,   label:'breathe out', sub:'let it all go wide',
-        from:HULL_HIGH, to:HULL_LOW, cam:'settle',
+        from:HULL_HIGH, to:HULL_LOW, ease:linear, cam:'settle',
         focus:FOCUS.NONE, reach:[REACH_FULL, 0],
         count:'breathe in in',
         // all the way down to nothing gathered. Eased so the letting-go
@@ -211,18 +233,18 @@ export const PROTOCOLS = {
     id:'slower', name:'Slower · 2.4 + 1.6 in / 9.3 out · 4.5 breaths a minute', cycles:13,
     phases:[
       { k:'in',  d:2.4, label:'breathe in',  sub:'the near lights',
-        from:HULL_LOW, to:HULL_MID, cam:'lift',
+        from:HULL_LOW, to:HULL_MID, ease:linear, cam:'lift',
         focus:FOCUS.NEAR, reach:[0, REACH_NEAR],
         tight:p => 0.72 * p,
         scalar:p => p * 0.6 },
       { k:'in',  d:1.6, label:'and again',   sub:'up through them',
-        from:HULL_MID, to:HULL_HIGH, cam:'rise',
+        from:HULL_MID, to:HULL_HIGH, ease:linear, cam:'rise',
         focus:FOCUS.FAR, reach:[REACH_NEAR, REACH_FULL],
         count:'breathe out in',
         tight:p => 0.72 + 0.28 * p,
         scalar:p => 0.6 + 0.4 * p },
       { k:'out', d:9.3, label:'breathe out', sub:'let it all go wide',
-        from:HULL_HIGH, to:HULL_LOW, cam:'settle',
+        from:HULL_HIGH, to:HULL_LOW, ease:linear, cam:'settle',
         focus:FOCUS.NONE, reach:[REACH_FULL, 0],
         count:'breathe in in',
         tight:p => 1 - smooth(clamp01(p / 0.82)),
@@ -248,7 +270,20 @@ export function attention(b, t){
   const [r0, r1] = p.reach || [0, 0];
   return {
     focus: p.focus || FOCUS.NONE,
-    reach: r0 + (r1 - r0) * (p.ease ? p.ease(s.pr) : s.pr),
+    /* LINEAR, AND NOT THE PHASE'S OWN EASE. The front is integrated
+       from the reader's hold at a constant rate, so the only shape it
+       can possibly have is a straight ramp. This read the phase's ease,
+       which protocol() defaults to smoothstep, and the gap between a
+       smoothstep and the straight line a constant-rate control actually
+       produces peaks at 0.096 — which is exactly what the harness
+       measured, to three figures, and is a tenth of the whole arch.
+
+       Third time this project has learned it in three places: Long
+       Air's schedule, Bamboo's curtain, and now here twice over. A
+       constant-rate control can only track the integral of a constant.
+       The phases below now say ease:linear explicitly for the same
+       reason, so the hull is not quietly eased either. */
+    reach: r0 + (r1 - r0) * s.pr,
     tight: clamp01(p.tight ? p.tight(s.pr) : 0)
   };
 }
@@ -409,11 +444,24 @@ export function archLights(){
   return out;
 }
 
-/** Is this light lit, given a front? A plain threshold on the baked
- *  order, with a short lip so a light comes up over about a tenth of
- *  the path rather than snapping. */
+/** How much of the path a light takes to come up. */
+export const LIT_LIP = 0.10;
+
+/** Is this light lit, given a front?
+ *
+ *  THE LIP RUNS AHEAD OF THE FRONT, NOT BEHIND IT: a light begins to
+ *  come up a tenth of the path before the front reaches it and is FULLY
+ *  lit at the moment the front arrives. Written the other way round —
+ *  full only a tenth of the path after the front passes — the apex can
+ *  never light at all, because the front's own travel stops exactly at
+ *  the apex and there is no tenth beyond it to give.
+ *
+ *  That is not a rounding detail. It is the keystone of the arch, it is
+ *  the thing the second sip exists to reach, and an arch whose keystone
+ *  never comes on is not an arch. Nothing in a screenshot of the middle
+ *  of an inhale would have shown it. */
 export const litAmount = (s, front) =>
-  clamp01((front - s) / 0.10);
+  clamp01((front - s) / LIT_LIP + 1);
 
 /** How many arches fit in one strip period. Rounded, because a fraction
  *  of an arch at the wrap is a visible jolt once a lap. */

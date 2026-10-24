@@ -38,7 +38,7 @@ import * as deepLight from '../app/js/deep-light-breath.js';
 import * as longAir from '../app/js/long-air-breath.js';
 import * as bamboo from '../app/js/bamboo-rain-breath.js';
 import * as lantern from '../app/js/lantern-breath.js';
-import { body, ratesOf } from '../app/js/course.js';
+import { body, ratesOf, corridor as cor } from '../app/js/course.js';
 
 const STEP = 0.05;          // 20 samples a second
 const EPS  = 1e-12;
@@ -782,11 +782,37 @@ for(const [id, proto] of Object.entries(lantern.PROTOCOLS)){
     if(!(ins[1].tight(1) > ins[0].tight(1)))
       fail(`lantern/${id}: attention is not tighter on the second object ` +
            `(${ins[0].tight(1)} vs ${ins[1].tight(1)})`);
-    const rate = q => (q.reach[1] - q.reach[0]) / q.d;
-    if(!(rate(ins[1]) > rate(ins[0]) * 1.2))
-      fail(`lantern/${id}: the front does not speed up on the second sip ` +
-           `(${rate(ins[0]).toFixed(3)} then ${rate(ins[1]).toFixed(3)} of the arch a second) ` +
-           `— the increase has to be somewhere and this is where it lives`);
+    /* THE FRONT'S ANCHORS, like the hull's, MUST BE WHAT A CONSTANT
+       RATE REACHES. Both were written for a "the second sip is faster"
+       effect and both were wrong in the same way: the control
+       integrates at one rate across the whole inhale, so an anchor it
+       cannot reach is not a target, it is a permanent error. The front
+       version trailed by 0.15 of the arch, which on screen is the light
+       running up the wire visibly behind the cue asking for it.
+
+       So the increase is NOT A SPEED anywhere in this chapter. It is
+       what gets lit (the second sip finishes the span and the keystone,
+       the part that is overhead), how tightly it is held, and where the
+       lens goes. Those are the three checks below. */
+    const totalInR = ins.reduce((a, q) => a + q.d, 0);
+    const wantReach = ins[0].d / totalInR;
+    if(Math.abs(ins[0].reach[1] - wantReach) > 1e-9)
+      fail(`lantern/${id}: the first sip ends with the front at ${ins[0].reach[1]} but a ` +
+           `constant-rate hold reaches ${wantReach.toFixed(3)} there`);
+
+    /* and the second sip must light the TOP of the arch: everything it
+       adds has to be higher than everything the first sip reached */
+    const archA = lantern.archLights();
+    const firstTop  = Math.max(...archA.filter(L => L.s <= ins[0].reach[1] + 1e-9).map(L => L.y));
+    const secondTop = Math.max(...archA.map(L => L.y));
+    const secondSet = archA.filter(L => L.s > ins[0].reach[1] + 1e-9);
+    if(!secondSet.length)
+      fail(`lantern/${id}: the second sip lights nothing the first did not`);
+    else if(!(Math.min(...secondSet.map(L => L.y)) >= firstTop - 1e-9))
+      fail(`lantern/${id}: the second sip lights something LOWER than the first reached ` +
+           `— "up through them" has to be up`);
+    if(!(secondTop > firstTop))
+      fail(`lantern/${id}: the second sip does not reach higher than the first`);
 
     /* THE HULL'S OWN ANCHORS MUST BE WHAT A CONSTANT RATE REACHES.
        The hull is the kit's body with the schedule holding the control,
@@ -876,6 +902,70 @@ for(const [id, proto] of Object.entries(lantern.PROTOCOLS)){
   if(Math.abs(lantern.archZ(nArch, period) - period) > 1e-9)
     fail('lantern: the arches do not close at the strip seam');
 
+  /* ---------------------------------------------------------------
+     THE FRONT, FLOWN. The reader holds through both inhales and lets
+     go through the exhale, driven by the same controller the page
+     drives, and three things must come out of it:
+
+       - the front reaches the apex, so the whole arch can light;
+       - it comes back to the feet before the next breath, so the fade
+         is a thing that completes rather than a thing that is
+         interrupted;
+       - HOLDING THROUGH THE EXHALE TOO CANNOT PUSH IT PAST THE APEX.
+         That is the rate cap, and it is what stops "hold more" being a
+         strategy. The arch has a top.
+     --------------------------------------------------------------- */
+  const FRONT_CORRIDOR = cor({ lo:-0.20, hi:1.14, low:-0.12, high:1.06 });
+  const flyFront = (holdAlways) => {
+    const f = body({ corridor: FRONT_CORRIDOR, rates: ratesOf(proto), k: 140, zeta: 0.55 });
+    let hi = -Infinity, lo = Infinity, endOfExhale = null, worstE = 0;
+    const dt = 1 / 120;
+    for(let tt = 0; tt < proto.session; tt += dt){
+      const kind = b.at(tt).p.k;
+      const hold = holdAlways ? true : (kind === 'in');
+      f.drive(dt, hold, !hold);
+      if(tt > proto.cycle){
+        hi = Math.max(hi, f.value); lo = Math.min(lo, f.value);
+        if(!holdAlways) worstE = Math.max(worstE, Math.abs(f.fill - lantern.attention(b, tt).reach));
+      }
+      // the instant before the cycle wraps, on the second cycle onward
+      const u = tt % proto.cycle;
+      if(!holdAlways && tt > proto.cycle && u > proto.cycle - dt * 1.5) endOfExhale = f.value;
+    }
+    return { hi:+hi.toFixed(4), lo:+lo.toFixed(4), endOfExhale, worstE:+worstE.toFixed(4) };
+  };
+  const onCue = flyFront(false);
+  const greedy = flyFront(true);
+  /* THE APEX MUST ACTUALLY LIGHT. Not "the front gets close to 1" —
+     the keystone lamp's own litAmount must reach full, which is the
+     thing the reader can see and the thing two separate bugs stopped
+     happening (a lip running the wrong way, and a spring target of
+     exactly 1 that a sprung value approaches and never arrives at). */
+  const apex = Math.max(...lantern.archLights().map(L => L.s));
+  if(lantern.litAmount(apex, onCue.hi) < 1 - 1e-9)
+    fail(`lantern/${id}: holding exactly on the cue leaves the keystone at ` +
+         `${lantern.litAmount(apex, onCue.hi).toFixed(3)} — the arch never closes`);
+  if(onCue.endOfExhale === null || lantern.litAmount(0, onCue.endOfExhale) > 1e-9)
+    fail(`lantern/${id}: the feet are still lit at ${onCue.endOfExhale} when the next breath ` +
+         `begins — the fade never completes`);
+  /* AND HOLDING THROUGH THE EXHALE GAINS NOTHING. The arch has a top;
+     this is the rate cap, and it is what stops "hold more" being a
+     strategy in a chapter where nothing is counted. */
+  if(lantern.litAmount(apex, greedy.hi) > lantern.litAmount(apex, onCue.hi) + 1e-9)
+    fail(`lantern/${id}: holding through the exhale lights more of the arch than holding on ` +
+         `the cue does — the arch is supposed to have a top`);
+  const frontCtrl = body({ corridor: FRONT_CORRIDOR, rates: ratesOf(proto), k: 140, zeta: 0.55 });
+  /* fill is integrated, not sprung, so the only error it can have
+     against the schedule is a real mismatch between the anchors and the
+     rate — which is exactly what this is looking for. The tolerance is
+     a hundredth of the arch, not a derived lag, because there is no
+     spring in this comparison at all. */
+  const frontAllow = 0.01;
+  void frontCtrl;
+  if(onCue.worstE > frontAllow)
+    fail(`lantern/${id}: the front trails the schedule by ${onCue.worstE} of the arch, more ` +
+         `than the ${frontAllow.toFixed(4)} its own spring explains`);
+
   /* litAmount is the only thing that decides what is on, so it had
      better be monotonic in the front and bounded. */
   let prevLit = -1;
@@ -889,7 +979,10 @@ for(const [id, proto] of Object.entries(lantern.PROTOCOLS)){
   if(failures === 0)
     console.log(`    ok    lantern/${id}: hull stays ${lowest.toFixed(2)} m clear of the waterline ` +
                 `(walls ${lantern.WALL_LOW}/${lantern.WALL_HIGH}), lag ${worst.toFixed(2)} m, ` +
-                `banks and treeline close at the seam, no lantern in the lane`);
+                `banks and treeline close at the seam, no lantern in the lane; ` +
+                `arch: ${arch.length} lights, feet first, keystone lights at front ` +
+                `${onCue.hi.toFixed(3)} and the feet go out before the next breath, ` +
+                `front tracks the hold to ${onCue.worstE} of the arch`);
 }
 
 /* ------------------------------------------------------------------
