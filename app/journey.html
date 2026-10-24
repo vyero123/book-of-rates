@@ -76,6 +76,8 @@
   #start p{font:400 13px/1.7 ui-sans-serif;color:rgba(243,234,215,.7);margin:0 0 20px}
   #begin{appearance:none;border:0;border-radius:999px;padding:15px 34px;background:#F3EAD7;
     color:#14183F;font:600 11px/1 ui-sans-serif;letter-spacing:.2em}
+  #toContents{display:inline-block;margin-top:10px;color:rgba(243,234,215,.45);
+    font:400 11px/1.4 ui-sans-serif;letter-spacing:.06em;text-decoration:underline}
   #more{margin-top:16px;background:none;border:0;color:rgba(243,234,215,.4);
     font:500 9px/1 ui-sans-serif;letter-spacing:.18em;text-transform:uppercase}
 
@@ -130,6 +132,13 @@
     <p id="jbl"></p>
     <button id="begin">BEGIN</button>
     <div><button id="more">Options</button></div>
+    <!-- THE STOP BUTTON LANDED HERE AND THIS PANEL HAD NO WAY OUT. A
+         reader who began a journey and stopped it was returned to a
+         plate offering BEGIN and Options and nothing else: the only
+         exits were the browser's own back button and the address bar.
+         Every other screen in the project has a way back to the
+         contents; this one did not. -->
+    <div><a id="toContents" href="./#contents">Back to the contents</a></div>
   </div>
 </div>
 
@@ -312,7 +321,9 @@ showControls(false);
 /* ---------- transport ---------- */
 d('begin').onclick = () => begin();
 d('stop').onclick  = () => finish(false);
-d('again').onclick = () => { location.href = './index.html'; };
+// the end card's own button, and it says BACK TO THE CONTENTS, so it had
+// better land there rather than on a closed cover
+d('again').onclick = () => { location.href = './#contents'; };
 
 function applyEyesClosed(on){
   document.body.classList.toggle('eyes', on);

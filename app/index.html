@@ -358,8 +358,22 @@ const save = () => { try { localStorage.setItem('bor.pref', JSON.stringify(PREF)
 
 const $ = id => document.getElementById(id);
 
-/* ================= the cover ================= */
+/* ================= the cover =================
+   COMING BACK IS NOT ARRIVING. A reader who taps "back to the book" has
+   already opened it: landing them on a closed cover and asking them to
+   open it again is an obstacle wearing an animation. Every exit path in
+   the project now comes here as `./#contents`, and that lands on the
+   list of chapters with no cover, no turn and no tap.
+
+   The cover is still the front door — the root redirect, the archive's
+   "open the book" card and a plain visit all still get it. Only
+   RETURNING skips it, which is the distinction the hash is carrying.
+
+   The hash is then cleared from the address bar with replaceState, so a
+   later reload of that same URL opens the book properly rather than
+   inheriting a decision made by a button the reader pressed once. */
 const coverWrap = $('coverWrap');
+const returning = location.hash === '#contents';
 let opened = false;
 function openBook(){
   if (opened) return;
@@ -384,6 +398,20 @@ function openBook(){
 }
 coverWrap.addEventListener('click', openBook);
 coverWrap.addEventListener('touchstart', openBook, {passive:true});
+
+if (returning){
+  // straight to the contents: no board turn, no scroll, no tap
+  opened = true;
+  coverWrap.classList.add('gone');
+  $('contents').classList.add('on');
+  PREF.coverSeen = true; save();
+  // the scroll is still shown if it has never been seen. Skipping the
+  // cover is a convenience; skipping the disclosure is not on the table,
+  // and requireScroll() is a no-op once it has been read (design doc
+  // §1.6: disclosure, not a consent gate).
+  requireScroll(() => {});
+  try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+}
 
 /* ================= contents ================= */
 const SHOW_LOCKED = true;
