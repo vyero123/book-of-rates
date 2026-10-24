@@ -49,9 +49,18 @@
   .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.06em}
   .sheet p{margin:0 0 14px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(242,227,200,.78);max-width:320px}
   .sheet .fine{font-size:11.5px;line-height:1.55;color:rgba(242,227,200,.6)}
-  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 24px;margin-top:6px;
-    background:#F2E3C8;color:#08202C;font:600 12px/1 ui-sans-serif,sans-serif;letter-spacing:.16em}
+  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
+    background:#F2E3C8;color:#08202C;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    display:block;width:100%;max-width:320px}
+  .sheet button.alt{background:transparent;color:#F2E3C8;
+    box-shadow:inset 0 0 0 1.5px rgba(242,227,200,.45);font-weight:500}
+  .sheet button.link{background:transparent;color:rgba(242,227,200,.55);box-shadow:none;
+    font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;text-decoration:underline;
+    padding:8px;margin-top:14px}
   .sheet strong{color:#F2E3C8;font-weight:600}
+  .sheet .own{border-left:2px solid rgba(242,227,200,.3);padding-left:12px;text-align:left;
+    margin-bottom:18px}
+  .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(242,227,200,.45);margin-top:16px}
 
   #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
     text-align:center;
@@ -72,23 +81,28 @@
 
 <div id="cue"><div id="phase">breathe in</div><div id="sub">above the water</div></div>
 <div id="bar"><div id="barfill"></div></div>
-<div id="note">Prototype. Silent by design. Box breathing — this version contains two 4-second breath-holds. Sit or lie down. Never in or near water. Ease off at the first light-headedness.</div>
+<div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Never hold your breath in or near water. Ease off at any light-headedness.</div>
 
-<!-- Design doc §2.2 asks for screening before ANY protocol containing a hold.
-     This is a stand-in for that gate, not the real screening flow. -->
+<!-- Design doc §2.2: screening before ANY protocol containing a hold, and the
+     gate must leave a real exercise behind, because an all-or-nothing gate
+     trains people to lie to it. "Not sure" counts as yes. The answer persists. -->
 <div id="gate" class="sheet on"><div>
   <h2>Before you begin</h2>
-  <p>This is <strong>box breathing</strong>: four seconds in, four holding, four out, four holding. It contains breath-holds.</p>
-  <p class="fine">The holds are short, equal, and set by the app. Nothing here is timed by you, scored, or compared to last time. Lift off whenever you want — the dive continues.</p>
-  <p class="fine"><strong>Skip this one</strong> if any of these apply to you, or if you are not sure: epilepsy or any seizure history; pregnancy; under 18; heart disease, arrhythmia, or unexplained fainting; stroke, TIA, or aneurysm; sickle cell disease or trait; uncontrolled high blood pressure; glaucoma or recent eye surgery; COPD or unstable asthma; a previous collapsed lung; recent surgery; panic disorder or PTSD; psychosis or mania.</p>
-  <p class="fine"><strong>Never do breath-holding in or near water</strong> — not a bath, pool, sea, or hot tub. Sit or lie down. Not in a vehicle.</p>
-  <button id="begin">I'M SEATED — BEGIN</button>
+  <p class="fine own"><strong>This is a personal project.</strong> It was built by one person, for his own benefit, to suit his own taste and needs — including exercises that are unconventional, and some that no commercial app would offer. Anyone else is welcome to use it at will and with consideration. It is offered as-is, for your own discretion and your own judgement. It is not advice and it is not designed for a general audience.</p>
+  <p>The default is <strong>box breathing</strong> — four in, four holding, four out, four holding. <strong>It contains breath-holds.</strong></p>
+  <p class="fine">The holds are short, exactly equal to the other phases, and set by the app. They never lengthen. Nothing is timed by you, scored, or compared to last time.</p>
+  <p class="fine"><strong>Take the no-holds version instead</strong> if any of these apply to you — and <strong>if you are not sure, that counts as yes</strong>: epilepsy or any seizure history; pregnancy; under 18; heart disease, arrhythmia, or unexplained fainting; stroke, TIA, or aneurysm; sickle cell disease or trait; uncontrolled high blood pressure; glaucoma or recent eye surgery; COPD or unstable asthma; a previous collapsed lung; recent surgery; panic disorder or PTSD; psychosis or mania.</p>
+  <p class="fine"><strong>Never hold your breath in or near water</strong> — not a bath, pool, sea, or hot tub. Sit or lie down, never standing, never in a vehicle.</p>
+  <button id="gateHolds">NONE APPLY — BOX BREATHING</button>
+  <button id="gateNo" class="alt">ONE APPLIES, OR I'M NOT SURE<br>— THE NO-HOLDS VERSION</button>
+  <p class="fine tiny">The no-holds version is the same dive at the same length, with a rest at the bottom of the exhale in place of a hold. Nothing is withheld from it. Your answer is remembered on this device; you can change it from the stop screen.</p>
 </div></div>
 
 <div id="halt" class="sheet"><div>
   <h2>Stopped</h2>
   <p>Let your breathing go back to whatever it wants to do. She keeps the pearl either way.</p>
   <button id="resume">RESUME</button>
+  <button id="rescreen" class="link">Change my answer about breath-holds</button>
 </div></div>
 
 <div id="fallback"><div>
@@ -114,21 +128,28 @@
        breathe out (4 s)  — rising with it, bubbles going up
        hold        (4 s)  — floating at the waterline, lungs empty
 
-   *** THIS INTRODUCES RETENTION INTO THE WATER LEVEL, WHICH THE DESIGN
-   DOC DECIDED AGAINST. *** §8 decision 2: "No retention anywhere in v1.
-   The pearl diver ships as the bottom-of-exhale version." §2.4 gives the
-   reason and it is specifically about this level: do not teach the
-   association between holding your breath and being underwater, because
-   some fraction of people who enjoy it will later be in a pool. The doc
-   does permit 4-second box holds in general (§1.4, §6.1, "low-risk") —
-   but in level 3, Kite Line, which has no water in it.
+   This introduces retention into the water level, which the design doc
+   originally decided against (§8 decision 2, §2.4). That decision was
+   AMENDED by the author on 23 October 2026 — see §1.5, §2.4 — on the
+   grounds that this is a personal project, built to one person's taste,
+   offered as-is to anyone else to use with their own judgement. The
+   original reasoning is preserved in the doc, not deleted: the §2.4
+   worry about teaching a breath-hold-underwater association to third
+   parties is now answered by FRAMING rather than by omission.
 
-   Built as asked, with the doc's own safety architecture carried over:
-   a screening notice before the first breath (§2.2), nothing timed or
-   scored (§2.4), the hold countdowns point towards air and never show
-   elapsed time (§2.4), no fast breathing anywhere — 3.75/min is SLOWER
-   than the 5.45/min this page used before, so §2.1 rule 3, the
-   hyperventilation-then-hold combination, is not engaged.
+   What that framing has to earn, and what this file implements:
+     - the app says what it is, in the gate and in the footer;
+     - it names the hazard instead of hiding it;
+     - it screens before the first hold (§2.2), and "not sure" counts
+       as yes;
+     - anybody who screens out gets the doc's original no-retention
+       protocol, fully built — §2.2 is explicit that an all-or-nothing
+       gate trains people to lie to it;
+     - nothing timed, scored or compared; the hold countdowns point
+       towards air and never show elapsed time (§2.4);
+     - no fast breathing anywhere. 3.75/min is SLOWER than the 5.45/min
+       this page used before, so §2.1 rule 3 — hyperventilation then a
+       hold, the combination that kills people — is not engaged.
 
    SILENT. No AudioContext, no media elements.
 
@@ -142,61 +163,75 @@
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
-/* ---------- the box ---------- */
-const PHASES = [
-  { k:'in',    d:4.0, label:'breathe in',  sub:'above the water' },
-  { k:'hold1', d:4.0, label:'hold',        sub:'down for the pearl' },
-  { k:'out',   d:4.0, label:'breathe out', sub:'rising with it' },
-  { k:'hold2', d:4.0, label:'hold',        sub:'floating, empty' }
-];
-const CYCLE   = PHASES.reduce((a,p)=>a+p.d, 0);     // 16 s = 3.75 / min
-const CYCLES  = 10;
-const SESSION = CYCLE * CYCLES;                      // 2 min 40 s
-
-function phaseAt(t){
-  let u = t % CYCLE; if(u < 0) u += CYCLE;
-  for(const p of PHASES){ if(u < p.d) return { p, pr:u/p.d, left:p.d - u }; u -= p.d; }
-  const p = PHASES[PHASES.length-1]; return { p, pr:1, left:0 };
-}
-const smooth = x => x*x*(3-2*x);
-
-/* Where she is, as one continuous height. Above zero is out of the water. */
+/* ---------- the dive, in height terms. Above zero is out of the water. */
 const Y_AIR    =  0.52;
 const Y_FLOAT  = -0.42;
 const Y_BOTTOM = -14.4;
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const smooth  = x => x*x*(3-2*x);
+/* drops through the surface fast, then glides the rest of the way down */
+const drop    = x => smooth(Math.pow(x, 0.80));
+
+/* ---------- TWO PROTOCOLS ----------
+   The default is box breathing. The second is the design doc's original
+   no-retention version of this same level, and it is what the screening
+   gate hands anybody who should not be holding their breath — §2.2 is
+   explicit that an all-or-nothing gate trains people to lie to it, so
+   what sits behind the gate has to be a real exercise, not a refusal.
+   Each phase carries its own height anchors, camera mode and grip curve,
+   so both protocols drive the same scene without special cases. */
+const PROTOCOLS = {
+  box: {
+    id:'box', name:'Box breathing · 4-4-4-4 · 3.75 breaths a minute', cycles:10,
+    phases:[
+      { k:'in',   d:4, label:'breathe in',  sub:'above the water',
+        from:Y_FLOAT, to:Y_AIR, cam:'air',
+        grip:p => 1 - smooth(clamp01((p - 0.45) / 0.45)) },
+      { k:'hold', d:4, label:'hold',        sub:'down for the pearl',
+        from:Y_AIR, to:Y_BOTTOM, cam:'down', ease:drop, count:'rising in',
+        grip:p => smooth(clamp01((p - 0.70) / 0.30)) },
+      { k:'out',  d:4, label:'breathe out', sub:'rising with it',
+        from:Y_BOTTOM, to:Y_FLOAT, cam:'up', bubbles:true, grip:() => 1 },
+      { k:'hold', d:4, label:'hold',        sub:'floating, empty',
+        from:Y_FLOAT, to:Y_FLOAT * 0.45, cam:'line', count:'breathe in',
+        grip:() => 1 }
+    ]
+  },
+  open: {
+    id:'open', name:'No holds · 4 out / 2 at empty / 5 in · 5.45 breaths a minute', cycles:14,
+    phases:[
+      { k:'out',  d:4, label:'breathe out', sub:'she sinks',
+        from:Y_AIR, to:Y_BOTTOM, cam:'down', ease:drop, bubbles:true,
+        grip:p => 1 - smooth(clamp01(p / 0.35)) },
+      // a rest at empty, not a hold against urge: §2.4's version
+      { k:'rest', d:2, label:'rest',        sub:'drifting at the bottom',
+        from:Y_BOTTOM, to:Y_BOTTOM, cam:'down', count:'rising in',
+        grip:p => smooth(clamp01((p - 0.15) / 0.75)) },
+      { k:'in',   d:5, label:'breathe in',  sub:'rising into the air',
+        from:Y_BOTTOM, to:Y_AIR, cam:'up2air', grip:() => 1 }
+    ]
+  }
+};
+let PROTO = PROTOCOLS.box, CYCLE = 16, SESSION = 160;
+function useProtocol(p){
+  PROTO = p;
+  CYCLE = PROTO.phases.reduce((a, q) => a + q.d, 0);
+  SESSION = CYCLE * PROTO.cycles;
+}
+useProtocol(PROTOCOLS.box);
+
+function phaseAt(t){
+  let u = t % CYCLE; if(u < 0) u += CYCLE;
+  for(const p of PROTO.phases){ if(u < p.d) return { p, pr:u/p.d, left:p.d - u }; u -= p.d; }
+  const p = PROTO.phases[PROTO.phases.length-1]; return { p, pr:1, left:0 };
+}
 function diverY(t){
-  const s = phaseAt(t), p = s.pr;
-  switch(s.p.k){
-    case 'in':    return Y_FLOAT * (1 - smooth(p)) + Y_AIR * smooth(p);
-    // drops through the surface quickly, then glides the rest of the way
-    case 'hold1': return Y_AIR + (Y_BOTTOM - Y_AIR) * smooth(Math.pow(p, 0.80));
-    case 'out':   return Y_BOTTOM + (Y_FLOAT - Y_BOTTOM) * smooth(p);
-    default:      return Y_FLOAT * (1 - 0.55 * smooth(p));   // drifts up to the line
-  }
+  const s = phaseAt(t);
+  return s.p.from + (s.p.to - s.p.from) * (s.p.ease || smooth)(s.pr);
 }
-/* How much of the pearl is in her hands. She takes it at the end of the
-   search, holds it all the way up and through the float, and lets it go
-   as she breathes; it settles back to the bed through the next descent. */
-function carry(t){
-  const s = phaseAt(t), p = s.pr;
-  switch(s.p.k){
-    case 'hold1': return smooth(Math.max(0, (p - 0.78) / 0.22));
-    case 'out':   return 1;
-    case 'hold2': return 1;
-    default:      return 1 - smooth(Math.max(0, (p - 0.55) / 0.45));
-  }
-}
-/* Both hands on it, in at the chest. Lags carry slightly so the grasp
-   closes before she starts up. */
-function gripAmount(t){
-  const s = phaseAt(t), p = s.pr;
-  switch(s.p.k){
-    case 'hold1': return smooth(Math.max(0, (p - 0.70) / 0.30));
-    case 'out':   return 1;
-    case 'hold2': return 1;
-    default:      return 1 - smooth(Math.max(0, (p - 0.45) / 0.40));
-  }
-}
+/* One scalar for both the grasp and the pearl: the pearl sits at her
+   chest exactly when both hands are on it. */
+function gripAmount(t){ const s = phaseAt(t); return clamp01(s.p.grip(s.pr)); }
 
 /* ---------- BELOW: the value ramp, teal into indigo ---------- */
 const RAMP = [0xD8F0E6, 0x93CFC6, 0x4E9C9E, 0x246E78, 0x103C4C, 0x08202C];
@@ -1179,20 +1214,23 @@ function frame(now){
   if(started) t += dt;
 
   const st = phaseAt(t);
-  const k  = st.p.k;
+  const ph = st.p;
   const dyNow = diverY(t);
-  const cr = carry(t);
-  const grip = gripAmount(t);
+  const cr = gripAmount(t);
+  const grip = cr;
+  const travel = ph.to - ph.from;          // <0 descending, >0 rising, 0 still
 
   /* --- the diver --- */
   diver.position.set(Math.sin(t * 0.21) * 0.30, dyNow, Math.cos(t * 0.17) * 0.26);
-  const aim = k === 'hold1' ? 0.60 : k === 'out' ? -0.45 : k === 'in' ? -0.18 : 0.08;
+  const aim = ph.cam === 'air'  ? -0.15
+            : ph.cam === 'line' ?  0.06
+            : travel < 0 ? 0.60 : -0.45;
   diver.rotation.x += (aim - diver.rotation.x) * Math.min(1, dt * 1.8);
   diver.rotation.y  = Math.sin(t * 0.13) * 0.35;
   diver.rotation.z  = Math.sin(t * 0.31) * 0.06;
 
-  /* kick: strong on the descent, idling on the holds at the surface */
-  const swim = k === 'hold1' ? 1.0 : k === 'out' ? 0.8 : 0.22;
+  /* kick: she swims when she is going somewhere, idles when she is not */
+  const swim = Math.abs(travel) > 2 ? 1.0 : 0.22;
   const kick = Math.sin(t * 3.4) * 0.5 * swim;
   legL.rotation.x =  kick;  finL.rotation.x =  kick * 1.4;
   legR.rotation.x = -kick;  finR.rotation.x = -kick * 1.4;
@@ -1200,7 +1238,8 @@ function frame(now){
   legR.position.z = -kick * 0.22; finR.position.z = -kick * 0.5;
 
   /* arms: open and sweeping when free, closed on the pearl when gripped */
-  const freeZL = 0.34 + (k === 'hold1' ? 0.42 : -0.55);
+  const searching = travel < 0 || ph.k === 'rest';
+  const freeZL = 0.34 + (searching ? 0.42 : -0.55);
   const armZL = freeZL * (1 - grip) + (-0.78) * grip;
   armL.rotation.z +=  (armZL - armL.rotation.z) * Math.min(1, dt * 3.0);
   armR.rotation.z += (-armZL - armR.rotation.z) * Math.min(1, dt * 3.0);
@@ -1225,7 +1264,7 @@ function frame(now){
   pearl.position.lerpVectors(vBed, vChest, cr);
 
   /* --- bubbles on the exhale only; the hold is silent and still --- */
-  if(k === 'out'){
+  if(ph.bubbles){
     bubAccum += dt * (10 + 14 * (1 - st.pr));
     while(bubAccum >= 1){ bubAccum -= 1; spawn(0, diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12); }
   } else bubAccum = 0;
@@ -1242,12 +1281,19 @@ function frame(now){
      because the above-water shot is a different shot, not the same one
      from higher up: further back, level with the horizon, wide open. --- */
   let wantY, lookY, wantBack, ease;
-  if(k === 'in'){
+  if(ph.cam === 'air'){
     wantY = Math.max(dyNow + 0.78, 0.95); lookY = 0.62;  wantBack = 12.5; ease = 2.4;
-  } else if(k === 'hold1'){
+  } else if(ph.cam === 'down'){
     wantY = dyNow + 1.60; lookY = dyNow - 1.30; wantBack = 9.0;  ease = 5.0;
-  } else if(k === 'out'){
+  } else if(ph.cam === 'up'){
     wantY = dyNow + 1.60; lookY = dyNow + 2.40; wantBack = 9.0;  ease = 5.0;
+  } else if(ph.cam === 'up2air'){
+    // the no-holds protocol rises all the way into the air on one breath,
+    // so the shot has to become the above-water shot on the way
+    const f = clamp01((dyNow + 3.2) / 3.4);
+    wantY = (dyNow + 1.60) * (1 - f) + Math.max(dyNow + 0.78, 0.95) * f;
+    lookY = (dyNow + 2.40) * (1 - f) + 0.62 * f;
+    wantBack = 9.0 * (1 - f) + 12.5 * f;  ease = 4.0;
   } else {
     wantY = 0.42;         lookY = 0.22;        wantBack = 11.5; ease = 2.2;
   }
@@ -1279,10 +1325,8 @@ function frame(now){
   matBody.color.copy(cBodyUp).lerp(cBodyDown, Math.min(1, Math.max(0, (dn - 0.12) / 0.5)));
 
   /* --- cue text. §2.4: the holds count towards air, never elapsed. --- */
-  if(st.p.label !== elPhase.textContent) elPhase.textContent = st.p.label;
-  let sub = st.p.sub;
-  if(k === 'hold1') sub = 'rising in ' + Math.max(1, Math.ceil(st.left));
-  if(k === 'hold2') sub = 'breathe in ' + Math.max(1, Math.ceil(st.left));
+  if(ph.label !== elPhase.textContent) elPhase.textContent = ph.label;
+  const sub = ph.count ? (ph.count + ' ' + Math.max(1, Math.ceil(st.left))) : ph.sub;
   if(sub !== subShown){ elSub.textContent = sub; subShown = sub; }
   elBar.style.width = (100 * Math.min(1, t / SESSION)).toFixed(2) + '%';
 
@@ -1312,16 +1356,51 @@ document.addEventListener('visibilitychange', () => {
   if(document.hidden) stopLoop(); else startLoop();
 });
 
-/* ---------- the screening notice, then the always-visible stop ---------- */
-$('begin').addEventListener('click', () => {
+/* ---------- the screening gate (§2.2) ----------
+   Two real answers, not an acknowledgement. "Not sure" is wired to the
+   same branch as "yes", because that is what §2.2 says it must count
+   as, and the branch leads to a complete exercise rather than a
+   refusal. The answer persists on the device so the question is asked
+   once, and can be changed from the stop screen. */
+const ACK_KEY = 'bor.deeplight.screening.v1';
+function readAck(){
+  try{
+    const raw = localStorage.getItem(ACK_KEY);
+    const v = raw ? JSON.parse(raw) : null;
+    return (v && (v.choice === 'holds' || v.choice === 'noholds')) ? v : null;
+  }catch(e){ return null; }         // private browsing throws; just ask again
+}
+function writeAck(choice){
+  try{ localStorage.setItem(ACK_KEY, JSON.stringify({ choice, at:new Date().toISOString() })); }
+  catch(e){ /* not persisted; the gate will ask next time, which is the safe way to fail */ }
+}
+function beginWith(choice, remember){
+  useProtocol(choice === 'holds' ? PROTOCOLS.box : PROTOCOLS.open);
+  $('proto').textContent = PROTO.name;
+  if(remember) writeAck(choice);
   elGate.classList.remove('on');
   started = true;
+  t = 0; prevY = diverY(0); subShown = '';
   last = fPrev = performance.now();
-});
+}
+$('gateHolds').addEventListener('click', () => beginWith('holds', true));
+$('gateNo').addEventListener('click',    () => beginWith('noholds', true));
+
 $('stop').addEventListener('click', () => { running = false; elHalt.classList.add('on'); });
 $('resume').addEventListener('click', () => {
   elHalt.classList.remove('on'); running = true; last = fPrev = performance.now();
 });
+$('rescreen').addEventListener('click', () => {
+  try{ localStorage.removeItem(ACK_KEY); }catch(e){}
+  elHalt.classList.remove('on');
+  elGate.classList.add('on');
+  started = false; running = true; t = 0;
+  last = fPrev = performance.now();
+});
+
+/* a remembered answer means the question is not asked again */
+const ack = readAck();
+if(ack) beginWith(ack.choice, false);
 
 /* ---------- context loss ---------- */
 canvas.addEventListener('webglcontextlost', e => {
@@ -1339,15 +1418,17 @@ canvas.addEventListener('webglcontextrestored', () => {
    the fps readout reports single digits, and a four-second exhale's
    worth of bubbles can never accumulate. That is the instrument. */
 window.__deepLight = {
-  begin(){ elGate.classList.remove('on'); started = true; },
+  begin(which){ beginWith(which === 'noholds' ? 'noholds' : 'holds', false); },
+  ack: () => readAck(),
   scene, camera, THREE,   // so a stray shape can be identified by toggling
   // hide one named mesh type to find out what something on screen is
   only(hide){ scene.traverse(o => { if(o.isMesh && hide.indexOf(o.name) >= 0) o.visible = false; }); },
   seek(v){ t = v; prevY = diverY(v); },
   now(){ const s = phaseAt(t);
-    return { t, phase:s.p.k, left:+s.left.toFixed(2), y:+diverY(t).toFixed(2),
-             camY:+camY.toFixed(2), above:+uAbove.value.toFixed(2),
-             grip:+gripAmount(t).toFixed(2), carry:+carry(t).toFixed(2),
+    return { protocol:PROTO.id, cycle:CYCLE, session:SESSION,
+             t, phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
+             y:+diverY(t).toFixed(2), camY:+camY.toFixed(2),
+             above:+uAbove.value.toFixed(2), grip:+gripAmount(t).toFixed(2),
              liveParticles: parts.filter(p => p.live).length }; },
   puff(n, kind){
     for(let i = 0; i < (n || 30); i++){

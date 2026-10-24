@@ -127,6 +127,34 @@ sound — and be clear in the copy that the imagery is doing most of that work. 
 That is legitimate design and illegitimate science, and the difference should be visible in
 how we write about it.
 
+### 1.5 Whose app this is, and what that licenses
+
+*Added 23 October 2026, by the author. This governs the protocol decisions above and the
+ones still to come.*
+
+The Book of Rates is a personal project. I built it for my own benefit, to suit my own taste
+and needs, and I intend to go on building a variety of breathing exercises here — including
+unconventional ones, and including ones no commercial wellness product would ship, because
+they are not aimed at a general population and are not sold to anybody.
+
+Anyone else is welcome to use it, at will and with consideration: their own discretion, their
+own judgement, their own body. That is an offer, not a recommendation, and it should be
+stated that way wherever the app speaks to a user.
+
+This changes what §1 is *for*. The evidence sections are not a bar a protocol must clear
+before it may be included. They are an honest account of what is known and what is not, so
+that the person choosing a practice chooses it knowingly. Two things it does not relax:
+
+- **§1.3 stands in full.** The app may not say things that are not true. A personal project
+  is still not licensed to misinform, and "it's just for me" is not a defence for a claim
+  that reaches someone else.
+- **The safety information in §2 stands in full.** Every hazard identified there stays
+  identified and stays on screen. What changes is that a hazard may now be *disclosed and
+  chosen* rather than designed out — the user carries the risk, so the user gets the facts
+  and the decision.
+
+Where those two hold, the question "is this proven?" stops being a gate and becomes a label.
+
 ---
 
 ## 2. Safety: the architecture, not the disclaimer
@@ -211,6 +239,45 @@ the mental model and then hoping it stays in the app.
 bottom-of-exhale version described below. Retention becomes a future unlockable — the design
 for that lock is §2.4a.
 
+> **AMENDED 23 October 2026, by the author.** The decision above is reversed for this
+> author's own use. The pearl diver now runs as **box breathing, 4-4-4-4, with the submerged
+> search inside the first hold** — which is precisely the thing this section argued against.
+>
+> **The analysis above is not withdrawn, and is deliberately left in place.** It was and
+> remains the right reasoning for a product shipped to strangers. What changed is not the
+> risk assessment; it is who the app is for. See §1.5.
+>
+> The specific worry in this section is a third-party one: that somebody who enjoys a
+> rewarded underwater breath-hold carries that association to a pool. That worry is now
+> **addressed by framing rather than by omission.** Concretely, in the build:
+>
+> - The app says plainly what it is — one person's project, built to his taste, offered
+>   as-is, to be used with the user's own judgement. It does not present itself as a
+>   general-purpose wellness product, because the general-purpose version of this level is
+>   the one described below and it is still there.
+> - It **names** the hazard instead of hiding it. The same argument §2.4a makes for showing
+>   the locked state rather than concealing it — that a person who learns here why retention
+>   is treated differently is better off than one who meets it first on YouTube — applies to
+>   the practice itself once it is present.
+> - It **screens before the first hold** (§2.2) and treats "not sure" as "yes".
+> - Anybody who screens out is routed to **the no-retention version of this same level**,
+>   which stays fully built and fully playable. §2.2's point holds: an all-or-nothing gate
+>   trains people to lie to it, so the gate must leave a real exercise behind.
+>
+> **Unchanged, and not up for amendment:**
+>
+> - No fast breathing before, during or near the hold. §2.1 rule 3 — hyperventilation
+>   followed by a breath-hold — is the combination that kills people and it is absent here.
+>   Box breathing at 3.75/min is *slower* than the 5.45/min version it replaced.
+> - The holds stay short and exactly equal to the other phases. They do not lengthen, ever,
+>   and they are not adjustable by progress.
+> - The hold is set by the app and shown as a **countdown pointing towards air**, never as
+>   an elapsed timer.
+> - Nothing is scored, streaked, recorded or compared across sessions. No duration is ever
+>   shown to the user.
+> - Every water rule in §2.1 stays on screen, including the un-skippable one: never in or
+>   near water.
+
 **What I recommended, and what we are doing: ship the pearl diver with no breath-hold at all.**
 
 Make "underwater" the bottom of a long slow exhale rather than a retention. The diver sinks
@@ -227,6 +294,13 @@ Some fraction of them will be in a pool at some point. That's the real reason to
 ceiling low and the framing pointed at surfacing.
 
 ### 2.4a Retention as a locked future feature
+
+> **Status note, 23 Oct 2026.** Superseded for the pearl diver only, by the amendment at
+> §2.4: retention is present in that level now rather than locked. The lock design below is
+> kept, both because it still applies to any *other* retention practice this app grows, and
+> because its central argument — that a visible, explained lock teaches better than a silent
+> omission — is the same argument now being made one step further on, for a visible,
+> explained practice.
 
 Decided: retention is **out of v1 and visible as locked**, presented as something offered
 rather than something hidden. Two things have to be true at once — it must read as *not yet*
@@ -723,6 +797,14 @@ Levels 3, 6 and 7 are your three.
 | 9 | **Two Rivers** | Clear-headed | Alternate nostril, cued | 5.0 | Forest confluence, two channels of water | Thumb rests on the left or right half to mark which nostril is open. |
 | 10 | **The Summit** | Grounded, arrived | The user's own resonance rate, found by a gentle 6.5 → 4.5 sweep | ~4.5–6.5 | Above the clouds at sunrise, enormous negative space | **Nothing at all.** The last page of the book. |
 
+> **Table note, 23 Oct 2026.** Row 7, Pearl Diver, now has two protocols rather than one.
+> The default is **box breathing, 4-4-4-4, 3.75/min**, with the descent and the search
+> inside the first hold and the inhale taken above the surface. The row as written —
+> 4 / 2 at empty / 5, no retention, 5.45/min — is still built, and is what the screening
+> gate offers anybody for whom holds are contraindicated or who is unsure. The reasoning
+> for the change, and the original reasoning against it, are both at §2.4; the authorial
+> grounds are at §1.5.
+
 ### 6.1 Notes on the three you specified
 
 **3 · Kite Line.** The Flappy-Bird reference is right about the *feel* and must be wrong about
@@ -805,6 +887,13 @@ In the order I'd worry about it.
    shelved rather than deleted. §5.4.
 2. **No retention anywhere in v1.** The pearl diver ships as the bottom-of-exhale version.
    Retention becomes a visible locked future feature, designed at §2.4a.
+   > **AMENDED 23 Oct 2026:** relaxed by the author, for his own use, on the grounds set out
+   > in §1.5. Retention is now permitted in the pearl diver as short equal holds inside box
+   > breathing. The original decision and the whole of its reasoning are preserved at §2.4
+   > and have not been deleted: this is a decision changed on purpose, not a constraint that
+   > evaporated. The hazard is now disclosed and chosen rather than designed out, and the
+   > no-retention version of the level remains built and is what anyone who screens out
+   > gets. Everything in §2.1 still binds.
 3. **Two evidence standards, separated.** Breathing-to-body claims keep the full discipline;
    the music layer is design and is not apologised for. §3.1.
 
