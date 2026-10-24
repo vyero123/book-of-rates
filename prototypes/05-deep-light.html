@@ -692,6 +692,27 @@ canvas.addEventListener('webglcontextrestored', () => {
   startLoop();
 }, false);
 
+/* ---------- a small hook for inspecting this from outside ----------
+   The page can only be looked at through a browser pane that is hidden
+   between tool calls, which throttles requestAnimationFrame to nothing:
+   the breath appears frozen and the fps readout reports single digits.
+   That is the instrument, not the scene. These let a specific moment in
+   the cycle be seeked to, and the render cost be timed without rAF. */
+window.__deepLight = {
+  seek(v){ t = v; },
+  now(){ return { t, phase: phaseAt(t).p.k, level: level(t) }; },
+  bench(n){
+    const gl = renderer.getContext();
+    renderer.render(scene, camera); gl.finish();
+    const s = performance.now();
+    for(let i = 0; i < n; i++) renderer.render(scene, camera);
+    gl.finish();
+    return { msPerRender: (performance.now() - s) / n, n,
+             drawCalls: renderer.info.render.calls,
+             triangles: renderer.info.render.triangles };
+  }
+};
+
 startLoop();
 }
 </script>
