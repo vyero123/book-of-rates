@@ -14,7 +14,16 @@
     -webkit-font-smoothing:antialiased;color:var(--paper)}
 
   /* ---------- the living background, shared by everything ---------- */
-  #bg{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  /* TWO BACKGROUNDS, ONE AT A TIME. #bg3d is the Deep Light column in
+     WebGL; #bg is the 2-D scene the book has always had, and it is what
+     runs when there is no WebGL, when the reader turns the 3-D one off,
+     or when the 3-D one fails to start. Never both: that would be two
+     full-screen redraws a frame for one picture. */
+  #bg,#bg3d{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  #bg3d{display:none}
+  body.deepbg #bg{display:none}
+  body.deepbg #bg3d{display:block}
+  body.nobg #bg,body.nobg #bg3d{display:none}
   #scrim{position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(180deg, rgba(12,7,22,.30) 0%, rgba(12,7,22,.52) 42%, rgba(12,7,22,.80) 100%)}
 
@@ -199,6 +208,7 @@
 <body>
 
 <canvas id="bg"></canvas>
+<canvas id="bg3d"></canvas>
 <div id="scrim"></div>
 
 <!-- ============ cover ============
@@ -313,6 +323,11 @@
     you would rather start somewhere else.</p>
   <h2>Hand</h2><div class="row" id="optHand"></div>
   <h2>Opening</h2><div class="row" id="optCover"></div>
+  <h2>Background</h2><div class="row" id="optBg"></div>
+  <p class="note">The Deep Light column runs behind the book at twenty frames a second,
+    at a reduced resolution, and stops the moment you leave the page. If your phone
+    gets warm, turn it to flat or off — and it is already still rather than slow if you
+    have asked your device for reduced motion.</p>
   <h2>Safety</h2><div class="row"><button class="opt" id="reGate">Read the scroll again</button></div>
   <h2>Behind the book</h2>
   <div class="row"><a class="opt" href="../archive.html" style="text-decoration:none">Prototypes, research &amp; design notes</a></div>
@@ -333,7 +348,9 @@ import { requireScroll, openScroll } from './js/scroll.js';
 
 /* ---------- preferences ---------- */
 const PREF = (() => {
-  const d = { len:'standard', sound:true, entry:'', hand:'right', coverSeen:false };
+  // bg: 'deep' = the Deep Light column in WebGL, 'flat' = the 2-D scene
+  // the book has always had, 'off' = neither. Default 'deep'.
+  const d = { len:'standard', sound:true, entry:'', hand:'right', coverSeen:false, bg:'deep' };
   try { Object.assign(d, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
   return d;
 })();
@@ -604,20 +621,55 @@ const lanternHTML = `<a class="entry three" href="lantern-current.html">
    than dropped. Silently losing a chapter because somebody renamed an id
    is a worse failure than an entry in the wrong place, and it would look
    like a content decision. */
-const TAKES_OVER = { 'kite-line': longAirHTML, 'pearl-diver': deepLightHTML };
-const rows = [];
-for(const j of JOURNEYS){
-  rows.push(TAKES_OVER[j.id] !== undefined ? TAKES_OVER[j.id] : entryHTML(j, rows.length));
-  delete TAKES_OVER[j.id];
-}
-for(const leftover of Object.values(TAKES_OVER)) rows.push(leftover);
+/* ==================================================================
+   THE THREE-DIMENSIONAL CHAPTERS COME FIRST, AS A GROUP — 24 Oct
+   ==================================================================
+   They already took their chapters' own numbers. Now they also take the
+   front of the book: four 3-D chapters in a block, then the flat ones,
+   then the chapter that is not in this edition.
 
-/* The chapters that are ONLY three-dimensional. Bamboo Rain and Lantern
-   Current have no flat twin to take over from — they are new chapters
-   of the book rather than second readings of old ones — so they append
-   after the seven and take the next two numbers. */
-rows.push(bambooHTML, lanternHTML);
-$('list').innerHTML = rows.join('') + (SHOW_LOCKED ? lockedHTML : '');
+   So THE PAGE NUMBERS NO LONGER RUN IN ORDER — 4, 6, 8, 9, then 1, 2,
+   3, 5, 7 — and that is the point rather than a bug to hide. The number
+   is the chapter's identity and stays with it; the position is the
+   reading order, and the reading order now says what kind of book this
+   is. Two headed sections make the jump legible instead of looking like
+   a sort that went wrong.
+
+   The flat chapters are still here and still open. This is an ordering,
+   not another demotion: the two that WERE demoted (the flat Kite Line
+   and Pearl Diver) went to the archive in their own commit and are not
+   in this list at all.
+   ================================================================== */
+const TAKES_OVER = { 'kite-line': longAirHTML, 'pearl-diver': deepLightHTML };
+const flat = [];
+const taken = [];
+for(const j of JOURNEYS){
+  if(TAKES_OVER[j.id] !== undefined){
+    taken.push(TAKES_OVER[j.id]);
+    delete TAKES_OVER[j.id];
+  } else {
+    // the page number still comes from the chapter's own place in
+    // JOURNEYS, not from where the row ends up in this list
+    flat.push(entryHTML(j, JOURNEYS.indexOf(j)));
+  }
+}
+/* A 3-D chapter whose twin is missing from JOURNEYS is kept rather than
+   dropped. Silently losing a chapter to a renamed id is worse than an
+   entry in the wrong place, and it would read as a content decision. */
+for(const leftover of Object.values(TAKES_OVER)) taken.push(leftover);
+
+/* Bamboo Rain and Lantern Current have no flat twin to take over from —
+   they are new chapters rather than second readings — so they simply
+   join the 3-D block at the end of it, in chapter order. */
+const three = taken.concat([bambooHTML, lanternHTML]);
+
+const head = label => `<div class="ct"><span>${label}</span><i></i></div>`;
+$('list').innerHTML =
+  head('In three dimensions') + three.join('') +
+  head('Flat') + flat.join('') +
+  // the locked row carries its own "Not in this edition" kicker, so a
+  // heading above it would say the same thing twice
+  (SHOW_LOCKED ? lockedHTML : '');
 // if the reader flagged a condition, say so on the locked chapter rather
 // than leaving them to wonder
 if (!retentionAllowed() && gatePassed()){
@@ -630,6 +682,11 @@ if (!retentionAllowed() && gatePassed()){
 const bg = $('bg'), bgx = bg.getContext('2d');
 let W=0, H=0, grain=null, grainTile=null;
 function fitBg(){
+  /* Only allocate the 2-D background when it is the one running. It is a
+     900,000-pixel backing store plus a grain tile, and holding that on a
+     phone for a canvas the Deep Light column is covering is a real cost
+     for nothing. Switching back to flat calls this again. */
+  if (PREF.bg !== 'flat'){ W = 0; return; }
   const r = sizeCanvas(bg, bgx, 900_000, 2);   // the background is scenery, not detail
   W = r.W; H = r.H;
   if (!grainTile){
@@ -666,12 +723,17 @@ if ('IntersectionObserver' in window){
 }
 let rr = 0;
 
+let bgCost = { ms: 0, n: 0 };
 function frame(now){
   if (!running) return;        // never keep drawing a page we have left
   const t = now/1000;
 
-  /* --- background --- */
-  if (W > 0){
+  /* --- background. Skipped entirely when the Deep Light column is
+     running or the reader has turned the background off: two full-screen
+     redraws a frame for one picture is exactly the cost this whole
+     change is supposed to be arguing about. --- */
+  if (W > 0 && PREF.bg === 'flat'){
+    const t0 = performance.now();
     if (t > nextTurnAt && !bgTurn.active){
       bgTurn.begin(bg);
       bgIdx = (bgIdx + 1) % ORDER.length;
@@ -682,6 +744,10 @@ function frame(now){
     sc.draw({ g: bgx, W, H, t, lv, dlv: 0, info:{} });
     if (grain){ bgx.save(); bgx.globalAlpha=0.4; bgx.fillStyle=grain; bgx.fillRect(0,0,W,H); bgx.restore(); }
     bgTurn.draw(bgx, W, H, t);
+    // measured, not assumed: __bor.bg reports what the 2-D background
+    // actually costs on this device, so the WebGL one can be compared
+    // against it rather than against a guess
+    bgCost.ms += performance.now() - t0; bgCost.n++;
   }
 
   /* --- one preview per frame --- */
@@ -704,6 +770,59 @@ function frame(now){
 }
 requestAnimationFrame(frame);
 
+/* ================= THE DEEP LIGHT BACKGROUND =================
+   Chapter six's water column, running behind the cover and the contents
+   as an idle variant: 20 fps, DPR 1, four draw calls, no protocol, no
+   diver, nothing written per frame. The reasoning and the full list of
+   what it does NOT include are at the top of js/deep-light-idle.js.
+
+   THREE THINGS GUARD IT, and they are all switches rather than
+   cleverness, because a background that measures itself and changes its
+   mind is worse than one that can be turned off:
+
+     - the reader's own setting (Options → Background),
+     - prefers-reduced-motion, which gets a STILL and not a slow one,
+     - no WebGL, or a failure to start, which falls back to the 2-D
+       scene the book has always had rather than to nothing.
+
+   It is disposed on pagehide along with everything else: iOS can keep
+   this document alive in the back/forward cache while the next page
+   allocates its own context, and two live contexts at once is what gets
+   a tab killed.
+   ============================================================ */
+let idle = null;
+function applyBg(){
+  document.body.classList.toggle('deepbg', PREF.bg === 'deep' && !!idle);
+  document.body.classList.toggle('nobg', PREF.bg === 'off');
+}
+function startDeepBg(){
+  if (idle || PREF.bg !== 'deep') return;
+  import('./js/stage.js').then(({ boot }) => import('./js/deep-light-idle.js').then(mod => {
+    boot({
+      cdn: 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js',
+      // no panel, no apology: the book simply keeps the background it
+      // had. A reader who never asked for a 3-D background should not be
+      // told that one failed.
+      fallback(){ if (PREF.bg === 'deep'){ PREF.bg = 'flat'; applyBg(); markSheet(); } },
+      start(THREE){
+        idle = mod.deepLightIdle(THREE, {
+          canvas: $('bg3d'), still: mod.reducedMotion()
+        });
+        applyBg();
+        idle.start();
+      }
+    });
+  })).catch(() => { PREF.bg = 'flat'; applyBg(); });
+}
+function stopDeepBg(){
+  if (!idle) return;
+  idle.dispose();
+  idle = null;
+  applyBg();
+}
+applyBg();
+startDeepBg();
+
 /* ================= options ================= */
 function buildSheet(){
   $('optLen').innerHTML = Object.values(LENGTHS).map(l =>
@@ -719,9 +838,18 @@ function buildSheet(){
      <button class="opt" data-k="hand" data-v="right">Right</button>`;
   $('optCover').innerHTML =
     `<button class="opt" data-k="coverSeen" data-v="false">Show the full opening</button>`;
+  $('optBg').innerHTML =
+    `<button class="opt" data-k="bg" data-v="deep">Deep Light</button>
+     <button class="opt" data-k="bg" data-v="flat">Flat</button>
+     <button class="opt" data-k="bg" data-v="off">None</button>`;
   document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
     const v = b.dataset.v;
     PREF[b.dataset.k] = v === 'true' ? true : v === 'false' ? false : v;
+    if (b.dataset.k === 'bg'){
+      if (PREF.bg === 'deep') startDeepBg(); else stopDeepBg();
+      fitBg();            // allocate or release the 2-D surface to match
+      applyBg();
+    }
     save(); markSheet();
   });
   markSheet();
@@ -770,12 +898,41 @@ function teardown(){
   bgTurn.release();
   previews.forEach(p => release(p.cv));
   releaseAll();
+  // and the WebGL context, for the same reason as every other surface
+  // here: iOS may hold this document in the back/forward cache while the
+  // chapter we are opening allocates its own
+  stopDeepBg();
 }
 addEventListener('pagehide', teardown);
 document.querySelectorAll('a.entry').forEach(a => {
   a.addEventListener('click', () => { save(); teardown(); });
 });
-window.__bor = { diag };
+/* The cost of the background, both ways, measured on the device rather
+   than argued about. `flat` is the 2-D scene's real per-frame time at
+   60 Hz; `deep` is the WebGL column's per-render time at its own 20 Hz
+   cap. Compare msPerSecond, not msPerFrame — the whole case for the
+   WebGL one rests on it running a third as often. */
+window.__bor = {
+  diag,
+  bg(){
+    const flatMs = bgCost.n ? bgCost.ms / bgCost.n : null;
+    const deep = idle ? idle.bench(30) : null;
+    return {
+      mode: PREF.bg,
+      flat: flatMs === null ? 'not running' :
+            { msPerFrame:+flatMs.toFixed(3), frames:bgCost.n,
+              msPerSecond:+(flatMs * 60).toFixed(2), note:'2-D canvas, 60 Hz' },
+      deep: deep === null ? 'not running' :
+            { msPerRender:+deep.msPerRender.toFixed(3),
+              msPerSecond:+deep.msPerSecondOfIdle.toFixed(2),
+              drawCalls:deep.drawCalls, triangles:deep.triangles,
+              note:'WebGL, ' + (idle.info.fpsCap) + ' Hz, DPR ' + idle.info.pixelRatio },
+      info: idle ? idle.info : null
+    };
+  },
+  idle: () => idle,
+  setBg(m){ PREF.bg = m; if (m === 'deep') startDeepBg(); else stopDeepBg(); applyBg(); markSheet(); return PREF.bg; }
+};
 
 /* Offline, without getting stuck on a stale build. When a new worker
    takes control we reload ONCE, so a deployed fix actually reaches the
