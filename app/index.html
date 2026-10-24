@@ -401,12 +401,32 @@ const lockedHTML = `<div class="entry locked">
     <div class="pg">—</div>
   </div>`;
 
-/* Deep Light is not a JOURNEY — it is its own page with its own engine, so
-   it cannot come out of protocols.js. It still uses the same entry markup,
-   and it sits directly after the flat Pearl Diver rather than replacing it,
-   because the point is to be able to open both and compare them. The thumb
-   is a flat drawing rather than a live preview: the previews come from
-   SCENES, and this chapter's scene is not one of them. */
+/* ==================================================================
+   THE BOOK IS A THREE-DIMENSIONAL BOOK FIRST — 24 October 2026
+   ==================================================================
+   Until now the 3-D chapters were siblings: they sat UNDER their flat
+   twins, badged "again", numbered 4ii and 6ii. That ordering said the
+   flat one is the chapter and the 3-D one is a variant of it, which is
+   no longer what the book is.
+
+   So each 3-D chapter now TAKES ITS CHAPTER'S OWN NUMBER AND POSITION,
+   and the flat original is demoted rather than deleted: it keeps its
+   URL, keeps working exactly as it did, and is linked from the archive,
+   which is already where this project puts work that is still readable
+   but is no longer the way in. (The archive's existing precedent runs
+   the other way — Deep Light's card there says PROMOTED · NOW A CHAPTER
+   — so the pattern for "reachable from the archive, not from the
+   contents" is established and is just being used in both directions.)
+
+   Nothing is deleted and no URL breaks. The flat chapters are reached at
+   journey.html?j=kite-line and ?j=pearl-diver exactly as before.
+
+   Deep Light and Long Air are not JOURNEYS — each is its own page with
+   its own engine, so neither can come out of protocols.js. They use the
+   same entry markup. The thumbs are flat drawings rather than live
+   previews: the previews come from SCENES, and these chapters' scenes
+   are not among them.
+   ================================================================== */
 const deepLightHTML = `<a class="entry three" href="deep-light.html">
     <div class="thumb">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
@@ -427,19 +447,16 @@ const deepLightHTML = `<a class="entry three" href="deep-light.html">
       </svg>
     </div>
     <div class="body">
-      <div class="ch">Chapter six, again <span class="badge">3&#8209;D</span></div>
+      <div class="ch">Chapter six <span class="badge">3&#8209;D</span></div>
       <div class="ti">Deep Light</div>
-      <div class="bl">The same dive built as a space you move through instead of a picture of
-        one. Box breathing, or the no-holds version — you choose at the start.</div>
+      <div class="bl">A dive built as a space you move through instead of a picture of one.
+        Box breathing, or the no-holds version — you choose at the start. The flat Pearl
+        Diver is in the archive.</div>
     </div>
-    <div class="pg">6<span style="opacity:.6">ii</span></div>
+    <div class="pg">6</div>
   </a>`;
 
-/* Long Air, the second 3-D chapter, in exactly the same idiom: it sits
-   directly after its flat twin rather than replacing it, because the
-   point is to be able to open both and compare them. Its thumb is a flat
-   drawing for the same reason Deep Light's is — the live previews come
-   from SCENES, and this chapter's scene is not one of them.
+/* Long Air, the second 3-D chapter, in exactly the same idiom.
 
    RE-BADGED 24 October from chapter five to chapter four. The scene is a
    kite on a plateau, which is chapter four's theme, and it was carrying
@@ -479,24 +496,33 @@ const longAirHTML = `<a class="entry three" href="long-air.html">
       </svg>
     </div>
     <div class="body">
-      <div class="ch">Chapter four, again <span class="badge">3&#8209;D</span></div>
+      <div class="ch">Chapter four <span class="badge">3&#8209;D</span></div>
       <div class="ti">Long Air</div>
       <div class="bl">A kite, two buttons, and a course whose gaps are placed where your
         breath should have taken you — so flying it well and breathing on pace are the same
-        thing. Box breathing, or the no-holds version. It cannot crash and nothing is counted.</div>
+        thing. Box breathing, or the no-holds version. It cannot crash and nothing is counted.
+        The flat Kite Line is in the archive.</div>
     </div>
-    <div class="pg">4<span style="opacity:.6">ii</span></div>
+    <div class="pg">4</div>
   </a>`;
 
-/* Both 3-D chapters are inserted from the BOTTOM UP. Splicing after the
-   flat Kite Line first would shift the Pearl Diver's index by one and put
-   Deep Light in the wrong place — the kind of off-by-one that looks like
-   a content decision rather than a bug. */
-const rows = JOURNEYS.map(entryHTML);
-const pdIdx = JOURNEYS.findIndex(j => j.id === 'pearl-diver');
-rows.splice(pdIdx >= 0 ? pdIdx + 1 : rows.length, 0, deepLightHTML);
-const klIdx = JOURNEYS.findIndex(j => j.id === 'kite-line');
-rows.splice(klIdx >= 0 ? klIdx + 1 : rows.length, 0, longAirHTML);
+/* Each 3-D chapter REPLACES its flat twin in the contents, in place, so
+   it inherits the chapter's own number and position. Replacement rather
+   than splice-and-remove: the old code inserted and had to run bottom-up
+   to avoid shifting the other insertion's index, and an in-place write by
+   id cannot have that bug at all.
+
+   A 3-D chapter whose twin is missing from JOURNEYS is APPENDED rather
+   than dropped. Silently losing a chapter because somebody renamed an id
+   is a worse failure than an entry in the wrong place, and it would look
+   like a content decision. */
+const TAKES_OVER = { 'kite-line': longAirHTML, 'pearl-diver': deepLightHTML };
+const rows = [];
+for(const j of JOURNEYS){
+  rows.push(TAKES_OVER[j.id] !== undefined ? TAKES_OVER[j.id] : entryHTML(j, rows.length));
+  delete TAKES_OVER[j.id];
+}
+for(const leftover of Object.values(TAKES_OVER)) rows.push(leftover);
 $('list').innerHTML = rows.join('') + (SHOW_LOCKED ? lockedHTML : '');
 // if the reader flagged a condition, say so on the locked chapter rather
 // than leaving them to wonder
