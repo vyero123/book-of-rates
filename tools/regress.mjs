@@ -203,80 +203,146 @@ if(negControl.length === 0){
 }
 
 /* ------------------------------------------------------------------
-   4. LONG AIR: is the terrain actually the breath?
+   4. LONG AIR: the course must BE the protocol
    ------------------------------------------------------------------
-   The whole argument for that chapter is that the canyon ahead of her is
-   the breath schedule laid out in space — the slope rising in front of
-   you is the inhale you are about to take. It is baked once, at build
-   time, and scrolled by a modulo in a vertex shader, and the arithmetic
-   that makes that work (derived in the page) relies on SPEED, BEHIND and
-   the strip length agreeing in three separate places.
-
-   If they ever stop agreeing, the canyon drifts out of step with the
-   breath and the chapter has no argument — and crucially it would still
-   LOOK completely fine. There is no screenshot that catches this. So it
-   is checked here: for a point n metres ahead of her, the altitude the
-   terrain was built for must equal the altitude the breath will be at
-   when she arrives.
-
-   The seam is checked too. The strip is periodic and scrolled by a
-   modulo, so anything in the profile that is not periodic in the strip
-   length leaves a visible step that arrives once every twenty seconds
-   and reads as a glitch.
+   The chapter is a game now, and its whole claim is that the obstacle
+   course is the breath schedule expressed as level design: the gap in
+   each gate, at the moment the player reaches it, sits at the altitude
+   the protocol wants. If that drifts, flying well and breathing on pace
+   stop being the same act and the chapter has no argument — and it would
+   still look completely fine, which is exactly why it is checked here.
    ------------------------------------------------------------------ */
 for(const id of Object.keys(longAir.PROTOCOLS)){
-  const p = longAir.PROTOCOLS[id];
-  const b = breath(p);
-  const period = longAir.periodOf(p);
-  const back = period * longAir.BEHIND;
-  let worst = 0, worstAt = null;
-  for(let t = 0; t < p.session; t += 0.37){
-    for(const m of [0, 7, 23, 58, 101, 160]){
-      const zb = (longAir.SPEED * t + m + back) % period;
-      const terrain = b.value(zb / longAir.SPEED - back / longAir.SPEED);
-      const willBe  = b.value(t + m / longAir.SPEED);
-      const e = Math.abs(terrain - willBe);
-      if(e > worst){ worst = e; worstAt = { t:+t.toFixed(2), m }; }
-    }
-  }
-  if(worst > 1e-9){
-    fail(`long air/${id}: the terrain is NOT the breath — ${worst.toExponential(2)} m out ` +
-         `at t=${worstAt.t}, ${worstAt.m} m ahead`);
-  }
+  const proto = longAir.PROTOCOLS[id];
+  const b = breath(proto);
+  const course = longAir.courseOf(proto, t => b.value(t));
+  const period = course.period, back = course.back;
 
-  // periodicity of everything the strip bakes
-  const seamAlt = Math.abs(b.value(-back / longAir.SPEED) -
-                           b.value(period / longAir.SPEED - back / longAir.SPEED));
-  // EVERY function of z the strip bakes must close at the wrap, not just
-  // the breath-derived ones. The decorative ones are the easy ones to
-  // forget, because the breath is periodic for free and they are not.
+  /* (a) every gate's opening is the schedule at the gate's arrival time,
+         and the arrival time must be recoverable from the player's
+         position — the same inverse the collision test uses. */
+  let worst = 0, worstAt = null;
+  for(const g of course.gates){
+    const e = Math.abs(g.centre - b.value(g.ta));
+    if(e > worst){ worst = e; worstAt = g.i; }
+  }
+  if(worst > 1e-9) fail(`long air/${id}: gate ${worstAt} is ${worst.toExponential(2)} m off its own schedule`);
+
+  /* (b) gateAt() must find the gate the player is actually at. Walk a
+         whole session and check the gate it returns is the nearest one. */
+  let lookupBad = 0;
+  for(let t = 0; t < proto.session; t += 0.21){
+    const dist = longAir.SPEED * t;
+    const { gate, ahead } = longAir.gateAt(course, dist);
+    if(Math.abs(ahead) > course.dz / 2 + 1e-6) lookupBad++;
+    // and the gate it found must be the schedule at the time it is reached
+    const reachIn = ahead / longAir.SPEED;
+    if(Math.abs(gate.centre - b.value(t + reachIn)) > 1e-6) lookupBad++;
+  }
+  if(lookupBad) fail(`long air/${id}: gateAt() disagreed with the layout ${lookupBad} times`);
+
+  /* (c) THE CORRIDOR. The first pass let the figure clip through the
+         floor. This checks the margin rather than trusting it: the kite
+         is clamped into [CORR_LO, CORR_HI], every ridge crest must stay
+         below CORR_LO, and no gate's lower lip may reach the ridge. */
+  let minRidgeGap = Infinity, minLipGap = Infinity, lipOverHi = 0;
+  for(let z = 0; z < period; z += 1.3){
+    minRidgeGap = Math.min(minRidgeGap, longAir.CORR_LO - longAir.ridgeAt(z, period));
+  }
+  for(const g of course.gates){
+    minLipGap = Math.min(minLipGap, (g.centre - g.half) - longAir.RIDGE_TOP);
+    if(g.centre + g.half < longAir.CORR_LO) lipOverHi++;
+  }
+  if(minRidgeGap <= 0.5) fail(`long air/${id}: only ${minRidgeGap.toFixed(2)} m between the ridge and the corridor floor`);
+  if(minLipGap <= 0.5)   fail(`long air/${id}: a gate's lower lip comes within ${minLipGap.toFixed(2)} m of the ridge`);
+  if(lipOverHi)          fail(`long air/${id}: ${lipOverHi} gate(s) sit entirely below the corridor`);
+
+  /* (d) seams. Everything the strip bakes must close at the wrap, or
+         the course visibly jolts once every twenty-odd seconds. The
+         breath-derived parts are periodic for free; the decorative ones
+         are the easy ones to forget. */
   const seams = {
     wander: [longAir.wanderAt(0, period), longAir.wanderAt(period, period)],
-    rim:    [longAir.rimOf(0, period),    longAir.rimOf(period, period)],
-    crease: [longAir.creaseOf(0, period), longAir.creaseOf(period, period)]
+    ridge:  [longAir.ridgeAt(0, period),  longAir.ridgeAt(period, period)],
+    ceiling:[longAir.ceilAt(0, period),   longAir.ceilAt(period, period)],
+    gates:  [course.gates[0].centre, b.value(period / longAir.SPEED - back / longAir.SPEED)]
   };
-  if(seamAlt > 1e-9) fail(`long air/${id}: altitude profile does not close at the seam (${seamAlt.toExponential(2)})`);
-  for(const [what, [a, c]] of Object.entries(seams)){
-    if(Math.abs(a - c) > 1e-9)
-      fail(`long air/${id}: the ${what} does not close at the seam (${Math.abs(a-c).toExponential(2)})`);
-  }
-  // and the rim must never end up under the floor, which the climb can
-  // push it towards: a wall with negative height is inside out
-  for(let z = 0; z < period; z += 1.7){
-    const alt = b.value(z / longAir.SPEED - back / longAir.SPEED);
-    if(longAir.rimOf(z, period) < longAir.floorOf(alt))
-      { fail(`long air/${id}: rim below floor at z=${z.toFixed(1)} (the page clamps this; the raw profile should be close)`); break; }
+  for(const [what, [x, y]] of Object.entries(seams)){
+    if(Math.abs(x - y) > 1e-9)
+      fail(`long air/${id}: the ${what} does not close at the seam (${Math.abs(x-y).toExponential(2)})`);
   }
 
-  // the three-minute cap §6 asks for, and the climb must clear the rim
-  if(Math.abs(p.session - 180) > 1e-9) fail(`long air/${id}: session is ${p.session}s, not the 180s cap`);
-  const topOfClimb = b.value(p.phases[0].d);
-  if(!(topOfClimb > longAir.RIM)) fail(`long air/${id}: the climb never breaks the rim`);
-  // and no phase may hold the breath: §6.1 says this level has no holds
-  for(const q of p.phases){
+  /* (e) the rate cap is DERIVED from the protocol, not tuned. Holding the
+         inhale button for the length of the protocol's inhale must fill
+         the kite exactly once — no more, which is the cap, and no less,
+         or a player breathing correctly could not reach the gates. */
+  const r = longAir.rates(proto);
+  if(Math.abs(r.fillPerSec * r.din - 1) > 1e-12)
+    fail(`long air/${id}: a full inhale fills the kite ${(r.fillPerSec*r.din).toFixed(3)} times, not once`);
+  if(Math.abs(r.emptyPerSec * r.dout - 1) > 1e-12)
+    fail(`long air/${id}: a full exhale empties the kite ${(r.emptyPerSec*r.dout).toFixed(3)} times, not once`);
+
+  /* (f) §6 row 6 and §6.1: three-minute cap, and no holds anywhere. */
+  if(Math.abs(proto.session - 180) > 1e-9) fail(`long air/${id}: session is ${proto.session}s, not the 180s cap`);
+  for(const q of proto.phases)
     if(q.k === 'hold') fail(`long air/${id}: a hold phase appeared; §6.1 says this level has none`);
+
+  if(failures === 0)
+    console.log(`    ok    long air/${id}: course is the schedule to ${worst.toExponential(1)} m, ` +
+                `seams close, ${minRidgeGap.toFixed(1)} m under the corridor, 180 s, no holds`);
+}
+
+/* ------------------------------------------------------------------
+   4b. PACE INTEGRITY — breathing faster must not be rewarded
+   ------------------------------------------------------------------
+   Handing the player the buttons hands them the protocol, so the claim
+   that the intended rate is still the intended rate has to be checked
+   rather than asserted.
+
+   The kite's fill rate is capped at the protocol's own, so a player
+   breathing m times faster gets 1/m of the altitude range — they
+   oscillate around the middle while the gates sweep the whole of it.
+   This simulates a player breathing at several multiples of the pace and
+   measures how well each one tracks the schedule. The intended rate must
+   come out best, by a clear margin, and the achieved swing must fall off
+   as 1/m. Nothing here is a score or is shown to anyone; it is a
+   statement about the design, tested.
+   ------------------------------------------------------------------ */
+function flyAt(proto, m){
+  const b = breath(proto);
+  const r = longAir.rates(proto);
+  const dt = 1 / 120;
+  let fill = 0, lo = 1, hi = 0, se = 0, n = 0;
+  // the player repeats the protocol's own in/out pattern, time-compressed
+  const pin = r.din / m, pout = r.dout / m, pcyc = pin + pout;
+  for(let t = 0; t < proto.session; t += dt){
+    const u = t % pcyc;
+    if(u < pin) fill = Math.min(1, fill + r.fillPerSec * dt);
+    else        fill = Math.max(0, fill - r.emptyPerSec * dt);
+    if(t > proto.cycle){                 // let the first cycle settle
+      lo = Math.min(lo, fill); hi = Math.max(hi, fill);
+      const want = longAir.normOf(b.value(t));
+      se += (fill - want) ** 2; n++;
+    }
   }
-  if(failures === 0) console.log(`    ok    long air/${id}: terrain is the breath to ${worst.toExponential(1)} m, seam closes, 180 s, no holds`);
+  return { m, swing:+(hi - lo).toFixed(3), rms:+Math.sqrt(se / n).toFixed(3) };
+}
+for(const id of Object.keys(longAir.PROTOCOLS)){
+  const proto = longAir.PROTOCOLS[id];
+  const runs = [1, 2, 3, 4].map(m => flyAt(proto, m));
+  const onPace = runs[0];
+  for(const r of runs.slice(1)){
+    if(r.rms <= onPace.rms)
+      fail(`long air/${id}: breathing ${r.m}x faster tracks the course as well as the intended ` +
+           `pace (rms ${r.rms} vs ${onPace.rms}) — the rate cap is not doing its job`);
+    const expected = 1 / r.m;
+    if(r.swing > expected * 1.15)
+      fail(`long air/${id}: breathing ${r.m}x faster reached ${r.swing} of the range, ` +
+           `more than the ${expected.toFixed(2)} the rate cap should allow`);
+  }
+  if(failures === 0)
+    console.log(`    ok    long air/${id}: pace integrity — swing ` +
+                runs.map(r => `${r.m}x:${r.swing}`).join(' ') + `, best fit at 1x`);
 }
 
 /* ------------------------------------------------------------------

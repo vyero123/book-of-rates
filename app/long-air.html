@@ -28,34 +28,34 @@
     width:22px;height:22px;border-radius:50%;display:none}
   #fpsdot.on{display:block}
 
-  #cue{position:fixed;left:0;right:0;bottom:max(146px,calc(env(safe-area-inset-bottom) + 138px));
+  #cue{position:fixed;left:0;right:0;bottom:max(152px,calc(env(safe-area-inset-bottom) + 144px));
     z-index:20;text-align:center;pointer-events:none;color:#FFF6DC}
-  #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+  #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
     text-shadow:0 2px 16px rgba(23,42,48,.85)}
-  #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
+  #sub{margin-top:8px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
     opacity:.82;text-transform:uppercase;text-shadow:0 2px 12px rgba(23,42,48,.85)}
-  #bar{position:fixed;left:0;right:0;bottom:max(124px,calc(env(safe-area-inset-bottom) + 116px));
+  #bar{position:fixed;left:0;right:0;bottom:max(130px,calc(env(safe-area-inset-bottom) + 122px));
     z-index:20;height:2px;margin:0 36px;background:rgba(255,246,220,.26);pointer-events:none}
   #barfill{height:100%;width:0;background:rgba(255,246,220,.85)}
-  #note{position:fixed;left:0;right:0;bottom:max(98px,calc(env(safe-area-inset-bottom) + 90px));
+  #note{position:fixed;left:0;right:0;bottom:max(100px,calc(env(safe-area-inset-bottom) + 92px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(255,246,220,.72);letter-spacing:.06em;padding:0 20px;pointer-events:none;
     text-shadow:0 1px 8px rgba(23,42,48,.9)}
 
   /* §6 row 6: two buttons, bottom-left and bottom-right. Left is the
-     inhale, right is the exhale. They are EXPRESSIVE — they roll her and
-     flare the wings. They cannot make her climb and they cannot make her
-     crash. Lift your finger and the run continues. */
+     inhale and flies the kite up; right is the exhale and lets it down.
+     They cannot make it crash and nothing they do is counted. */
   .hand{position:fixed;bottom:max(20px,calc(env(safe-area-inset-bottom) + 12px));z-index:25;
-    appearance:none;border:0;width:118px;height:70px;border-radius:14px;
+    appearance:none;border:0;width:150px;height:74px;border-radius:16px;
     background:rgba(244,236,194,.17);box-shadow:inset 0 0 0 1.5px rgba(255,246,220,.42);
-    color:#FFF6DC;font:700 11px/1.5 ui-sans-serif,sans-serif;letter-spacing:.2em;
-    backdrop-filter:blur(4px);touch-action:none;user-select:none}
-  .hand span{display:block;font:400 8px/1.3 ui-sans-serif;letter-spacing:.14em;
-    text-transform:uppercase;opacity:.62;margin-top:4px}
-  .hand.lit{background:rgba(228,87,46,.42);box-shadow:inset 0 0 0 1.5px rgba(255,246,220,.85)}
-  #bL{left:max(12px,env(safe-area-inset-left))}
-  #bR{right:max(12px,env(safe-area-inset-right))}
+    color:#FFF6DC;font:700 13px/1.4 ui-sans-serif,sans-serif;letter-spacing:.2em;
+    backdrop-filter:blur(4px);touch-action:none;user-select:none;
+    transition:background .08s linear}
+  .hand span{display:block;font:400 8.5px/1.3 ui-sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;opacity:.66;margin-top:5px;letter-spacing:.1em}
+  .hand.lit{background:rgba(228,87,46,.46);box-shadow:inset 0 0 0 2px rgba(255,246,220,.9)}
+  #bL{left:max(10px,env(safe-area-inset-left))}
+  #bR{right:max(10px,env(safe-area-inset-right))}
 
   .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
     background:rgba(23,42,48,.9);backdrop-filter:blur(3px);text-align:center;padding:28px;
@@ -75,7 +75,10 @@
   .sheet a.link{margin-top:4px}
   .sheet strong{color:#F4ECC2;font-weight:600}
   .sheet .own{border-left:2px solid rgba(244,236,194,.32);padding-left:12px;text-align:left;
-    margin-bottom:18px}
+    margin-bottom:16px}
+  .sheet .how{text-align:left;max-width:320px;margin:0 auto 16px;
+    font:400 12px/1.6 ui-sans-serif;color:rgba(244,236,194,.76)}
+  .sheet .how b{color:#F4ECC2}
   .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(244,236,194,.48);margin-top:16px}
   .sheet .sub2{display:block;margin-top:5px;font:400 9.5px/1.3 ui-sans-serif,sans-serif;
     letter-spacing:.06em;text-transform:none;opacity:.62}
@@ -97,29 +100,34 @@
 <div id="fpsdot" aria-hidden="true"></div>
 <div id="fps" role="status" title="Tap to hide">—</div>
 
-<div id="cue"><div id="phase">breathe in</div><div id="sub">climbing</div></div>
+<div id="cue"><div id="phase">breathe in</div><div id="sub">let it climb</div></div>
 <div id="bar"><div id="barfill"></div></div>
 <div id="note"><span id="proto">The run · 3 in / 4.5 out · 8 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
-<button id="bL" class="hand" aria-label="Breathe in">IN<span>roll left</span></button>
-<button id="bR" class="hand" aria-label="Breathe out">OUT<span>roll right</span></button>
+<button id="bL" class="hand" aria-label="Breathe in — the kite climbs">IN<span>let it climb</span></button>
+<button id="bR" class="hand" aria-label="Breathe out — the kite falls">OUT<span>let it fall</span></button>
 
 <!-- A CHOICE, not a screening gate. There are no holds in this chapter at
-     all, so there is nothing here to be screened out of — the two options
-     are simply two paces. The blocking step is the warning scroll
-     (js/scroll.js), which discloses what the practice asks for and then
-     gets out of the way: design doc §1.6. -->
+     all, so there is nothing to be screened out of — the two options are
+     two paces. The blocking step is the warning scroll (js/scroll.js),
+     which discloses what the practice asks for and gets out of the way:
+     design doc §1.6. -->
 <div id="gate" class="sheet"><div>
-  <h2>Which pace?</h2>
-  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. No breath is held anywhere in this chapter. Both are three minutes. Pick the one you want.</p>
+  <h2>Fly the kite</h2>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. No breath is held anywhere in this chapter.</p>
+  <div class="how">
+    <p><b>Hold IN</b> and the kite fills and climbs. <b>Hold OUT</b> and it empties and falls. Let go and it coasts.</p>
+    <p>The gaps in the course are placed where your breath should have taken you, so flying it well and breathing on pace are the same thing. You can see several breaths ahead of you.</p>
+    <p>It cannot crash. Drift off pace and the gaps simply open wider. Nothing here is timed, scored, counted or compared — not between sessions and not within one.</p>
+  </div>
   <button id="gateBrisk">THE RUN · 3 IN / 4.5 OUT<br><span class="sub2">brisk · 8 breaths a minute</span></button>
-  <button id="gateSlow" class="alt">THE LONG GLIDE · 4 / 5 / 1<br><span class="sub2">a second at empty at the bottom · 6 a minute</span></button>
-  <p class="fine tiny">Eight breaths a minute is brisk, and it is deliberately not fast breathing — a round of the sort that causes blackouts would be thirty or forty breaths in under a minute. Nothing is timed by you, nothing is scored, and the glider cannot crash. Your choice is remembered on this device and can be changed from the stop screen.</p>
+  <button id="gateSlow" class="alt">THE LONG GLIDE · 4 / 5 / 1<br><span class="sub2">a second flying level at the bottom · 6 a minute</span></button>
+  <p class="fine tiny">Eight breaths a minute is brisk, and it is deliberately not fast breathing — a round of the sort that causes blackouts would be thirty or forty breaths in under a minute. The kite will not go up faster than the pace allows, however hard you press. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
 <div id="halt" class="sheet"><div>
   <h2>Stopped</h2>
-  <p>Let your breathing go back to whatever it wants to do. She lands either way.</p>
+  <p>Let your breathing go back to whatever it wants to do. The kite stays up.</p>
   <button id="resume">RESUME</button>
   <button id="rescreen" class="link">Choose a different pace</button>
   <a class="link" href="./">Back to the book</a>
@@ -135,96 +143,85 @@
 <script type="module">
 /* ============================================================
    BOOK OF RATES — Prototype 6: LONG AIR
-   A 3-D treatment of level 6, The Run (design doc §6, §6.1).
-   The second 3-D chapter, and the first one built ON the kit rather
-   than the one the kit was taken out of.
+   A 3-D treatment of level 6, The Run (design doc §6).
 
-   WHY THIS THEME. Argued in full at the top of js/long-air-breath.js.
-   Short version: of the nine themes left, this is the only one that is
-   actually about depth. Every other scene in the book can be staged as a
-   picture that changes, and the flat versions are not missing anything.
-   A flight down a gorge is forward translation, and forward translation
-   IS parallax, occlusion and approach — a flat painting of speed has to
-   draw speed lines and ask you to believe them. And it lets the chapter
-   inherit the one functional advantage the project has found anywhere
-   (§5.1): the canyon ahead of her is generated from the breath schedule
-   at the moment she will arrive there, so the shape of the gorge in front
-   of you is the next three breaths, and the turnaround can be prepared
-   instead of reacted to.
+   -- SECOND PASS: it is a game now --
 
-   HOW THE BREATH DRIVES IT, all of it from the phase descriptors:
-     breathe in   she climbs; the gorge opens out, the floor falls away,
-                  and at the top she breaks the rim into open sky
-     breathe out  she dives; the walls close in, the floor comes up, and
-                  the near rock starts hammering past the lens
-     rest         (the slow protocol only) a second at empty, skimming
+   The first pass generated the terrain from the breath schedule and had
+   the player watch it. The two buttons rolled the figure and slid her
+   sideways, and the camera followed her sideways position almost
+   exactly, so the one thing they controlled was the one thing the camera
+   cancelled out. Height meant nothing because nothing asked her to be
+   at any particular height.
 
-   HOW THE WORLD ANSWERS HER, which is the part that makes the movement
-   legible rather than decorative:
-     - the gorge NARROWS as she accelerates, so the walls are nearest the
-       lens exactly when she is fastest;
-     - her clearance over the floor swings from eleven metres to four,
-       because the floor follows her at a little over half her own swing.
-       Floor and glider moving together would be a camera trick;
-     - the rock spurs on the walls recoil towards the rock as she passes;
-     - the birds above the rim scatter out of her line;
-     - grit comes off the wingtips on the dive and nowhere else.
+   Now THE OBSTACLE COURSE IS THE PROTOCOL. The figure is a kite; the
+   two buttons are breathe-in and breathe-out and they fly it; and the
+   gates are placed so the gap, at the moment you reach it, sits at the
+   altitude the protocol wants you at. Flying the course correctly and
+   breathing on schedule are the same act. The predictive property the
+   first pass was built around (§5.1) is unchanged and is now the thing
+   generating the gameplay rather than the scenery.
 
+   Three separate scalars, and keeping them apart is the whole design:
+
+     SCHEDULE   B.value(t) — what the protocol wants. Builds the course.
+                Not affected by the player in any way.
+     FILL       0..1, the player's own breath, integrated from the
+                buttons at the protocol's own rates. Drives the KITE'S
+                SHAPE: it inflates on the inhale and empties on the
+                exhale, visibly, as its own motion.
+     ALTITUDE   springs towards fill, with lag, because a kite has mass
+                and a line. So the sail fills BEFORE the kite lifts —
+                which is why the shape is independent of the height, and
+                why the turnarounds are where the kite is most alive.
+
+   Why breathing faster cannot help: the fill rate is capped at the
+   protocol's own, so a doubled rate gives half the swing, and the gates
+   need the full swing. Reasoning in js/long-air-breath.js.
+
+   Collision: §6.1 decided this before anyone built it — the gap widens
+   when the player drifts off pace rather than the kite crashing. Contact
+   that still happens is a soft push and a puff of grit. NOTHING IS
+   COUNTED ANYWHERE. No score, no streak, no gates-cleared, no summary.
+
+   §1.6a is vacuous here: no water in this chapter.
    SILENT. No AudioContext, no media elements.
-
-   TWO WORLDS, as in Deep Light, and the hinge is the rim line. Inside the
-   gorge: enclosed, close, dense, slate and teal, low-key, the nearest
-   shape two metres from the lens. Above the rim: open, far, empty,
-   high-key pale yellow into green, nothing near the lens at all, a small
-   hard noon sun and a few flat clouds. Different hue family, inverted
-   value structure — not a tint of each other.
    ============================================================ */
 
 import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice,
-         RIM, ALT_LOW, ALT_HIGH, SPEED, BEHIND, periodOf,
-         floorOf, gapOf, wanderAt, rimOf, creaseOf } from './js/long-air-breath.js';
+         GROUND, RIDGE_TOP, CORR_LO, CORR_HI, ALT_LOW, ALT_HIGH, RANGE,
+         normOf, altOf, SPEED, BEHIND, periodOf, rates,
+         courseOf, gateAt, forgiveness, GATE_HALF, FORGIVE_MAX,
+         ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
 import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
-import { builder, bands, triBillboard, particles,
+import { builder, bands, particles,
          posterMat, screenQuad, overlayQuad, part } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
-/* ---------- THE GORGE: the value ramp, bleached limestone into
-   slate-teal. Six steps, palest first, and every surface in the canyon
-   picks an index out of it BY HAND. The plateau tops are the palest
-   thing in the frame because they are the only thing the noon sun hits
-   square on; the floor is the darkest because nothing reaches it. Those
-   are decisions about what each surface IS, not a function of how far
-   away it is. ---------- */
+/* ---------- the rock and haze family. Six steps, palest first, and
+   every surface picks an index BY HAND: the ridge crests are pale
+   because the noon sun hits them square, the gate slabs are mid because
+   they are the thing you must read against the sky, the undersides are
+   the dark end. Decisions about what each thing IS, never a function of
+   distance. ---------- */
 const R = ramp([0xF4ECC2, 0xD9C98E, 0xB79A66, 0x7E6B4E, 0x3C4A48, 0x173A44]);
 
 /* §4.3 energised-cliffs row: shadow #173A44, accent #E4572E. The shadow
    is a HUE SHIFT into teal, not a darkening — §4.2 rule 2. */
 const ROCK = {
-  shadow:0x1E4C52,      // what a shadowed face shifts towards
-  shadowDeep:0x14323C,
-  accent:0xE4572E,      // the one accent, on her sail and nothing else
-  spur:0x5E5A44,
-  grit:0xE8DCAE
+  shadow:0x1E4C52, shadowDeep:0x14323C,
+  accent:0xE4572E, grit:0xE8DCAE
 };
-
-/* ---------- ABOVE THE RIM: a different hue family, and the value
-   structure inverted. In the gorge the frame is mostly dark with a pale
-   slot overhead. Above the rim it is mostly pale with the rock as the
-   dark shape in it. §4.3 reads sky top-to-horizon. ---------- */
 const AIR = {
-  skyHigh:0xF2E6A0,     // pale yellow overhead, loudest thing in the frame
-  skyLow :0xBFE3B4,     // green down at the horizon
-  sun    :0xFFFDF0,
-  halo1  :0xFFF6C8,
-  cloud  :0xA8C49E,     // the shadow family up here is a cool green
-  haze   :0xCFE0AE,
-  bird   :0x3C4A48,
-  flare  :0xFFF3C4
+  skyHigh:0xF2E6A0, skyLow:0xBFE3B4,
+  sun:0xFFFDF0, halo:0xFFF6C8,
+  cloud:0xBFD3AE, cloudLo:0x8FAE92, cloudDeep:0x6E8C7A,
+  haze:0xCFE0AE, bird:0x3C4A48, flare:0xFFF3C4
 };
 
 /* ---------- DOM ---------- */
@@ -252,214 +249,33 @@ const canvas = $('c');
 const B = breath(PROTOCOLS.run);
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const C = h => new THREE.Color(h);
 const ramp6 = R.steps.map(C);
 
 /* shared uniforms */
-const uTime   = { value: 0 };
-const uDist   = { value: 0 };          // metres travelled down the gorge
-const uFlyer  = { value: new THREE.Vector3(0, ALT_LOW, 0) };
-const uOpen   = { value: 0 };          // 0 lens in the gorge, 1 above the rim
-const uRimUv  = { value: 0.5 };        // where the rim line falls, in uv
-const uHorizon= { value: 0.5 };
-const uRush   = { value: 0 };          // 0 at the top of the climb, 1 at full dive
-const uFog    = { value: C(R.at(MID)) };
-const uRamp   = { value: ramp6 };
-const uPeriod = { value: 1 };          // the strip's length, set per protocol
+const uTime    = { value: 0 };
+const uDist    = { value: 0 };
+const uKite    = { value: new THREE.Vector3(0, ALT_LOW, 0) };
+const uFill    = { value: 0 };          // the player's own breath, 0..1
+const uForgive = { value: 0 };          // 0..1 of FORGIVE_MAX
+const uHit     = { value: 0 };          // soft contact, fades
+const uRush    = { value: 0 };
+const uFog     = { value: C(AIR.haze) };
+const uRamp    = { value: ramp6 };
+const uPeriod  = { value: 1 };
+const uHorizon = { value: 0.5 };
 
-/* An open-air scene wants fog that reaches much further than Deep
-   Light's water did, and a lower ceiling, or the far mesas merge into
-   one slab and the parallax they exist for stops being visible. */
-const FOG = fogGlsl({ near: 26, rate: 0.0082, steps: 5, max: 0.50 });
+const FOG = fogGlsl({ near: 30, rate: 0.0070, steps: 5, max: 0.48 });
 const PRE = RAMP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
 
 const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
-  canvas,
-  clear: R.at(DARK),
-  fov: a => a < 0.75 ? 64 : 54,
-  far: 900
+  canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 66 : 55, far: 1200
 });
 
-/* ------------------------------------------------------------------
-   1. BACKGROUND — one quad, two worlds, hinged on the rim line.
-   ------------------------------------------------------------------ */
-const skyUniforms = {
-  uTime, uAspect:{value:1}, uOpen, uHorizon, uRimUv, uRamp,
-  uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
-  uSun:{value:C(AIR.sun)}, uHalo1:{value:C(AIR.halo1)},
-  uCloud:{value:C(AIR.cloud)}, uHaze:{value:C(AIR.haze)}
-};
-onFit(() => { skyUniforms.uAspect.value = camera.aspect; });
-const sky = screenQuad(THREE, {
-  uniforms: skyUniforms,
-  prelude: RAMP_GLSL + GRAIN_GLSL,
-  fragment:`
-    varying vec2 vUv;
-    uniform float uTime, uAspect, uOpen, uHorizon, uRimUv;
-    uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo1, uCloud, uHaze;
-
-    /* Inside the gorge: mostly the deep end of the rock ramp, with a
-       pale slot of sky up at the top of the frame. The inverse of the
-       world above, where the pale is everywhere and the rock is the
-       small dark shape. */
-    vec3 inGorge(){
-      float v = clamp(1.0 - (vUv.y - uRimUv) / 0.55, 0.0, 1.0);
-      vec3 col = rampPick(0.45 + v * 0.50);
-      // the slot of daylight overhead, hard-edged
-      col = mix(uHaze, col, step(0.015, uRimUv - vUv.y + 0.015));
-      return col;
-    }
-
-    /* Above the rim: five hard bands, pale yellow at the top and green
-       at the horizon, a small hard noon sun high in the frame, and three
-       flat cloud lobes with hard undersides (§4.4). */
-    vec3 openAir(){
-      float h = vUv.y - uHorizon;
-      float b = floor(clamp(h / 0.95, 0.0, 0.999) * 5.0) / 4.0;
-      vec3 col = mix(uSkyLow, uSkyHigh, b);
-
-      vec2 sp = vec2(0.40, uHorizon + 0.66);
-      vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
-      float sd = length(q);
-      col = mix(col, uHalo1, step(sd, 0.052));
-      col = mix(col, uSun,   step(sd, 0.026));
-
-      float cl = 0.0;
-      for(int i = 0; i < 3; i++){
-        float fi = float(i);
-        float cx = fract(0.22 + fi * 0.33 + uTime * 0.0038) * 1.8 - 0.4;
-        vec2 cc = vec2(cx, uHorizon + 0.30 + fi * 0.095);
-        vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.26, vUv.y - cc.y);
-        cl = max(cl, step(length(d2), 0.028));
-      }
-      col = mix(col, uCloud, cl * step(0.04, h));
-
-      // the haze band that sits on the horizon below the rim
-      col = mix(col, uHaze, (1.0 - step(0.0, h)) * 0.55);
-      return col;
-    }
-
-    void main(){
-      vec3 col = mix(inGorge(), openAir(), uOpen);
-      col += (grainAt(vUv * 640.0) - 0.5) * 0.020;   // §4.2 rule 7
-      gl_FragColor = vec4(col, 1.0);
-    }
-  `
-});
-scene.add(sky);
-
-/* ------------------------------------------------------------------
-   2. FAR MESAS — the parallax background band pattern from the kit,
-   used the way it is meant to be: three hard flat-topped layers at
-   fixed depth, tiers HAND-ASSIGNED, and deliberately not following the
-   breath. They drift sideways against the gorge's wander, which is
-   where the parallax comes from in a forward-flight scene.
-   ------------------------------------------------------------------ */
-const mesas = new THREE.Mesh(bands(THREE, [
-  { z:-620, base: 26, amp:16, step:7.0, seed:5,  tier:1 },
-  { z:-430, base: 20, amp:12, step:5.5, seed:17, tier:2 },
-  { z:-300, base: 14, amp: 9, step:4.0, seed:29, tier:3 }
-], { n: 40, span: 1500, skirt: -40 }), posterMat(THREE, {
-  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)} },
-  prelude: RAMP_GLSL,
-  vertex:`
-    attribute float aTier; varying float vTier;
-    void main(){ vTier = aTier;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-  `,
-  fragment:`
-    varying float vTier;
-    uniform vec3 uHaze;
-    void main(){
-      vec3 col = rampPick((vTier + 0.5) / 6.0);
-      // the furthest layer is the most hazed, but it is CLAMPED well
-      // short of the haze colour so it stays distinguishable from the
-      // one in front of it
-      float f = (3.0 - vTier) / 3.0 * 0.55;
-      gl_FragColor = vec4(mix(col, uHaze, f), 1.0);
-    }
-  `
-}));
-scene.add(mesas);
-
-/* ------------------------------------------------------------------
-   3. THE GORGE — one merged mesh, and THE TERRAIN IS THE BREATH.
-   ------------------------------------------------------------------
-   Built once per protocol as a strip that is PERIODIC in z, and scrolled
-   for ever by a modulo in the vertex shader: one draw call, no streaming,
-   no seam. The seam closes because everything in the profile is a
-   function of the breath, which is periodic, and the strip is a whole
-   number of cycles long.
-
-   The arithmetic that makes it predictive. A vertex built at z=zb shows
-   up at world z = BEHIND·P - mod(zb - uDist, P), so its distance ahead
-   of her is d = mod(zb - SPEED·t, P) - BEHIND·P, and she reaches it in
-   d/SPEED seconds. Because the altitude curve is periodic and P is a
-   whole number of cycles of it, that arrival TIME reduces to
-   zb/SPEED - BEHIND·P/SPEED — a function of zb alone, with t cancelled
-   out. So the whole canyon can be baked at build time and is still
-   exactly the breath schedule laid out in space. The floor directly
-   under her is her current altitude; the slope rising ahead of her is
-   the inhale she is about to take.
-   ------------------------------------------------------------------ */
-const SLICE = 2.0;          // metres between profile slices
-
-/* Hand-assigned ramp indices. Four values across the canyon, which is
-   §4.2 rule 2's two-to-four per object, and the shadow side shifts hue
-   rather than simply going darker. */
-const TONE = { plateau: PALE, lit: LIGHT, shade: BODY, floor: DEEP };
-
-function gorgeGeometry(proto){
-  const b = builder(THREE, { aTone:1, aH:1, aSun:1, aRoot:3 });
-  const period = periodOf(proto);   // three cycles long, so the wander does
-  const back = period * BEHIND;     // not repeat every single breath
-  const n = Math.round(period / SLICE);
-  const probe = breath(proto);
-
-  // one pass to collect the profile, so the ribbons all agree
-  const prof = [];
-  for(let i = 0; i <= n; i++){
-    const zb = (i / n) * period;
-    const ta = zb / SPEED - back / SPEED;     // see the derivation above
-    const alt = probe.value(ta);
-    const w = wanderAt(zb, period);
-    const fl = floorOf(alt);
-    const half = gapOf(alt);
-    // at the top of the climb the breath lifts the floor to within a
-    // couple of metres of the rim, and a rim notch there could put the
-    // rim UNDER the floor and turn the wall inside out
-    const rim = Math.max(fl + 1.6, rimOf(zb, period));
-    prof.push({ zb, xl: w - half, xr: w + half, fl,
-                flr: fl + creaseOf(zb, period), rim });
-  }
-
-  const rail = (p, x, y, tone, h, sun) =>
-    b.vertex(x, y, p.zb, { aTone:tone, aH:h, aSun:sun, aRoot:[x, y, p.zb] });
-
-  // left wall — the lit one. Noon sun from high and to the left.
-  for(const p of prof){ rail(p, p.xl, p.fl, TONE.lit, 0, 1); rail(p, p.xl, p.rim, TONE.lit, 1, 1); }
-  b.strip(n, true);
-  // right wall — in shadow, hue-shifted into teal
-  for(const p of prof){ rail(p, p.xr, p.fl, TONE.shade, 0, 0); rail(p, p.xr, p.rim, TONE.shade, 1, 0); }
-  b.strip(n, true);
-  // the floor, with the sun reaching only its left half: a hard-edged
-  // shadow polygon, which is what rule 2 actually asks for
-  for(const p of prof){ rail(p, p.xl, p.flr, TONE.floor, 0, 1); rail(p, p.xr, p.fl, TONE.floor, 0, 0); }
-  b.strip(n, true);
-  // the two plateau tops, running out of frame
-  for(const p of prof){ rail(p, p.xl - 300, p.rim + 2.0, TONE.plateau, 1, 1); rail(p, p.xl, p.rim, TONE.plateau, 1, 1); }
-  b.strip(n, true);
-  for(const p of prof){ rail(p, p.xr, p.rim, TONE.plateau, 1, 1); rail(p, p.xr + 300, p.rim + 2.0, TONE.plateau, 1, 1); }
-  b.strip(n, true);
-
-  return { geometry: b.geometry(), period, prof };
-}
-
+/* The endless strip, shared by every scrolled mesh. */
 const SCROLL_GLSL = `
   uniform float uDist, uPeriod;
-  /* the endless strip: wrap the built z into the period and lay it out
-     ahead of the lens. A fixed fraction stays behind her, or the near
-     wall pops into existence at the edge of the frame. */
   vec3 scrolled(vec3 p){
     float s = mod(p.z - uDist, uPeriod);
     p.z = uPeriod * ${BEHIND} - s;
@@ -467,14 +283,133 @@ const SCROLL_GLSL = `
   }
 `;
 
-const gorgeMat = posterMat(THREE, {
-  uniforms:{ uDist, uPeriod, uRamp, uFog, uFlyer, uOpen,
+/* ------------------------------------------------------------------
+   1. SKY — hard bands, a small hot noon sun, flat cloud lobes.
+   §4.2 rule 4: choose the sky first and let it be the loudest thing.
+   ------------------------------------------------------------------ */
+const skyU = {
+  uTime, uAspect:{value:1}, uHorizon, uRamp, uHit,
+  uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
+  uSun:{value:C(AIR.sun)}, uHalo:{value:C(AIR.halo)},
+  uCloud:{value:C(AIR.cloud)}, uHaze:{value:C(AIR.haze)}
+};
+onFit(() => { skyU.uAspect.value = camera.aspect; });
+scene.add(screenQuad(THREE, {
+  uniforms: skyU, prelude: RAMP_GLSL + GRAIN_GLSL,
+  fragment:`
+    varying vec2 vUv;
+    uniform float uTime, uAspect, uHorizon, uHit;
+    uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo, uCloud, uHaze;
+    void main(){
+      float h = vUv.y - uHorizon;
+      float b = floor(clamp(h / 0.95, 0.0, 0.999) * 5.0) / 4.0;
+      vec3 col = mix(uSkyLow, uSkyHigh, b);
+
+      vec2 sp = vec2(0.38, uHorizon + 0.70);
+      vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
+      float sd = length(q);
+      col = mix(col, uHalo, step(sd, 0.050));
+      col = mix(col, uSun,  step(sd, 0.025));
+
+      float cl = 0.0;
+      for(int i = 0; i < 3; i++){
+        float fi = float(i);
+        float cx = fract(0.2 + fi * 0.34 + uTime * 0.0035) * 1.8 - 0.4;
+        vec2 cc = vec2(cx, uHorizon + 0.34 + fi * 0.10);
+        vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.24, vUv.y - cc.y);
+        cl = max(cl, step(length(d2), 0.026));
+      }
+      col = mix(col, uCloud, cl * step(0.05, h));
+      col = mix(col, uHaze, (1.0 - step(0.0, h)) * 0.6);
+      // a soft contact warms the whole sky for a moment. Warm, not red:
+      // it is information, not a penalty.
+      col = mix(col, uHaze, uHit * 0.18);
+      col += (grainAt(vUv * 640.0) - 0.5) * 0.020;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+}));
+
+/* ------------------------------------------------------------------
+   2. FAR MESAS — the kit's parallax band pattern, hand-assigned tiers,
+   deliberately not following the breath.
+   ------------------------------------------------------------------ */
+const mesas = new THREE.Mesh(bands(THREE, [
+  { z:-780, base: 34, amp:18, step:7.0, seed:5,  tier:1 },
+  { z:-520, base: 25, amp:13, step:5.5, seed:17, tier:2 },
+  { z:-360, base: 17, amp: 9, step:4.0, seed:29, tier:3 }
+], { n: 40, span: 1800, skirt: -40 }), posterMat(THREE, {
+  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)} }, prelude: RAMP_GLSL,
+  vertex:`
+    attribute float aTier; varying float vTier;
+    void main(){ vTier = aTier;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying float vTier; uniform vec3 uHaze;
+    void main(){
+      vec3 col = rampPick((vTier + 0.5) / 6.0);
+      // clamped well short of the haze colour so the layers stay
+      // distinguishable from each other — that is the whole point of them
+      gl_FragColor = vec4(mix(col, uHaze, (3.0 - vTier) / 3.0 * 0.55), 1.0);
+    }
+  `
+}));
+scene.add(mesas);
+
+/* ------------------------------------------------------------------
+   3. THE RIDGE below the corridor. Scenery: it tells you how fast you
+   are going and which way is down, and it is never in the way — its
+   crests are clamped under RIDGE_TOP and the kite is clamped above
+   CORR_LO. The first pass let the figure clip through the floor; this
+   cannot, and tools/regress.mjs checks the margin rather than trusting it.
+   ------------------------------------------------------------------ */
+function ridgeGeometry(proto){
+  const period = periodOf(proto);
+  const n = Math.round(period / 4);
+  const b = builder(THREE, { aTone:1, aH:1, aSun:1 });
+  // ONE open profile across the width, extruded along z: a single ribbon.
+  // Building a skirt at every column instead of only at the outer edges
+  // put a vertical wall down the middle of the ridge seven times over.
+  // dy is relative to the crest; the two ends drop away out of frame.
+  const PROF = [
+    { x:-190, dy:-15, tone:BODY, h:0 },
+    { x:-120, dy: -1.2, tone:LIGHT, h:1 },
+    { x: -34, dy:  0,   tone:PALE,  h:1 },
+    { x: -13, dy:  0.4, tone:PALE,  h:1 },
+    { x:   0, dy:  0,   tone:PALE,  h:1 },
+    { x:  13, dy:  0.4, tone:PALE,  h:1 },
+    { x:  34, dy:  0,   tone:PALE,  h:1 },
+    { x: 120, dy: -1.2, tone:LIGHT, h:1 },
+    { x: 190, dy:-15,   tone:BODY,  h:0 }
+  ];
+  for(let i = 0; i <= n; i++){
+    const zb = (i / n) * period;
+    const w = wanderAt(zb, period);
+    const top = ridgeAt(zb, period);
+    for(const q of PROF){
+      b.vertex(q.x + w * (Math.abs(q.x) > 100 ? 0.4 : 1), top + q.dy, zb,
+               { aTone:q.tone, aH:q.h, aSun: q.x <= 0 ? 1 : 0 });
+    }
+  }
+  const row = PROF.length;
+  for(let i = 0; i < n; i++){
+    for(let k = 0; k < row - 1; k++){
+      const a = i*row + k, c = (i+1)*row + k;
+      b.tri(a, a+1, c);
+      b.tri(a+1, c+1, c);
+    }
+  }
+  return b.geometry();
+}
+
+const rockMat = posterMat(THREE, {
+  uniforms:{ uDist, uPeriod, uRamp, uFog,
              uShadow:{value:C(ROCK.shadow)}, uShadowDeep:{value:C(ROCK.shadowDeep)} },
   side: THREE.DoubleSide, prelude: PRE,
   vertex: SCROLL_GLSL + `
     attribute float aTone; attribute float aH; attribute float aSun;
-    varying float vTone; varying float vH; varying float vSun;
-    varying float vDist; varying float vY;
+    varying float vTone; varying float vH; varying float vSun; varying float vDist; varying float vY;
     void main(){
       vec3 p = scrolled(position);
       vTone = aTone; vH = aH; vSun = aSun; vY = p.y;
@@ -484,131 +419,335 @@ const gorgeMat = posterMat(THREE, {
     }
   `,
   fragment:`
-    varying float vTone; varying float vH; varying float vSun;
-    varying float vDist; varying float vY;
+    varying float vTone; varying float vH; varying float vSun; varying float vDist; varying float vY;
     uniform vec3 uShadow, uShadowDeep;
-    uniform float uOpen;
     void main(){
-      // two to four values per surface: the hand-assigned index, plus
-      // one step darker towards the floor of the canyon
-      float tone = vTone + (1.0 - vH) * 1.35;
+      float tone = vTone + (1.0 - vH) * 1.6;
       vec3 col = rampPick((tone + 0.5) / 6.0);
-      // the shadowed faces SHIFT HUE into teal rather than darkening,
-      // and the edge is hard because vSun is flat across each face
       float sh = 1.0 - step(0.5, vSun);
-      col = mix(col, uShadow, sh * 0.62);
-      col = mix(col, uShadowDeep, sh * (1.0 - vH) * 0.45);
-      // a chipped speckle on the rock, quantised into cells, kept off
-      // everything that is not scenery (§4.2 rule 7)
-      col *= 1.0 + (chipAt(vec2(floor(vY * 1.7), floor(vTone * 3.0 + vH * 5.0))) - 0.5) * 0.07;
+      col = mix(col, uShadow, sh * 0.58);
+      col = mix(col, uShadowDeep, sh * (1.0 - vH) * 0.4);
+      col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vTone * 3.0 + vH * 5.0))) - 0.5) * 0.07;
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
 
-/* Both protocols' canyons are built at boot and one is shown, rather
-   than rebuilt on the gate. Rebuilding meant disposing a live geometry
-   from inside an event handler, and the version that forgot the dispose
-   leaked a megabyte per switch. Two static meshes, one visible, still
-   one draw call. */
-const gorges = {};
-for(const id of Object.keys(PROTOCOLS)){
-  const g = gorgeGeometry(PROTOCOLS[id]);
-  const m = new THREE.Mesh(g.geometry, gorgeMat);
-  m.frustumCulled = false;          // the vertices move; the bounds do not
-  m.visible = false;
-  gorges[id] = { mesh:m, period:g.period };
-  scene.add(m);
-}
-
 /* ------------------------------------------------------------------
-   4. ROCK SPURS — the near-field detail that makes speed visible, and
-   the thing that answers her. They RECOIL towards the wall as she goes
-   past, the way the coral shrank from the diver, which is what tells you
-   how close to the rock you actually are.
+   4. THE GATES — THE COURSE IS THE PROTOCOL.
+   ------------------------------------------------------------------
+   Each gate is a rock slab rising from below and a cloud bank hanging
+   from above, leaving an opening centred on the altitude the schedule
+   wants at the moment the player arrives. One merged mesh for the rock
+   and one for the cloud, both scrolled by the same modulo as everything
+   else: two draw calls for the entire course.
+
+   aLip marks the vertices AT the opening. The vertex shader pushes them
+   away from the centre by uForgive, so the gap widens when the player is
+   off pace (§6.1) while the far ends of the slabs stay put. The world
+   makes room; the kite is never in question.
    ------------------------------------------------------------------ */
-function spurGeometry(proto){
-  const b = builder(THREE, { aCorner:2, aSeed:1, aRoot:3, aSide:1 });
-  const period = periodOf(proto), back = period * BEHIND;
-  const probe = breath(proto);
-  const n = Math.round(period / 11);
-  for(let i = 0; i < n; i++){
-    const zb = (i / n) * period + ((i * 7919) % 53) / 53 * 6;
-    const side = i % 2 ? 1 : -1;
-    // the SAME altitude the wall at this z was baked for, or the teeth
-    // float in mid-air where the gorge is wide and are buried where it
-    // is narrow
-    const alt = probe.value(zb / SPEED - back / SPEED);
-    const w = wanderAt(zb, period);
-    const fl = floorOf(alt), rim = Math.max(fl + 1.6, rimOf(zb, period));
-    const x = w + side * (gapOf(alt) - 0.4);
-    const y = fl + 1.0 + ((i * 5281) % 71) / 71 * Math.max(1.0, rim - fl - 2.0);
-    const s = 1.1 + ((i * 3779) % 47) / 47 * 2.2;
-    // a hard angular tooth, pointing into the canyon
-    const pts = [[0, 0.55], [0, -0.45], [-side * 1.5, 0.05]];
-    triBillboard(b, [x, y, zb], pts, { aSeed:(i * 1.37) % 6.283, aRoot:[x, y, zb], aSide:side }, s);
+const GX = [-15, -9.5, -4.6, 0, 4.6, 9.5, 15];
+const SLAB_Z = 2.6;
+
+function gateGeometry(course, which){
+  // which: -1 rock from below, +1 cloud from above
+  const b = builder(THREE, { aLip:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
+  for(const g of course.gates){
+    const lip = g.centre + which * g.half;
+    const far = which < 0 ? GROUND - 12 : ceilAt(g.zb, course.period) + 8;
+    const seed = ((g.i * 7919) % 97) / 97;
+    // the lip is level in the kite's own lane and steps away from it to
+    // the sides, so the centre lane is visibly the route and the sides
+    // are visibly rougher. Variation only ever makes the hole BIGGER.
+    const lipAt = k => {
+      if(k === 3) return lip;
+      const v = Math.round((((g.i * 31 + k * 17) % 11) / 11 * 1.8) / 0.6) * 0.6;
+      return lip + which * v;
+    };
+    const base = b.count;
+    for(let k = 0; k < GX.length; k++){
+      b.vertex(GX[k], lipAt(k), g.zb,
+               { aLip:1, aTone: which < 0 ? MID : LIGHT, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
+    }
+    for(let k = 0; k < GX.length; k++){
+      b.vertex(GX[k], far, g.zb,
+               { aLip:0, aTone: which < 0 ? BODY : MID, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
+    }
+    // the back face, offset in z, so a slab reads as solid as it passes
+    for(let k = 0; k < GX.length; k++){
+      b.vertex(GX[k], lipAt(k), g.zb - SLAB_Z,
+               { aLip:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed });
+    }
+    const N = GX.length;
+    for(let k = 0; k < N - 1; k++){
+      // front face: lip row to far row
+      b.tri(base+k, base+k+1, base+N+k);
+      b.tri(base+k+1, base+N+k+1, base+N+k);
+      // the lip itself, running back in z: this is the edge you fly past
+      b.tri(base+k, base+2*N+k, base+k+1);
+      b.tri(base+k+1, base+2*N+k, base+2*N+k+1);
+    }
   }
   return b.geometry();
 }
-const spurMat = posterMat(THREE, {
-  uniforms:{ uDist, uPeriod, uFog, uFlyer, uRamp,
-             uSpur:{value:C(ROCK.spur)}, uShadow:{value:C(ROCK.shadow)} },
+
+const gateMatFor = kind => posterMat(THREE, {
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uForgive, uKite,
+             uShadow:{value:C(kind === 'rock' ? ROCK.shadow : AIR.cloudLo)},
+             uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
+             uAccent:{value:C(ROCK.accent)},
+             uIsCloud:{value: kind === 'cloud' ? 1 : 0} },
   side: THREE.DoubleSide, prelude: PRE,
   vertex: SCROLL_GLSL + `
-    attribute vec2 aCorner; attribute float aSeed; attribute vec3 aRoot; attribute float aSide;
-    uniform vec3 uFlyer;
-    varying float vDist; varying float vShy; varying float vSide; varying float vUp;
+    attribute float aLip; attribute float aTone; attribute float aSun;
+    attribute float aSide; attribute float aSeed;
+    uniform float uForgive;
+    varying float vTone; varying float vSun; varying float vLip;
+    varying float vDist; varying float vSide; varying float vSeed; varying float vY;
     void main(){
-      vec3 p = scrolled(position);
-      vec3 root = scrolled(aRoot);
-      float near = 1.0 - smoothstep(0.0, 5.5, distance(root, uFlyer));
-      vShy = near; vSide = aSide; vUp = aCorner.y;
-      // pull the tooth back towards the wall as she comes past
-      vec2 off = aCorner * (1.0 - near * 0.55);
+      vec3 p = position;
+      // §6.1: the gap widens when the player drifts off pace rather than
+      // the kite crashing. Only the lip moves; the far end stays anchored.
+      p.y += aSide * uForgive * ${FORGIVE_MAX.toFixed(1)} * aLip;
+      p = scrolled(p);
+      vTone = aTone; vSun = aSun; vLip = aLip; vSide = aSide; vSeed = aSeed; vY = p.y;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      mv.xy += off;
       vDist = -mv.z;
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragment:`
-    varying float vDist; varying float vShy; varying float vSide; varying float vUp;
-    uniform vec3 uSpur, uShadow;
+    varying float vTone; varying float vSun; varying float vLip;
+    varying float vDist; varying float vSide; varying float vSeed; varying float vY;
+    uniform vec3 uShadow, uDeep, uAccent;
+    uniform float uIsCloud;
     void main(){
-      vec3 col = mix(uSpur, rampPick(0.30), step(0.0, vUp) * 0.5);
-      // the teeth on the right-hand wall are in the same shadow the
-      // wall behind them is in
-      col = mix(col, uShadow, step(0.5, vSide) * 0.6);
-      col = mix(col, uShadow, vShy * 0.35);
+      float tone = vTone + (1.0 - vLip) * 1.3;
+      vec3 col = rampPick((tone + 0.5) / 6.0);
+      col = mix(col, uShadow, uIsCloud * 0.55);
+      float sh = 1.0 - step(0.5, vSun);
+      col = mix(col, uDeep, sh * 0.45);
+      // a hard accent line along the lip — the one place colour appears
+      // besides the kite, and it is there because the lip is the thing
+      // you actually have to read
+      col = mix(col, uAccent, step(0.96, vLip) * 0.30);
+      col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5) * 0.08;
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
-const spurs = {};
-for(const id of Object.keys(gorges)){
-  const m = new THREE.Mesh(spurGeometry(PROTOCOLS[id]), spurMat);
-  m.frustumCulled = false;
-  m.visible = false;
-  spurs[id] = m;
-  scene.add(m);
+const rockGateMat = gateMatFor('rock');
+const cloudGateMat = gateMatFor('cloud');
+
+/* Both protocols' courses are built at boot and one is shown. Rebuilding
+   on the gate meant disposing live geometry from inside an event
+   handler, which is how a megabyte-per-switch leak happens. */
+const worlds = {};
+for(const id of Object.keys(PROTOCOLS)){
+  const proto = PROTOCOLS[id];
+  const probe = breath(proto);
+  const course = courseOf(proto, t => probe.value(t));
+  const ridge = new THREE.Mesh(ridgeGeometry(proto), rockMat);
+  const rock  = new THREE.Mesh(gateGeometry(course, -1), rockGateMat);
+  const cloud = new THREE.Mesh(gateGeometry(course, +1), cloudGateMat);
+  for(const m of [ridge, rock, cloud]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
+  worlds[id] = { course, period: course.period, meshes:[ridge, rock, cloud] };
 }
 
 /* ------------------------------------------------------------------
-   5. SPEED LINES — thin slivers of air in a tube around her line of
-   flight, scrolling faster than the rock. They are WORLD-SPACE, so they
-   parallax correctly and pass the lens at the right rate; a screen-space
-   radial blur would have been cheaper and would have been a lie.
-   Their length and their presence are both uRush, which is the exhale's
-   own curve, so they exist on the dive and nowhere else.
+   5. THE KITE — and it has to READ AS LUNGS.
+   ------------------------------------------------------------------
+   Three concentric diamond rings, like the cells of a parafoil. uFill
+   grows the whole sail AND spreads the outer rings further than the
+   inner ones, so inflation is visible as the ribs opening out rather
+   than as a sprite getting bigger. The sail also billows towards the
+   lens as it fills. All of that is its own motion, independent of the
+   height — and because altitude LAGS fill, the sail is always a beat
+   ahead of the kite, which is exactly where the turnarounds live.
    ------------------------------------------------------------------ */
-const LINE_Q = 110;
+const RINGS = [0.0, 0.34, 0.68, 1.0];
+function sailGeometry(){
+  const b = builder(THREE, { aR:1, aRing:1, aSector:1 });
+  const pt = (r, s) => {
+    // a diamond, slightly wider than tall
+    const ang = s * Math.PI / 2;
+    return [Math.sin(ang) * r * 0.86, Math.cos(ang) * r * 1.0];
+  };
+  for(let k = 1; k < RINGS.length; k++){
+    for(let s = 0; s < 4; s++){
+      const [x0, y0] = pt(RINGS[k-1], s),     [x1, y1] = pt(RINGS[k], s);
+      const [x2, y2] = pt(RINGS[k-1], s+1),   [x3, y3] = pt(RINGS[k], s+1);
+      const base = b.count;
+      const A = { aRing:k, aSector:s };
+      b.vertex(x0, y0, 0, { ...A, aR:RINGS[k-1] });
+      b.vertex(x1, y1, 0, { ...A, aR:RINGS[k] });
+      b.vertex(x2, y2, 0, { ...A, aR:RINGS[k-1] });
+      b.vertex(x3, y3, 0, { ...A, aR:RINGS[k] });
+      if(k === 1){ b.tri(base, base+1, base+3); }
+      else { b.tri(base, base+1, base+3); b.tri(base, base+3, base+2); }
+    }
+  }
+  return b.geometry();
+}
+const sail = new THREE.Mesh(sailGeometry(), posterMat(THREE, {
+  uniforms:{ uFill, uRamp, uTime, uAccent:{value:C(ROCK.accent)},
+             uShadow:{value:C(ROCK.shadow)} },
+  side: THREE.DoubleSide, prelude: RAMP_GLSL,
+  vertex:`
+    attribute float aR; attribute float aRing; attribute float aSector;
+    uniform float uFill, uTime;
+    varying float vRing; varying float vSector; varying float vR;
+    void main(){
+      vec3 p = position;
+      // the sail grows, and the OUTER ribs grow more than the inner ones
+      float grow   = 0.74 + 0.44 * uFill;
+      float spread = 1.0 + aRing * 0.14 * uFill;
+      p.xy *= grow * spread;
+      // and it billows towards the lens as it fills
+      p.z += (1.0 - aR * aR) * (0.18 + 0.82 * uFill) * 0.85;
+      // a slow luff, so it is never completely still
+      p.x += sin(uTime * 1.7 + aSector * 1.6) * 0.035 * aR;
+      vRing = aRing; vSector = aSector; vR = aR;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragment:`
+    varying float vRing; varying float vSector; varying float vR;
+    uniform vec3 uAccent, uShadow;
+    uniform float uFill;
+    void main(){
+      // one hand-assigned value per rib: pale core out to mid edge
+      vec3 col = rampPick((vRing - 1.0 + 0.5) / 6.0);
+      // the two sectors on the right are the shadowed side, and they
+      // shift hue rather than darken (§4.2 rule 2)
+      float sh = step(0.5, vSector) * (1.0 - step(2.5, vSector));
+      col = mix(col, uShadow, sh * 0.5);
+      // the one accent: the trailing rib, brighter as the sail fills
+      col = mix(col, uAccent, step(2.5, vRing) * (0.25 + 0.35 * uFill));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+}));
+scene.add(sail);
+
+/* the two crossed spars, one merged geometry */
+function sparGeometry(){
+  const b = builder(THREE, { aR:1 });
+  const bar = (dx, dy, w) => {
+    const base = b.count;
+    const px = -dy * w, py = dx * w;
+    b.vertex(-dx + px, -dy + py, 0, { aR:1 });
+    b.vertex(-dx - px, -dy - py, 0, { aR:1 });
+    b.vertex( dx + px,  dy + py, 0, { aR:1 });
+    b.vertex( dx - px,  dy - py, 0, { aR:1 });
+    b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
+  };
+  bar(0.86, 0, 0.030);     // the cross-spar
+  bar(0, 1.0, 0.026);      // the spine
+  return b.geometry();
+}
+const spars = new THREE.Mesh(sparGeometry(), posterMat(THREE, {
+  uniforms:{ uFill, uRamp }, prelude: RAMP_GLSL, side: THREE.DoubleSide,
+  vertex:`
+    attribute float aR;
+    uniform float uFill;
+    void main(){
+      vec3 p = position;
+      p.xy *= 0.74 + 0.44 * uFill;
+      p.z += 0.02;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragment:`void main(){ gl_FragColor = vec4(rampPick(4.5 / 6.0), 1.0); }`
+}));
+scene.add(spars);
+
+/* ------------------------------------------------------------------
+   6. THE TAIL — a ribbon through the kite's own recent history, so it
+   lags through every turn and shows the line of flight. Positions are
+   rewritten each frame into one merged mesh: one draw call, and the
+   shape is real motion rather than an animation.
+   ------------------------------------------------------------------ */
+const TAIL_SEG = 18, TAIL_STRIDE = 3;
+const histLen = TAIL_SEG * TAIL_STRIDE + 2;
+const hist = new Float32Array(histLen * 3);
+let histN = 0;
+function tailGeometry(){
+  const b = builder(THREE, { aT:1, aSide:1 });
+  for(let s = 0; s <= TAIL_SEG; s++){
+    const t = s / TAIL_SEG;
+    b.vertex(0, 0, 0, { aT:t, aSide:-1 });
+    b.vertex(0, 0, 0, { aT:t, aSide: 1 });
+  }
+  b.strip(TAIL_SEG, true);
+  return b.geometry();
+}
+const tail = new THREE.Mesh(tailGeometry(), posterMat(THREE, {
+  uniforms:{ uRamp, uAccent:{value:C(ROCK.accent)}, uFill },
+  prelude: RAMP_GLSL, side: THREE.DoubleSide, transparent:true, depthWrite:false,
+  vertex:`
+    attribute float aT; attribute float aSide;
+    varying float vT; varying float vSide;
+    void main(){
+      vT = aT; vSide = aSide;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      // width tapers along the tail, in view space so it always reads
+      mv.x += aSide * (0.19 * (1.0 - aT) + 0.02);
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vT; varying float vSide;
+    uniform vec3 uAccent;
+    void main(){
+      // hard alternating bands: a ribbon tail, posterised, no gradient
+      float band = step(0.5, fract(vT * 7.0));
+      vec3 col = mix(rampPick(0.5 / 6.0), uAccent, band);
+      float a = (1.0 - vT) * 0.92;
+      if(a < 0.03) discard;
+      gl_FragColor = vec4(col, a);
+    }
+  `
+}));
+tail.frustumCulled = false;
+tail.renderOrder = 3;
+scene.add(tail);
+const tailPos = tail.geometry.getAttribute('position');
+
+function pushHistory(x, y, z){
+  for(let i = histLen - 1; i > 0; i--){
+    hist[i*3] = hist[(i-1)*3]; hist[i*3+1] = hist[(i-1)*3+1]; hist[i*3+2] = hist[(i-1)*3+2];
+  }
+  hist[0] = x; hist[1] = y; hist[2] = z;
+  if(histN < histLen) histN++;
+}
+function updateTail(){
+  for(let s = 0; s <= TAIL_SEG; s++){
+    const h = Math.min(histN - 1, s * TAIL_STRIDE);
+    const i = Math.max(0, h) * 3;
+    for(let v = 0; v < 2; v++){
+      const o = (s*2 + v) * 3;
+      tailPos.array[o]   = hist[i];
+      tailPos.array[o+1] = hist[i+1];
+      tailPos.array[o+2] = hist[i+2] + s * 0.30;   // trails behind
+    }
+  }
+  tailPos.needsUpdate = true;
+}
+
+/* ------------------------------------------------------------------
+   7. WIND STREAKS — world-space slivers, so they parallax correctly.
+   Present in proportion to how fast the kite is sinking.
+   ------------------------------------------------------------------ */
+const LINE_Q = 90;
 function lineGeometry(n){
   const b = builder(THREE, { aEnd:1, aLen:1, aSeed:1, aRad:1 });
   for(let i = 0; i < n; i++){
     const a = (i * 2.399) % 6.283;
-    const rad = 2.6 + ((i * 7919) % 83) / 83 * 11.0;
-    const len = 7.0 + ((i * 6367) % 59) / 59 * 17.0;
-    const hw = 0.045 + ((i * 5281) % 31) / 31 * 0.05;
+    const rad = 2.2 + ((i * 7919) % 83) / 83 * 9.0;
+    const len = 6.0 + ((i * 6367) % 59) / 59 * 14.0;
+    const hw = 0.04 + ((i * 5281) % 31) / 31 * 0.045;
     const cx = Math.cos(a) * rad, cy = Math.sin(a) * rad;
     const tx = -Math.sin(a) * hw, ty = Math.cos(a) * hw;
     const zb = (i / n) * LINE_Q;
@@ -622,32 +761,25 @@ function lineGeometry(n){
   }
   return b.geometry();
 }
-const lines = new THREE.Mesh(lineGeometry(80), posterMat(THREE, {
-  uniforms:{ uDist, uRush, uFlyer, uPale:{value:C(AIR.flare)} },
+const lines = new THREE.Mesh(lineGeometry(70), posterMat(THREE, {
+  uniforms:{ uDist, uRush, uKite, uPale:{value:C(AIR.flare)} },
   transparent:true, depthWrite:false, side:THREE.DoubleSide,
   vertex:`
     attribute float aEnd; attribute float aLen; attribute float aSeed; attribute float aRad;
-    uniform float uDist, uRush; uniform vec3 uFlyer;
+    uniform float uDist, uRush; uniform vec3 uKite;
     varying float vA;
     void main(){
       vec3 p = position;
-      float s = mod(p.z + aSeed * 7.3 - uDist * 1.25, ${LINE_Q}.0);
-      p.z = 14.0 - s + aEnd * aLen * uRush;
-      p.x += uFlyer.x;
-      p.y += uFlyer.y;
-      // gone entirely at the top of the climb, and thinnest far from
-      // the lens: three hard steps, no smooth falloff
-      vA = floor(clamp(uRush * (1.0 - aRad / 15.0), 0.0, 0.999) * 3.0) / 2.0 * 0.42;
+      float s = mod(p.z + aSeed * 7.3 - uDist * 1.3, ${LINE_Q}.0);
+      p.z = 12.0 - s + aEnd * aLen * uRush;
+      p.x += uKite.x; p.y += uKite.y;
+      vA = floor(clamp(uRush * (1.0 - aRad / 12.0), 0.0, 0.999) * 3.0) / 2.0 * 0.38;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
     }
   `,
   fragment:`
-    varying float vA;
-    uniform vec3 uPale;
-    void main(){
-      if(vA < 0.02) discard;
-      gl_FragColor = vec4(uPale, vA);
-    }
+    varying float vA; uniform vec3 uPale;
+    void main(){ if(vA < 0.02) discard; gl_FragColor = vec4(uPale, vA); }
   `
 }));
 lines.frustumCulled = false;
@@ -655,61 +787,12 @@ lines.renderOrder = 4;
 scene.add(lines);
 
 /* ------------------------------------------------------------------
-   6. BIRDS above the rim — the only fast small marks in the open world,
-   and they scatter out of her line. Below the rim they are not drawn.
+   8. GRIT — a puff when the kite brushes a lip, and a little coming off
+   the tail on a fast sink. The puff is the whole of the contact
+   feedback: no flash of red, no shake, nothing counted.
    ------------------------------------------------------------------ */
-function birdGeometry(n){
-  const b = builder(THREE, { aCorner:2, aSeed:1, aAnchor:3 });
-  const pts = [[0,0],[-1,0.55],[-0.55,-0.1],[0,0],[1,0.55],[0.55,-0.1]];
-  for(let i = 0; i < n; i++){
-    const s = 0.55 + (i % 3) * 0.3;
-    const x = -26 + ((i * 4451) % 59) / 59 * 52;
-    const y = RIM + 4 + ((i * 7331) % 67) / 67 * 15;
-    const z = -34 - ((i * 8117) % 71) / 71 * 70;
-    triBillboard(b, [x, y, z], pts, { aSeed:i * 1.91, aAnchor:[x, y, z] }, s);
-  }
-  return b.geometry();
-}
-const birds = new THREE.Mesh(birdGeometry(11), posterMat(THREE, {
-  uniforms:{ uTime, uFlyer, uCol:{value:C(AIR.bird)} },
-  side:THREE.DoubleSide,
-  vertex:`
-    attribute vec2 aCorner; attribute float aSeed; attribute vec3 aAnchor;
-    uniform float uTime; uniform vec3 uFlyer;
-    varying float vFlee;
-    void main(){
-      vec3 c = aAnchor;
-      float dir = mod(aSeed, 2.0) < 1.0 ? 1.0 : -1.0;
-      c.x = mod(aSeed * 11.0 + uTime * 2.6 * dir, 90.0) - 45.0;
-      c.y += sin(uTime * 0.45 + aSeed) * 1.3;
-      float flee = 1.0 - smoothstep(0.0, 11.0, distance(c, uFlyer));
-      vFlee = flee;
-      c += normalize(c - uFlyer + vec3(0.001, 0.6, 0.001)) * flee * 7.0;
-      vec2 off = aCorner;
-      off.y *= 0.45 + 0.55 * abs(sin(uTime * (3.0 + flee * 7.0) + aSeed * 2.0));
-      vec4 mv = modelViewMatrix * vec4(c, 1.0);
-      mv.xy += off;
-      gl_Position = projectionMatrix * mv;
-    }
-  `,
-  fragment:`
-    varying float vFlee;
-    uniform vec3 uCol;
-    void main(){ gl_FragColor = vec4(uCol * (1.0 - vFlee * 0.3), 1.0); }
-  `
-}));
-birds.frustumCulled = false;
-scene.add(birds);
-
-/* ------------------------------------------------------------------
-   7. GRIT — one mesh, two kinds. Dust comes off the wingtips on the
-   dive and nowhere else, which is what keeps the dive legible as the
-   working half of the breath. A harder puff is thrown up when she
-   bottoms out near the rock.
-   ------------------------------------------------------------------ */
-const NP = 120;
 const grit = particles(THREE, {
-  n: NP, renderOrder: 6,
+  n: 130, renderOrder: 6,
   material: posterMat(THREE, {
     uniforms:{ uGrit:{value:C(ROCK.grit)}, uPale:{value:C(R.at(PALE))}, uAccent:{value:C(ROCK.accent)} },
     transparent:true, depthWrite:false, side:THREE.DoubleSide,
@@ -728,122 +811,94 @@ const grit = particles(THREE, {
       uniform vec3 uGrit, uPale, uAccent;
       void main(){
         if(vSize <= 0.0) discard;
-        // a hard little lozenge, not a soft sprite: no gradients
-        if(abs(vC.x) + abs(vC.y) > 1.0) discard;
+        if(abs(vC.x) + abs(vC.y) > 1.0) discard;   // a hard lozenge, no soft sprite
         vec3 col = mix(uGrit, uPale, step(0.0, vC.y) * 0.5);
-        col = mix(col, uAccent, vKind * 0.45);
-        gl_FragColor = vec4(col, mix(0.55, 0.85, vKind));
+        col = mix(col, uAccent, vKind * 0.4);
+        gl_FragColor = vec4(col, mix(0.5, 0.85, vKind));
       }
     `
   })
 });
 scene.add(grit.mesh);
 let gritAccum = 0;
-
 const dust = (x, y, z, kind) => grit.spawn(p => {
   p.kind = kind;
-  p.x = x + (Math.random()-0.5)*0.5;
-  p.y = y + (Math.random()-0.5)*0.3;
+  p.x = x + (Math.random()-0.5)*0.6; p.y = y + (Math.random()-0.5)*0.5;
   p.z = z + (Math.random()-0.5)*0.4;
-  p.r = (kind ? 0.09 : 0.055) + Math.random()*0.10;
-  p.vx = (Math.random()-0.5)*1.4;
-  p.vy = kind ? 1.4 + Math.random()*3.0 : (Math.random()-0.3)*1.1;
-  p.vz = 9.0 + Math.random()*10.0;         // straight out the back
+  p.r = (kind ? 0.11 : 0.05) + Math.random()*0.10;
+  p.vx = (Math.random()-0.5)*2.2;
+  p.vy = kind ? (Math.random()-0.5)*3.4 : (Math.random()-0.4)*1.0;
+  p.vz = 7.0 + Math.random()*9.0;
 });
 function stepGrit(dt){
   grit.step(dt, (p, d) => {
-    p.vy -= d * 4.2;
-    p.x += p.vx * d; p.y += p.vy * d; p.z += p.vz * d;
-    p.r *= 1.0 - d * 0.35;
-    return p.z < 34.0 && p.r > 0.012;
+    p.vy -= d * 3.6;
+    p.x += p.vx*d; p.y += p.vy*d; p.z += p.vz*d;
+    p.r *= 1.0 - d * 0.4;
+    return p.z < 30.0 && p.r > 0.012;
   });
 }
 
 /* ------------------------------------------------------------------
-   8. THE RIM FLARE — the analogue of Deep Light's meniscus, and the
-   same job: sell the crossing. A hard warm band along the rim line when
-   the lens is within a couple of metres of it, so the moment of breaking
-   out into open air is an EVENT rather than a gradual brightening.
+   9. THE OFF-PACE BAND — a soft overlay that appears when the course is
+   making room for the player. It is the only feedback about being off
+   pace, it is warm rather than alarming, and it is not a score.
    ------------------------------------------------------------------ */
 const flare = overlayQuad(THREE, {
-  uniforms:{ uRimUv, uOpen, uFlare:{value:C(AIR.flare)}, uPale:{value:C(R.at(PALE))},
-             uNearRim:{value:0} },
+  uniforms:{ uForgive, uHit, uFlare:{value:C(AIR.flare)} },
   fragment:`
     varying vec2 vUv;
-    uniform float uRimUv, uNearRim;
-    uniform vec3 uFlare, uPale;
+    uniform float uForgive, uHit;
+    uniform vec3 uFlare;
     void main(){
-      if(uNearRim <= 0.01) discard;
-      float d = abs(vUv.y - uRimUv);
-      float core = step(d, 0.003 + uNearRim * 0.011);
-      float edge = step(d, 0.009 + uNearRim * 0.026);
-      float a = (core * 0.80 + (edge - core) * 0.28) * uNearRim;
+      float a = max(uForgive * 0.10, uHit * 0.30);
       if(a < 0.02) discard;
-      gl_FragColor = vec4(mix(uPale, uFlare, core), a);
+      // a vignette at the very edge, three hard steps. Nothing central:
+      // whatever happens, the view of the course stays clear.
+      float d = max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0;
+      float e = floor(clamp((d - 0.72) / 0.28, 0.0, 0.999) * 3.0) / 2.0;
+      if(e <= 0.0) discard;
+      gl_FragColor = vec4(uFlare, a * e);
     }
   `
 });
 scene.add(flare);
 
 /* ------------------------------------------------------------------
-   9. THE GLIDER — a delta wing with a figure slung under it. Flat
-   unlit colour, no interior detail, no lighting model (§4.2 rule 1),
-   and GENERIC: §4.1 means nothing here is derived from any existing
-   design. The accent is the sail's underside and it is the only place
-   in the chapter that colour appears.
+   THE CONTROLS. Two buttons: breathe in, breathe out.
+   Both down cancels, which is the honest reading of pressing both.
    ------------------------------------------------------------------ */
-const matSail  = new THREE.MeshBasicMaterial({ color: R.at(PALE) });
-const matUnder = new THREE.MeshBasicMaterial({ color: ROCK.accent });
-const matHull  = new THREE.MeshBasicMaterial({ color: R.at(DARK) });
-const matBody  = new THREE.MeshBasicMaterial({ color: R.at(BODY) });
-
-const SPH = new THREE.SphereGeometry(1, 10, 8);
-const BOX = new THREE.BoxGeometry(1, 1, 1);
-const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => part(THREE, geo, mat, sx, sy, sz, px, py, pz, rz);
-
-const glider = new THREE.Group();
-const hull   = mk(SPH, matHull,  0.17, 0.15, 0.80,  0,  0.00,  0.05);
-const wingL  = mk(BOX, matSail,  1.55, 0.035, 0.62, -0.84, 0.16, 0.10);
-const wingR  = mk(BOX, matSail,  1.55, 0.035, 0.62,  0.84, 0.16, 0.10);
-const undrL  = mk(BOX, matUnder, 1.40, 0.030, 0.30, -0.80, 0.10, 0.30);
-const undrR  = mk(BOX, matUnder, 1.40, 0.030, 0.30,  0.80, 0.10, 0.30);
-const fin    = mk(BOX, matHull,  0.045, 0.40, 0.34,  0,  0.22,  0.62);
-const pilot  = mk(SPH, matBody,  0.13, 0.17, 0.30,  0, -0.21, -0.02);
-glider.add(hull, wingL, wingR, undrL, undrR, fin, pilot);
-scene.add(glider);
-
-/* ------------------------------------------------------------------
-   The two buttons. Expressive only — §6's governing principle: the
-   interaction guarantees success, so input changes how the scene looks
-   and feels and the thing that actually advances is on the schedule.
-   ------------------------------------------------------------------ */
-let steer = 0, steerWant = 0;
-function holdDown(el, dir){
-  const on = e => { e.preventDefault(); steerWant = dir; el.classList.add('lit'); };
-  const off = () => { if(steerWant === dir) steerWant = 0; el.classList.remove('lit'); };
+let inDown = false, outDown = false;
+function holdDown(el, set){
+  const on  = e => { e.preventDefault(); set(true);  el.classList.add('lit'); };
+  const off = e => { if(e) e.preventDefault(); set(false); el.classList.remove('lit'); };
   el.addEventListener('pointerdown', on);
   el.addEventListener('pointerup', off);
   el.addEventListener('pointercancel', off);
   el.addEventListener('pointerleave', off);
+  // a pointer that leaves the window entirely never delivers pointerup
+  window.addEventListener('blur', () => off());
 }
-holdDown(elBL, -1);
-holdDown(elBR,  1);
+holdDown(elBL, v => { inDown = v; });
+holdDown(elBR, v => { outDown = v; });
 
 /* ------------------------------------------------------------------
    The loop
    ------------------------------------------------------------------ */
 let t = 0;
 let started = false;
-let camY = ALT_LOW + 2;
-let camBack = 10;
-let lateral = 0;
-let roll = 0;
-let prevAlt = ALT_LOW;
+let fill = 0;              // the player's own breath, 0..1
+let kiteY = ALT_LOW;       // altitude, springing towards fill
+let kiteV = 0;
+let camY = ALT_LOW + 1.5;
+let camBack = 13;
+let hit = 0;
+let RATE = rates(PROTOCOLS.run);
+let COURSE = null;
 let subShown = '';
 
-const vRim = new THREE.Vector3();
-const vHz  = new THREE.Vector3();
-const cHaze = C(AIR.haze), cMid = C(R.at(MID)), cDeep = C(R.at(DEEP));
+const vHz = new THREE.Vector3();
+const cHaze = C(AIR.haze), cMid = C(R.at(MID));
 
 const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
 
@@ -853,119 +908,100 @@ const loop = clock((dt, now, running) => {
 
   const st = B.at(t);
   const ph = st.p;
-  const alt = B.value(t);
-  const spread = B.scalar(t);            // 1 wings out, 0 wings tucked
-  const travel = B.travel(t);            // <0 diving, >0 climbing, 0 level
-
-  /* how far down the gorge she has come. This is the only link between
-     time and distance, and the canyon was baked against it. */
+  const sched = B.value(t);             // what the protocol wants. The course.
   uDist.value = SPEED * t;
-  const rush = clamp01(1 - spread);
-  uRush.value = rush;
 
-  /* --- her line. The steer is expressive: it rolls her and slides her
-     across the canyon, and it is CLAMPED inside the walls, which tighten
-     as the gorge narrows. Nothing she can do reaches the rock. --- */
-  steer += (steerWant - steer) * Math.min(1, dt * 4.5);
-  const half = gapOf(alt);
-  const room = half - 2.6;
-  const wander = wanderAt(uDist.value, gorges[B.proto.id].period);
-  const want = wander + steer * room * 0.62 + Math.sin(t * 0.37) * room * 0.14;
-  lateral += (want - lateral) * Math.min(1, dt * 2.2);
-  lateral = Math.max(wander - room, Math.min(wander + room, lateral));
+  /* --- FILL: the player's breath, at the protocol's own rate and no
+     faster. This is the rate cap, and it is the whole reason breathing
+     quickly cannot be rewarded: a doubled rate buys half the swing, and
+     the gates were built from the full swing. --- */
+  const drive = (inDown ? 1 : 0) - (outDown ? 1 : 0);
+  if(drive > 0) fill = Math.min(1, fill + RATE.fillPerSec * dt);
+  else if(drive < 0) fill = Math.max(0, fill - RATE.emptyPerSec * dt);
+  uFill.value = fill;
 
-  glider.position.set(lateral, alt, 0);
-  uFlyer.value.set(lateral, alt, 0);
+  /* --- ALTITUDE: springs towards fill. The lag is the kite's mass, and
+     it is what makes the sail's shape independent of the height — the
+     sail fills before the kite lifts. --- */
+  const wantY = altOf(fill);
+  const k = 26.0, damp = 2.0 * Math.sqrt(k) * 0.85;
+  kiteV += ((wantY - kiteY) * k - kiteV * damp) * dt;
+  kiteY += kiteV * dt;
+  // the clamp the first pass did not have. The figure clipped through
+  // the floor; this makes that unreachable rather than unlikely.
+  if(kiteY < CORR_LO){ kiteY = CORR_LO; kiteV = Math.max(0, kiteV); }
+  if(kiteY > CORR_HI){ kiteY = CORR_HI; kiteV = Math.min(0, kiteV); }
 
-  /* pitch follows the breath, bank follows the phase and the finger */
-  const pitch = travel > 0 ? -0.42 : travel < 0 ? 0.50 : -0.06;
-  glider.rotation.x += (pitch - glider.rotation.x) * Math.min(1, dt * 2.4);
-  const bankWant = (ph.bank || 0) * 0.12 + steer * 0.46;
-  roll += (bankWant - roll) * Math.min(1, dt * 3.2);
-  glider.rotation.z = roll;
-  glider.rotation.y = -steer * 0.12;
+  const kiteX = Math.sin(t * 0.7) * 0.18;
+  uKite.value.set(kiteX, kiteY, 0);
+  uRush.value = clamp01(-kiteV / 7.0);
 
-  /* the wings: spread wide on the climb, swept back for the dive. One
-     scalar for the whole airframe, so the sweep, the sail and the speed
-     lines cannot disagree with one another. */
-  const sweep = (1 - spread) * 0.62;
-  wingL.rotation.y =  sweep;  wingR.rotation.y = -sweep;
-  undrL.rotation.y =  sweep;  undrR.rotation.y = -sweep;
-  const dihedral = 0.06 + spread * 0.17;
-  wingL.rotation.z =  dihedral; wingR.rotation.z = -dihedral;
-  undrL.rotation.z =  dihedral; undrR.rotation.z = -dihedral;
-  fin.scale.y = 0.30 + spread * 0.18;
+  /* --- how far off pace, and therefore how much room the course makes.
+     §6.1: the gap widens rather than the kite crashing. --- */
+  const forg = forgiveness(kiteY, sched);
+  uForgive.value = forg.extra / FORGIVE_MAX;
 
-  /* --- grit off the wingtips, on the working half of the breath --- */
-  if(ph.grit){
-    gritAccum += dt * (6 + 30 * rush);
-    while(gritAccum >= 1){
-      gritAccum -= 1;
-      const s = Math.random() < 0.5 ? -1 : 1;
-      dust(lateral + s * 1.5, alt + 0.14, 0.2, 0);
+  /* --- contact. Soft, informative, and NOT COUNTED. --- */
+  const { gate, ahead } = gateAt(COURSE, uDist.value);
+  const half = gate.half + forg.extra;
+  const KITE_HALF = 0.78;
+  if(Math.abs(ahead) < SLAB_Z + 1.4){
+    const off = kiteY - gate.centre;
+    const over = Math.abs(off) - (half - KITE_HALF);
+    if(over > 0){
+      // pushed back towards the opening, never stopped and never scored
+      kiteY -= Math.sign(off) * Math.min(over, 26 * dt);
+      kiteV += -Math.sign(off) * 9.0 * dt;
+      hit = Math.min(1, hit + dt * 7);
+      for(let i = 0; i < 2; i++){
+        dust(kiteX + (Math.random()-0.5)*2.2, gate.centre + Math.sign(off) * half, 0.6, 1);
+      }
     }
-  } else gritAccum = 0;
-
-  /* a harder puff when she bottoms out close to the rock */
-  const clearance = alt - floorOf(alt);
-  if(prevAlt > alt && clearance < 5.0 && Math.random() < dt * 14){
-    for(let i = 0; i < 4; i++) dust(lateral + (Math.random()-0.5)*3, floorOf(alt) + 0.4, 1.0, 1);
   }
-  prevAlt = alt;
+  hit = Math.max(0, hit - dt * 1.7);
+  uHit.value = hit;
+
+  /* a little grit off the tail on a fast sink */
+  if(uRush.value > 0.25){
+    gritAccum += dt * 18 * uRush.value;
+    while(gritAccum >= 1){ gritAccum -= 1; dust(kiteX, kiteY - 0.4, 1.2, 0); }
+  } else gritAccum = 0;
   stepGrit(dt);
 
-  /* --- the camera. A different shot per phase, as in Deep Light: the
-     climb looks UP past her at the rim opening, the dive looks DOWN the
-     throat of the canyon, and the skim sits low and level with the walls
-     going past. The camera banks with her, which is most of why the
-     rolling reads as flying. --- */
-  let wantY, lookY, wantBack, lookZ, ease;
-  if(ph.cam === 'rise'){
-    wantY = alt - 1.15; lookY = alt + 3.6; wantBack = 11.0; lookZ = -16; ease = 2.6;
-  } else if(ph.cam === 'dive'){
-    wantY = alt + 2.45; lookY = alt - 3.1; wantBack = 9.2;  lookZ = -18; ease = 3.4;
-  } else if(ph.cam === 'skim'){
-    wantY = alt + 1.25; lookY = alt - 0.5; wantBack = 7.4;  lookZ = -22; ease = 3.8;
-  } else {
-    wantY = alt + 1.6;  lookY = alt;       wantBack = 10.0; lookZ = -18; ease = 2.4;
-  }
-  camY    += (wantY - camY) * Math.min(1, dt * ease);
+  /* --- the kite's body --- */
+  sail.position.set(kiteX, kiteY, 0);
+  spars.position.copy(sail.position);
+  // it pitches with its vertical speed and rolls a little with the luff
+  const pitch = clamp(-kiteV * 0.055, -0.5, 0.5);
+  sail.rotation.x = pitch; spars.rotation.x = pitch;
+  sail.rotation.z = Math.sin(t * 1.1) * 0.05 + drive * 0.04;
+  spars.rotation.z = sail.rotation.z;
+  pushHistory(kiteX, kiteY, 0);
+  updateTail();
+
+  /* --- the camera. Behind, and leaning the way the phase is going, so
+     the gates you are about to meet are the ones in frame. --- */
+  let lookOff, wantBack, ease;
+  if(ph.cam === 'rise'){      lookOff =  2.6; wantBack = 13.5; ease = 2.6; }
+  else if(ph.cam === 'dive'){ lookOff = -2.2; wantBack = 12.5; ease = 3.0; }
+  else {                      lookOff =  0.2; wantBack = 11.5; ease = 3.2; }
+  camY += ((kiteY + 1.0) - camY) * Math.min(1, dt * 4.5);
   camBack += (wantBack - camBack) * Math.min(1, dt * 2.0);
   const back = camBack * (camera.aspect < 0.75 ? 1.0 : 1.3);
-  // The camera trails her laterally at very nearly 1:1, and AIMS at her.
-  // It used to sit at 0.72x her offset while looking at 0.5x it, and the
-  // 0.22x difference is a lateral offset that grows with how far the
-  // gorge has wandered — by nine metres of wander she was off the right
-  // edge of a 375 px frame entirely. Caught by where().inFrame on the
-  // deployed page. The small residual lag frames her INTO the turn,
-  // which is what the offset was reaching for; the wobble is life.
-  camera.position.set(lateral * 0.92 + Math.sin(t * 0.21) * 0.5, camY, back);
-  camera.up.set(Math.sin(-roll * 0.62), Math.cos(-roll * 0.62), 0);
-  camera.lookAt(lateral, lookY, lookZ);
+  camera.position.set(kiteX * 0.3, camY, back);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(kiteX * 0.3, kiteY + lookOff, -22);
 
-  /* --- which world is the lens in --- */
-  const rimHere = RIM + 1.0;
-  uOpen.value = clamp01((camY - rimHere + 1.6) / 3.2);
-  birds.visible = camY > RIM - 5.0;
-  lines.visible = rush > 0.04;
-
-  /* where the rim line and the far horizon fall on screen, so the flare
-     and the sky bands sit against them rather than at a fixed height */
-  vRim.set(camera.position.x, rimHere, camera.position.z - 150).project(camera);
-  uRimUv.value = vRim.y * 0.5 + 0.5;
-  vHz.set(camera.position.x, RIM + 3, camera.position.z - 800).project(camera);
+  vHz.set(camera.position.x, RIDGE_TOP + 2, camera.position.z - 900).project(camera);
   uHorizon.value = vHz.y * 0.5 + 0.5;
-  flare.material.uniforms.uNearRim.value = clamp01(1 - Math.abs(camY - rimHere) / 2.6);
 
-  /* --- haze and depth. Deep in the canyon the air is slate; up over the
-     rim it is the pale green of the open sky. --- */
-  const dn = clamp01((RIM - camY) / RIM);
   uTime.value = t;
-  uFog.value.copy(cHaze).lerp(cMid, dn).lerp(cDeep, dn * 0.45);
-  mesas.position.x = -wander * 0.6;
+  const dn = clamp01((CORR_HI - kiteY) / CORR_HI);
+  uFog.value.copy(cHaze).lerp(cMid, dn * 0.35);
+  mesas.position.x = -wanderAt(uDist.value, worlds[B.proto.id].period) * 0.5;
 
   /* --- cue text. The countdown points at the next breath, never at
-     elapsed time (§2.4). --- */
+     elapsed time (§2.4). Nothing here is a score. --- */
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
   if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
@@ -976,30 +1012,29 @@ const loop = clock((dt, now, running) => {
 });
 
 /* ---------- the pace choice ---------- */
-const picked = choice({ key:'bor.longair.pace.v1', valid: validChoice });
+const picked = choice({ key:'bor.longair.pace.v2', valid: validChoice });
 
 function beginWith(which, remember){
   const id = CHOICE[which];
   B.use(PROTOCOLS[id]);
-  uPeriod.value = gorges[id].period;
-  for(const k of Object.keys(gorges)){
-    gorges[k].mesh.visible = (k === id);
-    spurs[k].visible = (k === id);
+  RATE = rates(PROTOCOLS[id]);
+  COURSE = worlds[id].course;
+  uPeriod.value = worlds[id].period;
+  for(const kk of Object.keys(worlds)){
+    for(const m of worlds[kk].meshes) m.visible = (kk === id);
   }
   $('proto').textContent = B.proto.name;
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
-  t = 0; prevAlt = B.value(0); subShown = '';
+  t = 0; fill = 0; kiteY = ALT_LOW; kiteV = 0; hit = 0; histN = 0; subShown = '';
   loop.resync();
 }
 $('gateBrisk').addEventListener('click', () => beginWith('brisk', true));
 $('gateSlow').addEventListener('click',  () => beginWith('slow', true));
 
 $('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
-$('resume').addEventListener('click', () => {
-  elHalt.classList.remove('on'); loop.running = true;
-});
+$('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
 $('rescreen').addEventListener('click', () => {
   picked.clear();
   elHalt.classList.remove('on');
@@ -1007,16 +1042,12 @@ $('rescreen').addEventListener('click', () => {
   started = false; loop.running = true; t = 0;
 });
 
-/* Something has to be visible before the gate is answered, or the first
-   frame draws an empty sky. Show the brisk canyon as the backdrop to the
-   gate itself, without starting the clock. */
-uPeriod.value = gorges.run.period;
-gorges.run.mesh.visible = true;
-spurs.run.visible = true;
+/* Something has to be on screen behind the gate, or the first frame is
+   an empty sky. Show the brisk course without starting the clock. */
+COURSE = worlds.run.course;
+uPeriod.value = worlds.run.period;
+for(const m of worlds.run.meshes) m.visible = true;
 
-/* The scroll first, once, then the choice. stage.js's enter() owns the
-   one contract that matters: requireScroll must never both return false
-   AND run the callback. */
 const ack = picked.read();
 enter(requireScroll, () => {
   if(ack) beginWith(ack.choice, false); else elGate.classList.add('on');
@@ -1032,54 +1063,52 @@ contextGuard(canvas, {
   onRestored(){ resize(); loop.resync(); loop.start(); }
 });
 
-/* ---------- inspection hook ----------
-   Same instrument as Deep Light's, and the same caveat: through a
-   browser pane that is hidden between tool calls, rAF is throttled to
-   two or three frames per call, so the breath looks frozen and no
-   quantity that has to accumulate over a second ever will. Read the
-   mapping with seek() and now(); do not read it off a screenshot.
-
-   predict() is the one addition, and it is the claim this chapter rests
-   on: for a point n metres ahead of her it reports the altitude the
-   canyon was built for there, and the altitude the breath will actually
-   be at when she arrives. If those two columns disagree, the terrain is
-   not the breath and the chapter has no argument. */
+/* ---------- inspection hook ---------- */
 window.__longAir = {
   begin(which){ beginWith(which === 'slow' ? 'slow' : 'brisk', false); },
   ack: () => picked.read(),
   scene, camera, THREE,
-  seek(v){ t = v; prevAlt = B.value(v); uDist.value = SPEED * v; },
-  now(){ const s = B.at(t);
-    return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
-             phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
-             alt:+B.value(t).toFixed(2), spread:+B.scalar(t).toFixed(2),
-             floor:+floorOf(B.value(t)).toFixed(2),
-             clearance:+(B.value(t) - floorOf(B.value(t))).toFixed(2),
-             gap:+(gapOf(B.value(t)) * 2).toFixed(2),
-             dist:+uDist.value.toFixed(1), lateral:+lateral.toFixed(2),
-             camY:+camY.toFixed(2), open:+uOpen.value.toFixed(2),
-             rush:+uRush.value.toFixed(2), roll:+roll.toFixed(3),
-             liveGrit: grit.live() }; },
-  predict(metres){
-    const period = gorges[B.proto.id].period;
-    const back = period * BEHIND;
-    const arrive = t + metres / SPEED;
-    // recover the build-z of the slice that is `metres` ahead of her
-    // right now, the same way the builder laid it out, and ask what
-    // altitude it was built for
-    const zb = (SPEED * t + metres + back) % period;
-    return { metres, inSeconds:+(metres / SPEED).toFixed(2),
-             breathWillBe:+B.value(arrive).toFixed(2),
-             terrainBuiltFor:+B.value(zb / SPEED - back / SPEED).toFixed(2),
-             phaseOnArrival:B.at(arrive).p.k };
-  },
-  steer(v){ steerWant = v; return steerWant; },
-  /* Drive the real frame body without rAF. A hidden browser pane gets
-     no rAF callbacks at all, so the loop body — camera, uniform
-     writes, per-phase branches — is otherwise unreachable from a tool
-     call, and a throw in there is indistinguishable from a stalled
+  /* Drive the real frame body without rAF. A hidden browser pane gets no
+     rAF callbacks at all, so the loop body is otherwise unreachable from
+     a tool call and a throw in there is indistinguishable from a stalled
      loop. See clock().pump in js/stage.js. */
   pump(dt, n){ return loop.pump(dt, n); },
+  /* press and release the controls from a tool call */
+  hold(which, down){
+    if(which === 'in') inDown = !!down; else outDown = !!down;
+    return { inDown, outDown };
+  },
+  seek(v){ t = v; uDist.value = SPEED * v; },
+  now(){ const s = B.at(t);
+    const g = gateAt(COURSE, uDist.value);
+    const f = forgiveness(kiteY, B.value(t));
+    return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
+             phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
+             schedule:+B.value(t).toFixed(2),
+             fill:+fill.toFixed(3), kiteY:+kiteY.toFixed(2), kiteV:+kiteV.toFixed(2),
+             error:+(kiteY - B.value(t)).toFixed(2), offPace:+f.err.toFixed(3),
+             forgiveExtra:+f.extra.toFixed(2),
+             gapCentre:+g.gate.centre.toFixed(2), gapHalf:+(g.gate.half + f.extra).toFixed(2),
+             gateAhead:+g.ahead.toFixed(2),
+             clearanceOverRidge:+(kiteY - ridgeAt(uDist.value, worlds[B.proto.id].period)).toFixed(2),
+             hit:+hit.toFixed(2), dist:+uDist.value.toFixed(1),
+             camY:+camY.toFixed(2), liveGrit: grit.live(),
+             inDown, outDown }; },
+  /* The claim the chapter rests on: for a point n metres ahead, the gap
+     the course was built for must equal the altitude the schedule will
+     want when the kite arrives. */
+  predict(metres){
+    const w = worlds[B.proto.id];
+    const back = w.period * BEHIND;
+    const arrive = t + metres / SPEED;
+    const zb = (SPEED * t + metres + back) % w.period;
+    const g = gateAt(w.course, uDist.value + metres);
+    return { metres, inSeconds:+(metres / SPEED).toFixed(2),
+             scheduleOnArrival:+B.value(arrive).toFixed(2),
+             terrainBuiltFor:+B.value(zb / SPEED - back / SPEED).toFixed(2),
+             nearestGateCentre:+g.gate.centre.toFixed(2),
+             phaseOnArrival:B.at(arrive).p.k };
+  },
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();
@@ -1096,8 +1125,7 @@ window.__longAir = {
       return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
                inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
     };
-    return { glider:put(glider), rimUv:+uRimUv.value.toFixed(3),
-             horizonUv:+uHorizon.value.toFixed(3) };
+    return { kite:put(sail), horizonUv:+uHorizon.value.toFixed(3) };
   }
 };
 
