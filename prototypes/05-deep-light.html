@@ -407,7 +407,10 @@ function kelpGeometry(n, seg){
     const ang   = (i / n) * Math.PI * 2 + (i * 2.399);
     const rad   = 5 + ((i * 7919) % 97) / 97 * 14;
     const cx    = Math.cos(ang) * rad;
-    const cz    = Math.sin(ang) * rad - 3;
+    // Keep every blade behind the diver's plane. Blades that landed
+    // between her and the lens filled the middle of the frame.
+    let cz = Math.sin(ang) * rad - 3;
+    if(cz > -0.5) cz = -1.0 - (cz + 0.5);
     const h     = 5 + ((i * 6367) % 83) / 83 * 8.5;
     const wBase = 0.34 + ((i * 5281) % 61) / 61 * 0.5;
     const ph    = (i * 1.7) % 6.283;
@@ -518,7 +521,13 @@ scene.add(shafts);
    detail. Deliberately featureless: §4.1 forbids anything that reads
    as a specific character or costume.
    ------------------------------------------------------------------ */
-const inkMat  = new THREE.MeshBasicMaterial({ color: PAL.ink });
+/* Flat, one value, no shading — but the value is not fixed. An ink
+   silhouette reads beautifully against the bright water near the surface
+   and vanishes completely at the bottom, where the water is ink too. So
+   the figure's single flat colour slides from ink to a pale sea-grey as
+   she descends, which is what a cel painter would do by hand. */
+const inkMat = new THREE.MeshBasicMaterial({ color: PAL.ink });
+const cBody  = new THREE.Color();
 const diver   = new THREE.Group();
 const sphere  = new THREE.SphereGeometry(1, 14, 10);
 const torso = new THREE.Mesh(sphere, inkMat); torso.scale.set(0.26, 0.60, 0.21);
@@ -593,6 +602,7 @@ let camY = TOP_Y + 2.0;
 const vBed  = new THREE.Vector3();
 const vHand = new THREE.Vector3();
 const cHigh = C(PAL.high), cDeep = C(PAL.deep), cInk = C(PAL.ink);
+const cBodyDeep = C(0x9FC2BC);
 
 function frame(now){
   rafId = requestAnimationFrame(frame);
@@ -641,6 +651,7 @@ function frame(now){
   // the fog is the water at this depth, so distant geometry dissolves into
   // the column behind it instead of ending in a hard black horizon
   fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.2);
+  inkMat.color.copy(cInk).lerp(cBodyDeep, Math.max(0, (dn - 0.25) / 0.6));
 
   // --- cue text + session bar ---
   if(st.p.label !== elPhase.textContent){
@@ -703,6 +714,18 @@ canvas.addEventListener('webglcontextrestored', () => {
 window.__deepLight = {
   seek(v){ t = v; },
   now(){ return { t, phase: phaseAt(t).p.k, level: level(t) }; },
+  // where things actually land on screen, in CSS pixels — so "I cannot
+  // see her" can be checked rather than guessed at
+  where(){
+    const put = o => {
+      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x:+((v.x*0.5+0.5)*W).toFixed(0), y:+((-v.y*0.5+0.5)*H).toFixed(0),
+               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
+    };
+    return { diver:put(diver), pearl:put(pearl),
+             diverColor:'#'+inkMat.color.getHexString(),
+             camY:+camera.position.y.toFixed(2) };
+  },
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();
