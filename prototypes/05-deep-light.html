@@ -366,8 +366,10 @@ const bedMat = new THREE.ShaderMaterial({
     varying float vDist;
     void main(){
       vec3 p = position;
-      float h = sin(p.x * 0.21) * 1.5 + sin(p.y * 0.17 + 1.3) * 1.2 + sin((p.x - p.y) * 0.09) * 1.8;
-      h = floor(h / 0.75) * 0.75;
+      // Amplitude matters: at 4.5 the humps rose to y = -12.5, above the
+      // diver at -14.4, and buried her and the pearl inside the seabed.
+      float h = sin(p.x * 0.21) * 0.5 + sin(p.y * 0.17 + 1.3) * 0.4 + sin((p.x - p.y) * 0.09) * 0.6;
+      h = floor(h / 0.3) * 0.3;
       p.z += h; vH = h;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
@@ -381,8 +383,8 @@ const bedMat = new THREE.ShaderMaterial({
     uniform vec3 uInk, uDeep;
     ${FOG_GLSL}
     void main(){
-      float v = floor(clamp(vH * 0.16 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
-      vec3 col = mix(uInk, uDeep, v * 0.8);
+      float v = floor(clamp(vH * 0.45 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
+      vec3 col = mix(uInk, uDeep, v);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
@@ -413,7 +415,7 @@ function kelpGeometry(n, seg){
       const f = s / seg;
       const w = wBase * (1 - f * 0.88);
       for(const side of [-1, 1]){
-        verts.push(cx + side * w, BED_Y + f * h, cz);
+        verts.push(cx + side * w, BED_Y + 1.1 + f * h, cz);
         aH.push(f); aPhase.push(ph); aSide.push(side);
       }
     }
@@ -553,8 +555,8 @@ const pearlMat = new THREE.ShaderMaterial({
 const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), pearlMat);
 scene.add(pearl);
 const halo = new THREE.Mesh(
-  new THREE.SphereGeometry(0.55, 12, 10),
-  new THREE.MeshBasicMaterial({ color:PAL.warm, transparent:true, opacity:0.085,
+  new THREE.SphereGeometry(0.85, 12, 10),
+  new THREE.MeshBasicMaterial({ color:PAL.warm, transparent:true, opacity:0.1,
                                 depthWrite:false, blending:THREE.AdditiveBlending })
 );
 scene.add(halo);
@@ -616,7 +618,7 @@ function frame(now){
   vHand.set(diver.position.x + 0.22, diver.position.y - 0.42, diver.position.z + 0.2);
   pearl.position.lerpVectors(vBed, vHand, cr);
   halo.position.copy(pearl.position);
-  halo.material.opacity = 0.055 + cr * 0.075;
+  halo.material.opacity = 0.10 + cr * 0.12;
 
   // --- camera: trails her, with a lag, so the water moves past ---
   const wantY = diver.position.y + 1.6;
@@ -638,7 +640,7 @@ function frame(now){
   shaftMat.uniforms.uTime.value = t;
   // the fog is the water at this depth, so distant geometry dissolves into
   // the column behind it instead of ending in a hard black horizon
-  fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.3);
+  fogCol.copy(cHigh).lerp(cDeep, dn).lerp(cInk, dn * 0.2);
 
   // --- cue text + session bar ---
   if(st.p.label !== elPhase.textContent){
