@@ -155,6 +155,54 @@ that the person choosing a practice chooses it knowingly. Two things it does not
 
 Where those two hold, the question "is this proven?" stops being a gate and becomes a label.
 
+### 1.6 The governing principle for protocol selection
+
+*Added 23 October 2026, by the author. With §1.5, this governs which practices may appear in
+the book. It supersedes the precautionary framing that preceded it.*
+
+> **Established practices across cultures are safe to practise, as long as the practitioner
+> is aware of the circumstances the practice requires. That awareness is at the
+> practitioner's discretion and cannot be controlled through the app. The app's job is
+> therefore the disclosure of circumstances, not the gatekeeping of practices.**
+
+Pranayama — including forms with vigorous breathing and with retention — is practised daily,
+for health, by a very large number of people, and has been for a long time. A framework that
+concludes such a practice must not appear at all has not identified a hazard; it has
+identified that it is not the one taking the risk. The app is not the practitioner. It cannot
+see the room, the posture, the hour, or the body. What it can do is say, exactly and without
+softening, what the practice requires — and then get out of the way.
+
+**The one place this needs care, because the document and this principle have until now been
+talking about two different claims.**
+
+The hyperventilation-then-hold hazard that the literature is unambiguous about is a hazard
+**in water**. Hypoxic blackout is a *drowning* mechanism. The blackout is survivable on a mat
+and lethal in a pool, which is precisely why it is a lifeguarding rule rather than a yoga one.
+Read the sources in §2.1 again with that in mind: the CDC case series is four drownings;
+Craig's 58-case series is drownings; the RLSS position is a position about swimmers. None of
+it is evidence that the same physiology, performed seated on a floor, kills people. On dry
+land the realistic worst case is a faint.
+
+This app is practised on land, in a room, seated or lying down. The water in it is imagery.
+
+So the principle and the evidence are not in conflict, and the honest statement of both is the
+same statement: **the hazard is conditional on circumstance; the circumstance here is dry land
+and seated; and the practitioner is the one who knows their circumstance.** Which is also why
+the rule that survives all of this intact is the water rule — stated plainly, and without
+exception.
+
+What this principle does **not** license:
+
+- **Any weakening of §2.1 rule 1.** It is strengthened. Once the blanket prohibition is gone,
+  the entire weight of the documented hazard rests on the water rule, so that rule carries
+  more now, not less.
+- **False claims.** §1.3 is untouched. Nor does "established across cultures" become a
+  claim of efficacy: traditional is not the same as proven, and §1.2 still governs what may
+  be said about outcomes.
+- **Dropping the disclosure.** Holds stay short and equal to the other phases; countdowns
+  point towards air; nothing is scored. Disclosure is the part the app is actually
+  responsible for, so it is the part that must be good.
+
 ---
 
 ## 2. Safety: the architecture, not the disclaimer
@@ -177,6 +225,27 @@ contain, not text to append to a settings screen.
 3. **No hyperventilation followed by a breath-hold. Anywhere in the product.** This is the
    combination that kills people. There is no level, no unlock, no advanced mode where the
    app pairs them.
+
+   > **AMENDED 23 October 2026, by the author.** The blanket form of this rule — *anywhere in
+   > the product* — is withdrawn, on the principle at §1.6. The practice may appear.
+   >
+   > **The reasoning above is left standing, because it is correct about the thing it is
+   > actually describing: a drowning mechanism.** Every death cited for this combination,
+   > here and in the research dossier, happened in water. What changes is not the strength of
+   > the rule but its location. The prohibition moves wholly onto **rule 1**, where the
+   > evidence actually sits, and is stated there without exception and with no circumstance
+   > in which it bends. On dry land, seated, the realistic worst case of the same physiology
+   > is a faint, which is what **rule 2** exists to make safe.
+   >
+   > The app's obligation becomes disclosure: say precisely what circumstances the practice
+   > requires, every time, and leave the practice to the practitioner. What the app may not
+   > do is pair the two and imply the pairing is safe *in water*, because it is not, and no
+   > framing makes it so.
+   >
+   > For the record: as of this date nothing built uses fast breathing. This amendment
+   > removes a prohibition; it does not describe a shipped feature. Box breathing, the
+   > protocol now in the pearl diver, is 3.75 breaths a minute — slower than anything this
+   > app shipped before it.
 4. **An always-visible stop.** One tap, always on screen, always works, kills audio and
    visuals immediately. Implemented in all three prototypes already.
 5. **No driving or operating machinery.**

@@ -61,6 +61,8 @@
   .sheet .own{border-left:2px solid rgba(242,227,200,.3);padding-left:12px;text-align:left;
     margin-bottom:18px}
   .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(242,227,200,.45);margin-top:16px}
+  .sheet .sub2{display:block;margin-top:5px;font:400 9.5px/1.3 ui-sans-serif,sans-serif;
+    letter-spacing:.06em;text-transform:none;opacity:.6}
 
   #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
     text-align:center;
@@ -83,26 +85,24 @@
 <div id="bar"><div id="barfill"></div></div>
 <div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Never hold your breath in or near water. Ease off at any light-headedness.</div>
 
-<!-- Design doc §2.2: screening before ANY protocol containing a hold, and the
-     gate must leave a real exercise behind, because an all-or-nothing gate
-     trains people to lie to it. "Not sure" counts as yes. The answer persists. -->
-<div id="gate" class="sheet on"><div>
-  <h2>Before you begin</h2>
-  <p class="fine own"><strong>This is a personal project.</strong> It was built by one person, for his own benefit, to suit his own taste and needs — including exercises that are unconventional, and some that no commercial app would offer. Anyone else is welcome to use it at will and with consideration. It is offered as-is, for your own discretion and your own judgement. It is not advice and it is not designed for a general audience.</p>
-  <p>The default is <strong>box breathing</strong> — four in, four holding, four out, four holding. <strong>It contains breath-holds.</strong></p>
-  <p class="fine">The holds are short, exactly equal to the other phases, and set by the app. They never lengthen. Nothing is timed by you, scored, or compared to last time.</p>
-  <p class="fine"><strong>Take the no-holds version instead</strong> if any of these apply to you — and <strong>if you are not sure, that counts as yes</strong>: epilepsy or any seizure history; pregnancy; under 18; heart disease, arrhythmia, or unexplained fainting; stroke, TIA, or aneurysm; sickle cell disease or trait; uncontrolled high blood pressure; glaucoma or recent eye surgery; COPD or unstable asthma; a previous collapsed lung; recent surgery; panic disorder or PTSD; psychosis or mania.</p>
-  <p class="fine"><strong>Never hold your breath in or near water</strong> — not a bath, pool, sea, or hot tub. Sit or lie down, never standing, never in a vehicle.</p>
-  <button id="gateHolds">NONE APPLY — BOX BREATHING</button>
-  <button id="gateNo" class="alt">ONE APPLIES, OR I'M NOT SURE<br>— THE NO-HOLDS VERSION</button>
-  <p class="fine tiny">The no-holds version is the same dive at the same length, with a rest at the bottom of the exhale in place of a hold. Nothing is withheld from it. Your answer is remembered on this device; you can change it from the stop screen.</p>
+<!-- A CHOICE, not a screening gate. The circumstances this practice asks
+     for are disclosed by the warning scroll (app/js/scroll.js), which
+     opens first and is the only blocking step — design doc §1.6: the app
+     discloses the circumstances, the practitioner supplies them. What is
+     left here is which protocol you would rather breathe. -->
+<div id="gate" class="sheet"><div>
+  <h2>Which breath?</h2>
+  <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols drive the same dive. Neither is withheld from you and neither is better for you — pick the one you want.</p>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">with two short holds · 3.75 a minute</span></button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 / 2 / 5<br><span class="sub2">a rest at empty instead · 5.45 a minute</span></button>
+  <p class="fine tiny">The holds are short, exactly equal to the other phases, and set by the app — they never lengthen, and nothing is timed by you or scored. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
 <div id="halt" class="sheet"><div>
   <h2>Stopped</h2>
   <p>Let your breathing go back to whatever it wants to do. She keeps the pearl either way.</p>
   <button id="resume">RESUME</button>
-  <button id="rescreen" class="link">Change my answer about breath-holds</button>
+  <button id="rescreen" class="link">Choose a different breath</button>
 </div></div>
 
 <div id="fallback"><div>
@@ -160,6 +160,8 @@
    marks crossing it. The surface plane is the hinge, and the crossing
    gets a meniscus band at the lens line and a burst of spray.
    ============================================================ */
+
+import { requireScroll } from '../app/js/scroll.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
@@ -1356,13 +1358,13 @@ document.addEventListener('visibilitychange', () => {
   if(document.hidden) stopLoop(); else startLoop();
 });
 
-/* ---------- the screening gate (§2.2) ----------
-   Two real answers, not an acknowledgement. "Not sure" is wired to the
-   same branch as "yes", because that is what §2.2 says it must count
-   as, and the branch leads to a complete exercise rather than a
-   refusal. The answer persists on the device so the question is asked
-   once, and can be changed from the stop screen. */
-const ACK_KEY = 'bor.deeplight.screening.v1';
+/* ---------- the protocol choice ----------
+   This was a screening gate. It is now a choice, because the blocking
+   step moved to the warning scroll, which discloses the circumstances
+   the practice asks for and then gets out of the way (design doc §1.6).
+   Both protocols stay built; neither is withheld. The choice persists
+   on the device and can be changed from the stop screen. */
+const ACK_KEY = 'bor.deeplight.protocol.v1';
 function readAck(){
   try{
     const raw = localStorage.getItem(ACK_KEY);
@@ -1398,9 +1400,13 @@ $('rescreen').addEventListener('click', () => {
   last = fPrev = performance.now();
 });
 
-/* a remembered answer means the question is not asked again */
+/* The scroll first, once, then the choice — or straight in if the choice
+   is already remembered. requireScroll returns true when it has opened
+   and runs `next` on dismissal; false when it has been seen, in which
+   case we call `next` ourselves. It must never do both. */
 const ack = readAck();
-if(ack) beginWith(ack.choice, false);
+const next = () => { if(ack) beginWith(ack.choice, false); else elGate.classList.add('on'); };
+if(!requireScroll(next)) next();
 
 /* ---------- context loss ---------- */
 canvas.addEventListener('webglcontextlost', e => {

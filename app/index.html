@@ -18,29 +18,114 @@
   #scrim{position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(180deg, rgba(12,7,22,.30) 0%, rgba(12,7,22,.52) 42%, rgba(12,7,22,.80) 100%)}
 
-  /* ---------- the cover ---------- */
-  #coverWrap{position:fixed;inset:0;z-index:40;perspective:1600px;background:var(--deep)}
-  #cover{position:absolute;inset:0;transform-origin:left center;
-    background:
-      radial-gradient(120% 90% at 20% 10%, rgba(243,234,215,.07), transparent 60%),
-      linear-gradient(160deg,#1B2150 0%,#14183F 45%,#0E1130 100%);
-    display:grid;place-items:center;padding:34px;text-align:center;
-    box-shadow:inset -14px 0 28px rgba(0,0,0,.45)}
-  #cover::after{content:'';position:absolute;left:0;top:0;bottom:0;width:16px;
-    background:linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,0))}
-  #coverWrap.opening #cover{transform:rotateY(-142deg);opacity:.15}
+  /* ---------- the cover: a bound book with a thickness ----------
+     The old cover was one flat panel that rotated. The turn read as an
+     image swinging rather than a board opening, because there was no
+     object there — nothing behind the panel, no edge to the panel, and
+     nothing on its inside face. This version is built as a real solid in
+     CSS 3-D: a front board and a back board separated in Z, a fore-edge
+     strip standing between them, and the text block behind it all. The
+     turn then happens THROUGH something. */
+  :root{ --leather:#4A2418; --leatherHi:#6E3A24; --leatherLo:#24100A;
+         --gold:#C9A227; --goldHi:#EFD98B; --goldLo:#8A6A14; --board:14px; }
+
+  #coverWrap{position:fixed;inset:0;z-index:40;background:var(--deep);
+    perspective:1500px;perspective-origin:26% 48%}
   #coverWrap.gone{display:none}
-  .mark{width:92px;height:92px;margin:0 auto 20px;display:block}
-  #cover h1{font:300 36px/1.08 ui-serif,Georgia,serif;margin:0;letter-spacing:.01em}
-  #cover .of{display:block;font:400 14px/1 ui-serif,Georgia,serif;
-    letter-spacing:.42em;text-transform:uppercase;opacity:.55;margin-bottom:9px}
-  #cover .sub{margin-top:18px;font:500 9px/1.6 ui-sans-serif;letter-spacing:.3em;
-    text-transform:uppercase;color:rgba(243,234,215,.42)}
-  #cover .open{margin-top:30px;font:500 9px/1 ui-sans-serif;letter-spacing:.3em;
-    text-transform:uppercase;color:rgba(243,234,215,.55);
-    border:1px solid rgba(243,234,215,.3);border-radius:999px;padding:12px 24px;display:inline-block}
-  #cover .edge{position:absolute;right:0;top:6%;bottom:6%;width:5px;border-radius:2px;
-    background:repeating-linear-gradient(180deg, rgba(243,234,215,.22) 0 2px, transparent 2px 5px)}
+  #book{position:absolute;inset:0;transform-style:preserve-3d}
+
+  /* the paper stack, sitting behind the board and slightly inset */
+  #textblock{position:absolute;top:9px;bottom:9px;left:16px;right:7px;
+    border-radius:2px 6px 6px 2px;transform:translateZ(calc(var(--board) / -2 - 3px));
+    background:linear-gradient(90deg,#D9C9A6 0%,#EFE6CE 14%,#E7DCC4 70%,#CBB890 100%);
+    box-shadow:
+      inset -2px 0 0 rgba(140,118,76,.55), inset -4px 0 0 rgba(239,230,206,.9),
+      inset -6px 0 0 rgba(140,118,76,.45), inset -8px 0 0 rgba(239,230,206,.9),
+      inset -10px 0 0 rgba(140,118,76,.35), inset -12px 0 0 rgba(239,230,206,.85),
+      inset 0 2px 0 rgba(140,118,76,.35), inset 0 -2px 0 rgba(140,118,76,.35)}
+  /* gilt on the fore-edge of the text block */
+  #textblock::after{content:'';position:absolute;top:2px;bottom:2px;right:0;width:4px;
+    border-radius:0 3px 3px 0;
+    background:linear-gradient(180deg,var(--goldHi),var(--gold) 30%,var(--goldLo) 70%,var(--gold))}
+
+  /* the board itself: two faces and a fore-edge, held apart in Z */
+  #board{position:absolute;inset:0;transform-origin:left center;transform-style:preserve-3d;
+    will-change:transform}
+  #coverWrap.opening #board{transform:rotateY(-158deg)}
+  .face{position:absolute;inset:0;backface-visibility:hidden;overflow:hidden;
+    border-radius:3px 8px 8px 3px}
+  #faceFront{transform:translateZ(calc(var(--board) / 2));
+    background:
+      radial-gradient(135% 95% at 18% 6%, rgba(255,226,180,.16), transparent 58%),
+      radial-gradient(90% 70% at 85% 95%, rgba(0,0,0,.42), transparent 60%),
+      linear-gradient(158deg,var(--leatherHi) 0%,var(--leather) 46%,var(--leatherLo) 100%);
+    display:grid;place-items:center;padding:30px 26px;text-align:center}
+  /* pebbled leather grain, flat and hard-edged */
+  #faceFront::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:
+      repeating-linear-gradient(26deg, rgba(0,0,0,.14) 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(-54deg, rgba(255,214,160,.07) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0 2px, transparent 2px 6px)}
+  #faceBack{transform:translateZ(calc(var(--board) / -2)) rotateY(180deg);
+    background:
+      radial-gradient(110% 80% at 70% 20%, rgba(255,240,210,.1), transparent 60%),
+      linear-gradient(200deg,#5A3A5E 0%,#3E2746 50%,#241630 100%)}
+  /* a marbled paste-down on the inside of the board */
+  #faceBack::before{content:'';position:absolute;inset:0;opacity:.5;
+    background:
+      repeating-linear-gradient(74deg, rgba(201,162,39,.16) 0 2px, transparent 2px 9px),
+      repeating-linear-gradient(104deg, rgba(243,234,215,.10) 0 1px, transparent 1px 7px)}
+  #faceBack::after{content:'';position:absolute;inset:14px;
+    border:1px solid rgba(201,162,39,.3)}
+
+  /* the fore-edge of the board — the actual thickness, standing in Z */
+  /* translateZ first, THEN rotate, so the strip spans +half to -half of
+     the board thickness rather than hanging off one side of it */
+  #boardEdge{position:absolute;top:0;bottom:0;right:0;width:var(--board);
+    transform-origin:right center;
+    transform:translateZ(calc(var(--board) / 2)) rotateY(90deg);
+    background:linear-gradient(180deg,#3A1C12 0%,#73411F 12%,#4A2418 48%,#1E0D08 100%);
+    box-shadow:inset 0 1px 0 rgba(255,214,160,.2)}
+
+  /* the spine, with raised bands */
+  /* pushed just in front of the front face, or the faces would hide it */
+  #spine{position:absolute;top:0;bottom:0;left:0;width:26px;
+    transform:translateZ(calc(var(--board) / 2 + 1px));
+    background:linear-gradient(90deg,#1A0A06 0%,#3E1D11 42%,#5A2E1C 72%,#2A120C 100%)}
+  #spine i{position:absolute;left:0;right:0;height:7px;
+    background:linear-gradient(180deg,rgba(255,214,160,.26),rgba(0,0,0,.5));
+    box-shadow:0 1px 0 rgba(0,0,0,.5)}
+
+  /* gold tooling: a double rule with a stitch line running between */
+  #tool{position:absolute;inset:16px 14px;pointer-events:none}
+  #tool .outer{position:absolute;inset:0;border:2px solid var(--gold);opacity:.78}
+  #tool .inner{position:absolute;inset:9px;border:1px solid var(--goldHi);opacity:.5}
+  #tool .stitch{position:absolute;inset:4px;
+    border:1px dashed rgba(239,217,139,.72)}
+  #tool svg{position:absolute;width:34px;height:34px;opacity:.9}
+  #tool .c1{top:-5px;left:-5px}
+  #tool .c2{top:-5px;right:-5px;transform:scaleX(-1)}
+  #tool .c3{bottom:-5px;left:-5px;transform:scaleY(-1)}
+  #tool .c4{bottom:-5px;right:-5px;transform:scale(-1,-1)}
+
+  #plate{position:relative;z-index:2}
+  .mark{width:74px;height:74px;margin:0 auto;display:block}
+  #medallion{width:106px;height:106px;margin:0 auto 18px;position:relative;
+    display:grid;place-items:center;border-radius:50%;
+    background:radial-gradient(circle at 34% 28%, rgba(239,217,139,.3), rgba(0,0,0,.25) 68%);
+    box-shadow:0 0 0 2px var(--gold), 0 0 0 4px rgba(0,0,0,.4), 0 0 0 5px rgba(201,162,39,.4),
+               inset 0 2px 7px rgba(0,0,0,.5)}
+  #cover h1{font:300 34px/1.06 ui-serif,Georgia,serif;margin:0;letter-spacing:.02em;
+    color:var(--goldHi);text-shadow:0 1px 0 rgba(0,0,0,.65), 0 -1px 0 rgba(255,232,180,.22)}
+  #cover .of{display:block;font:400 12px/1 ui-serif,Georgia,serif;
+    letter-spacing:.46em;text-transform:uppercase;color:var(--gold);opacity:.82;
+    margin-bottom:10px;text-indent:.46em}
+  #cover .sub{margin-top:16px;font:500 8.5px/1.6 ui-sans-serif;letter-spacing:.32em;
+    text-transform:uppercase;color:rgba(239,217,139,.5)}
+  #cover .open{margin-top:26px;font:500 8.5px/1 ui-sans-serif;letter-spacing:.3em;
+    text-transform:uppercase;color:rgba(239,217,139,.78);
+    border:1px solid rgba(201,162,39,.5);border-radius:999px;padding:11px 22px;
+    display:inline-block;background:rgba(0,0,0,.2)}
 
   /* ---------- contents ---------- */
   #contents{position:fixed;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;
@@ -108,30 +193,69 @@
 <canvas id="bg"></canvas>
 <div id="scrim"></div>
 
-<!-- ============ cover ============ -->
+<!-- ============ cover ============
+     A board with two faces and a fore-edge, with the text block behind
+     it. See the comment above the cover CSS for why it is built as a
+     solid rather than as one rotating panel. -->
 <div id="coverWrap">
-  <div id="cover">
-    <div>
-      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
-        <defs><clipPath id="ck"><circle cx="32" cy="32" r="26"/></clipPath></defs>
-        <g clip-path="url(#ck)">
-          <rect x="0" y="0" width="64" height="64" fill="#1B2150"/>
-          <rect x="0" y="38" width="64" height="26" fill="#2C3E8C"/>
-          <polygon points="8,38 24,16 40,38" fill="#F3EAD7"/>
-          <polygon points="30,38 44,22 60,38" fill="#C9B7A0"/>
-          <rect x="0" y="44" width="64" height="2.4" fill="#46D6C8" opacity=".85"/>
-          <rect x="0" y="51" width="64" height="1.8" fill="#46D6C8" opacity=".55"/>
-          <polygon points="38,12 50,16 38,18" fill="#F6B04A"/>
-        </g>
-        <circle cx="32" cy="32" r="26" fill="none" stroke="#F3EAD7" stroke-width="2.2" opacity=".9"/>
-        <circle cx="32" cy="32" r="30" fill="none" stroke="#F3EAD7" stroke-width="0.8" opacity=".35"/>
-      </svg>
-      <span class="of">The Book of</span>
-      <h1>Rates</h1>
-      <div class="sub">Breath · Journeys · Weather</div>
-      <div class="open">Open</div>
+  <div id="book">
+    <div id="textblock"></div>
+    <div id="board">
+      <div class="face" id="faceBack"></div>
+      <div id="boardEdge"></div>
+      <div class="face" id="faceFront">
+        <div id="tool">
+          <div class="outer"></div>
+          <div class="stitch"></div>
+          <div class="inner"></div>
+          <svg class="c1" viewBox="0 0 34 34" aria-hidden="true">
+            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
+            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
+            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
+          </svg>
+          <svg class="c2" viewBox="0 0 34 34" aria-hidden="true">
+            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
+            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
+            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
+          </svg>
+          <svg class="c3" viewBox="0 0 34 34" aria-hidden="true">
+            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
+            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
+            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
+          </svg>
+          <svg class="c4" viewBox="0 0 34 34" aria-hidden="true">
+            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
+            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
+            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
+          </svg>
+        </div>
+
+        <div id="cover">
+          <div id="plate">
+            <div id="medallion">
+              <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+                <defs><clipPath id="ck"><circle cx="32" cy="32" r="26"/></clipPath></defs>
+                <g clip-path="url(#ck)">
+                  <rect x="0" y="0" width="64" height="64" fill="#1B2150"/>
+                  <rect x="0" y="38" width="64" height="26" fill="#2C3E8C"/>
+                  <polygon points="8,38 24,16 40,38" fill="#F3EAD7"/>
+                  <polygon points="30,38 44,22 60,38" fill="#C9B7A0"/>
+                  <rect x="0" y="44" width="64" height="2.4" fill="#46D6C8" opacity=".85"/>
+                  <rect x="0" y="51" width="64" height="1.8" fill="#46D6C8" opacity=".55"/>
+                  <polygon points="38,12 50,16 38,18" fill="#F6B04A"/>
+                </g>
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#EFD98B" stroke-width="2.2" opacity=".85"/>
+              </svg>
+            </div>
+            <span class="of">The Book of</span>
+            <h1>Rates</h1>
+            <div class="sub">Breath · Journeys · Weather</div>
+            <div class="open">Open</div>
+          </div>
+        </div>
+      </div>
+      <div id="spine"><i style="top:13%"></i><i style="top:34%"></i><i style="top:55%"></i><i style="top:76%"></i></div>
     </div>
-    <div class="edge"></div>
   </div>
 </div>
 
@@ -181,7 +305,7 @@
     you would rather start somewhere else.</p>
   <h2>Hand</h2><div class="row" id="optHand"></div>
   <h2>Opening</h2><div class="row" id="optCover"></div>
-  <h2>Safety</h2><div class="row"><button class="opt" id="reGate">Read the rules again</button></div>
+  <h2>Safety</h2><div class="row"><button class="opt" id="reGate">Read the scroll again</button></div>
   <h2>Behind the book</h2>
   <div class="row"><a class="opt" href="../archive.html" style="text-decoration:none">Prototypes, research &amp; design notes</a></div>
   <p class="note" id="noteAbout"></p>
@@ -196,7 +320,8 @@ import { PageTurn } from './js/pageturn.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { lastNote, clearNote, install as installBlackbox } from './js/blackbox.js';
 installBlackbox();
-import { requireGate, gatePassed, retentionAllowed } from './js/gate.js';
+import { gatePassed, retentionAllowed } from './js/gate.js';
+import { requireScroll, openScroll } from './js/scroll.js';
 
 /* ---------- preferences ---------- */
 const PREF = (() => {
@@ -218,13 +343,17 @@ function openBook(){
   // an obstacle by the fifth session
   const ms = PREF.coverSeen ? 420 : 1500;
   coverWrap.style.transition = `none`;
-  $('cover').style.transition = `transform ${ms}ms cubic-bezier(.33,0,.2,1), opacity ${ms}ms ease`;
+  // the BOARD turns, not the artwork on it: it carries its own faces and
+  // its fore-edge with it, so the turn goes through a solid thing
+  $('board').style.transition = `transform ${ms}ms cubic-bezier(.33,0,.2,1)`;
   coverWrap.classList.add('opening');
   $('contents').classList.add('on');
   setTimeout(() => {
     coverWrap.classList.add('gone');
-    // the rules are shown once, after the book opens, before anything else
-    requireGate(() => {});
+    // cover → page turn → the scroll → the book. The scroll is disclosure,
+    // not a consent gate (design doc §1.6), so it takes any input at all
+    // to dismiss and is shown once.
+    requireScroll(() => {});
   }, ms + 40);
   PREF.coverSeen = true; save();
 }
@@ -378,7 +507,7 @@ function markSheet(){
     b.classList.toggle('on', String(PREF[b.dataset.k]) === b.dataset.v));
 }
 buildSheet();
-$('reGate').onclick = () => { $('sheet').classList.remove('on'); openGateAgain(); };
+$('reGate').onclick = () => { $('sheet').classList.remove('on'); openScroll(() => {}); };
 $('optBtn').onclick   = () => $('sheet').classList.add('on');
 $('sheetClose').onclick = () => $('sheet').classList.remove('on');
 /* If the last session never reached its end, say so — quietly, in the
@@ -406,11 +535,6 @@ $('aboutBtn').onclick = () => {
     `claim nothing about your body.`;
   $('sheet').classList.add('on');
 };
-
-async function openGateAgain(){
-  const m = await import('./js/gate.js');
-  m.openGate(() => {});
-}
 
 /* Leaving for a journey: stop the loop and hand back every canvas. iOS
    may keep this document alive in the back/forward cache while the next

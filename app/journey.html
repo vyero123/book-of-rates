@@ -160,7 +160,7 @@ import { journeyById, journeyPlan, ENTRY, RATES, LENGTHS } from './js/protocols.
 import { sceneForBeats, SCENES } from './js/scenes.js';
 import { LEVEL_SCENES } from './js/levels.js';
 import { PageTurn } from './js/pageturn.js';
-import { requireGate } from './js/gate.js';
+import { requireScroll } from './js/scroll.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { note, clearNote, install as installBlackbox } from './js/blackbox.js';
 installBlackbox();
@@ -320,7 +320,7 @@ function applyEyesClosed(on){
 async function begin(){
   note('session-start', JOURNEY.id + ' ' + JSON.stringify(diag()));
   applyEyesClosed(PREF.eyesClosed);
-  if (requireGate(() => begin())) return;   // rules first, always
+  if (requireScroll(() => begin())) return;   // the scroll first, always
   d('start').classList.add('gone');
   session = buildPlan();
   inkTrail = [];
