@@ -176,7 +176,7 @@ import { ramp, FOG_GLSL, RAMP_GLSL, GRAIN_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, polyBillboard, triBillboard, particles,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
-import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
+import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
@@ -1165,6 +1165,18 @@ window.__deepLight = {
      its draw call and still shows up in renderer.info, so the
      only other way to find out is to read the console. */
   links(){ return linkReport(renderer, scene, camera); },
+  /* EXACTLY ONE RENDERER AND ONE LOOP is the only healthy answer for a
+     chapter page. Two things drawing to one surface is invisible to a
+     screenshot and to draw-call counts, which is why it gets its own
+     question rather than an argument. */
+  solo(){ return soloReport(); },
+  /* The frame-to-frame meter: a whole scene swapping scores in the
+     tens, ordinary motion scores in single figures. prove() first --
+     the readback has to be shown able to tell two scenes apart before
+     any of its numbers mean anything. */
+  probe(){ return flashMeter({ renderer, scene, camera,
+    step: (dt) => loop.pump(dt, 1) }); },
+
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();

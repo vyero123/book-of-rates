@@ -142,6 +142,58 @@ export function bands(THREE, layers, { n = 34, span = 150, skirt = -46, profile 
 }
 
 /* ------------------------------------------------------------------
+   NEAR-FIELD DISSOLVE — do not let a wall sweep the lens
+   ------------------------------------------------------------------
+   Any chapter that flies a camera THROUGH its own scenery has this
+   problem, and Long Air shipped it: the gates are walls with a hole in
+   them, the camera rides thirteen metres behind the kite, and once a
+   gate reaches the lens it fills the frame. Measured on the deployed
+   page, a single gate covered 99.8% of the frame at its peak, about
+   2.3 times a second — the whole picture flipping between "slab face"
+   and "open view", which reads as a different scene flashing in.
+
+   A screenshot cannot show it: every individual frame is correct. Draw
+   call counts cannot show it: nothing is drawn twice. It is only
+   visible as a DISCONTINUITY BETWEEN frames, which is why it needed a
+   frame-to-frame meter to find and why one now ships (flashMeter, on
+   every chapter's hook).
+
+   The fix is to stop drawing a thing the reader has already passed,
+   and to stop over a few metres rather than popping. `keep` runs 0 at
+   `gone` to 1 at `full`; fragments are dropped in HARD TERRACES rather
+   than stippled or faded, because a gradient here would be the one
+   soft edge in a scene built entirely of hard ones (§4.2 rule 5). The
+   slab comes apart into layers and the layers go.
+
+   Opaque, so there is no transparency sorting and no cost: this is a
+   discard, not a blend.
+
+   Pick the distances from the CAMERA'S OWN LAG, not by eye. The gate
+   the reader is about to fly is further away than the camera's
+   trailing distance; the one dissolving is the one already behind the
+   figure. Getting that backwards would dissolve gates before they were
+   flown, which is a worse bug than the one being fixed.
+   ------------------------------------------------------------------ */
+export const nearFadeGlsl = ({ gone = 4.0, full = 11.0, terrace = 0.35 } = {}) => `
+  float nearKeep(float dist){
+    return clamp((dist - ${gone.toFixed(2)}) /
+                 ${(full - gone).toFixed(2)}, 0.0, 1.0);
+  }
+  // true when this fragment should be dropped. The band argument is any
+  // per-object scalar that varies across the surface -- a height, a seed
+  // -- so the terraces belong to the object and do not crawl in screen
+  // space. (No backticks in here: this string IS a template literal, and
+  // quoting an identifier that way closes it. Second time; the gate
+  // caught it both times.)
+  bool nearGone(float dist, float band){
+    float keep = nearKeep(dist);
+    if(keep <= 0.0) return true;
+    if(keep >= 1.0) return false;
+    return fract(band * ${terrace.toFixed(2)}) > keep;
+  }
+`;
+
+/* ------------------------------------------------------------------
    DID EVERY SHADER ACTUALLY LINK?
    ------------------------------------------------------------------
    A shader that fails to link is the worst failure mode in this

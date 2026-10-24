@@ -220,8 +220,9 @@ import { body, drag } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, particles, scrollGlsl,
-         posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
-import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
+         posterMat, screenQuad, overlayQuad, part, linkReport,
+         nearFadeGlsl } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
@@ -466,6 +467,16 @@ const rockMat = posterMat(THREE, {
 const GX = [-15, -9.5, -4.6, 0, 4.6, 9.5, 15];
 const SLAB_Z = 2.6;
 
+/* THE NEAR DISSOLVE, sized from the camera's own lag rather than by eye.
+   The lens rides CAM_BACK_MIN..MAX behind the kite, so a gate at that
+   distance from the lens is level with the FIGURE: anything nearer has
+   already been flown and is only in the way. Fully drawn out to the
+   nearest the camera ever trails, gone well before the lens reaches it.
+   Getting this backwards would dissolve gates BEFORE they were flown,
+   which is a worse fault than the one being fixed. */
+const CAM_BACK_MIN = 11.5;
+const NEAR_FADE = nearFadeGlsl({ gone: CAM_BACK_MIN - 7.0, full: CAM_BACK_MIN - 0.5 });
+
 function gateGeometry(course, which){
   // which: -1 rock from below, +1 cloud from above
   const b = builder(THREE, { aLip:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
@@ -514,7 +525,7 @@ const gateMatFor = kind => posterMat(THREE, {
              uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
              uAccent:{value:C(ROCK.accent)},
              uIsCloud:{value: kind === 'cloud' ? 1 : 0} },
-  side: THREE.DoubleSide, prelude: PRE,
+  side: THREE.DoubleSide, prelude: PRE + NEAR_FADE,
   vertex: SCROLL_GLSL + `
     attribute float aLip; attribute float aTone; attribute float aSun;
     attribute float aSide; attribute float aSeed;
@@ -539,6 +550,15 @@ const gateMatFor = kind => posterMat(THREE, {
     uniform vec3 uShadow, uDeep, uAccent;
     uniform float uIsCloud;
     void main(){
+      /* THE GATE THE READER HAS ALREADY FLOWN STOPS BEING DRAWN.
+         Without this a slab fills the frame as it reaches the lens --
+         measured on the deployed page at 99.8% coverage, about 2.3
+         times a second -- and the picture flips between the slab's face
+         and the open view. That is the "different theme flashing in"
+         this chapter was reported for. The terraces are hashed on
+         height and seed so they belong to the slab rather than crawling
+         across the screen. */
+      if(nearGone(vDist, vY + vSeed * 17.0)) discard;
       float tone = vTone + (1.0 - vLip) * 1.3;
       vec3 col = rampPick((tone + 0.5) / 6.0);
       col = mix(col, uShadow, uIsCloud * 0.55);
@@ -1202,6 +1222,18 @@ window.__longAir = {
      its draw call and still shows up in renderer.info, so the
      only other way to find out is to read the console. */
   links(){ return linkReport(renderer, scene, camera); },
+  /* EXACTLY ONE RENDERER AND ONE LOOP is the only healthy answer for a
+     chapter page. Two things drawing to one surface is invisible to a
+     screenshot and to draw-call counts, which is why it gets its own
+     question rather than an argument. */
+  solo(){ return soloReport(); },
+  /* The frame-to-frame meter: a whole scene swapping scores in the
+     tens, ordinary motion scores in single figures. prove() first --
+     the readback has to be shown able to tell two scenes apart before
+     any of its numbers mean anything. */
+  probe(){ return flashMeter({ renderer, scene, camera,
+    step: (dt) => loop.pump(dt, 1) }); },
+
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();

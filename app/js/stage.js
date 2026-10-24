@@ -27,6 +27,47 @@
 export const DPR_CAP = 1.5;
 
 /* ------------------------------------------------------------------
+   TWO INSTRUMENTS FOR FAULTS THAT ARE INVISIBLE TO A SCREENSHOT
+   ------------------------------------------------------------------
+   A chapter was reported as flashing a different scene in about once a
+   second. The first hypothesis was two things drawing to one surface —
+   a second render loop, or the book's background still alive behind a
+   chapter. It was neither, and it took four wrong measurements to find
+   that out, so both the suspicion and the real cause now have an
+   instrument instead of an argument.
+
+   soloReport() answers the first: how many renderers and how many
+   render loops exist in this document. stage() and clock() count
+   themselves, so nothing has to remember to register.
+
+   flashMeter() answers the second, and is the one that found it: drive
+   the REAL frame body, read the frame back each time, and report the
+   discontinuity BETWEEN frames. Every individual frame was correct, so
+   a screenshot showed nothing; nothing was drawn twice, so draw-call
+   counts showed nothing. The fault only exists in the difference.
+   ------------------------------------------------------------------ */
+const LIVE = { renderers: 0, loops: 0 };
+
+/** How many renderers and loops this document has made. Exactly one of
+ *  each is the only healthy answer for a chapter page. */
+export function soloReport(){
+  const canvases = typeof document === 'undefined' ? []
+    : [...document.querySelectorAll('canvas')].map(c => {
+        const kinds = [];
+        for(const k of ['webgl2','webgl','2d','bitmaprenderer']){
+          try { if(c.getContext(k)) kinds.push(k); } catch(e){}
+        }
+        return { id: c.id || '(none)', kinds };
+      });
+  const drawing = canvases.filter(c => c.kinds.length);
+  return {
+    renderers: LIVE.renderers, loops: LIVE.loops,
+    canvasesWithAContext: drawing.length, canvases: drawing,
+    ok: LIVE.renderers === 1 && LIVE.loops === 1 && drawing.length === 1
+  };
+}
+
+/* ------------------------------------------------------------------
    Getting off the ground
    ------------------------------------------------------------------ */
 
@@ -73,6 +114,7 @@ export async function boot({ cdn, fallback, start }){
  *  at 375 px, so the portrait value is the real one and the other is the
  *  accommodation. */
 export function stage(THREE, { canvas, clear, fov, near = 0.1, far = 400, dprCap = DPR_CAP }){
+  LIVE.renderers++;
   const renderer = new THREE.WebGLRenderer({
     canvas, antialias:true, alpha:false, powerPreference:'high-performance',
     stencil:false, depth:true
@@ -124,6 +166,7 @@ export function stage(THREE, { canvas, clear, fov, near = 0.1, far = 400, dprCap
  *  it report the last live number for ever.
  */
 export function clock(frame){
+  LIVE.loops++;
   let rafId = 0, last = performance.now(), running = true;
 
   function tick(now){
@@ -258,4 +301,137 @@ export function choice({ key, valid }){
  */
 export function enter(requireScroll, next){
   if(!requireScroll(next)) next();
+}
+
+/* ------------------------------------------------------------------
+   THE FLASH METER
+   ------------------------------------------------------------------
+   Drive the real frame body, read each frame back, and report how much
+   the picture changes BETWEEN consecutive frames.
+
+   This is the instrument that found Long Air's reported fault, after
+   four measurements that were wrong for four different reasons, every
+   one of them mine:
+
+     - sampling a 1x1 drawing buffer, because the viewport emulation had
+       not reached the renderer, and calling the single pixel a frame;
+     - bisecting by hiding one mesh at a time while the function under
+       test called begin(), which re-asserts every world mesh's
+       visibility and quietly put them all back;
+     - bisecting over t = 0..4 when the events were at t = 7..8;
+     - trusting readPixels before proving it could tell two scenes
+       apart. (It could: hiding everything gives exactly the clear
+       colour. That test should have come first.)
+
+   So: prove the instrument before using it. `prove()` below hides the
+   whole scene, renders, and checks the frame really is the clear colour
+   — if it is not, the readback is not reading what was just drawn and
+   every number it produces is worthless.
+
+   `coverage(mesh)` answers the follow-up a flash always raises: how
+   much of the frame does ONE layer own right now? Long Air's answer was
+   99.8%, which is the whole diagnosis in one number.
+   ------------------------------------------------------------------ */
+export function flashMeter({ renderer, scene, camera, step, canvas }){
+  const gl = renderer.getContext();
+  const el = canvas || renderer.domElement;
+  let buf = null;
+  function grid(stride = 16){
+    const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
+    const need = W * H * 4;
+    if(!buf || buf.length < need) buf = new Uint8Array(need);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    const out = [];
+    for(let y = 0; y < H; y += stride) for(let x = 0; x < W; x += stride){
+      const o = (y * W + x) * 4;
+      out.push(buf[o], buf[o+1], buf[o+2]);
+    }
+    return out;
+  }
+  const mean = g => {
+    let r = 0, b = 0, gg = 0;
+    for(let i = 0; i < g.length; i += 3){ r += g[i]; gg += g[i+1]; b += g[i+2]; }
+    const n = g.length / 3;
+    return [r/n, gg/n, b/n];
+  };
+  const delta = (a, c) => Math.abs(a[0]-c[0]) + Math.abs(a[1]-c[1]) + Math.abs(a[2]-c[2]);
+
+  return {
+    /** The readback must be able to tell two scenes apart before any of
+     *  its numbers mean anything. */
+    prove(){
+      const meshes = []; scene.traverse(o => { if(o.isMesh) meshes.push(o); });
+      const was = meshes.map(o => o.visible);
+      renderer.render(scene, camera); const all = mean(grid(24));
+      meshes.forEach(o => o.visible = false);
+      renderer.render(scene, camera); const none = mean(grid(24));
+      meshes.forEach((o, i) => o.visible = was[i]);
+      renderer.render(scene, camera);
+      let cc = null;
+      try { cc = renderer.getClearColor({ r:0, g:0, b:0 }); } catch(e){}
+      return {
+        withEverything: all.map(Math.round),
+        withNothing: none.map(Math.round),
+        expectedClear: cc ? [Math.round(cc.r*255), Math.round(cc.g*255), Math.round(cc.b*255)] : null,
+        canTellThemApart: delta(all, none) > 4,
+        sizedProperly: gl.drawingBufferWidth > 4 && gl.drawingBufferHeight > 4,
+        buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight],
+        element: [el.width, el.height]
+      };
+    },
+
+    /** Run `frames` of the real frame body and report the worst and
+     *  typical jump between consecutive frames. `threshold` is in the
+     *  same summed-channel units; a whole scene swapping scores in the
+     *  tens, ordinary motion scores in single figures. */
+    run({ frames = 900, warmup = 240, dt = 1/60, threshold = 25 } = {}){
+      let prev = null, worst = 0, worstAt = 0, over = 0, n = 0, total = 0;
+      for(let i = 0; i < frames; i++){
+        step(dt, i);
+        if(i < warmup) continue;
+        const c = mean(grid());
+        if(prev){
+          const d = delta(prev, c);
+          total += d; n++;
+          if(d > threshold) over++;
+          if(d > worst){ worst = d; worstAt = i; }
+        }
+        prev = c;
+      }
+      return { frames, worst:+worst.toFixed(1), worstAtFrame: worstAt,
+               mean:+(n ? total/n : 0).toFixed(2), over, threshold,
+               perSecond:+(n ? over / (n * dt) : 0).toFixed(2) };
+    },
+
+    /** What fraction of the frame does this one mesh own right now? */
+    coverage(mesh){
+      renderer.render(scene, camera); const withIt = grid(24);
+      const was = mesh.visible; mesh.visible = false;
+      renderer.render(scene, camera); const without = grid(24);
+      mesh.visible = was;
+      let diff = 0;
+      for(let i = 0; i < withIt.length; i += 3){
+        if(Math.abs(withIt[i]-without[i]) + Math.abs(withIt[i+1]-without[i+1]) > 12) diff++;
+      }
+      return +(diff / (withIt.length / 3)).toFixed(3);
+    },
+
+    /** The worst any single mesh covers over a run — the number that
+     *  says "one layer is filling the screen". */
+    peakCoverage({ frames = 420, dt = 1/60 } = {}){
+      const meshes = []; scene.traverse(o => { if(o.isMesh && o.visible) meshes.push(o); });
+      let peak = 0, which = null, at = 0;
+      for(let i = 0; i < frames; i++){
+        step(dt, i);
+        if(i % 6) continue;
+        for(const o of meshes){
+          if(!o.visible) continue;
+          const c = this.coverage(o);
+          if(c > peak){ peak = c; at = i;
+            which = o.geometry.getAttribute('position').count + 'v/order' + o.renderOrder; }
+        }
+      }
+      return { peak, mesh: which, atFrame: at };
+    }
+  };
 }
