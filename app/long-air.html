@@ -924,7 +924,13 @@ const loop = clock((dt, now, running) => {
      it is what makes the sail's shape independent of the height — the
      sail fills before the kite lifts. --- */
   const wantY = altOf(fill);
-  const k = 26.0, damp = 2.0 * Math.sqrt(k) * 0.85;
+  /* k was 26, which left a steady-state lag of about 2.2 m behind a
+     climbing ramp — on its own nearly two thirds of the half-gap, and
+     enough that an on-pace player clipped lips. Stiffer: the lag behind
+     a ramp of slope v is about 2v/sqrt(k), so k=64 puts it near 1.4 m,
+     which still reads as a kite with mass and leaves the sail visibly
+     ahead of the height, but fits inside the opening with room spare. */
+  const k = 64.0, damp = 2.0 * Math.sqrt(k) * 0.9;
   kiteV += ((wantY - kiteY) * k - kiteV * damp) * dt;
   kiteY += kiteV * dt;
   // the clamp the first pass did not have. The figure clipped through
@@ -937,12 +943,15 @@ const loop = clock((dt, now, running) => {
   uRush.value = clamp01(-kiteV / 7.0);
 
   /* --- how far off pace, and therefore how much room the course makes.
-     §6.1: the gap widens rather than the kite crashing. --- */
-  const forg = forgiveness(kiteY, sched);
+     §6.1: the gap widens rather than the kite crashing. Measured against
+     the gate the player is ABOUT TO MEET rather than the schedule right
+     now — during a turnaround those differ by enough that the wrong gate
+     opened by the wrong amount. --- */
+  const { gate, ahead } = gateAt(COURSE, uDist.value);
+  const forg = forgiveness(kiteY, gate.centre);
   uForgive.value = forg.extra / FORGIVE_MAX;
 
   /* --- contact. Soft, informative, and NOT COUNTED. --- */
-  const { gate, ahead } = gateAt(COURSE, uDist.value);
   const half = gate.half + forg.extra;
   const KITE_HALF = 0.78;
   if(Math.abs(ahead) < SLAB_Z + 1.4){
@@ -1081,7 +1090,7 @@ window.__longAir = {
   seek(v){ t = v; uDist.value = SPEED * v; },
   now(){ const s = B.at(t);
     const g = gateAt(COURSE, uDist.value);
-    const f = forgiveness(kiteY, B.value(t));
+    const f = forgiveness(kiteY, g.gate.centre);
     return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
              phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
              schedule:+B.value(t).toFixed(2),

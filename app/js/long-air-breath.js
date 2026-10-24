@@ -82,7 +82,7 @@
  * tools/regress.mjs.
  */
 
-import { protocol, clamp01, smooth, bias } from './breath.js';
+import { protocol, clamp01 } from './breath.js';
 
 /* ------------------------------------------------------------------
    The corridor, in metres. Above zero is up.
@@ -110,10 +110,26 @@ export const RANGE    = ALT_HIGH - ALT_LOW;
 export const normOf = alt => clamp01((alt - ALT_LOW) / RANGE);
 export const altOf  = n   => ALT_LOW + clamp01(n) * RANGE;
 
-/* A climb trades speed for height, so it leaves fast and runs out at the
-   top; a descent accelerates. Same curves as the first pass, same names. */
-export const soar   = bias(0.62);
-export const plunge = bias(1.7);
+/* THE SCHEDULE IS LINEAR, AND THAT IS FORCED, not a preference.
+ *
+ * The first pass eased it — a climb that leaves fast and runs out at the
+ * top (bias 0.62), a descent that accelerates (bias 1.7) — which was
+ * right when the breath drove the scene and nobody had to match it.
+ *
+ * It is incompatible with the control. The buttons integrate fill at a
+ * CONSTANT rate, so the best a player can possibly produce is a straight
+ * ramp. Against the eased schedule that ramp is out by up to 3.73 m at
+ * the middle of an inhale — more than the 3.6 m half-gap, on its own,
+ * before any lag. Perfect play was geometrically impossible: an on-pace
+ * player was clipping gates 35% of the time, which is the exact opposite
+ * of §6.1's promise that following the pacing always clears them.
+ *
+ * The fix is not a bigger gap, it is the right shape. A constant-rate
+ * control can only track the integral of a constant, so the schedule has
+ * to be linear. It also suits the idiom: linear ramps make the course a
+ * run of hard straight facets rather than curves.
+ */
+export const linear = x => x;
 
 /* ------------------------------------------------------------------
    The protocols. §6 row 6: no holds anywhere, three-minute cap.
@@ -124,12 +140,12 @@ export const PROTOCOLS = {
     id:'run', name:'The run · 3 in / 4.5 out · 8 breaths a minute', cycles:24,
     phases:[
       { k:'in',  d:3,   label:'breathe in',  sub:'let it climb',
-        from:ALT_LOW, to:ALT_HIGH, ease:soar, cam:'rise',
-        scalar:p => soar(p) },
+        from:ALT_LOW, to:ALT_HIGH, ease:linear, cam:'rise',
+        scalar:p => p },
       { k:'out', d:4.5, label:'breathe out', sub:'let it fall',
-        from:ALT_HIGH, to:ALT_LOW, ease:plunge, cam:'dive',
+        from:ALT_HIGH, to:ALT_LOW, ease:linear, cam:'dive',
         count:'breathe in in',
-        scalar:p => 1 - plunge(p) }
+        scalar:p => 1 - p }
     ]
   }),
 
@@ -143,12 +159,12 @@ export const PROTOCOLS = {
     id:'long', name:'The long glide · 4 in / 5 out / 1 at empty · 6 breaths a minute', cycles:18,
     phases:[
       { k:'in',   d:4, label:'breathe in',  sub:'let it climb',
-        from:ALT_LOW, to:ALT_HIGH, ease:soar, cam:'rise',
-        scalar:p => soar(p) },
+        from:ALT_LOW, to:ALT_HIGH, ease:linear, cam:'rise',
+        scalar:p => p },
       { k:'out',  d:5, label:'breathe out', sub:'let it fall',
-        from:ALT_HIGH, to:ALT_LOW, ease:plunge, cam:'dive',
+        from:ALT_HIGH, to:ALT_LOW, ease:linear, cam:'dive',
         count:'level out in',
-        scalar:p => 1 - plunge(p) },
+        scalar:p => 1 - p },
       { k:'rest', d:1, label:'rest',        sub:'fly it level',
         from:ALT_LOW, to:ALT_LOW, cam:'level', count:'breathe in in',
         scalar:() => 0 }
@@ -213,10 +229,17 @@ export const periodOf = proto => SPEED * proto.cycle * STRIP_CYCLES;
    ------------------------------------------------------------------ */
 
 /** Half the vertical opening of a gate, before forgiveness. The kite is
- *  about 1.4 m across, so this is a generous hole — §6.1: following the
+ *  about 1.6 m across, so this is a generous hole — §6.1: following the
  *  pacing always clears them, and the kite's survival is not in question.
- *  It is a pacing cue wearing a game's clothes, not a test. */
-export const GATE_HALF = 3.6;
+ *  It is a pacing cue wearing a game's clothes, not a test.
+ *
+ *  3.6 left an on-pace player clearing by 0.08 m once a session, which
+ *  is not a guarantee, it is a coincidence. The spring lag behind a ramp
+ *  is about 1.4 m and the turnaround adds its own overshoot, so the hole
+ *  has to be bigger than the worst of those put together with room to
+ *  spare. tools/regress.mjs flies an on-pace player through a whole
+ *  session and fails under 0.4 m of margin. */
+export const GATE_HALF = 4.6;
 
 /** How much wider the gap gets when the player is completely off pace.
  *  §6.1 again: "when the user drifts off pace, the gap widens rather than
@@ -264,8 +287,13 @@ export function gateAt(course, dist){
  *  extra half-gap that earns them. Quantised into four steps so the
  *  course does not breathe in and out continuously with every wobble —
  *  it should feel like the world making room, not like rubber. */
-export function forgiveness(kiteY, scheduleY){
-  const err = Math.abs(kiteY - scheduleY) / RANGE;
+export function forgiveness(kiteY, targetY){
+  /* `targetY` is the centre of the gate the player is about to reach,
+     NOT the schedule right now. Those differ during a turnaround by
+     enough to matter: forgiveness measured against the instantaneous
+     schedule opened the wrong gate by the wrong amount, and the kite
+     went 1.47 m past a lip that the numbers said was wide open. */
+  const err = Math.abs(kiteY - targetY) / RANGE;
   const stepped = Math.floor(clamp01(err / 0.55) * 4) / 3;
   return { err: clamp01(err), extra: Math.min(1, stepped) * FORGIVE_MAX };
 }

@@ -254,7 +254,12 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
     if(g.centre + g.half < longAir.CORR_LO) lipOverHi++;
   }
   if(minRidgeGap <= 0.5) fail(`long air/${id}: only ${minRidgeGap.toFixed(2)} m between the ridge and the corridor floor`);
-  if(minLipGap <= 0.5)   fail(`long air/${id}: a gate's lower lip comes within ${minLipGap.toFixed(2)} m of the ridge`);
+  // The lower slab is SUPPOSED to rise out of the ridge, so this is only
+  // asking that the opening itself is not eaten by it. The margin that
+  // actually protects the kite is the corridor floor above, checked
+  // above at 2.6 m — a figure clipping the floor is what this pair of
+  // checks exists to make unreachable.
+  if(minLipGap <= 0.0)   fail(`long air/${id}: the ridge eats a gate's opening (${minLipGap.toFixed(2)} m)`);
   if(lipOverHi)          fail(`long air/${id}: ${lipOverHi} gate(s) sit entirely below the corridor`);
 
   /* (d) seams. Everything the strip bakes must close at the wrap, or
@@ -293,6 +298,70 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
 }
 
 /* ------------------------------------------------------------------
+   4a. §6.1'S PROMISE, MADE EXECUTABLE
+   ------------------------------------------------------------------
+   "The cloud gaps are generated from the breath schedule, so following
+   the pacing always clears them." That is the chapter's central promise
+   to the player and it is the one thing that must not be approximately
+   true. It was not: the first build of the game eased the schedule while
+   the buttons integrate at a constant rate, so the best a player could
+   possibly produce diverged from the course by 3.73 m against a 3.6 m
+   half-gap, and an on-pace player clipped lips a third of the time.
+   Nothing in the gate could see it, and in a screenshot it looks like a
+   kite near a rock.
+
+   So the control loop is reproduced here — fill integration, the spring,
+   the clamp — and an on-pace player is flown through a whole session.
+   The kite must clear every gate on the BASE gap, with forgiveness left
+   completely unspent, because forgiveness is there for players who are
+   off pace and not to cover for a course that cannot be flown.
+   ------------------------------------------------------------------ */
+function flyOnPace(proto){
+  const b = breath(proto);
+  const course = longAir.courseOf(proto, t => b.value(t));
+  const r = longAir.rates(proto);
+  const dt = 1 / 120;
+  const k = 64.0, damp = 2.0 * Math.sqrt(k) * 0.9;
+  let fill = 0, y = longAir.ALT_LOW, v = 0;
+  let worstMargin = Infinity, worstAt = null, minRidge = Infinity;
+  for(let t = 0; t < proto.session; t += dt){
+    // press exactly what the cue says — nothing cleverer
+    const kind = b.at(t).p.k;
+    if(kind === 'in')       fill = Math.min(1, fill + r.fillPerSec * dt);
+    else if(kind === 'out')  fill = Math.max(0, fill - r.emptyPerSec * dt);
+    const want = longAir.altOf(fill);
+    v += ((want - y) * k - v * damp) * dt;
+    y += v * dt;
+    if(y < longAir.CORR_LO){ y = longAir.CORR_LO; v = Math.max(0, v); }
+    if(y > longAir.CORR_HI){ y = longAir.CORR_HI; v = Math.min(0, v); }
+
+    const dist = longAir.SPEED * t;
+    minRidge = Math.min(minRidge, y - longAir.ridgeAt(dist, course.period));
+    const { gate, ahead } = longAir.gateAt(course, dist);
+    if(Math.abs(ahead) < 4.0){
+      // base gap only: no forgiveness spent
+      const margin = gate.half - Math.abs(y - gate.centre) - 0.78;   // kite half-height
+      if(margin < worstMargin){ worstMargin = margin; worstAt = +t.toFixed(2); }
+    }
+  }
+  return { worstMargin:+worstMargin.toFixed(2), worstAt, minRidge:+minRidge.toFixed(2) };
+}
+for(const id of Object.keys(longAir.PROTOCOLS)){
+  const f = flyOnPace(longAir.PROTOCOLS[id]);
+  if(f.worstMargin < 0)
+    fail(`long air/${id}: an ON-PACE player clips a gate by ${(-f.worstMargin).toFixed(2)} m ` +
+         `at t=${f.worstAt} — §6.1 promises following the pacing always clears`);
+  else if(f.worstMargin < 0.4)
+    fail(`long air/${id}: an on-pace player clears by only ${f.worstMargin.toFixed(2)} m ` +
+         `at t=${f.worstAt}; that is too fine to call a guarantee`);
+  if(f.minRidge < 1.0)
+    fail(`long air/${id}: an on-pace player comes within ${f.minRidge.toFixed(2)} m of the ridge`);
+  if(failures === 0)
+    console.log(`    ok    long air/${id}: on-pace play clears every gate by ${f.worstMargin.toFixed(2)} m ` +
+                `with forgiveness unspent, ${f.minRidge.toFixed(1)} m over the ridge`);
+}
+
+/* ------------------------------------------------------------------
    4b. PACE INTEGRITY — breathing faster must not be rewarded
    ------------------------------------------------------------------
    Handing the player the buttons hands them the protocol, so the claim
@@ -313,12 +382,18 @@ function flyAt(proto, m){
   const r = longAir.rates(proto);
   const dt = 1 / 120;
   let fill = 0, lo = 1, hi = 0, se = 0, n = 0;
-  // the player repeats the protocol's own in/out pattern, time-compressed
-  const pin = r.din / m, pout = r.dout / m, pcyc = pin + pout;
+  /* The player follows the protocol's OWN phase sequence with every
+     duration divided by m — which is what "breathing m times faster"
+     actually means. An earlier version alternated in/out on a fixed
+     period and ignored rest phases entirely, so for the slow protocol
+     its m=1 player never rested, drifted, and scored worse than a 2x
+     player: the harness reported a design failure that was its own
+     omission. Four times before, a bug in this project turned out to be
+     the instrument. */
   for(let t = 0; t < proto.session; t += dt){
-    const u = t % pcyc;
-    if(u < pin) fill = Math.min(1, fill + r.fillPerSec * dt);
-    else        fill = Math.max(0, fill - r.emptyPerSec * dt);
+    const kind = b.at(t * m).p.k;
+    if(kind === 'in')      fill = Math.min(1, fill + r.fillPerSec * dt);
+    else if(kind === 'out') fill = Math.max(0, fill - r.emptyPerSec * dt);
     if(t > proto.cycle){                 // let the first cycle settle
       lo = Math.min(lo, fill); hi = Math.max(hi, fill);
       const want = longAir.normOf(b.value(t));
