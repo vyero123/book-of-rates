@@ -404,6 +404,63 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
 }
 
 /* ------------------------------------------------------------------
+   4-ALPHA. HOW OFTEN DOES THE WORLD THROW SOMETHING ACROSS THE LENS?
+   ------------------------------------------------------------------
+   Long Air was reported as flashing a different scene in about once a
+   second. Every structural candidate was measured and cleared — a
+   second render loop, the book's background, depth precision, the near
+   field, the far stack, an accent shelf, the forgiveness stepping — and
+   the answer was simply that a gate went past every 0.55 seconds and
+   each one is a large opaque object crossing the whole frame.
+
+   That is not a bug any single check could have seen, because nothing
+   was wrong: the course was the schedule, every gate was level, the
+   seams closed, on-pace play cleared everything. It was a RATE, and a
+   rate is arithmetic, so it can be checked here.
+
+   This is deliberately a design bound and not a physical one. It says:
+   if a chapter puts something across the reader's view more often than
+   about once a second, it will read as a strobe however correct each
+   frame is. A reader looking at a breathing app should not be made to
+   blink.
+   ------------------------------------------------------------------ */
+const SWEEPS_PER_SECOND_MAX = 1.0;
+
+for(const id of Object.keys(longAir.PROTOCOLS)){
+  const proto = longAir.PROTOCOLS[id];
+  const b = breath(proto);
+  const course = longAir.courseOf(proto, t => b.value(t));
+  /* gates a second = SPEED / dz, which reduces to 1 / SPACING: the rate
+     does not depend on how fast the course travels, only on how finely
+     it is sampled. Worth stating, because the instinct when something
+     flickers is to slow the world down, and that would not have helped. */
+  const rate = longAir.SPEED / course.dz;
+  if(rate > SWEEPS_PER_SECOND_MAX)
+    fail(`long air/${id}: a gate crosses the lens ${rate.toFixed(2)} times a second ` +
+         `(every ${course.dz.toFixed(1)} m). Over ${SWEEPS_PER_SECOND_MAX}/s a corridor of ` +
+         `walls reads as a strobe however correct each frame is — this is what the ` +
+         `"different theme flashing in" report turned out to be.`);
+  if(failures === 0)
+    console.log(`    ok    long air/${id}: a gate crosses the lens ${rate.toFixed(2)} times a ` +
+                `second, every ${course.dz.toFixed(1)} m`);
+}
+
+/* The same question of the other travelling chapter. Lantern Current
+   passes under an arch, which is a cable and some lamps rather than a
+   wall, but it is still something crossing the view on a fixed cadence
+   and it is still worth knowing the number. */
+for(const id of Object.keys(lantern.PROTOCOLS)){
+  const period = lantern.periodOf(lantern.PROTOCOLS[id]);
+  const spacing = period / lantern.archCount(period);
+  const rate = lantern.SPEED / spacing;
+  if(rate > SWEEPS_PER_SECOND_MAX)
+    fail(`lantern/${id}: an arch crosses the lens ${rate.toFixed(2)} times a second`);
+  if(failures === 0)
+    console.log(`    ok    lantern/${id}: an arch crosses the lens ${rate.toFixed(2)} times a ` +
+                `second, every ${spacing.toFixed(1)} m`);
+}
+
+/* ------------------------------------------------------------------
    4a. §6.1'S PROMISE, MADE EXECUTABLE
    ------------------------------------------------------------------
    "The cloud gaps are generated from the breath schedule, so following
