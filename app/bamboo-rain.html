@@ -194,7 +194,7 @@ import { body } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, particles,
-         posterMat, screenQuad, overlayQuad, part } from './js/mesh.js';
+         posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter } from './js/stage.js';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
@@ -952,6 +952,10 @@ window.__bamboo = {
              clearingIdentical: idle.endClearing === hard.endClearing,
              curtainDiffers: idle.furthestCurtain !== hard.furthestCurtain };
   },
+  /* Did every shader actually link? A broken one still issues
+     its draw call and still shows up in renderer.info, so the
+     only other way to find out is to read the console. */
+  links(){ return linkReport(renderer, scene, camera); },
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();

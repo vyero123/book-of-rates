@@ -142,6 +142,47 @@ export function bands(THREE, layers, { n = 34, span = 150, skirt = -46, profile 
 }
 
 /* ------------------------------------------------------------------
+   DID EVERY SHADER ACTUALLY LINK?
+   ------------------------------------------------------------------
+   A shader that fails to link is the worst failure mode in this
+   project, and it has now happened three times. Nothing throws. The
+   draw call is still issued and still counted by renderer.info. The
+   frame still renders. The only symptom is that a layer is MISSING, and
+   a layer missing from a scene nobody has seen before looks exactly
+   like a scene.
+
+   Long Air shipped a kite with no sail for an afternoon this way. The
+   idle background shipped with no fish and no bubbles — two of its five
+   layers — and the bench reported five draw calls throughout, because
+   three counts the call whether the program is valid or not.
+
+   The console says so plainly and nothing else does. So this makes it
+   something a tool call can ask: compile the scene, then interrogate
+   the GL link status of every material in it. Chapters hang it on their
+   inspection hook, so "is anything silently missing" is one call.
+   ------------------------------------------------------------------ */
+export function linkReport(renderer, scene, camera){
+  const gl = renderer.getContext();
+  try { renderer.compile(scene, camera); } catch(e){ /* report what we can */ }
+  const out = [];
+  scene.traverse(o => {
+    const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for(const m of mats){
+      let linked = null;
+      try {
+        const p = renderer.properties.get(m).currentProgram;
+        const glp = p && (p.program || p);
+        linked = glp ? !!gl.getProgramParameter(glp, gl.LINK_STATUS) : null;
+      } catch(e){ linked = null; }
+      out.push({ type: m.type, name: m.name || '', visible: o.visible, linked });
+    }
+  });
+  const broken = out.filter(r => r.linked === false).length;
+  const unknown = out.filter(r => r.linked === null).length;
+  return { materials: out.length, broken, unknown, ok: broken === 0, detail: out };
+}
+
+/* ------------------------------------------------------------------
    The endless strip
    ------------------------------------------------------------------ */
 

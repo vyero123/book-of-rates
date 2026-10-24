@@ -56,7 +56,7 @@
 
 import { ramp, RAMP_GLSL, GRAIN_GLSL, fogGlsl,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './palette.js';
-import { builder, bands, posterMat, screenQuad } from './mesh.js';
+import { builder, bands, posterMat, screenQuad, linkReport } from './mesh.js';
 import { stage, clock, contextGuard, webglOk } from './stage.js';
 
 /** Chapter six's own ramp, unchanged, because this is meant to read as
@@ -249,6 +249,7 @@ export function deepLightIdle(THREE, { canvas, fps = IDLE_FPS, dpr = IDLE_DPR,
     side: THREE.DoubleSide, prelude: FOG,
     vertex:`
       attribute vec2 aCorner; attribute float aSeed; attribute float aLane; attribute float aDepth;
+      uniform float uTime;
       varying float vUpper; varying float vDist;
       void main(){
         // the whole path is a modulo: nothing is spawned, nothing retires
@@ -319,7 +320,6 @@ export function deepLightIdle(THREE, { canvas, fps = IDLE_FPS, dpr = IDLE_DPR,
         mv.xy += aCorner * aR;
         gl_Position = projectionMatrix * mv;
       }
-      uniform float uTime;
     `,
     fragment:`
       varying vec2 vC; varying float vA;
@@ -351,10 +351,16 @@ export function deepLightIdle(THREE, { canvas, fps = IDLE_FPS, dpr = IDLE_DPR,
      it returns in a few microseconds unless enough time has passed.
      The GPU work is what costs, and that is what this cuts.
      ---------------------------------------------------------------- */
-  let t = 0, acc = 0, rendered = 0;
+  let t = 0, acc = 0, rendered = 0, dead = false;
   const period = 1 / fps;
   const loop = clock((dt, now, running) => {
-    if(!running) return;
+    /* A rAF callback can already be queued when dispose() runs, and
+       rendering into a disposed renderer throws
+       "Cannot read properties of null (reading 'precision')" out of
+       three's own program cache. Seen in the console while switching
+       the background setting. loop.stop() cancels the next frame, not
+       the one in flight; this flag catches that one. */
+    if(dead || !running) return;
     /* REDUCED MOTION IS A STILL, NOT A SLOW ONE. `still` freezes the
        clock as well as the camera and the loop stops itself after one
        frame: a reader who has asked the OS for less motion is not asking
@@ -392,6 +398,7 @@ export function deepLightIdle(THREE, { canvas, fps = IDLE_FPS, dpr = IDLE_DPR,
      *  page allocates its own surfaces, and two live contexts at once is
      *  exactly what gets a tab killed. */
     dispose(){
+      dead = true;
       loop.stop();
       scene.traverse(o => {
         if(o.geometry) o.geometry.dispose();
@@ -401,6 +408,8 @@ export function deepLightIdle(THREE, { canvas, fps = IDLE_FPS, dpr = IDLE_DPR,
       try { renderer.forceContextLoss(); } catch(e){ /* not everywhere */ }
     },
     resize,
+    /** every shader in here, and whether it linked */
+    links(){ return linkReport(renderer, scene, camera); },
     /** Drive the real frame body without rAF — a hidden browser pane
      *  gets no rAF callbacks at all. See clock().pump in stage.js. */
     pump(dt, n){ return loop.pump(dt, n); },
