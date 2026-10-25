@@ -577,16 +577,21 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat
     uniform float uTime, uFront, uClear, uFlash;
     uniform vec3 uWet, uSplash, uAccent, uDeep;
     void main(){
-      float out = -vW.z;
+      // NOT the three-letter word this used to be: it is RESERVED in GLSL and this shader has
+      // never compiled because of it. The ground has been missing from
+      // this chapter since it shipped -- no error, no thrown exception,
+      // the draw call still counted. Found by the linkReport instrument
+      // while sweeping the chapters for the Long Air flash.
+      float away = -vW.z;
       vec3 col = rampPick(4.3 / 6.0);
       // wet sheen in hard terraces, not a gradient
-      float sheen = posterise(clamp(out / 46.0, 0.0, 1.0), 5.0);
+      float sheen = posterise(clamp(away / 46.0, 0.0, 1.0), 5.0);
       col = mix(col, uWet, sheen * 0.55);
       col = mix(col, uDeep, (1.0 - sheen) * 0.30);
 
       // RIPPLES, only beyond the curtain's near face. Hard rings in
       // quantised cells — §4.2 rule 5 applies to water too.
-      float wet = step(uFront, out);
+      float wet = step(uFront, away);
       vec2 cell = floor(vec2(vW.x, vW.z) * 0.55);
       float ph = chipAt(cell) * 6.283;
       float r = fract(uTime * 0.9 + ph);
@@ -598,7 +603,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat
       // THE SPLASH LINE: one hard accent band standing exactly where the
       // curtain meets the ground, so the reader can see where the thing
       // they are pushing actually is.
-      float line = step(abs(out - uFront), 0.55);
+      float line = step(abs(away - uFront), 0.55);
       col = mix(col, uAccent, line * 0.40);
 
       col = mix(col, vec3(1.0), uFlash * 0.35);
