@@ -524,14 +524,33 @@ function gateGeometry(course, which){
       b.vertex(GX[k], lipAt(k), g.zb - SLAB_Z,
                { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed });
     }
+    /* WINDING, and it is why this mesh could not be front-face culled.
+       ------------------------------------------------------------
+       For the rock gate the lip is ABOVE the far row; for the cloud
+       gate it is BELOW it. The same vertex order therefore produces
+       opposite windings for the two, so one of them was always
+       back-facing — which is why the material was DoubleSide, and why
+       the interior of every slab was being drawn as if it were lit.
+
+       That is the big flash. Measured on the deployed page, switching
+       the gates to FrontSide takes the frame-to-frame events from 17 to
+       7 and the worst from 111.3 to 42.7 — but it also loses 27% of the
+       gate geometry, because the badly wound half simply vanishes. So
+       the fix is to wind each gate correctly and then cull, rather than
+       to draw both faces of everything.
+
+       `cw` flips the order for the rock gate. The cloud gate keeps the
+       original order, which was the one that happened to be right. */
     const N = GX.length;
+    const cw = which < 0;
+    const tri = (a, b2, c) => cw ? b.tri(a, c, b2) : b.tri(a, b2, c);
     for(let k = 0; k < N - 1; k++){
       // front face: lip row to far row
-      b.tri(base+k, base+k+1, base+N+k);
-      b.tri(base+k+1, base+N+k+1, base+N+k);
+      tri(base+k, base+k+1, base+N+k);
+      tri(base+k+1, base+N+k+1, base+N+k);
       // the lip itself, running back in z: this is the edge you fly past
-      b.tri(base+k, base+2*N+k, base+k+1);
-      b.tri(base+k+1, base+2*N+k, base+2*N+k+1);
+      tri(base+k, base+2*N+k, base+k+1);
+      tri(base+k+1, base+2*N+k, base+2*N+k+1);
     }
   }
   return b.geometry();
@@ -543,7 +562,10 @@ const gateMatFor = kind => posterMat(THREE, {
              uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
              uAccent:{value:C(ROCK.accent)},
              uIsCloud:{value: kind === 'cloud' ? 1 : 0} },
-  side: THREE.DoubleSide, prelude: PRE + NEAR_FADE,
+  /* FrontSide, not DoubleSide: with the winding fixed above, the
+     interior of a slab is never drawn, and the interior being drawn as
+     a lit surface was the chapter's reported flash. */
+  side: THREE.FrontSide, prelude: PRE + NEAR_FADE,
   vertex: SCROLL_GLSL + `
     attribute float aLip; attribute float aLedge; attribute float aTone; attribute float aSun;
     attribute float aSide; attribute float aSeed;
