@@ -480,10 +480,6 @@ const SLAB_Z = 2.6;
    Getting this backwards would dissolve gates BEFORE they were flown,
    which is a worse fault than the one being fixed. */
 const CAM_BACK_MIN = 11.5;
-/* How deep the band is on each side of the opening. Wide enough to
-   read as a solid edge to fly between, narrow enough that it never
-   fills the frame. */
-const GATE_BAND = 3.2;
 const NEAR_FADE = nearFadeGlsl({ gone: CAM_BACK_MIN - 7.0, full: CAM_BACK_MIN - 0.5 });
 
 function gateGeometry(course, which){
@@ -491,28 +487,16 @@ function gateGeometry(course, which){
   const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
   for(const g of course.gates){
     const lip = g.centre + which * g.half;
-    /* A GATE IS A BAND AROUND THE OPENING, NOT A WALL TO THE GROUND.
-       ------------------------------------------------------------
-       This is the fix for the reported flash, and it is structural
-       rather than a number.
-
-       The slab used to run from the lip down to twelve metres under the
-       ground and up to above the cloud ceiling: a thirty-six metre wall
-       with a hole in it. Almost none of that was ever seen except as
-       the thing filling the frame on the way past -- and a large opaque
-       surface whose share of the frame changes quickly as it goes by IS
-       the flash. Attributed at the worst frame by rendering each layer
-       alone: rock gate 46.8, cloud gate 27.8, every other layer exactly
-       0.0, with the near dissolve switched off so it could not be the
-       explanation.
-
-       So the gate is now a band of GATE_BAND metres on each side of the
-       opening. It still marks the altitude the schedule wants -- that
-       is the whole mechanic and it is untouched -- but you can see the
-       ridge under it and the sky over it, and no gate ever owns a third
-       of the view. It is also closer to what the design doc describes:
-       cloud gaps, not walls. */
-    const far = lip - which * GATE_BAND;
+    /* REVERTED, AND THE MEASUREMENT IS WHY.
+       The slab was briefly cut down to a 3.2 m band on each side of the
+       opening, on the theory that a large opaque surface sweeping the
+       frame was the flash. Measured on the deployed page it made things
+       WORSE, not better: on-cue events 11 -> 19, worst 49.5 -> 89.2,
+       mean 2.16 -> 4.30. Seeing the sky and the ridge THROUGH each gate
+       increases the contrast swing as it goes past rather than reducing
+       it. So the mechanism is not "a big opaque area moving" and the
+       slab goes back to reaching past the corridor. */
+    const far = which < 0 ? GROUND - 1.5 : ceilAt(g.zb, course.period) + 2.0;
     const seed = ((g.i * 7919) % 97) / 97;
     // the lip is level in the kite's own lane and steps away from it to
     // the sides, so the centre lane is visibly the route and the sides
