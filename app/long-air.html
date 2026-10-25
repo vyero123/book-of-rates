@@ -284,6 +284,11 @@ const uFill    = { value: 0 };          // the player's own breath, 0..1
 const uForgive = { value: 0 };          // 0..1 of FORGIVE_MAX
 const uHit     = { value: 0 };          // soft contact, fades
 const uDrag    = { value: 0 };          // surface friction, 0..1
+/* A SWITCH ON THE NEAR DISSOLVE, so the one discontinuous operation
+   in the gate shader can be attributed rather than argued about.
+   discard is the only thing in there that can make a whole surface
+   appear or vanish between two frames; everything else is a mix. */
+const uNearFade= { value: 1 };
 const uRush    = { value: 0 };
 const uFog     = { value: C(AIR.haze) };
 const uRamp    = { value: ramp6 };
@@ -528,7 +533,7 @@ function gateGeometry(course, which){
 }
 
 const gateMatFor = kind => posterMat(THREE, {
-  uniforms:{ uDist, uPeriod, uRamp, uFog, uForgive, uKite,
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uForgive, uKite, uNearFade,
              uShadow:{value:C(kind === 'rock' ? ROCK.shadow : AIR.cloudLo)},
              uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
              uAccent:{value:C(ROCK.accent)},
@@ -559,7 +564,7 @@ const gateMatFor = kind => posterMat(THREE, {
     varying float vDist; varying float vSide; varying float vSeed;
     varying float vY; varying float vX;
     uniform vec3 uShadow, uDeep, uAccent;
-    uniform float uIsCloud;
+    uniform float uIsCloud, uNearFade;
     void main(){
       /* THE GATE THE READER HAS ALREADY FLOWN STOPS BEING DRAWN.
          Without this a slab fills the frame as it reaches the lens --
@@ -569,7 +574,7 @@ const gateMatFor = kind => posterMat(THREE, {
          this chapter was reported for. The terraces are hashed on
          height and seed so they belong to the slab rather than crawling
          across the screen. */
-      if(nearGone(vDist, vec2(vX, vY + vSeed * 17.0))) discard;
+      if(uNearFade > 0.5 && nearGone(vDist, vec2(vX, vY + vSeed * 17.0))) discard;
       float tone = vTone + (1.0 - vLip) * 1.3;
       vec3 col = rampPick((tone + 0.5) / 6.0);
       col = mix(col, uShadow, uIsCloud * 0.55);
@@ -1248,6 +1253,7 @@ window.__longAir = {
      its draw call and still shows up in renderer.info, so the
      only other way to find out is to read the console. */
   links(){ return linkReport(renderer, scene, camera); },
+  nearFade(on){ uNearFade.value = on ? 1 : 0; return uNearFade.value; },
   /* EXACTLY ONE RENDERER AND ONE LOOP is the only healthy answer for a
      chapter page. Two things drawing to one surface is invisible to a
      screenshot and to draw-call counts, which is why it gets its own
