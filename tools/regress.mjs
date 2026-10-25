@@ -387,9 +387,16 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
        The claim that survives at every spacing, and the one that
        matters, is the second check: no gate inside a stationary phase
        may open anywhere but level. */
-    if(q.d >= course.dz / longAir.SPEED * 2 && inside.length < 2)
-      fail(`long air/${id}: the ${q.k} phase is ${q.d}s, long enough for two gates at ` +
-           `${(course.dz / longAir.SPEED).toFixed(2)}s apart, but produced ${inside.length}`);
+    /* UNCONDITIONAL AGAIN. This was briefly exempted for phases shorter
+       than the gate spacing, which was papering over a real mismatch:
+       a stationary phase that cannot hold two gates cannot be a level
+       channel, and a chapter that promises one has to make the phase
+       long enough rather than make the check quieter. The no-holds
+       protocol's rest went from 1 s to 3 s for exactly that reason. */
+    if(inside.length < 2)
+      fail(`long air/${id}: the ${q.k} phase is ${q.d}s and produced ${inside.length} gate(s) ` +
+           `at ${(course.dz / longAir.SPEED).toFixed(2)}s spacing — a stationary phase has to ` +
+           `be at least two gate spacings long to be a channel at all`);
     for(const g of inside){
       if(Math.abs(g.centre - q.from) > 1e-9)
         fail(`long air/${id}: a gate inside the ${q.k} phase opens at ${g.centre.toFixed(2)}, ` +
@@ -459,6 +466,36 @@ for(const id of Object.keys(lantern.PROTOCOLS)){
     console.log(`    ok    lantern/${id}: an arch crosses the lens ${rate.toFixed(2)} times a ` +
                 `second, every ${spacing.toFixed(1)} m`);
 }
+
+/* ------------------------------------------------------------------
+   4-BETA. WHY THE ONE-FRAME COLOUR JUMP IS NOT CHECKED HERE
+   ------------------------------------------------------------------
+   The chapter was reported as flashing a different scene in about once
+   a second. What finds that is a frame-to-frame meter in a browser:
+   render, read the frame back, and compare CONSECUTIVE frames. Every
+   individual frame was correct, so a screenshot showed nothing; nothing
+   was drawn twice, so draw-call counts showed nothing. The fault exists
+   only in the difference.
+
+   I tried to give that an arithmetic shadow here — how much of the
+   field of view a gate's slabs occupy, and how fast that changes per
+   frame — and then tried to prove the shadow could fail, which is this
+   project's own standard. IT COULD NOT. At 14 m/s and 60 fps the lens
+   moves 0.23 m a frame, and the share of the view a gate occupies is a
+   smooth function of distance: the worst real case scores 2.2% and the
+   worst case I could contrive scores 0.0%. A check that cannot be made
+   to fail is worse than no check, because it reads as cover.
+
+   It is also the wrong shape. The fault turned out to be the INSIDE of
+   the slabs being drawn as though lit — shading, winding and draw
+   order, none of which geometry arithmetic can see. So the geometric
+   proxy was deleted rather than kept as decoration.
+
+   WHERE THIS CLASS IS ACTUALLY CAUGHT: tools/flash-check.md, which is a
+   procedure for a browser plus the measured baseline for every chapter.
+   The rate check above (4-ALPHA) is the part that IS arithmetic and
+   does bind: how often the world puts something across the lens.
+   ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------
    4a. §6.1'S PROMISE, MADE EXECUTABLE

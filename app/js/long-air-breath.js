@@ -239,15 +239,28 @@ export const PROTOCOLS = {
     ]
   }),
 
-  /* THE NO-HOLDS ALTERNATIVE, 4 in / 5 out / 1 at empty, 6 a minute.
-     18 × 10 s = 180 s. This is the protocol the chapter shipped as its
-     slow option, kept verbatim and re-cast as the no-holds choice, which
-     is what it always was — `rest` is a second at empty, not a breath
-     held against urge. It keeps one short level channel of its own, at
-     the bottom of the range, so the shape the box protocol is built
-     around is present in both. */
+  /* THE NO-HOLDS ALTERNATIVE, 4 in / 5 out / 3 at empty, 5 a minute.
+     15 × 12 s = 180 s.
+
+     THE REST WAS ONE SECOND AND IS NOW THREE, and that is a structural
+     fix rather than a tuning one. A level channel is a run of gates at
+     one altitude; gates are laid every SPACING seconds of schedule; so
+     a stationary phase SHORTER THAN THE GATE SPACING cannot contain two
+     gates and cannot be a channel at all. At the old 0.55 s spacing a
+     one-second rest held two gates and worked. When the spacing went to
+     1.45 s to cut how often a wall crosses the lens, the one-second
+     rest quietly stopped being a channel — the harness caught it, and
+     the first response was to exempt short phases from the check, which
+     is papering over a real mismatch between two numbers that have to
+     agree.
+
+     They agree now: the rest is 3 s, comfortably longer than two gate
+     spacings, so the no-holds protocol has a real level channel again
+     and the check is unconditional. The pace moves from 6 a minute to
+     5, which is the middle of the resonance band and a better place for
+     this chapter's slow option to be anyway. */
   open: protocol({
-    id:'open', name:'No holds · 4 in / 5 out / 1 at empty · 6 breaths a minute', cycles:18,
+    id:'open', name:'No holds · 4 in / 5 out / 3 at empty · 5 breaths a minute', cycles:15,
     phases:[
       { k:'in',   d:4, label:'breathe in',  sub:'let it climb',
         from:ALT_LOW, to:ALT_HIGH, ease:linear, cam:'rise',
@@ -256,7 +269,7 @@ export const PROTOCOLS = {
         from:ALT_HIGH, to:ALT_LOW, ease:linear, cam:'dive',
         count:'level out in',
         scalar:p => 1 - p },
-      { k:'rest', d:1, label:'rest',        sub:'fly it level',
+      { k:'rest', d:3, label:'rest',        sub:'fly it level',
         from:ALT_LOW, to:ALT_LOW, cam:'level', count:'breathe in in',
         scalar:() => 0 }
     ]
