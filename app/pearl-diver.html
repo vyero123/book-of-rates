@@ -28,6 +28,21 @@
     width:22px;height:22px;border-radius:50%;display:none}
   #fpsdot.on{display:block}
 
+  #up{position:fixed;inset:0;z-index:14;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+  /* The one mark. Not an invitation and deliberately NOT the shimmer
+     js/invite.js gives a control that is WANTED: nothing here is
+     wanted, the chapter runs perfectly with no input at all, and a
+     pulsing "press me" would be asking for a press that is not asked
+     for. It is a quiet standing note that the door is open, present
+     only while she is under water and there is something to decline. */
+  #upnote{position:fixed;left:0;right:0;
+    bottom:max(132px,calc(env(safe-area-inset-bottom) + 124px));
+    z-index:20;text-align:center;pointer-events:none;
+    font:500 8.5px/1 ui-sans-serif,sans-serif;letter-spacing:.24em;
+    text-transform:uppercase;color:rgba(242,227,200,.0);
+    transition:color .6s ease}
+  #upnote.on{color:rgba(242,227,200,.38)}
   #cue{position:fixed;left:0;right:0;bottom:max(64px,calc(env(safe-area-inset-bottom) + 56px));
     z-index:20;text-align:center;pointer-events:none;color:#F2E3C8}
   #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
@@ -77,11 +92,17 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<!-- COME UP NOW. The one action §1.6b asks every chapter for: a way to
+     decline the rest of a phase that is available, immediate, and costs
+     nothing. The whole screen, because a target you have to find is not
+     available. Under the cue so the cue stays readable. -->
+<div id="up" aria-label="Touch to come up to the surface now"></div>
 
 <button id="stop" aria-label="Stop the session"><i></i>STOP</button>
 <div id="fpsdot" aria-hidden="true"></div>
 <div id="fps" role="status" title="Tap to hide">—</div>
 
+<div id="upnote">touch to come up</div>
 <div id="cue"><div id="phase">breathe in</div><div id="sub">above the water</div></div>
 <div id="bar"><div id="barfill"></div></div>
 <div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Never hold your breath in or near water. Ease off at any light-headedness.</div>
@@ -239,6 +260,7 @@ const AIR = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
+const elUpNote = $('upnote');
 const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
@@ -973,13 +995,99 @@ let subShown = '';
 
 const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
 
+/* ==================================================================
+   COME UP NOW — design doc §1.6b, 31 October 2026
+   ==================================================================
+   The standing principle is that a rhythm is RECOMMENDED, NOT
+   REQUIRED: the protocol is an invitation the reader may decline at
+   any instant without the scene punishing them, stalling, correcting
+   them or marking it.
+
+   This chapter did not comply, and was the case that produced the
+   principle. A reader who could not hold for the whole of a hold
+   phase had exactly one option: sit it out. A breathing app that
+   gives you nothing to do when you cannot continue is REQUIRING the
+   protocol while claiming to recommend it.
+
+   WHAT A TOUCH DOES. She starts for the surface at once, and faster
+   than the schedule would have brought her — 1.7x the ascent the
+   protocol's own rise uses. Nothing flashes, nothing is said, the cue
+   does not acknowledge it, and no number anywhere changes. The world
+   simply does the thing that was asked for.
+
+   WHY A TOUCH AND NOT A HELD FINGER. The obvious mapping is hold-to-
+   stay-down, lift-to-rise, which is what the flat chapter six did. It
+   is the wrong shape HERE, under this principle: it would make a
+   press the way to FOLLOW the protocol, so a reader who did nothing
+   would surface immediately and the chapter would require an input it
+   currently does not. Declining must be the cheap action, not
+   complying. So: she dives by herself, and a touch means "I am coming
+   up now."
+
+   HOW THE CYCLE RECOVERS, by rejoining rather than resetting.
+   `freeY` is a floor under her depth, not a replacement for it. Once
+   released it rises to the surface and stays there, and
+   `shown = max(schedule, freeY)` means she is never deeper than the
+   schedule says but may be shallower. The release ENDS the moment the
+   schedule itself next reaches the surface — which is the start of
+   the next inhale — and from then she is schedule-driven again, on
+   time, with the next breath arriving when it was always going to.
+
+   §1.6a IS UNAFFECTED, AND IF ANYTHING EASIER. The rule is that the
+   inhale happens above the surface. A release can only make her
+   surface SOONER and can never hold her under, because freeY is a
+   maximum and only ever rises. tools/regress.mjs samples the
+   schedule, which is untouched; the release can only sit above it.
+   ================================================================== */
+const RISE_FASTER = 1.7;          // of the protocol's own ascent rate
+let freeY = null;                 // null when she is on the schedule
+let releasing = false;
+
+(function(){
+  const el = $('up');
+  const go = e => {
+    e.preventDefault();
+    // nothing to decline when she is already up, and nothing to
+    // decline before the session has started
+    if(!started || freeY !== null || B.value(t) >= Y_AIR - 0.02) return;
+    freeY = B.value(t);
+    releasing = true;
+  };
+  el.addEventListener('pointerdown', go);
+})();
+
+/** The protocol's own ascent rate, in metres a second: the rise phase
+ *  covers the whole water column in its own duration. Derived rather
+ *  than chosen, so a protocol with a different shape gets a release
+ *  that is faster than ITS rise and not than some other one's. */
+function ascentRate(){
+  let span = 0, dur = 0;
+  for(const ph of B.proto.phases){
+    const rise = (ph.to || 0) - (ph.from || 0);
+    if(rise > span){ span = rise; dur = ph.d; }
+  }
+  return dur > 0 ? (span / dur) * RISE_FASTER : 2.0;
+}
+
 const loop = clock((dt, now, running) => {
   if(!running){ fpsTick(now, true); return; }
   if(started) t += dt;
 
   const st = B.at(t);
   const ph = st.p;
-  const dyNow = B.value(t);
+  const schedY = B.value(t);
+
+  /* --- THE RELEASE (§1.6b). A floor under her depth, never a
+     replacement for it: she can be shallower than the schedule, never
+     deeper, so §1.6a cannot be weakened by it. It ends when the
+     schedule itself next reaches the surface, which is the start of
+     the next inhale — the cycle rejoins rather than resetting. --- */
+  if(freeY !== null){
+    freeY = Math.min(Y_AIR, freeY + ascentRate() * dt);
+    if(schedY >= Y_AIR - 0.02){ freeY = null; releasing = false; }
+    else if(freeY >= Y_AIR - 0.001) releasing = false;
+  }
+  const dyNow = freeY !== null ? Math.max(schedY, freeY) : schedY;
   const grip = B.scalar(t);
   const travel = B.travel(t);          // <0 descending, >0 rising, 0 still
 
@@ -1046,7 +1154,12 @@ const loop = clock((dt, now, running) => {
      because the above-water shot is a different shot, not the same one
      from higher up: further back, level with the horizon, wide open. --- */
   let wantY, lookY, wantBack, ease;
-  if(ph.cam === 'air'){
+  /* Released and on her way up, the shot is the ascent shot whatever
+     phase the schedule thinks it is in — framing her for a descent
+     while she is rising is the scene arguing with the reader. */
+  if(freeY !== null && dyNow > schedY + 0.05){
+    wantY = dyNow + 1.50; lookY = dyNow + 2.20; wantBack = 9.5; ease = 4.6;
+  } else if(ph.cam === 'air'){
     wantY = Math.max(dyNow + 0.78, 0.95); lookY = 0.62;  wantBack = 12.5; ease = 2.4;
   } else if(ph.cam === 'down'){
     wantY = dyNow + 1.60; lookY = dyNow - 1.30; wantBack = 9.0;  ease = 5.0;
@@ -1099,6 +1212,13 @@ const loop = clock((dt, now, running) => {
   matBody.color.copy(cBodyUp).lerp(cBodyDown, Math.min(1, Math.max(0, (dn - 0.12) / 0.5)));
 
   /* --- cue text. §2.4: the holds count towards air, never elapsed. --- */
+  /* The standing note that the door is open. Shown only while there
+     is something to decline — she is under and not already on her way
+     up — and never while she is at the surface, where it would be
+     asking for a press that does nothing. */
+  const canLeave = started && freeY === null && B.value(t) < Y_AIR - 0.4;
+  elUpNote.classList.toggle('on', canLeave);
+
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
   if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
@@ -1122,6 +1242,7 @@ function beginWith(which, remember){
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
+  freeY = null; releasing = false;
   t = 0; prevY = B.value(0); subShown = '';
   ARRIVE.start();
   loop.resync();
@@ -1175,7 +1296,12 @@ window.__pearlDiver = {
              t, phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
              y:+B.value(t).toFixed(2), camY:+camY.toFixed(2),
              above:+uAbove.value.toFixed(2), grip:+B.scalar(t).toFixed(2),
-             liveParticles: puffs.live() }; },
+             liveParticles: puffs.live(),
+             scheduleY:+B.value(t).toFixed(2),
+             released: freeY !== null, freeY: freeY === null ? null : +freeY.toFixed(2) }; },
+  /** §1.6b: come up now, from a tool call. */
+  comeUp(){ if(started && freeY === null && B.value(t) < Y_AIR - 0.02){ freeY = B.value(t); releasing = true; }
+            return { released: freeY !== null, from: freeY }; },
   puff(n, kind){
     for(let i = 0; i < (n || 30); i++){
       if(kind === 1) sprayDrop(diver.position.x, 0.04, diver.position.z);

@@ -248,6 +248,67 @@ Consequences, recorded so no future chapter has to rediscover them:
   the surface. The pre-rule mapping is kept as the negative case, so the check is known to be
   able to fail.
 
+### 1.6b Recommended, not required — the rhythm is an invitation
+
+*Added 31 October 2026, by the author. A standing design principle, not a note on any one
+level. It binds every chapter in the book, including the ones not yet built, and it is
+central to how all current and future environments are designed.*
+
+> **A rhythm is being recommended, not required. The protocol is an invitation the user may
+> decline at any instant, in whole or in part, without the scene punishing them, stalling,
+> correcting them, or marking it.**
+
+This belongs beside §1.6 and §1.6a because it is the same conviction applied one level
+down. §1.6 says the app discloses rather than gatekeeps, about *practices*. §1.6a says the
+app is nevertheless fully responsible for what it *depicts*. This one is about the
+**moment-to-moment experience**: having declined to gate who may begin, the app must not
+quietly re-impose a requirement second by second once they have.
+
+The concrete case that produced it: in **Pearl Diver** the user may not be able to hold for
+the whole of a hold phase, and the only option the chapter offered was to sit it out. A
+breathing app that gives you nothing to do when you cannot continue is requiring the
+protocol while claiming to recommend it.
+
+**It sits with "nothing is counted or scored", and is the other half of it.** Nothing in the
+book records what the user did, so there is no ledger in which an early release could be a
+failure that happens to go unrecorded. That is not the claim. The claim is stronger and
+simpler: **it is not a failure.** A user who comes up early has breathed; that is the whole
+of what the app was for.
+
+What it requires of a chapter, stated so it can be checked:
+
+- **Leaving early must be AVAILABLE, and it must be one action.** Not a menu, not a stop
+  screen, not a pause. If the only way out of a phase is to stop the session, the phase is
+  required.
+- **It must be IMMEDIATE.** A release that takes effect at the next phase boundary is a
+  sentence being served.
+- **The scene must not flinch.** No flash, no shake, no colour of alarm, no "you held for
+  X", no cue text that acknowledges the deviation at all. The world simply does the thing
+  the user asked for.
+- **The cycle must RECOVER GRACEFULLY, by rejoining rather than by being reset.** The user
+  who declines one phase is still in the session and still on the schedule; the next breath
+  arrives on time.
+- **Declining must cost nothing, and it must also not GAIN anything**, or the invitation
+  becomes a strategy. The right shape is almost always: the thing you asked for happens, and
+  nothing else changes.
+- **An affordance that invites an input must never imply obligation.** This governs the
+  shared invitation in `app/js/invite.js`: the pulse that teaches a control is present when
+  the input is wanted, absent when it is not, and **stops entirely once the user has shown
+  they understand**. A prompt that keeps prompting someone who already knows is nagging, and
+  nagging is a mild way of requiring.
+- **Where a rule and the rhythm conflict, §1.6a still wins.** An early release may not be
+  implemented in a way that puts an inhale underwater. In practice early release makes
+  §1.6a *easier*, because surfacing sooner is surfacing sooner.
+
+Where each chapter stood when this was written, audited rather than assumed:
+
+| chapter | before | after |
+|---|---|---|
+| Pearl Diver | **did not comply.** No control at all during a session: the hold was a cue you sat through. | a touch surfaces her at once, and faster. |
+| Long Air | complies. Contact is a skim, not a crash; what it costs is forward speed, which the next breath returns. Nothing is counted. Letting go used to sink the glider, which was a cost for declining — it now flies itself at 0.45 of the protocol's rate. | |
+| Bamboo Rain | complies, and was the model for it. The storm clears **on the schedule and not on the effort**: lift your finger for the whole session and it still clears. Releasing mid-exhale now stops the pushing rather than undoing it. | |
+| Lantern Current | complies. The darkening is on the schedule alone and the lanterns do not go out. Lighting is rate-limited so a palm left on the glass cannot spend the chapter, which is a limit on gaining rather than a penalty for declining. | |
+
 ---
 
 ## 2. Safety: the architecture, not the disclaimer
