@@ -131,13 +131,23 @@
   /* ---------- the plates ----------
      A plate is a picture with a caption. The frame is a hairline and a
      hard offset shadow — a print laid on a page, not a card in a UI. */
-  .plates{display:grid;grid-template-columns:repeat(2,1fr);gap:15px 13px;margin:0}
-  a.plate{display:block;text-decoration:none;color:inherit}
+  .plates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 13px;margin:0}
+  /* min-width:0 AND minmax(0,1fr), both deliberately. A grid item's
+     default min-width is auto, which is its MIN-CONTENT width — and
+     the min-content width of a plate is the longest word in its
+     caption. At 375 px "Lantern Current" was therefore setting the
+     column width, the two columns came to more than the page, and
+     because #contents clips rather than scrolls sideways the right
+     hand column was simply cut off at the glass. Found by looking at
+     it on a phone-sized viewport, which is the only way this class of
+     fault is ever found. */
+  a.plate{display:block;text-decoration:none;color:inherit;min-width:0}
   a.plate .pic{position:relative;aspect-ratio:96/66;border-radius:1px;overflow:hidden;
     background:#1B2150;
     box-shadow:0 0 0 1px rgba(42,28,16,.34), 2px 3px 0 rgba(42,28,16,.17)}
   a.plate .pic canvas,a.plate .pic svg{display:block;width:100%;height:100%}
-  a.plate .cap{margin:7px 1px 0;font:400 13px/1.2 ui-serif,Georgia,serif;color:#2A1C10}
+  a.plate .cap{margin:7px 1px 0;font:400 13px/1.2 ui-serif,Georgia,serif;color:#2A1C10;
+    overflow-wrap:break-word}
   a.plate.locked{opacity:.55}
   a.plate.locked .pic{background:rgba(42,28,16,.07);display:grid;place-items:center;
     box-shadow:0 0 0 1px rgba(42,28,16,.22)}
