@@ -460,7 +460,8 @@ const SHOW_LOCKED = true;
      the 3-D badge  the section head says it, nine times less often. */
 function entryHTML(j, i){
   return `<a class="plate" href="journey.html?j=${j.id}">
-    <div class="pic"><canvas data-prev="${j.preview}" width="192" height="132"></canvas></div>
+    <div class="pic"><canvas data-prev="${j.preview}" data-at="${(2.1 + i * 2.37).toFixed(2)}"
+      width="192" height="132"></canvas></div>
     <div class="cap">${j.title}</div>
   </a>`;
 }
@@ -811,10 +812,18 @@ let bgIdx = 0, bgTurn = new PageTurn(1.6), nextTurnAt = 14;
    are a flat horizon.
    ================================================================== */
 (function drawPlatesOnce(){
-  const at = { glide: 3.1, swell: 4.4, gallop: 2.2, kite: 5.0, flight: 1.7, dive: 6.3 };
+  /* THE MOMENT IS PER CHAPTER, NOT PER SCENE, and that is not a detail.
+     Several chapters share a SCENE — The High Valley and Deep Water are
+     both `glide` — so a time chosen per scene draws two chapters the
+     same picture, and two identical plates in a picture book is worse
+     than one bad one. Caught by looking at the deployed page: the first
+     version had High Valley and The Run near enough indistinguishable.
+     Each plate now carries its own `data-at`, spaced by a chapter's
+     index, so same-scene chapters catch the world at different
+     moments. */
   for (const cv of document.querySelectorAll('canvas[data-prev]')){
     const scene = SCENES[cv.dataset.prev] || SCENES.glide;
-    const t = at[cv.dataset.prev] !== undefined ? at[cv.dataset.prev] : 3.0;
+    const t = cv.dataset.at !== undefined ? +cv.dataset.at : 3.0;
     const g = cv.getContext('2d');
     const lv = 0.5 - 0.5*Math.cos(t*2*Math.PI/9);
     g.save(); g.scale(cv.width/192, cv.height/132);
