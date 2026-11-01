@@ -196,16 +196,16 @@
      ordinary one. */
   #contents.falling{pointer-events:none;overflow:hidden}
   #contents.falling .pad > *:not(#list),
-  #contents.falling #list > *:not(.chosen){transition:opacity .18s ease;opacity:0}
+  #contents.falling #list > *:not(.plates),
+  #contents.falling .plates > *:not(.chosen){transition:opacity .18s ease;opacity:0}
   #contents.falling .bor-tool.page,
   body.falling #bg,body.falling #bg3d,body.falling #scrim{transition:opacity .2s ease;opacity:0}
-  #contents.falling a.entry.chosen{
+  #contents.falling a.plate.chosen{
     transition:transform .26s cubic-bezier(.36,0,.66,-0.06);
-    transform:scale(1.7);transform-origin:38% center;
-    border-color:transparent}
+    transform:scale(1.7);transform-origin:center 40%}
   @media (prefers-reduced-motion: reduce){
     #contents.falling .pad > *,#contents.falling #list > *,
-    #contents.falling a.entry.chosen{transition:none;opacity:1;transform:none}
+    #contents.falling a.plate.chosen{transition:none;opacity:1;transform:none}
   }
 
   /* ---------- options sheet ---------- */
@@ -723,10 +723,22 @@ $('list').innerHTML =
    the count is CHECKED rather than assumed: a link that silently did
    not get wired is the same class of fault as a shader that silently
    did not link, and this project has shipped four of those. */
-const wired = fallIntoChapter($('contents'));
-if(wired < document.querySelectorAll('#list a.entry').length){
-  console.warn('bor: only', wired, 'of',
-    document.querySelectorAll('#list a.entry').length, 'chapter links were wired');
+/* THE GUARD HAS TO COUNT THE SAME THING THE WIRING DOES, or it is
+   not a guard. The first version wired `a.entry` and compared the
+   result against the number of `a.entry` elements. When the entries
+   became `a.plate`, BOTH sides went to zero: nothing was wired, the
+   check compared 0 against 0, and the fall-into-the-chapter
+   transition silently stopped happening on every link in the book.
+
+   A check whose own expectation is derived from the thing it is
+   checking cannot fail. The expected number now comes from the page's
+   real content — every link inside the list — and the selector is
+   passed once, from one constant. */
+const PLATE = 'a.plate[href]';
+const wired = fallIntoChapter($('contents'), { selector: PLATE });
+const expect = $('list').querySelectorAll('a[href]').length;
+if(wired !== expect){
+  console.warn('bor: wired', wired, 'of', expect, 'chapter links');
 }
 
 // if the reader flagged a condition, say so on the locked chapter rather
@@ -1001,7 +1013,14 @@ function teardown(){
   stopDeepBg();
 }
 addEventListener('pagehide', teardown);
-document.querySelectorAll('a.entry').forEach(a => {
+/* THE SAME SELECTOR, from the same constant. This one releases the
+   page's surfaces as the reader leaves, and it was also keyed to
+   `a.entry`: when the entries became plates it stopped firing, so a
+   phone would have carried this document's canvases into the chapter
+   in the back/forward cache, which is exactly what gets a tab killed.
+   Two separate things broke on one class rename, which is why there
+   is now one name for it. */
+document.querySelectorAll(PLATE).forEach(a => {
   a.addEventListener('click', () => { save(); teardown(); });
 });
 /* The cost of the background, both ways, measured on the device rather
