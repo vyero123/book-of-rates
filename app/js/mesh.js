@@ -272,6 +272,56 @@ export const scrollGlsl = (behind) => `
   }
 `;
 
+/** THE SAME SCROLL, WRAPPED PER OBJECT INSTEAD OF PER VERTEX.
+ *  -----------------------------------------------------------------
+ *  `scrolled()` above takes `mod` of EACH VERTEX's own z. That is right
+ *  for a continuous surface and wrong for a mesh of separate objects,
+ *  because a triangle whose three vertices fall either side of the wrap
+ *  boundary is stretched across the ENTIRE PERIOD for exactly as long as
+ *  it straddles it.
+ *
+ *  Measured, 31 October 2026, on Long Air's worst single frame (135.4,
+ *  the outstanding item in tools/flash-check.md since 12 October):
+ *
+ *      frame 947   rock gate straddling triangles: 0
+ *      frame 948   rock gate straddling triangles: 12, spread 669.4 m
+ *                  of a 672 m period   <-- the 135.4 frame
+ *
+ *  and the same twelve on the cloud gate in the same frame. The colour
+ *  grid for the rock gate alone, rendered in isolation across that frame
+ *  pair, is unchanged in the top two thirds and goes to a flat
+ *  (128,55,23) across the bottom third in one frame: a single huge
+ *  smeared triangle. The near dissolve cannot save it, because it
+ *  discards by view depth and the smear spans every depth there is.
+ *
+ *  The rate is one event per object per period, which is why the
+ *  reported count tracked GATE SPACING (0.55 s -> 1.45 s roughly halved
+ *  it) and why slowing the world down was never going to help.
+ *
+ *  So: give every vertex of one object the same anchor z in `aBaseZ`,
+ *  wrap THAT, and carry the vertex along at its own offset from it. No
+ *  triangle can straddle, because all three of its vertices wrap on the
+ *  same frame. The object then teleports whole — and it teleports at
+ *  s -> 0, which is the far end of the period, so the jump happens out
+ *  of sight at both ends rather than across the lens.
+ *
+ *  Everywhere except the wrap this is arithmetically identical to
+ *  `scrolled()`, which is why it is a safe swap for an object mesh.
+ *
+ *  Declares `uniform float uDist, uPeriod; attribute float aBaseZ;` and
+ *  `vec3 scrolledWhole(vec3)`. Do NOT include both this and
+ *  scrollGlsl() in one shader — they declare the same uniforms.
+ */
+export const scrollWholeGlsl = (behind) => `
+  uniform float uDist, uPeriod;
+  attribute float aBaseZ;
+  vec3 scrolledWhole(vec3 p){
+    float s = mod(aBaseZ - uDist, uPeriod);
+    p.z = uPeriod * ${behind.toFixed(4)} - s + (p.z - aBaseZ);
+    return p;
+  }
+`;
+
 /* ------------------------------------------------------------------
    Billboards
    ------------------------------------------------------------------ */

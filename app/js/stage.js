@@ -384,8 +384,35 @@ export function flashMeter({ renderer, scene, camera, step, canvas }){
      *  typical jump between consecutive frames. `threshold` is in the
      *  same summed-channel units; a whole scene swapping scores in the
      *  tens, ordinary motion scores in single figures. */
-    run({ frames = 900, warmup = 240, dt = 1/60, threshold = 25 } = {}){
+    /* FRAMES ARE NOT EVENTS, AND COUNTING FRAMES MISREADS THE WHOLE
+       TABLE — 31 October 2026.
+       ----------------------------------------------------------------
+       `over` counts FRAMES in which the picture changed a lot. A reader
+       does not see frames, they see EVENTS, and the two differ by a
+       factor of the number of frames an event lasts.
+
+       Measured, same session, same instrument, same parameters:
+
+         Pearl Diver, no holds   29 over-threshold frames, in 3 runs of
+                                 ~10 consecutive frames each
+         Long Air, box, on cue   12 over-threshold frames, in 12 runs of
+                                 ONE frame each
+
+       Those are opposite diagnoses recorded as nearly the same number.
+       Pearl Diver's are the camera crossing the waterline — a designed
+       transition that takes ten frames and re-tints the whole picture
+       continuously, counted ten times. Long Air's are single-frame pops,
+       which is what "a different theme flashes" actually looks like.
+
+       So the meter now also reports CLUSTERS: runs of over-threshold
+       frames, merged across up to `gap` quiet frames. `clusters` is the
+       number a reader could count; `over` is kept because every baseline
+       in tools/flash-check.md was recorded in it. Where they diverge the
+       cluster length is the thing worth reading. */
+    run({ frames = 900, warmup = 240, dt = 1/60, threshold = 25, gap = 2 } = {}){
       let prev = null, worst = 0, worstAt = 0, over = 0, n = 0, total = 0;
+      const clusters = [];
+      let cur = null, quiet = 0;
       for(let i = 0; i < frames; i++){
         step(dt, i);
         if(i < warmup) continue;
@@ -393,14 +420,63 @@ export function flashMeter({ renderer, scene, camera, step, canvas }){
         if(prev){
           const d = delta(prev, c);
           total += d; n++;
-          if(d > threshold) over++;
           if(d > worst){ worst = d; worstAt = i; }
+          if(d > threshold){
+            over++;
+            if(!cur){ cur = { from:i, to:i, frames:1, peak:d }; }
+            else { cur.to = i; cur.frames++; cur.peak = Math.max(cur.peak, d); }
+            quiet = 0;
+          } else if(cur && ++quiet > gap){ clusters.push(cur); cur = null; }
         }
         prev = c;
       }
+      if(cur) clusters.push(cur);
+      const longest = clusters.reduce((a, c) => Math.max(a, c.frames), 0);
       return { frames, worst:+worst.toFixed(1), worstAtFrame: worstAt,
                mean:+(n ? total/n : 0).toFixed(2), over, threshold,
-               perSecond:+(n ? over / (n * dt) : 0).toFixed(2) };
+               perSecond:+(n ? over / (n * dt) : 0).toFixed(2),
+               clusters: clusters.length,
+               clustersPerSecond:+(n ? clusters.length / (n * dt) : 0).toFixed(2),
+               longestCluster: longest,
+               runs: clusters.map(c => ({ at:c.from, frames:c.frames, peak:+c.peak.toFixed(1) })) };
+    },
+
+    /** DOES ANY TRIANGLE STRADDLE THE SCROLL WRAP RIGHT NOW?
+     *
+     *  The instrument that found Long Air's worst single event, kept
+     *  because it is the only one that can see the fault at all: every
+     *  frame is correct, every shader links, the mesh never moves, no
+     *  visibility changes, and the cause is one triangle stretched
+     *  across the whole period for one frame.
+     *
+     *  Pure arithmetic on the geometry — it renders nothing, so it
+     *  cannot be fooled by a readback. A mesh using scrollWholeGlsl must
+     *  report 0 at every frame; a continuous surface using scrollGlsl
+     *  reports a small constant count (one row), which is harmless as
+     *  long as it never CHANGES, because the wrap row sits behind the
+     *  lens. A count that goes 0 -> n in one frame is a flash.
+     */
+    straddling(mesh){
+      const u = mesh.material && mesh.material.uniforms;
+      if(!u || !u.uDist || !u.uPeriod) return { applicable:false };
+      const g = mesh.geometry, pos = g.getAttribute('position'), idx = g.index;
+      const uD = u.uDist.value, uP = u.uPeriod.value;
+      const anchored = !!g.getAttribute('aBaseZ');
+      const at = anchored ? g.getAttribute('aBaseZ') : null;
+      const s = i => { const z = anchored ? at.getX(i) : pos.getZ(i);
+                       let v = (z - uD) % uP; return v < 0 ? v + uP : v; };
+      const tris = idx ? idx.count / 3 : pos.count / 3;
+      let count = 0, worstSpread = 0;
+      for(let t = 0; t < tris; t++){
+        const a = idx ? idx.getX(t*3) : t*3,
+              b = idx ? idx.getX(t*3+1) : t*3+1,
+              c = idx ? idx.getX(t*3+2) : t*3+2;
+        const sa = s(a), sb = s(b), sc = s(c);
+        const spread = Math.max(sa, sb, sc) - Math.min(sa, sb, sc);
+        if(spread > uP * 0.5){ count++; if(spread > worstSpread) worstSpread = spread; }
+      }
+      return { applicable:true, anchored, triangles: tris, straddling: count,
+               worstSpread:+worstSpread.toFixed(1), period: uP };
     },
 
     /** What fraction of the frame does this one mesh own right now? */

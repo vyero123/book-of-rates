@@ -219,7 +219,7 @@ import { PROTOCOLS, CHOICE, validChoice,
 import { body, drag } from './js/course.js';
 import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
-import { builder, bands, particles, scrollGlsl,
+import { builder, bands, particles, scrollGlsl, scrollWholeGlsl,
          posterMat, screenQuad, overlayQuad, part, linkReport,
          nearFadeGlsl } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
@@ -304,6 +304,9 @@ const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
 
 /* The endless strip, shared by every scrolled mesh. The kit's now. */
 const SCROLL_GLSL = scrollGlsl(BEHIND);
+/* The same scroll, wrapped per object rather than per vertex, for meshes
+   that are a bag of separate things rather than a continuous surface. */
+const SCROLL_WHOLE_GLSL = scrollWholeGlsl(BEHIND);
 
 /* ------------------------------------------------------------------
    1. SKY — hard bands, a small hot noon sun, flat cloud lobes.
@@ -484,7 +487,13 @@ const NEAR_FADE = nearFadeGlsl({ gone: CAM_BACK_MIN - 7.0, full: CAM_BACK_MIN - 
 
 function gateGeometry(course, which){
   // which: -1 rock from below, +1 cloud from above
-  const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1 });
+  /* aBaseZ: the gate's OWN anchor z, the same value on every vertex of
+     that gate, so the scroll can wrap the gate as one object. See
+     scrollWholeGlsl in js/mesh.js for the measurement that made this
+     necessary — per-vertex wrapping smears any triangle that straddles
+     the boundary across the whole 672 m period for one frame, and that
+     was Long Air's worst single event. */
+  const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1, aBaseZ:1 });
   for(const g of course.gates){
     const lip = g.centre + which * g.half;
     /* REVERTED, AND THE MEASUREMENT IS WHY.
@@ -509,11 +518,11 @@ function gateGeometry(course, which){
     const base = b.count;
     for(let k = 0; k < GX.length; k++){
       b.vertex(GX[k], lipAt(k), g.zb,
-               { aLip:1, aLedge:0, aTone: which < 0 ? MID : LIGHT, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
+               { aLip:1, aLedge:0, aTone: which < 0 ? MID : LIGHT, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb });
     }
     for(let k = 0; k < GX.length; k++){
       b.vertex(GX[k], far, g.zb,
-               { aLip:0, aLedge:0, aTone: which < 0 ? BODY : MID, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed });
+               { aLip:0, aLedge:0, aTone: which < 0 ? BODY : MID, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb });
     }
     // the back face, offset in z, so a slab reads as solid as it passes
     for(let k = 0; k < GX.length; k++){
@@ -522,7 +531,7 @@ function gateGeometry(course, which){
       // front lip row form a HORIZONTAL SHELF thirty metres wide, and a
       // shelf is not an edge however much it shares an attribute with one.
       b.vertex(GX[k], lipAt(k), g.zb - SLAB_Z,
-               { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed });
+               { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed, aBaseZ: g.zb });
     }
     /* WINDING, and it is why this mesh could not be front-face culled.
        ------------------------------------------------------------
@@ -566,7 +575,10 @@ const gateMatFor = kind => posterMat(THREE, {
      interior of a slab is never drawn, and the interior being drawn as
      a lit surface was the chapter's reported flash. */
   side: THREE.FrontSide, prelude: PRE + NEAR_FADE,
-  vertex: SCROLL_GLSL + `
+  /* SCROLL_WHOLE_GLSL, not SCROLL_GLSL: the gates are separate objects in
+     one merged mesh, and a per-vertex mod() smears any triangle that
+     straddles the wrap. Measured cause of the 135.4 frame. */
+  vertex: SCROLL_WHOLE_GLSL + `
     attribute float aLip; attribute float aLedge; attribute float aTone; attribute float aSun;
     attribute float aSide; attribute float aSeed;
     uniform float uForgive;
@@ -578,7 +590,7 @@ const gateMatFor = kind => posterMat(THREE, {
       // §6.1: the gap widens when the player drifts off pace rather than
       // the kite crashing. Only the lip moves; the far end stays anchored.
       p.y += aSide * uForgive * ${FORGIVE_MAX.toFixed(1)} * aLip;
-      p = scrolled(p);
+      p = scrolledWhole(p);
       vTone = aTone; vSun = aSun; vLip = aLip; vLedge = aLedge; vSide = aSide; vSeed = aSeed;
       vY = p.y; vX = position.x;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
