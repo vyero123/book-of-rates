@@ -133,15 +133,22 @@ export function closeBook({ then = () => {}, ms = 760, face = '' } = {}){
   stage.innerHTML = `<div class="bor-book">${boardHTML({ face })}</div>`;
   document.body.appendChild(stage);
 
-  // Two frames before removing `bor-open`: one for the element to be in
-  // the document with its open transform resolved, one for the style to
-  // be the committed starting point of the transition. With one frame
-  // the board sometimes starts shut and nothing animates — which looks
-  // exactly like a transition that was never wired up.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    stage.classList.remove('bor-open');
-    stage.classList.add('shut');
-  }));
+  /* FLUSH THE OPEN STATE SYNCHRONOUSLY, DO NOT WAIT FOR A FRAME.
+     The transition needs the open transform to be the committed
+     starting style before the class comes off. The obvious way to get
+     that is to wait a frame or two with requestAnimationFrame — and it
+     is wrong, because a page that is not being painted gets NO rAF
+     callbacks at all. Measured: through a hidden browser pane the board
+     mounted correctly and then sat at rotateY(-158deg) for the whole
+     duration, because the callback never ran. It degraded to an instant
+     exit rather than a stuck page, which is the right way round, but it
+     also meant the turn could not be verified.
+
+     Reading offsetWidth forces a style and layout flush right now, with
+     no dependence on the compositor scheduling anything. */
+  void stage.offsetWidth;
+  stage.classList.remove('bor-open');
+  stage.classList.add('shut');
 
   // A transitionend that never arrives would strand the reader on a
   // chapter with a cover over it, so the timer is the authority and
