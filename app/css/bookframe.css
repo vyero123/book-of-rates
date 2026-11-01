@@ -1,0 +1,166 @@
+/* The Book of Rates — THE BOOK AS AN OBJECT, in one place.
+ *
+ * WHY THIS FILE EXISTS — 31 October 2026.
+ * Three things in the project want the same bound-book idiom:
+ *
+ *   1. the cover, which opens (app/index.html);
+ *   2. the contents, which should carry the cover's framing, because
+ *      otherwise the book stops feeling like a book at the exact moment
+ *      the reader is inside it;
+ *   3. every chapter's exit, which should read as the board closing
+ *      again rather than as a cut (app/js/bookframe.js).
+ *
+ * It was all inside index.html's <style>, as ids. Two more copies were
+ * the alternative, and a second definition of a gold rule is how two
+ * gold rules end up slightly different. So: ONE definition, class-based,
+ * in a file.
+ *
+ * IT IS A .css FILE AND NOT A STRING IN A MODULE on purpose. index.html
+ * links it in <head>, so the cover is framed in the first painted frame.
+ * A module that injected the same text would run deferred, and the cover
+ * would show unframed for a frame or two — which is the sort of flicker
+ * this project has already spent days on.
+ *
+ * Chapter pages get it at runtime from bookframe.js's ensureCss(), which
+ * is idempotent.
+ *
+ * Ids are deliberately absent. index.html keeps its ids on the same
+ * elements for its own JS to find; everything visual is a class, so the
+ * exit overlay and the page frame can wear the same clothes.
+ */
+
+:root{
+  --leather:#4A2418; --leatherHi:#6E3A24; --leatherLo:#24100A;
+  --gold:#C9A227; --goldHi:#EFD98B; --goldLo:#8A6A14; --board:14px;
+}
+
+/* ---------- gold tooling: a double rule with a stitch line between ----------
+   The idiom, and the only part of this file the contents uses. */
+.bor-tool{position:absolute;inset:16px 14px;pointer-events:none}
+.bor-tool .outer{position:absolute;inset:0;border:2px solid var(--gold);opacity:.78}
+.bor-tool .inner{position:absolute;inset:9px;border:1px solid var(--goldHi);opacity:.5}
+.bor-tool .stitch{position:absolute;inset:4px;border:1px dashed rgba(239,217,139,.72)}
+.bor-tool svg{position:absolute;width:34px;height:34px;opacity:.9}
+.bor-tool .c1{top:-5px;left:-5px}
+.bor-tool .c2{top:-5px;right:-5px;transform:scaleX(-1)}
+.bor-tool .c3{bottom:-5px;left:-5px;transform:scaleY(-1)}
+.bor-tool .c4{bottom:-5px;right:-5px;transform:scale(-1,-1)}
+
+/* THE SAME TOOLING, HELD TO THE VIEWPORT.
+   The contents scrolls. A frame drawn round the CONTENT would scroll
+   with it and leave the reader looking at an unframed middle, so the
+   page variant is fixed, and is a shade quieter than the cover's
+   because on the cover it is the artwork and here it is the binding
+   seen from inside. The inset is smaller: a frame has to clear the
+   notch and the home indicator, and at 375 px the cover's 16/14 leaves
+   the list cramped against it. */
+.bor-tool.page{
+  position:fixed;
+  top:max(8px,calc(env(safe-area-inset-top) * 0.5 + 4px));
+  bottom:max(8px,calc(env(safe-area-inset-bottom) * 0.5 + 4px));
+  left:7px;right:7px;
+  z-index:9;opacity:.62}
+.bor-tool.page .outer{border-width:1.5px}
+/* The stitch is the detail that says "bound", and at page scale a dashed
+   1 px line on all four sides reads as noise over a scrolling list. Kept,
+   quieter. */
+.bor-tool.page .stitch{opacity:.55}
+.bor-tool.page .inner{display:none}
+@media (min-width:430px){ .bor-tool.page .inner{display:block} }
+
+/* ---------- the board: a real solid, not a rotating panel ----------
+   The old cover was one flat panel that rotated. The turn read as an
+   image swinging rather than a board opening, because there was no
+   object there — nothing behind the panel, no edge to the panel, and
+   nothing on its inside face. This is a front board and a back board
+   separated in Z, a fore-edge strip standing between them, and the text
+   block behind it all. The turn then happens THROUGH something. */
+.bor-stage{position:fixed;inset:0;background:var(--deep,#0C0716);
+  perspective:1500px;perspective-origin:26% 48%}
+.bor-stage.gone{display:none}
+.bor-book{position:absolute;inset:0;transform-style:preserve-3d}
+
+/* the paper stack, sitting behind the board and slightly inset */
+.bor-textblock{position:absolute;top:9px;bottom:9px;left:16px;right:7px;
+  border-radius:2px 6px 6px 2px;transform:translateZ(calc(var(--board) / -2 - 3px));
+  background:linear-gradient(90deg,#D9C9A6 0%,#EFE6CE 14%,#E7DCC4 70%,#CBB890 100%);
+  box-shadow:
+    inset -2px 0 0 rgba(140,118,76,.55), inset -4px 0 0 rgba(239,230,206,.9),
+    inset -6px 0 0 rgba(140,118,76,.45), inset -8px 0 0 rgba(239,230,206,.9),
+    inset -10px 0 0 rgba(140,118,76,.35), inset -12px 0 0 rgba(239,230,206,.85),
+    inset 0 2px 0 rgba(140,118,76,.35), inset 0 -2px 0 rgba(140,118,76,.35)}
+/* gilt on the fore-edge of the text block */
+.bor-textblock::after{content:'';position:absolute;top:2px;bottom:2px;right:0;width:4px;
+  border-radius:0 3px 3px 0;
+  background:linear-gradient(180deg,var(--goldHi),var(--gold) 30%,var(--goldLo) 70%,var(--gold))}
+
+/* the board itself: two faces and a fore-edge, held apart in Z */
+.bor-board{position:absolute;inset:0;transform-origin:left center;
+  transform-style:preserve-3d;will-change:transform}
+/* OPEN is the state the cover animates TO and the exit animates FROM. */
+.bor-open .bor-board{transform:rotateY(-158deg)}
+
+.bor-face{position:absolute;inset:0;backface-visibility:hidden;overflow:hidden;
+  border-radius:3px 8px 8px 3px}
+.bor-front{transform:translateZ(calc(var(--board) / 2));
+  background:
+    radial-gradient(135% 95% at 18% 6%, rgba(255,226,180,.16), transparent 58%),
+    radial-gradient(90% 70% at 85% 95%, rgba(0,0,0,.42), transparent 60%),
+    linear-gradient(158deg,var(--leatherHi) 0%,var(--leather) 46%,var(--leatherLo) 100%);
+  display:grid;place-items:center;padding:30px 26px;text-align:center}
+/* pebbled leather grain, flat and hard-edged */
+.bor-front::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:
+    repeating-linear-gradient(26deg, rgba(0,0,0,.14) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-54deg, rgba(255,214,160,.07) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0 2px, transparent 2px 6px)}
+.bor-back{transform:translateZ(calc(var(--board) / -2)) rotateY(180deg);
+  background:
+    radial-gradient(110% 80% at 70% 20%, rgba(255,240,210,.1), transparent 60%),
+    linear-gradient(200deg,#5A3A5E 0%,#3E2746 50%,#241630 100%)}
+/* a marbled paste-down on the inside of the board */
+.bor-back::before{content:'';position:absolute;inset:0;opacity:.5;
+  background:
+    repeating-linear-gradient(74deg, rgba(201,162,39,.16) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(104deg, rgba(243,234,215,.10) 0 1px, transparent 1px 7px)}
+.bor-back::after{content:'';position:absolute;inset:14px;
+  border:1px solid rgba(201,162,39,.3)}
+
+/* the fore-edge of the board — the actual thickness, standing in Z.
+   translateZ first, THEN rotate, so the strip spans +half to -half of
+   the board thickness rather than hanging off one side of it */
+.bor-edge{position:absolute;top:0;bottom:0;right:0;width:var(--board);
+  transform-origin:right center;
+  transform:translateZ(calc(var(--board) / 2)) rotateY(90deg);
+  background:linear-gradient(180deg,#3A1C12 0%,#73411F 12%,#4A2418 48%,#1E0D08 100%);
+  box-shadow:inset 0 1px 0 rgba(255,214,160,.2)}
+
+/* the spine, with raised bands.
+   Pushed just in front of the front face, or the faces would hide it. */
+.bor-spine{position:absolute;top:0;bottom:0;left:0;width:26px;
+  transform:translateZ(calc(var(--board) / 2 + 1px));
+  background:linear-gradient(90deg,#1A0A06 0%,#3E1D11 42%,#5A2E1C 72%,#2A120C 100%)}
+.bor-spine i{position:absolute;left:0;right:0;height:7px;
+  background:linear-gradient(180deg,rgba(255,214,160,.26),rgba(0,0,0,.5));
+  box-shadow:0 1px 0 rgba(0,0,0,.5)}
+
+/* ---------- the exit: the board closing over a chapter ----------
+   The overlay the chapters mount. The chapter's own last frame is left
+   showing underneath, so the board closes OVER the world rather than
+   over a blank. */
+.bor-closing{z-index:9000}
+.bor-closing .bor-board{transition:transform var(--bor-close-ms,760ms) cubic-bezier(.3,0,.25,1)}
+/* A scrim under the board so the chapter's own bright scene does not
+   glow around the edges of a closing cover. */
+.bor-closing::before{content:'';position:absolute;inset:0;background:var(--deep,#0C0716);
+  opacity:0;transition:opacity var(--bor-close-ms,760ms) ease}
+.bor-closing.shut::before{opacity:1}
+
+/* ASKED FOR STILLNESS, GIVEN STILLNESS.
+   The turn is punctuation, not information: there is nothing in it a
+   reader needs, so under prefers-reduced-motion it simply does not
+   happen and the navigation is immediate. */
+@media (prefers-reduced-motion: reduce){
+  .bor-closing .bor-board{transition:none}
+  .bor-closing::before{transition:none}
+}

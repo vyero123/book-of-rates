@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#14183F">
 <link rel="manifest" href="manifest.webmanifest">
+<!-- THE BOOK AS AN OBJECT, in one place: the gold tooling, the board
+     solid and the fore-edge. Linked here rather than injected by a
+     module so the cover is framed in the FIRST painted frame. The
+     contents and every chapter exit use the same file. -->
+<link rel="stylesheet" href="css/bookframe.css">
 <title>The Book of Rates</title>
 <style>
   :root{ --paper:#F3EAD7; --ink:#14183F; --deep:#0C0716; --jade:#46D6C8; }
@@ -27,95 +32,22 @@
   #scrim{position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(180deg, rgba(12,7,22,.30) 0%, rgba(12,7,22,.52) 42%, rgba(12,7,22,.80) 100%)}
 
-  /* ---------- the cover: a bound book with a thickness ----------
-     The old cover was one flat panel that rotated. The turn read as an
-     image swinging rather than a board opening, because there was no
-     object there — nothing behind the panel, no edge to the panel, and
-     nothing on its inside face. This version is built as a real solid in
-     CSS 3-D: a front board and a back board separated in Z, a fore-edge
-     strip standing between them, and the text block behind it all. The
-     turn then happens THROUGH something. */
-  :root{ --leather:#4A2418; --leatherHi:#6E3A24; --leatherLo:#24100A;
-         --gold:#C9A227; --goldHi:#EFD98B; --goldLo:#8A6A14; --board:14px; }
+  /* ---------- the cover ----------
+     THE BOARD, THE FORE-EDGE, THE TEXT BLOCK AND THE GOLD TOOLING NOW
+     LIVE IN css/bookframe.css, because three places want them: this
+     cover, the contents (which carries the same framing, or the book
+     stops feeling like a book at the moment the reader is inside it),
+     and every chapter's exit (which is this board, closing). A second
+     copy of a gold rule is how two gold rules end up slightly
+     different.
 
-  #coverWrap{position:fixed;inset:0;z-index:40;background:var(--deep);
-    perspective:1500px;perspective-origin:26% 48%}
-  #coverWrap.gone{display:none}
-  #book{position:absolute;inset:0;transform-style:preserve-3d}
-
-  /* the paper stack, sitting behind the board and slightly inset */
-  #textblock{position:absolute;top:9px;bottom:9px;left:16px;right:7px;
-    border-radius:2px 6px 6px 2px;transform:translateZ(calc(var(--board) / -2 - 3px));
-    background:linear-gradient(90deg,#D9C9A6 0%,#EFE6CE 14%,#E7DCC4 70%,#CBB890 100%);
-    box-shadow:
-      inset -2px 0 0 rgba(140,118,76,.55), inset -4px 0 0 rgba(239,230,206,.9),
-      inset -6px 0 0 rgba(140,118,76,.45), inset -8px 0 0 rgba(239,230,206,.9),
-      inset -10px 0 0 rgba(140,118,76,.35), inset -12px 0 0 rgba(239,230,206,.85),
-      inset 0 2px 0 rgba(140,118,76,.35), inset 0 -2px 0 rgba(140,118,76,.35)}
-  /* gilt on the fore-edge of the text block */
-  #textblock::after{content:'';position:absolute;top:2px;bottom:2px;right:0;width:4px;
-    border-radius:0 3px 3px 0;
-    background:linear-gradient(180deg,var(--goldHi),var(--gold) 30%,var(--goldLo) 70%,var(--gold))}
-
-  /* the board itself: two faces and a fore-edge, held apart in Z */
-  #board{position:absolute;inset:0;transform-origin:left center;transform-style:preserve-3d;
-    will-change:transform}
-  #coverWrap.opening #board{transform:rotateY(-158deg)}
-  .face{position:absolute;inset:0;backface-visibility:hidden;overflow:hidden;
-    border-radius:3px 8px 8px 3px}
-  #faceFront{transform:translateZ(calc(var(--board) / 2));
-    background:
-      radial-gradient(135% 95% at 18% 6%, rgba(255,226,180,.16), transparent 58%),
-      radial-gradient(90% 70% at 85% 95%, rgba(0,0,0,.42), transparent 60%),
-      linear-gradient(158deg,var(--leatherHi) 0%,var(--leather) 46%,var(--leatherLo) 100%);
-    display:grid;place-items:center;padding:30px 26px;text-align:center}
-  /* pebbled leather grain, flat and hard-edged */
-  #faceFront::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
-    background:
-      repeating-linear-gradient(26deg, rgba(0,0,0,.14) 0 1px, transparent 1px 4px),
-      repeating-linear-gradient(-54deg, rgba(255,214,160,.07) 0 1px, transparent 1px 5px),
-      repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0 2px, transparent 2px 6px)}
-  #faceBack{transform:translateZ(calc(var(--board) / -2)) rotateY(180deg);
-    background:
-      radial-gradient(110% 80% at 70% 20%, rgba(255,240,210,.1), transparent 60%),
-      linear-gradient(200deg,#5A3A5E 0%,#3E2746 50%,#241630 100%)}
-  /* a marbled paste-down on the inside of the board */
-  #faceBack::before{content:'';position:absolute;inset:0;opacity:.5;
-    background:
-      repeating-linear-gradient(74deg, rgba(201,162,39,.16) 0 2px, transparent 2px 9px),
-      repeating-linear-gradient(104deg, rgba(243,234,215,.10) 0 1px, transparent 1px 7px)}
-  #faceBack::after{content:'';position:absolute;inset:14px;
-    border:1px solid rgba(201,162,39,.3)}
-
-  /* the fore-edge of the board — the actual thickness, standing in Z */
-  /* translateZ first, THEN rotate, so the strip spans +half to -half of
-     the board thickness rather than hanging off one side of it */
-  #boardEdge{position:absolute;top:0;bottom:0;right:0;width:var(--board);
-    transform-origin:right center;
-    transform:translateZ(calc(var(--board) / 2)) rotateY(90deg);
-    background:linear-gradient(180deg,#3A1C12 0%,#73411F 12%,#4A2418 48%,#1E0D08 100%);
-    box-shadow:inset 0 1px 0 rgba(255,214,160,.2)}
-
-  /* the spine, with raised bands */
-  /* pushed just in front of the front face, or the faces would hide it */
-  #spine{position:absolute;top:0;bottom:0;left:0;width:26px;
-    transform:translateZ(calc(var(--board) / 2 + 1px));
-    background:linear-gradient(90deg,#1A0A06 0%,#3E1D11 42%,#5A2E1C 72%,#2A120C 100%)}
-  #spine i{position:absolute;left:0;right:0;height:7px;
-    background:linear-gradient(180deg,rgba(255,214,160,.26),rgba(0,0,0,.5));
-    box-shadow:0 1px 0 rgba(0,0,0,.5)}
-
-  /* gold tooling: a double rule with a stitch line running between */
-  #tool{position:absolute;inset:16px 14px;pointer-events:none}
-  #tool .outer{position:absolute;inset:0;border:2px solid var(--gold);opacity:.78}
-  #tool .inner{position:absolute;inset:9px;border:1px solid var(--goldHi);opacity:.5}
-  #tool .stitch{position:absolute;inset:4px;
-    border:1px dashed rgba(239,217,139,.72)}
-  #tool svg{position:absolute;width:34px;height:34px;opacity:.9}
-  #tool .c1{top:-5px;left:-5px}
-  #tool .c2{top:-5px;right:-5px;transform:scaleX(-1)}
-  #tool .c3{bottom:-5px;left:-5px;transform:scaleY(-1)}
-  #tool .c4{bottom:-5px;right:-5px;transform:scale(-1,-1)}
+     What is left here is the cover's own CONTENT — the medallion, the
+     title, the plate — which belongs to the cover and nowhere else.
+     The elements keep their ids for this file's JS to find; everything
+     visual is a class. */
+  #coverWrap{z-index:40;opacity:0;transition:opacity .18s ease}
+  #coverWrap.ready{opacity:1}
+  @media (prefers-reduced-motion: reduce){ #coverWrap{transition:none} }
 
   #plate{position:relative;z-index:2}
   .mark{width:74px;height:74px;margin:0 auto;display:block}
@@ -215,39 +147,25 @@
      A board with two faces and a fore-edge, with the text block behind
      it. See the comment above the cover CSS for why it is built as a
      solid rather than as one rotating panel. -->
-<div id="coverWrap">
-  <div id="book">
-    <div id="textblock"></div>
-    <div id="board">
-      <div class="face" id="faceBack"></div>
-      <div id="boardEdge"></div>
-      <div class="face" id="faceFront">
-        <div id="tool">
-          <div class="outer"></div>
-          <div class="stitch"></div>
-          <div class="inner"></div>
-          <svg class="c1" viewBox="0 0 34 34" aria-hidden="true">
-            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
-            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
-            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
-          </svg>
-          <svg class="c2" viewBox="0 0 34 34" aria-hidden="true">
-            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
-            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
-            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
-          </svg>
-          <svg class="c3" viewBox="0 0 34 34" aria-hidden="true">
-            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
-            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
-            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
-          </svg>
-          <svg class="c4" viewBox="0 0 34 34" aria-hidden="true">
-            <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
-            <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
-            <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>
-          </svg>
-        </div>
+<div id="coverWrap" class="bor-stage">
+  <div class="bor-book">
+    <div class="bor-textblock"></div>
+    <div id="board" class="bor-board">
+      <div class="bor-face bor-back"></div>
+      <div class="bor-edge"></div>
+      <div class="bor-face bor-front" id="faceFront">
+        <!-- THE GOLD TOOLING IS INJECTED, not written here.
+             js/bookframe.js's toolHTML() is the only definition of the
+             corner ornament, the double rule and the stitch line in the
+             project, and the contents and the chapter exits use the same
+             function. Four hand-written copies of one SVG path is how
+             they drift apart.
 
+             #coverWrap starts transparent and is faded in once the
+             tooling is mounted, so there is no frame in which the cover
+             shows without its frame. The dark field it fades up from is
+             the page background, which is a better opening than a pop
+             anyway. -->
         <div id="cover">
           <div id="plate">
             <div id="medallion">
@@ -267,12 +185,16 @@
             </div>
             <span class="of">The Book of</span>
             <h1>Rates</h1>
-            <div class="sub">Breath · Journeys · Weather</div>
+            <!-- The three words under the title. Same face, same size,
+                 same letter-spacing; the CSS already uppercases it, and
+                 the markup is written in capitals too so that what is in
+                 the file is what is on the cover. -->
+            <div class="sub">BREATHING JOURNEYS</div>
             <div class="open">Open</div>
           </div>
         </div>
       </div>
-      <div id="spine"><i style="top:13%"></i><i style="top:34%"></i><i style="top:55%"></i><i style="top:76%"></i></div>
+      <div class="bor-spine"><i style="top:13%"></i><i style="top:34%"></i><i style="top:55%"></i><i style="top:76%"></i></div>
     </div>
   </div>
 </div>
@@ -340,6 +262,7 @@ import { JOURNEYS, journeyById, journeyPlan, ENTRY, LENGTHS } from './js/protoco
 import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
+import { toolHTML, mountPageFrame } from './js/bookframe.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { lastNote, clearNote, install as installBlackbox } from './js/blackbox.js';
 installBlackbox();
@@ -373,6 +296,20 @@ const $ = id => document.getElementById(id);
    later reload of that same URL opens the book properly rather than
    inheriting a decision made by a button the reader pressed once. */
 const coverWrap = $('coverWrap');
+
+/* ONE DEFINITION OF THE BINDING, USED TWICE ON THIS PAGE.
+   The cover's gold tooling and the contents' frame are the same four
+   paths and three rules out of js/bookframe.js. The contents one is
+   held to the viewport rather than to the content, because the contents
+   SCROLLS and a frame drawn round the content would scroll away and
+   leave the reader looking at an unframed middle.
+
+   Why the contents gets a frame at all: without it the book stops
+   feeling like a book at the exact moment the reader is inside it. */
+$('faceFront').insertAdjacentHTML('afterbegin', toolHTML());
+coverWrap.classList.add('ready');
+mountPageFrame($('contents'));
+
 const returning = location.hash === '#contents';
 let opened = false;
 function openBook(){
@@ -385,7 +322,7 @@ function openBook(){
   // the BOARD turns, not the artwork on it: it carries its own faces and
   // its fore-edge with it, so the turn goes through a solid thing
   $('board').style.transition = `transform ${ms}ms cubic-bezier(.33,0,.2,1)`;
-  coverWrap.classList.add('opening');
+  coverWrap.classList.add('bor-open');
   $('contents').classList.add('on');
   setTimeout(() => {
     coverWrap.classList.add('gone');
