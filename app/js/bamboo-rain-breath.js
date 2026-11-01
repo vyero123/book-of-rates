@@ -129,6 +129,53 @@ export const SESSION_CAP = 180;
 export const linear = x => x;
 
 /* ------------------------------------------------------------------
+   TWO INHALES, TWO THINGS TO LOOK AT — 31 October 2026
+   ------------------------------------------------------------------
+   The sigh's whole point is that it is TWO breaths in, and nothing in
+   the scene said so. The curtain crossed the band at one constant
+   speed by deliberate design (see the sigh's note below), the cue text
+   changed and nothing else did, so the sip was a caption rather than an
+   event.
+
+   The fix is the one Lantern Current already uses: two OBJECTS OF
+   FOCUS, the second above the first, so the second breath is taken
+   somewhere the first was not.
+
+     RING    the wet line where the rain meets the ground, right at the
+             edge of the dry circle you are sitting in. The first
+             inhale draws the wall in and the ring is what comes with
+             it. It is at your feet.
+     CANOPY  the rain seen from UNDERNEATH — overhead, between the
+             bamboo tops, closing over. The sip lifts attention off the
+             ground and puts it above you.
+
+   Ground, then overhead, is the same rising shape as Lantern's near
+   lights then up through them, and it is only available to this
+   chapter because the rain surrounds the figure rather than standing
+   in front of her. The settled protocol has ONE inhale and gets the
+   same two objects in sequence inside it, at 60%, so the chapters do
+   not disagree about what an inhale is.
+
+   These are SEPARATE SCALARS, not one with a threshold, because there
+   is a moment at the top of the sip where both are full and a long
+   exhale where they let go together. Collapsed into one the release
+   read as attention jumping back down to the floor.
+   ------------------------------------------------------------------ */
+export const FOCUS = { NONE:'none', RING:'ring', CANOPY:'canopy' };
+
+/** Where attention is, and how much of it is there, at time t.
+ *  Shaped exactly like Lantern Current's attention() so the two
+ *  chapters can be read against each other. */
+export function attention(b, t){
+  const s = b.at(t), p = s.p;
+  return {
+    focus: p.focus || FOCUS.NONE,
+    ring:   clamp01(p.ring   ? p.ring(s.pr)   : 0),
+    canopy: clamp01(p.canopy ? p.canopy(s.pr) : 0)
+  };
+}
+
+/* ------------------------------------------------------------------
    The protocols
    ------------------------------------------------------------------ */
 export const PROTOCOLS = {
@@ -160,14 +207,19 @@ export const PROTOCOLS = {
     phases:[
       { k:'in',  d:2, label:'breathe in',  sub:'through the nose',
         from:RAIN_FAR, to:RAIN_MID, ease:linear, cam:'draw',
+        focus:FOCUS.RING, ring:p => p, canopy:() => 0,
         scalar:p => p * 0.62 },
-      { k:'in',  d:1, label:'and again',   sub:'a short sip on top',
-        from:RAIN_MID, to:RAIN_NEAR, ease:linear, cam:'draw',
+      { k:'in',  d:1, label:'and again',   sub:'a short sip, and look up',
+        from:RAIN_MID, to:RAIN_NEAR, ease:linear, cam:'lift',
         count:'breathe out in',
+        focus:FOCUS.CANOPY, ring:() => 1, canopy:p => p,
         scalar:p => 0.62 + p * 0.38 },
       { k:'out', d:6, label:'breathe out', sub:'push it away',
         from:RAIN_NEAR, to:RAIN_FAR, ease:linear, cam:'push',
         count:'breathe in in',
+        // both let go together, and neither snaps: the release is the
+        // two of them widening out, not attention falling to the floor
+        focus:FOCUS.NONE, ring:p => 1 - p, canopy:p => 1 - p,
         scalar:p => 1 - p }
     ]
   }),
@@ -183,10 +235,16 @@ export const PROTOCOLS = {
       { k:'in',  d:5, label:'breathe in',  sub:'let it come in',
         from:RAIN_FAR, to:RAIN_NEAR, ease:linear, cam:'draw',
         count:'breathe out in',
+        /* One inhale, the same two objects in sequence inside it. The
+           split is at 60%, which is where the sigh's sip begins as a
+           fraction of its own whole inhale (2 s of 3). */
+        focus:FOCUS.RING,
+        ring:p => clamp01(p / 0.6), canopy:p => clamp01((p - 0.6) / 0.4),
         scalar:p => p },
       { k:'out', d:6, label:'breathe out', sub:'push it away',
         from:RAIN_NEAR, to:RAIN_FAR, ease:linear, cam:'push',
         count:'breathe in in',
+        focus:FOCUS.NONE, ring:p => 1 - p, canopy:p => 1 - p,
         scalar:p => 1 - p }
     ]
   })
@@ -233,6 +291,48 @@ export const pushes = kind => kind === 'out';
  *  tools/regress.mjs derives its tolerance from this number rather than
  *  carrying one of its own, so changing it here moves the bar with it. */
 export const SPRING = 180;
+
+/* ------------------------------------------------------------------
+   TWO REGIMES, NOT ONE CONTINUUM — 31 October 2026
+   ------------------------------------------------------------------
+   The complaint was that the inhale and the exhale were not different
+   enough, and it was exactly right: they were one scalar walked up and
+   then walked back down at a rate derived from the same place. One
+   continuum sampled at two points.
+
+   They are now two different RULES, and the difference is visible in
+   the motion before any colour is involved:
+
+     THE EXHALE IS DRIVEN. First-order integration of the reader's own
+       hand, at a constant capped rate. A straight line at a fixed
+       speed. It only ever opens the clearing — releasing mid-exhale
+       stops the pushing, it does not undo it. (That is also the
+       standing "recommended, not required" principle: declining the
+       invitation costs nothing, it simply does not gain anything.)
+
+     THE INHALE IS RELAXATION. The reader has no control over it at
+       all, and it is not a walk back: the fill DECAYS towards zero
+       with a time constant, so the wall comes in fast at first and
+       slower as it arrives. A curve, not a line.
+
+   Both still answer to the spring, so both still have mass.
+
+   PACE INTEGRITY IS UNCHANGED. The cap on the push is the same cap:
+   one full exhale of pressing crosses the band exactly once, derived
+   from the exhale's own duration by pushRates(). Breathing twice as
+   fast gives half the swing, because half the time is the only thing
+   that changed. The decay constant below is derived from the INHALE's
+   duration on the same principle, so the same holds coming back.
+   ------------------------------------------------------------------ */
+
+/** The inhale's relaxation rate, per second, such that one whole inhale
+ *  brings the fill back within about 5% of empty. ln(20) ~ 3, so three
+ *  time constants in `din` seconds.
+ *
+ *  Derived from the protocol rather than chosen, for the same reason
+ *  the push rate is: a number picked by eye is a number that stops
+ *  being right the moment a protocol's durations change. */
+export const drawDecay = rates => 3.0 / Math.max(0.1, rates.din);
 
 /* ------------------------------------------------------------------
    The grove and the ground — decoration, deliberately NOT keyed to the

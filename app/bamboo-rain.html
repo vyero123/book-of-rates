@@ -16,6 +16,33 @@
      button. It sits under the stop button and over everything else. */
   #push{position:fixed;inset:0;z-index:15;touch-action:none;user-select:none;
     -webkit-user-select:none;background:transparent}
+  /* THE VIBRATION IS VISUAL. Two hard rules low on the screen, where a
+     thumb already is. The upper one carries the invitation and the
+     press; the lower one is the release, in the plum that Lantern
+     Current's figure also uses for a release — richer and darker than
+     what it replaces, then gone.
+
+     Flat, hard-edged, no glow and no gradient: it is a mark in the
+     chapter's own idiom rather than a UI affordance pasted on top. The
+     scalars come from js/invite.js as custom properties, so the whole
+     behaviour — present only when a push would do something, absent
+     once the reader has understood — lives in one shared module and
+     not in this stylesheet. */
+  #push::before{content:'';position:absolute;left:14%;right:14%;
+    bottom:max(152px,calc(env(safe-area-inset-bottom) + 144px));height:2px;
+    background:rgba(255,242,168,.9);
+    opacity:calc(var(--invite,0) * 0.85 + var(--held,0) * 1.0);
+    transform:scaleX(calc(0.62 + var(--invite,0) * 0.38 + var(--held,0) * 0.0))}
+  #push::after{content:'';position:absolute;left:20%;right:20%;
+    bottom:max(145px,calc(env(safe-area-inset-bottom) + 137px));height:1px;
+    background:#7A3A72;opacity:var(--after,0)}
+  @media (prefers-reduced-motion: reduce){
+    /* The oscillation is the whole instrument, so asked for stillness
+       the mark holds at a steady half rather than flashing. It still
+       says "press here now"; it just stops moving. */
+    #push::before{opacity:calc(var(--invite,0) * 0.0 + var(--held,0) * 1.0 + 0.0);
+      transform:none}
+  }
 
   #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
     appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
@@ -187,6 +214,7 @@
 import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice, CORRIDOR, RANGE,
+         FOCUS, attention, drawDecay,
          RAIN_NEAR, RAIN_FAR, WALL_NEAR, WALL_FAR, normOf, distOf,
          CLEAR_SHIFT, clearingAt, pushRates, pushes, SPRING,
          stemAt, strokeAt } from './js/bamboo-rain-breath.js';
@@ -197,6 +225,7 @@ import { builder, bands, particles,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 import { arrival } from './js/arrival.js';
+import { invite } from './js/invite.js';
 import { wireExits } from './js/bookframe.js';
 
 /* FALLING IN. The lens starts back and rushes to its place over
@@ -229,7 +258,15 @@ const AIR = {
   skyHigh:0x5B4B7A, skyLow:0xB7C0D8,
   cloud:0x4A4066, cloudLo:0x332C49,
   rain:0xC8D4E6, haze:0x8D96B4, flash:0xFFF8D8,
-  leaf:0x6E7F82, leafLo:0x44535A, cleared:0xD9D3E8
+  leaf:0x6E7F82, leafLo:0x44535A, cleared:0xD9D3E8,
+  /* THE EXHALE'S OWN COLOURS. The inhale and the exhale are two
+     regimes (js/bamboo-rain-breath.js) and they are two palettes, so
+     that the difference is legible before anything has moved. Drawing
+     in is cold, blue and closed; pushing out is warm, pale and open.
+     Neither is the other brightened — they are named colours and the
+     scene mixes between them on uWarm. */
+  rainWarm:0xEDE4D2, hazeWarm:0xB2A892,
+  skyHighWarm:0x7A5F6B, skyLowWarm:0xE4CBA8
 };
 
 /* ---------- DOM ---------- */
@@ -267,6 +304,13 @@ const uClear  = { value: 0 };          // session progress, 0..1
 const uGust   = { value: 0 };          // how hard the exhale is blowing
 const uFlash  = { value: 0 };          // lightning, 0..1
 const uBreath = { value: 0 };          // the figure's own fullness, 0..1
+/* THE TWO OBJECTS OF FOCUS, and the two regimes' colour. All three are
+   eased towards their target rather than snapped, so the sip lifts the
+   canopy rather than switching it on. See the long notes in
+   js/bamboo-rain-breath.js. */
+const uRing   = { value: 0 };          // the wet ring at the edge of the dry circle
+const uCanopy = { value: 0 };          // the rain overhead, which the sip lifts
+const uWarm   = { value: 0 };          // 0 drawing in (cold), 1 pushing out (warm)
 const uFog    = { value: C(AIR.haze) };
 const uRamp   = { value: ramp6 };
 const uHorizon= { value: 0.5 };
@@ -489,69 +533,149 @@ const RAIN_H = 17.0;
    front reaches the far wall PLUS the whole clearing shift, and a slab
    built only to the wall would be completely empty halfway through. */
 const RAIN_DEPTH = WALL_FAR + CLEAR_SHIFT + 12.0;
+/* ==================================================================
+   THE RAIN SURROUNDS HER — 31 October 2026
+   ==================================================================
+   WHAT CHANGED AND WHY IT IS THE RIGHT CHANGE.
+
+   Every chapter in this book uses depth for something different:
+   Pearl Diver is vertical descent, Long Air is forward travel and the
+   parallax that comes with it, Lantern Current is a path fixed in the
+   world that carries you through it. Bamboo was "a volume with a near
+   face that you push away" — depth as DISTANCE, which is the least
+   distinctive of the four and is the one thing a flat picture can
+   nearly do.
+
+   The thing this chapter has and none of the others do is that THE
+   FIGURE IS STATIONARY AND ENCLOSED. It is the only one where you are
+   inside the volume rather than moving through it. So depth here
+   should be SURROUNDING, not receding: the breath changes the RADIUS
+   OF THE WORLD rather than your position in it.
+
+   Mechanically that is a small change and a large one. The slivers are
+   now laid out in POLAR coordinates — an angle all the way round and a
+   radius out — so the curtain is a cylindrical wall standing round the
+   shelter and `uFront` is the radius of the dry circle you are sitting
+   in. The shader's near-face test is unchanged, because `aOut` was
+   already a distance and is now a radius: the same one hard step kills
+   everything nearer than the front, and it now kills it in every
+   direction at once.
+
+   What that buys, and what the slab could not do:
+
+     - the wall is in your PERIPHERY and BEHIND you, so pushing it out
+       empties the edges of the frame, not just the middle;
+     - the dry ground is a growing DISC with you at its centre, and the
+       splash line is a ring rather than a line, so the thing you are
+       pushing has a size rather than a position;
+     - looking up, the wall is a wall all the way round, which is what
+       makes the sip's overhead focus possible at all;
+     - a lightning stroke behind the curtain lights the whole
+       circumference, so it tells you the DIAMETER of the room you have
+       opened.
+
+   The near wall is at 4 m and the lens sits about 3.4 m behind her, so
+   the camera is inside the clear circle by construction: there is
+   never rain between the reader and the figure. That is the same kind
+   of guarantee as the corridor floor — true because of where the wall
+   is, not because it is unlikely.
+   ================================================================== */
 function rainGeometry(n){
-  const b = builder(THREE, { aOut:1, aEnd:1, aSeed:1, aLen:1, aNear:1 });
+  const b = builder(THREE, { aOut:1, aEnd:1, aSeed:1, aLen:1, aNear:1, aHigh:1 });
   for(let i = 0; i < n; i++){
-    // distance out is biased towards the far end, so a curtain pushed
+    // radius out is biased towards the far end, so a curtain pushed
     // halfway back still has most of its slivers
     const f = Math.pow(i / n, 0.78);
     const out = 1.2 + f * RAIN_DEPTH;
-    const across = (((i * 7919) % 211) / 211 - 0.5) * (6.0 + out * 1.15);
+    /* All the way round. The angle is a hash rather than a sweep so
+       the wall does not read as a comb, and it is deterministic so the
+       same session twice is the same session. */
+    const th = (((i * 7919) % 2017) / 2017) * Math.PI * 2;
+    const dx = Math.sin(th), dz = -Math.cos(th);
+    const tx = Math.cos(th), tz = Math.sin(th);
     const y0 = ((i * 6367) % 173) / 173 * RAIN_H;
     const len = 0.55 + ((i * 5281) % 59) / 59 * 1.15;
+    // the half width is laid along the TANGENT, so a sliver is thin
+    // seen from the middle of the circle wherever it stands
     const hw = 0.016 + ((i * 2311) % 23) / 23 * 0.016;
     const seed = ((i * 1933) % 97) / 97;
     const base = b.count;
-    const at = { aOut: out, aSeed: seed, aLen: len, aNear: 1.0 - f };
-    b.vertex(across - hw, y0, -out, { ...at, aEnd:0 });
-    b.vertex(across + hw, y0, -out, { ...at, aEnd:0 });
-    b.vertex(across - hw, y0, -out, { ...at, aEnd:1 });
-    b.vertex(across + hw, y0, -out, { ...at, aEnd:1 });
+    /* aHigh marks the slivers in the top third of the column. They are
+       what the sip's overhead focus lifts — the rain seen from
+       underneath — and marking them at build time costs one float and
+       keeps the fragment shader free of a height test. */
+    const at = { aOut: out, aSeed: seed, aLen: len, aNear: 1.0 - f,
+                 aHigh: y0 > RAIN_H * 0.62 ? 1 : 0 };
+    const px = dx * out, pz = dz * out;
+    b.vertex(px - tx*hw, y0, pz - tz*hw, { ...at, aEnd:0 });
+    b.vertex(px + tx*hw, y0, pz + tz*hw, { ...at, aEnd:0 });
+    b.vertex(px - tx*hw, y0, pz - tz*hw, { ...at, aEnd:1 });
+    b.vertex(px + tx*hw, y0, pz + tz*hw, { ...at, aEnd:1 });
     b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
   }
   return b.geometry();
 }
 const rain = new THREE.Mesh(rainGeometry(DROPS), posterMat(THREE, {
-  uniforms:{ uTime, uFront, uClear, uGust, uFlash, uFog,
-             uRain:{value:C(AIR.rain)}, uFlashCol:{value:C(AIR.flash)} },
+  uniforms:{ uTime, uFront, uClear, uGust, uFlash, uFog, uCanopy, uWarm,
+             uRain:{value:C(AIR.rain)}, uFlashCol:{value:C(AIR.flash)},
+             uRainWarm:{value:C(AIR.rainWarm)} },
   transparent:true, depthWrite:false, side:THREE.DoubleSide, prelude: FOG,
   vertex:`
     attribute float aOut; attribute float aEnd; attribute float aSeed;
-    attribute float aLen; attribute float aNear;
-    uniform float uTime, uFront, uClear, uGust;
-    varying float vA; varying float vDist; varying float vNear;
+    attribute float aLen; attribute float aNear; attribute float aHigh;
+    uniform float uTime, uFront, uClear, uGust, uCanopy;
+    varying float vA; varying float vDist; varying float vNear; varying float vHigh;
     void main(){
       vec3 p = position;
       // fall: a modulo on height, so every sliver is always falling and
       // nothing is ever spawned or retired
       float fall = mod(p.y - uTime * (13.0 + aSeed * 5.0) - aSeed * 29.0, ${RAIN_H.toFixed(1)});
       p.y = fall - aEnd * aLen;
-      // slanted by the gust, and the slant is the thing that makes the
-      // exhale visible in the rain itself and not only in its distance
-      p.x += uGust * (3.0 - fall * 0.06) * 0.6;
-      p.z -= uGust * 0.8;
 
-      // THE CURTAIN'S NEAR FACE. A sliver nearer than the front is not
-      // drawn at all. One hard step, with a one-metre lip so the edge
-      // of the curtain is an edge rather than a saw.
+      /* THE GUST IS RADIAL NOW. On a slab the slant was a push in x; on
+         a wall that stands all the way round, the only direction that
+         means "away from her" is outward along the radius, and a slant
+         in x would lean half the circle the wrong way. The sideways
+         component goes along the tangent instead, so the whole wall
+         turns slightly rather than leaning. */
+      vec2 dir = normalize(position.xz + vec2(1e-5, 0.0));
+      vec2 tang = vec2(-dir.y, dir.x);
+      p.xz += dir  * uGust * 0.8;
+      p.xz += tang * uGust * (3.0 - fall * 0.06) * 0.6;
+
+      // THE CURTAIN'S NEAR FACE — now a RADIUS, and the test is
+      // unchanged because aOut was always a distance. One hard step,
+      // with a one-metre lip so the edge is an edge rather than a saw.
       float beyond = smoothstep(uFront - 1.0, uFront + 0.2, aOut);
       // and it thins as the storm clears, from the near side outwards
       float thinned = step(aNear * 0.85, 1.0 - uClear * 0.72);
       vA = beyond * thinned * (0.30 + aNear * 0.42);
+      // the sip lifts the overhead rain: the top of the wall gains body
+      // while the rest of it does not, so looking up is a different
+      // picture from looking out
+      vA += aHigh * uCanopy * beyond * thinned * 0.30;
 
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      vDist = -mv.z; vNear = aNear;
+      vDist = -mv.z; vNear = aNear; vHigh = aHigh;
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragment:`
-    varying float vA; varying float vDist; varying float vNear;
-    uniform vec3 uRain, uFlashCol; uniform float uFlash;
+    varying float vA; varying float vDist; varying float vNear; varying float vHigh;
+    uniform vec3 uRain, uFlashCol, uRainWarm; uniform float uFlash, uCanopy, uWarm;
     void main(){
       if(vA < 0.03) discard;
+      /* TWO PALETTES, NOT ONE DIMMED. uWarm is 0 through the inhale and
+         1 through the exhale, and the rain is a different colour in
+         each: cold and blue while the wall is drawing in, warm and pale
+         while it is being pushed out. Mixed between two named colours
+         rather than brightened, so neither is the other turned down. */
+      vec3 base = mix(uRain, uRainWarm, uWarm);
       // two values only: near rain reads paler than far rain, and that
       // is the whole of its shading. No gradient down a sliver.
-      vec3 col = mix(uRain * 0.72, uRain, step(0.45, vNear));
+      vec3 col = mix(base * 0.72, base, step(0.45, vNear));
+      // the overhead rain takes the sip's light
+      col = mix(col, uFlashCol, vHigh * uCanopy * 0.45);
       col = mix(col, uFlashCol, uFlash * 0.8);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.6), vA);
     }
@@ -567,8 +691,8 @@ scene.add(rain);
    only BEYOND the front, so the dry ground in front of you grows as you
    push, which is the second place the mechanic is legible.
    ------------------------------------------------------------------ */
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat(THREE, {
-  uniforms:{ uTime, uFront, uClear, uRamp, uFog, uFlash,
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300, 1, 1), posterMat(THREE, {
+  uniforms:{ uTime, uFront, uClear, uRamp, uFog, uFlash, uRing, uWarm,
              uWet:{value:C(STORM.wet)}, uSplash:{value:C(STORM.splash)},
              uAccent:{value:C(STORM.accent)}, uDeep:{value:C(STORM.shadowDeep)} },
   prelude: PRE,
@@ -592,7 +716,14 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat
       // this chapter since it shipped -- no error, no thrown exception,
       // the draw call still counted. Found by the linkReport instrument
       // while sweeping the chapters for the Long Air flash.
-      float away = -vW.z;
+      /* RADIAL, because the rain is a wall all the way round her now.
+         it was -vW.z, which made the splash line a line across the
+         view and the dry ground a region in front. It is the distance
+         from the middle of the clearing, so the dry ground is a DISC
+         with her at its centre and the splash line is a RING. The
+         thing the reader is pushing now has a size rather than a
+         position, which is the whole point of the change. */
+      float away = length(vW.xz);
       vec3 col = rampPick(4.3 / 6.0);
       // wet sheen in hard terraces, not a gradient
       float sheen = posterise(clamp(away / 46.0, 0.0, 1.0), 5.0);
@@ -610,11 +741,19 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat
       float ring = step(abs(d - r), 0.14) * (1.0 - r);
       col = mix(col, uSplash, wet * ring * 0.42);
 
-      // THE SPLASH LINE: one hard accent band standing exactly where the
-      // curtain meets the ground, so the reader can see where the thing
-      // they are pushing actually is.
-      float line = step(abs(away - uFront), 0.55);
-      col = mix(col, uAccent, line * 0.40);
+      /* THE SPLASH RING: one hard accent band standing exactly where
+         the curtain meets the ground. It is the first inhale's object
+         of focus, so uRing widens and brightens it — the ring is what
+         comes in with the wall, at your feet, and it is the thing to
+         watch on the first breath. */
+      float halfW = 0.55 + uRing * 0.85;
+      float line = step(abs(away - uFront), halfW);
+      col = mix(col, uAccent, line * (0.40 + uRing * 0.34));
+      // a second, fainter ring just inside it, present only while the
+      // ring has attention: two marks read as a band being watched,
+      // one reads as a line that was always there
+      float inner = step(abs(away - uFront + 1.6), 0.30) * uRing;
+      col = mix(col, uSplash, inner * 0.45);
 
       col = mix(col, vec3(1.0), uFlash * 0.35);
       col *= 1.0 + (grainAt(vW.xz * 7.0) - 0.5) * 0.07;
@@ -623,7 +762,12 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 1, 1), posterMat
   `
 }));
 ground.rotation.x = -Math.PI / 2;
-ground.position.set(0, 0, -60);
+/* CENTRED ON HER, not pushed down the view. The dry ground is a disc
+   around the figure now, so the plane has to reach behind the lens as
+   well as in front of it or the ring is cut off at the bottom of the
+   frame. 300 m covers the far wall plus the whole clearing shift in
+   every direction. */
+ground.position.set(0, 0, 0);
 ground.renderOrder = 1;
 scene.add(ground);
 
@@ -770,6 +914,11 @@ let started = false;
 let camZ = 3.4, camY = 1.95, camLook = 0.9;
 let gust = 0;
 let RATE = pushRates(PROTOCOLS.sigh);
+/* The inhale's relaxation rate, derived from the protocol's own inhale
+   duration rather than chosen. Declared HERE and not up with the other
+   colours, because it reads RATE: a `let` read in its own temporal dead
+   zone throws, and this project has already lost an afternoon to one. */
+let DECAY = drawDecay(RATE);
 
 /* The curtain's body is the kit's — js/course.js. tools/regress.mjs
    flies THE SAME OBJECT with the same corridor and the same stiffness. */
@@ -778,6 +927,14 @@ let CURTAIN = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
 let subShown = '', hintShown = false;
 const vHz = new THREE.Vector3();
 const cHaze = C(AIR.haze), cCleared = C(AIR.cleared);
+const cHazeWarm = C(AIR.hazeWarm);
+/* The shared affordance. Here a press is correct on the EXHALE, which
+   is the opposite of Lantern Current — and the reader is never told
+   either rule, because in both chapters the thing that invites a press
+   only invites it when pressing is the right thing to do. */
+const INVITE = invite();
+const elPush = $('push');
+
 
 const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
 
@@ -789,12 +946,28 @@ const loop = clock((dt, now, running) => {
   const ph = st.p;
   const prog = B.progress(t);
 
-  /* --- THE PUSH. Integrated at the protocol's own rates, swapped so
-     the exhale is what drives the curtain out, and capped: a full
-     exhale of pressing crosses the band exactly once and nothing
-     presses it further. Releasing lets it come back in at the inhale's
-     own rate. Both at once cannot happen — there is one control. --- */
-  CURTAIN.drive(dt, pressing, !pressing);
+  /* --- TWO REGIMES, AND THE DIFFERENCE IS VISIBLE IN THE MOTION.
+     See the long note in js/bamboo-rain-breath.js.
+
+     THE EXHALE IS DRIVEN: first-order integration of the reader's own
+     hand at a constant capped rate — a straight line at a fixed speed.
+     A full exhale of pressing crosses the band exactly once and
+     nothing presses it further. Releasing mid-exhale STOPS the
+     pushing; it does not undo it. Declining the invitation costs
+     nothing, it simply does not gain anything.
+
+     THE INHALE IS RELAXATION: the reader has no control over it at
+     all, and it is not the same walk run backwards. The fill decays
+     towards empty with a time constant, so the wall comes in fast and
+     arrives slowly. A curve, not a line.
+
+     Both still answer to the spring, so both still have mass. --- */
+  if(pushes(ph.k)){
+    CURTAIN.drive(dt, pressing && started, false);
+  } else {
+    CURTAIN.fill -= CURTAIN.fill * DECAY * dt;
+    CURTAIN.settle(dt);
+  }
   const fill = CURTAIN.fill;
 
   /* --- THE CLEARING. A function of elapsed time and nothing else. The
@@ -808,6 +981,31 @@ const loop = clock((dt, now, running) => {
      stronger when the reader is pushing with it. This is the one place
      the press changes something other than the distance, and it is what
      makes a press feel like a push rather than a slider. --- */
+  /* --- ATTENTION. Two objects across the double inhale: the wet ring
+     at your feet on the first breath, the rain overhead on the sip.
+     Eased, not snapped, so the sip LIFTS the canopy rather than
+     switching it on. They are separate scalars because there is a
+     moment at the top of the sip where both are full. --- */
+  const att = attention(B, t);
+  uRing.value   += (att.ring   - uRing.value)   * Math.min(1, dt * 3.4);
+  uCanopy.value += (att.canopy - uCanopy.value) * Math.min(1, dt * 3.0);
+
+  /* --- THE TWO PALETTES. 0 while the wall is drawing in, 1 while it
+     is being pushed out. The easing is slower than the attention's so
+     the colour is a weather change rather than a switch. --- */
+  const wantWarm = pushes(ph.k) ? 1 : 0;
+  uWarm.value += (wantWarm - uWarm.value) * Math.min(1, dt * 1.1);
+
+  /* --- THE INVITATION. Pressing is correct on the EXHALE here, which
+     is the opposite of Lantern Current, and the reader is never told
+     so: the press target shimmers only while a push would do
+     something. js/invite.js, and it stops once they have shown they
+     have understood. --- */
+  const inv = INVITE.step(dt, { wanted: started && pushes(ph.k), taken: pressing });
+  elPush.style.setProperty('--invite', inv.invite.toFixed(3));
+  elPush.style.setProperty('--held', inv.held.toFixed(3));
+  elPush.style.setProperty('--after', inv.after.toFixed(3));
+
   const blowing = pushes(ph.k) ? 1 : 0;
   const wantGust = blowing * (0.35 + (pressing ? 0.65 : 0.0));
   gust += (wantGust - gust) * Math.min(1, dt * 3.2);
@@ -845,6 +1043,10 @@ const loop = clock((dt, now, running) => {
      that answered the control would hide what the control does. --- */
   let wantZ, wantY, wantLook;
   if(ph.cam === 'push'){ wantZ = 4.3; wantY = 2.10; wantLook = 1.25; }
+  // THE SIP LOOKS UP. Its own shot, because the second breath is taken
+  // somewhere the first was not — the camera settles back and raises
+  // its gaze into the canopy rather than staying on the ground line.
+  else if(ph.cam === 'lift'){ wantZ = 3.4; wantY = 1.70; wantLook = 3.40; }
   else                 { wantZ = 3.0; wantY = 1.82; wantLook = 0.80; }
   camZ    += (wantZ    - camZ)    * Math.min(1, dt * 1.5);
   camY    += (wantY    - camY)    * Math.min(1, dt * 1.8);
@@ -862,7 +1064,8 @@ const loop = clock((dt, now, running) => {
   uHorizon.value = vHz.y * 0.5 + 0.5;
 
   uTime.value = t;
-  uFog.value.copy(cHaze).lerp(cCleared, prog * 0.55);
+  uFog.value.copy(cHaze).lerp(cHazeWarm, uWarm.value)
+           .lerp(cCleared, prog * 0.55);
 
   /* --- cue text. The countdown points at the next breath, never at
      elapsed time (§2.4). Nothing here is a score. --- */
@@ -894,6 +1097,8 @@ function beginWith(which, remember){
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
+  DECAY = drawDecay(RATE);
+  INVITE.reset();   // a new session is a new reader
   t = 0; gust = 0; subShown = ''; hintShown = false;
   ARRIVE.start();
   loop.resync();
