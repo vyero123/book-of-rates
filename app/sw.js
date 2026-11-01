@@ -7,10 +7,11 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v11';
+const CACHE = 'bor-v12';
 const SHELL = [
   './', './index.html', './journey.html',
-  './deep-light.html', './long-air.html', './bamboo-rain.html', './lantern-current.html',
+  './pearl-diver.html', './deep-light.html',  // the old address, a forwarding stub
+  './long-air.html', './bamboo-rain.html', './lantern-current.html',
   './manifest.webmanifest', './icon.svg',
   './js/protocols.js', './js/engine.js', './js/audio.js', './js/art.js',
   './js/scenes.js', './js/levels.js', './js/pageturn.js', './js/gate.js',

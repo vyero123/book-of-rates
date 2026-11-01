@@ -1,5 +1,10 @@
 # The frame-to-frame check, and why it is not in the gate
 
+*Deep Light was renamed **Pearl Diver** and made chapter one on 31 October
+2026. The page is `app/pearl-diver.html`; `window.__deepLight` still works
+there as an alias. Baselines recorded under the old name are the same
+chapter and the same measurements.*
+
 A chapter was reported as "a different theme flashes in every second or
 so". Nothing in `tools/check.sh` could see it and nothing was going to,
 because **every individual frame was correct**. A screenshot shows a
@@ -30,7 +35,10 @@ mixture of modules is its own cause of inconsistent rendering), force a
 resize so the drawing buffer is really the viewport, then:
 
 ```js
-const m = window.__longAir;              // or __deepLight, __bamboo, __lantern
+const m = window.__longAir;              // or __pearlDiver, __bamboo, __lantern
+//    (__deepLight is kept as an alias on the Pearl Diver page: the
+//     chapter was renamed on 31 October and every procedure written
+//     before that names the old global.)
 
 // 1. PROVE THE INSTRUMENT BEFORE USING IT.
 //    Hide everything and render: the frame must be exactly the clear
@@ -82,8 +90,8 @@ threshold 25. Measured on the deployed build.
 | Long Air · box | on cue | 12 | 0.75 | 135.4 | 1.99 |
 | Long Air · box | idle | 15 | 0.94 | 121.3 | 3.13 |
 | Long Air · open | on cue | 16 | 1.00 | 129.0 | 2.16 |
-| Deep Light · box | — | 14 | 0.88 | 274.4 | 2.33 |
-| Deep Light · no holds | — | 28 | 1.75 | 115.0 | 2.99 |
+| Pearl Diver · box | — | 14 | 0.88 | 274.4 | 2.33 |
+| Pearl Diver · no holds | — | 28 | 1.75 | 115.0 | 2.99 |
 | Bamboo Rain · sigh | on cue | 4 | 0.25 | 201.3 | 0.69 |
 | Bamboo Rain · settled | on cue | 3 | 0.19 | 200.2 | 0.65 |
 | Lantern Current · drift | on cue | 0 | 0.00 | 2.2 | 0.29 |
@@ -97,7 +105,7 @@ proves the meter is not simply reporting motion.
 full-frame event constrained to exhales and checked as such in
 `regress.mjs`. Its *rate* (0.2/s) is what matters and it is low.
 
-**Deep Light's worst 274 is the waterline crossing**, which is also
+**Pearl Diver's worst 274 is the waterline crossing**, which is also
 designed — but 1.75 events a second on the no-holds protocol is not
 explained by one surface break per breath, and is the clearest
 outstanding lead in the project.

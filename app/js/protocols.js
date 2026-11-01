@@ -170,7 +170,13 @@ export const JOURNEYS = [
     interaction: 'buttons', needsScreening: false
   },
   {
-    id: 'pearl-diver', chapter: 'Chapter six', title: 'The Pearl Diver',
+    /* RETITLED, NOT RE-IDed, 31 October 2026. The three-dimensional
+       chapter one is called "Pearl Diver" now, so only one thing in the
+       book may carry that name, and it is the chapter. This is the flat
+       first-edition drawing of the same dive: it keeps its id, so
+       journey.html?j=pearl-diver still opens it, and it is titled as what
+       it is. A study is what an archive holds. */
+    id: 'pearl-diver', chapter: 'Chapter six', title: 'Study for the Pearl Diver',
     blurb: 'Hold a finger on the water and she goes down with your breath out. Lift it and she comes up — with the pearl either way.',
     fromBeats: 22, toBeats: 26, preview: 'dive', fixedScene: 'dive',
     interaction: 'hold', needsScreening: false

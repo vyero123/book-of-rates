@@ -14,7 +14,7 @@
     -webkit-font-smoothing:antialiased;color:var(--paper)}
 
   /* ---------- the living background, shared by everything ---------- */
-  /* TWO BACKGROUNDS, ONE AT A TIME. #bg3d is the Deep Light column in
+  /* TWO BACKGROUNDS, ONE AT A TIME. #bg3d is the Pearl Diver column in
      WebGL; #bg is the 2-D scene the book has always had, and it is what
      runs when there is no WebGL, when the reader turns the 3-D one off,
      or when the 3-D one fails to start. Never both: that would be two
@@ -324,7 +324,7 @@
   <h2>Hand</h2><div class="row" id="optHand"></div>
   <h2>Opening</h2><div class="row" id="optCover"></div>
   <h2>Background</h2><div class="row" id="optBg"></div>
-  <p class="note">The Deep Light column runs behind the book at twenty frames a second,
+  <p class="note">The Pearl Diver column runs behind the book at twenty frames a second,
     at a reduced resolution, and stops the moment you leave the page. If your phone
     gets warm, turn it to flat or off — and it is already still rather than slow if you
     have asked your device for reduced motion.</p>
@@ -348,7 +348,7 @@ import { requireScroll, openScroll } from './js/scroll.js';
 
 /* ---------- preferences ---------- */
 const PREF = (() => {
-  // bg: 'deep' = the Deep Light column in WebGL, 'flat' = the 2-D scene
+  // bg: 'deep' = the Pearl Diver column in WebGL, 'flat' = the 2-D scene
   // the book has always had, 'off' = neither. Default 'deep'.
   const d = { len:'standard', sound:true, entry:'', hand:'right', coverSeen:false, bg:'deep' };
   try { Object.assign(d, JSON.parse(localStorage.getItem('bor.pref')||'{}')); } catch(e){}
@@ -415,11 +415,20 @@ if (returning){
 
 /* ================= contents ================= */
 const SHOW_LOCKED = true;
+/* The flat rows carry their own chapter numbers, and from 31 October one
+   of those numbers — chapter one — is also worn by a 3-D chapter. Rather
+   than renumber the whole book (a content decision, not mine), the flat
+   rows say which edition they are numbered in. It is true, it is in the
+   book's own idiom, and it incidentally explains the thing the previous
+   session had to apologise for in a comment: why the page numbers in
+   this list do not run in order. */
+const FIRST_EDITION = 'First edition';
+const kicker = j => `${FIRST_EDITION} · ${j.chapter.replace(/^Chapter /, 'chapter ')}`;
 function entryHTML(j, i){
   return `<a class="entry" href="journey.html?j=${j.id}">
     <div class="thumb"><canvas data-prev="${j.preview}" width="192" height="132"></canvas></div>
     <div class="body">
-      <div class="ch">${j.chapter}</div>
+      <div class="ch">${kicker(j)}</div>
       <div class="ti">${j.title}</div>
       <div class="bl">${j.blurb}</div>
     </div>
@@ -459,20 +468,45 @@ const lockedHTML = `<div class="entry locked">
    URL, keeps working exactly as it did, and is linked from the archive,
    which is already where this project puts work that is still readable
    but is no longer the way in. (The archive's existing precedent runs
-   the other way — Deep Light's card there says PROMOTED · NOW A CHAPTER
+   the other way — Pearl Diver's card there says PROMOTED · NOW CHAPTER ONE
    — so the pattern for "reachable from the archive, not from the
    contents" is established and is just being used in both directions.)
 
    Nothing is deleted and no URL breaks. The flat chapters are reached at
    journey.html?j=kite-line and ?j=pearl-diver exactly as before.
 
-   Deep Light and Long Air are not JOURNEYS — each is its own page with
+   Pearl Diver and Long Air are not JOURNEYS — each is its own page with
    its own engine, so neither can come out of protocols.js. They use the
    same entry markup. The thumbs are flat drawings rather than live
    previews: the previews come from SCENES, and these chapters' scenes
    are not among them.
    ================================================================== */
-const deepLightHTML = `<a class="entry three" href="deep-light.html">
+/* ==================================================================
+   PEARL DIVER LEADS THE BOOK — 31 October 2026
+   ==================================================================
+   The reader opened all four three-dimensional chapters and said this
+   one is the best, so it goes first and takes the theme's own name. It
+   was `deep-light.html`, titled "Deep Light", badged chapter six.
+
+   TWO COLLISIONS, BOTH RESOLVED HERE AND IN THE ARCHIVE:
+
+   1. THE NAME. The flat chapter six was also called "The Pearl Diver".
+      It is not in this list — it was demoted to the archive on 24
+      October — so the clash is only between the 3-D chapter and an
+      archive card and a journey.html heading. The flat one is retitled
+      "Study for the Pearl Diver" in protocols.js, keeping its id and
+      therefore its URL. One thing in the book is called Pearl Diver and
+      it is the chapter.
+
+   2. THE NUMBER. This chapter is now "Chapter one", and the flat
+      Long Descent already held that label. The numbers in the Flat
+      section are therefore prefixed "First edition ·" — which is what
+      they are, and which also explains why they run 1, 2, 3, 5, 7 while
+      this edition's run 1, 4, 8, 9. A full renumbering of the book is a
+      content decision and is left to the reader; it would be one edit,
+      in FIRST_EDITION below and the four `.ch` lines in this file.
+   ================================================================== */
+const pearlDiverHTML = `<a class="entry three" href="pearl-diver.html">
     <div class="thumb">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
         <rect width="96" height="66" fill="#246E78"/>
@@ -492,13 +526,13 @@ const deepLightHTML = `<a class="entry three" href="deep-light.html">
       </svg>
     </div>
     <div class="body">
-      <div class="ch">Chapter six <span class="badge">3&#8209;D</span></div>
-      <div class="ti">Deep Light</div>
+      <div class="ch">Chapter one <span class="badge">3&#8209;D</span></div>
+      <div class="ti">Pearl Diver</div>
       <div class="bl">A dive built as a space you move through instead of a picture of one.
-        Box breathing, or the no-holds version — you choose at the start. The flat Pearl
-        Diver is in the archive.</div>
+        Box breathing, or the no-holds version — you choose at the start. The flat study it
+        came from is in the archive.</div>
     </div>
-    <div class="pg">6</div>
+    <div class="pg">1</div>
   </a>`;
 
 /* Long Air, the second 3-D chapter, in exactly the same idiom.
@@ -665,10 +699,10 @@ const lanternHTML = `<a class="entry three" href="lantern-current.html">
 
    The flat chapters are still here and still open. This is an ordering,
    not another demotion: the two that WERE demoted (the flat Kite Line
-   and Pearl Diver) went to the archive in their own commit and are not
-   in this list at all.
+   and the flat dive, now titled "Study for the Pearl Diver") went to the
+   archive in their own commit and are not in this list at all.
    ================================================================== */
-const TAKES_OVER = { 'kite-line': longAirHTML, 'pearl-diver': deepLightHTML };
+const TAKES_OVER = { 'kite-line': longAirHTML, 'pearl-diver': pearlDiverHTML };
 const flat = [];
 const taken = [];
 for(const j of JOURNEYS){
@@ -685,6 +719,18 @@ for(const j of JOURNEYS){
    dropped. Silently losing a chapter to a renamed id is worse than an
    entry in the wrong place, and it would read as a content decision. */
 for(const leftover of Object.values(TAKES_OVER)) taken.push(leftover);
+
+/* PEARL DIVER FIRST — 31 October.
+   `taken` comes out in JOURNEYS order, which puts Long Air (chapter
+   four) ahead of Pearl Diver (chapter six's slot). The reading order is
+   now a judgement about which chapter should be opened first, not a
+   consequence of where the flat twin happened to sit, so it is STATED.
+   It is stated as a move of one entry that is already in the list — it
+   runs after the leftover sweep above, so an entry that the sweep had to
+   rescue is moved rather than added twice, and an entry that is somehow
+   absent is not conjured into existence. */
+const leadIdx = taken.indexOf(pearlDiverHTML);
+if(leadIdx > 0) taken.unshift(taken.splice(leadIdx, 1)[0]);
 
 /* Bamboo Rain and Lantern Current have no flat twin to take over from —
    they are new chapters rather than second readings — so they simply
@@ -712,7 +758,7 @@ let W=0, H=0, grain=null, grainTile=null;
 function fitBg(){
   /* Only allocate the 2-D background when it is the one running. It is a
      900,000-pixel backing store plus a grain tile, and holding that on a
-     phone for a canvas the Deep Light column is covering is a real cost
+     phone for a canvas the Pearl Diver column is covering is a real cost
      for nothing. Switching back to flat calls this again. */
   if (PREF.bg !== 'flat'){ W = 0; return; }
   const r = sizeCanvas(bg, bgx, 900_000, 2);   // the background is scenery, not detail
@@ -756,7 +802,7 @@ function frame(now){
   if (!running) return;        // never keep drawing a page we have left
   const t = now/1000;
 
-  /* --- background. Skipped entirely when the Deep Light column is
+  /* --- background. Skipped entirely when the Pearl Diver column is
      running or the reader has turned the background off: two full-screen
      redraws a frame for one picture is exactly the cost this whole
      change is supposed to be arguing about. --- */
@@ -885,7 +931,7 @@ function buildSheet(){
   $('optCover').innerHTML =
     `<button class="opt" data-k="coverSeen" data-v="false">Show the full opening</button>`;
   $('optBg').innerHTML =
-    `<button class="opt" data-k="bg" data-v="deep">Deep Light</button>
+    `<button class="opt" data-k="bg" data-v="deep">Pearl Diver</button>
      <button class="opt" data-k="bg" data-v="flat">Flat</button>
      <button class="opt" data-k="bg" data-v="off">None</button>`;
   document.querySelectorAll('.opt').forEach(b => b.onclick = () => {
