@@ -1042,6 +1042,14 @@ const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
 const RISE_FASTER = 1.7;          // of the protocol's own ascent rate
 let freeY = null;                 // null when she is on the schedule
 let releasing = false;
+/* WHERE SHE ACTUALLY IS. now() used to report `y: B.value(t)`, which is
+   where the SCHEDULE says she is — and once a release can put her
+   somewhere else, those are two different numbers. The first
+   measurement of this feature read the schedule, saw it unchanged, and
+   concluded the release did nothing; the release was working and the
+   instrument was reading the wrong field. Fifth time in this project.
+   Both numbers are now reported, separately and by name. */
+let shownY = Y_AIR;
 
 (function(){
   const el = $('up');
@@ -1088,6 +1096,7 @@ const loop = clock((dt, now, running) => {
     else if(freeY >= Y_AIR - 0.001) releasing = false;
   }
   const dyNow = freeY !== null ? Math.max(schedY, freeY) : schedY;
+  shownY = dyNow;
   const grip = B.scalar(t);
   const travel = B.travel(t);          // <0 descending, >0 rising, 0 still
 
@@ -1297,7 +1306,7 @@ window.__pearlDiver = {
              y:+B.value(t).toFixed(2), camY:+camY.toFixed(2),
              above:+uAbove.value.toFixed(2), grip:+B.scalar(t).toFixed(2),
              liveParticles: puffs.live(),
-             scheduleY:+B.value(t).toFixed(2),
+             scheduleY:+B.value(t).toFixed(2), shownY:+shownY.toFixed(2),
              released: freeY !== null, freeY: freeY === null ? null : +freeY.toFixed(2) }; },
   /** §1.6b: come up now, from a tool call. */
   comeUp(){ if(started && freeY === null && B.value(t) < Y_AIR - 0.02){ freeY = B.value(t); releasing = true; }
