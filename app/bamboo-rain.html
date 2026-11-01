@@ -708,7 +708,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300, 1, 1), posterMat
   `,
   fragment:`
     varying vec3 vW; varying float vDist;
-    uniform float uTime, uFront, uClear, uFlash;
+    uniform float uTime, uFront, uClear, uFlash, uRing, uWarm;
     uniform vec3 uWet, uSplash, uAccent, uDeep;
     void main(){
       // NOT the three-letter word this used to be: it is RESERVED in GLSL and this shader has
@@ -724,7 +724,11 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300, 1, 1), posterMat
          thing the reader is pushing now has a size rather than a
          position, which is the whole point of the change. */
       float away = length(vW.xz);
-      vec3 col = rampPick(4.3 / 6.0);
+      /* The two regimes' palettes reach the ground as well: a step
+         paler while the wall is being pushed out, a step deeper while
+         it is drawing in. Picked from the ramp rather than tinted, so
+         it stays posterised. */
+      vec3 col = rampPick(mix(4.3, 3.5, uWarm) / 6.0);
       // wet sheen in hard terraces, not a gradient
       float sheen = posterise(clamp(away / 46.0, 0.0, 1.0), 5.0);
       col = mix(col, uWet, sheen * 0.55);
