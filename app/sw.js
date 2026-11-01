@@ -7,7 +7,7 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v14';
+const CACHE = 'bor-v15';
 const SHELL = [
   './', './index.html', './journey.html',
   './pearl-diver.html', './deep-light.html',  // the old address, a forwarding stub
@@ -18,7 +18,7 @@ const SHELL = [
   './js/scroll.js', './js/surface.js', './js/blackbox.js',
   // the book as an object: the binding, shared by the cover, the
   // contents' frame and every chapter's exit
-  './js/bookframe.js', './css/bookframe.css', './js/arrival.js',
+  './js/bookframe.js', './css/bookframe.css', './js/arrival.js', './js/invite.js',
   // the 3-D kit, shared by every three-dimensional chapter
   './js/breath.js', './js/palette.js', './js/mesh.js', './js/stage.js', './js/course.js',
   // the book's own background, an idle variant of chapter six

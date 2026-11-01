@@ -191,6 +191,7 @@ import { builder, bands, particles, scrollGlsl,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 import { arrival } from './js/arrival.js';
+import { invite } from './js/invite.js';
 import { wireExits } from './js/bookframe.js';
 
 /* FALLING IN. The lens starts back and rushes to its place over
@@ -880,6 +881,48 @@ const mFig   = matOf(R.at(MID));
 const mFigS  = matOf(NIGHT.shadow);
 const mWarm  = matOf(NIGHT.accent);
 
+/* ------------------------------------------------------------------
+   THE FIGURE TEACHES THE CONTROL
+   ------------------------------------------------------------------
+   She pulses UNTIL PRESSED, and only during an inhale. That is the
+   whole instruction: a reader who presses when she is pulsing has
+   pressed on the inhale without being told that is the rule, because
+   the pulse was never there at any other time. The general form is in
+   js/invite.js and is meant for every interactive chapter.
+
+   It is an INVITATION. It changes nothing but her colour and a few
+   hundredths of her scale — ignore it entirely and this is exactly the
+   chapter it was. And it stops: two understood presses and she settles,
+   for the rest of the session. A prompt that keeps prompting someone
+   who already knows is nagging, and nagging is a mild way of requiring.
+
+   THREE PALETTES, AND THE RELEASE IS A SUBSTITUTION, NOT A LOSS.
+
+     resting   the ramp's mid, what she has always been
+     asking    a half-step toward the lanterns' own warm — she is the
+               colour of the thing she is inviting you to do
+     held      the lantern glow itself, her brightest state
+     after     RICHER AND DARKER. On release the warm does not drain
+               away to nothing: it is replaced by a saturated plum that
+               is darker than she started, which then recedes.
+
+   The last one is the figure's version of what uTight already does to
+   the light on the water — release as DIFFUSION rather than as loss,
+   the same quantity spread wider and lower instead of switched off.
+   One gesture, told twice. Her lap, which is the broad low mass, takes
+   the release colour hardest, so it reads as spreading down and out of
+   her rather than coming off her.
+   ------------------------------------------------------------------ */
+const FIG_REST   = new THREE.Color(R.at(MID));
+const FIG_ASK    = new THREE.Color(NIGHT.accent);
+const FIG_HELD   = new THREE.Color(NIGHT.glow);
+const FIG_AFTER  = new THREE.Color(0x7A3A72);   // plum: more colour, less light
+const LAP_REST   = new THREE.Color(NIGHT.shadow);
+const LAP_AFTER  = new THREE.Color(0x3C1742);   // deeper still, and warmer than night
+const figCol = new THREE.Color();
+const lapCol = new THREE.Color();
+const INVITE = invite();
+
 const box  = new THREE.BoxGeometry(1, 1, 1);
 const ball = new THREE.SphereGeometry(0.5, 10, 7);
 
@@ -1121,6 +1164,11 @@ const loop = clock((dt, now, running) => {
   // as everything else in this chapter
   uTight.value += (att.tight - uTight.value) * Math.min(1, dt * 4.0);
 
+  /* --- THE INVITATION. Wanted during an inhale and at no other time,
+     which is what makes the affordance teach the protocol rather than
+     just advertise a control. See js/invite.js. --- */
+  const inv = INVITE.step(dt, { wanted: started && ph.k === 'in', taken: touching });
+
   /* --- THE FRONT. Holding runs it up the arch at the protocol's own
      inhale rate; letting go lets it fall back at the exhale's. The path
      is the same in both directions and is fixed in the world, so the
@@ -1175,11 +1223,32 @@ const loop = clock((dt, now, running) => {
      hers rather than the river's. --- */
   const full = B.scalar(t);
   uBreath.value = full;
-  chest.scale.set(0.66 + full * 0.09, 0.70 + full * 0.07, 0.54 + full * 0.08);
+
+  /* The three states, mixed in order: asking, then held over the top of
+     it, then the release over the top of that. Written to the shared
+     flat materials rather than to a new shader — two colour writes a
+     frame, no extra draw call, and the chapter stays lineless and
+     posterised (§4.2 rule 1). */
+  figCol.copy(FIG_REST)
+        .lerp(FIG_ASK,   inv.invite * 0.60)
+        .lerp(FIG_HELD,  inv.held   * 0.85)
+        .lerp(FIG_AFTER, inv.after  * 0.80);
+  mFig.color.copy(figCol);
+  lapCol.copy(LAP_REST).lerp(LAP_AFTER, inv.after);
+  mFigS.color.copy(lapCol);
+
+  /* The shimmer is a few hundredths of her size on top of the breath's
+     own swell. Small on purpose: it has to be visible as a pulse and
+     invisible as a wobble, and she is already moving. */
+  const beat = inv.invite * 0.05;
+  chest.scale.set(0.66 + full * 0.09 + beat, 0.70 + full * 0.07 + beat, 0.54 + full * 0.08 + beat);
   chest.position.y = 0.56 + full * 0.03;
   head.position.y  = 1.02 + full * 0.05;
   head.rotation.x  = -0.06 + full * 0.10;
-  bowLamp.scale.set(0.17 + full * 0.035, 0.24 + full * 0.03, 0.17 + full * 0.035);
+  // her own lamp carries the glow of a press, so the light in the boat
+  // answers the hand as well as the breath
+  const lampUp = full * 0.035 + inv.held * 0.05;
+  bowLamp.scale.set(0.17 + lampUp, 0.24 + full * 0.03 + inv.held * 0.04, 0.17 + lampUp);
 
   /* --- the boat itself: it rides the hull's height, pitches with its
      vertical speed and rolls a little on the current. --- */
@@ -1263,6 +1332,7 @@ function beginWith(which, remember){
   elGate.classList.remove('on');
   started = true;
   t = 0; subShown = ''; hintDone = false; litAccum = 0.55;
+  INVITE.reset();   // a new session is a new reader
   ARRIVE.start();
   loop.resync();
 }
@@ -1326,6 +1396,9 @@ window.__lantern = {
              frontError:+(FRONT.value - a.reach).toFixed(3),
              archesInStrip: WORLD.arches,
              tightShown:+uTight.value.toFixed(3),
+             inviteLearned: INVITE.learned, invitePresses: INVITE.understood,
+             figColour: '#' + mFig.color.getHexString(),
+             lapColour: '#' + mFigS.color.getHexString(),
              dist:+uDist.value.toFixed(1), period:+WORLD.period.toFixed(1),
              /* `lit` is here and ONLY here, in a tool hook, because a
                 number on screen would be a score. It is a debugging
