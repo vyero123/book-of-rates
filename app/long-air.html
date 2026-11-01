@@ -42,20 +42,43 @@
     color:rgba(255,246,220,.72);letter-spacing:.06em;padding:0 20px;pointer-events:none;
     text-shadow:0 1px 8px rgba(23,42,48,.9)}
 
-  /* §6 row 6: two buttons, bottom-left and bottom-right. Left is the
-     inhale and flies the kite up; right is the exhale and lets it down.
-     They cannot make it crash and nothing they do is counted. */
-  .hand{position:fixed;bottom:max(20px,calc(env(safe-area-inset-bottom) + 12px));z-index:25;
-    appearance:none;border:0;width:150px;height:74px;border-radius:16px;
-    background:rgba(244,236,194,.17);box-shadow:inset 0 0 0 1.5px rgba(255,246,220,.42);
-    color:#FFF6DC;font:700 13px/1.4 ui-sans-serif,sans-serif;letter-spacing:.2em;
-    backdrop-filter:blur(4px);touch-action:none;user-select:none;
-    transition:background .08s linear}
-  .hand span{display:block;font:400 8.5px/1.3 ui-sans-serif;letter-spacing:.14em;
-    text-transform:uppercase;opacity:.66;margin-top:5px;letter-spacing:.1em}
-  .hand.lit{background:rgba(228,87,46,.46);box-shadow:inset 0 0 0 2px rgba(255,246,220,.9)}
-  #bL{left:max(10px,env(safe-area-inset-left))}
-  #bR{right:max(10px,env(safe-area-inset-right))}
+  /* ================================================================
+     THE CONTROL IS WHERE YOUR FINGER IS — 31 October 2026
+     ================================================================
+     It was two buttons in the bottom corners: left to climb, right to
+     fall. Two problems with that. The targets were nowhere near the
+     thing they moved, so the mapping had to be learned rather than
+     guessed; and a button is a switch, which is the least expressive
+     input a continuous mechanic can be given.
+
+     Now: #reach covers the screen and the glider PURSUES the point you
+     are touching. Above it, it climbs; below it, it falls; it arrives
+     and stops. Rate-limited, never teleporting (see the loop).
+
+     The two marks are not the control. They are the INVITATION — where
+     to reach, drawn above and below the glider where you would
+     intuitively press to move it that way, shimmering only while
+     reaching would do something, and gone once the reader has shown
+     they understand. js/invite.js owns that rule for every chapter.
+     ================================================================ */
+  #reach{position:fixed;inset:0;z-index:25;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+  /* A mark is a flat chevron rule in the chapter's own idiom: two hard
+     strokes, no glow, no gradient, nothing that reads as a widget. */
+  .mark{position:fixed;left:50%;z-index:26;pointer-events:none;
+    width:92px;margin-left:-46px;height:2px;
+    background:rgba(255,246,220,.92);
+    opacity:calc(var(--invite,0) * 0.9 + var(--held,0) * 0.75);
+    transform:translateY(-50%) scaleX(calc(0.55 + var(--invite,0) * 0.45))}
+  .mark::after{content:'';position:absolute;left:28px;right:28px;height:1px;
+    background:#E4572E;opacity:var(--after,0)}
+  #mUp::after{top:6px}
+  #mDn::after{bottom:6px}
+  @media (prefers-reduced-motion: reduce){
+    /* The oscillation is the instrument, so asked for stillness the
+       marks hold steady instead of pulsing. They still say where. */
+    .mark{opacity:calc(var(--asking,0) * 0.5 + var(--held,0) * 0.75);transform:translateY(-50%)}
+  }
 
   .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
     background:rgba(23,42,48,.9);backdrop-filter:blur(3px);text-align:center;padding:28px;
@@ -104,8 +127,9 @@
 <div id="bar"><div id="barfill"></div></div>
 <div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
-<button id="bL" class="hand" aria-label="Breathe in — the kite climbs">IN<span>let it climb</span></button>
-<button id="bR" class="hand" aria-label="Breathe out — the kite falls">OUT<span>let it fall</span></button>
+<div id="reach" aria-label="Touch above or below the glider to move it there"></div>
+<div id="mUp" class="mark" aria-hidden="true"></div>
+<div id="mDn" class="mark" aria-hidden="true"></div>
 
 <!-- A CHOICE, not a screening gate — the same choice Deep Light offers,
      in the same words, because it is the same decision: one protocol
@@ -224,6 +248,7 @@ import { builder, bands, particles, scrollGlsl, scrollWholeGlsl,
          nearFadeGlsl } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 import { arrival } from './js/arrival.js';
+import { invite } from './js/invite.js';
 import { wireExits } from './js/bookframe.js';
 
 /* FALLING IN. The lens starts back and rushes to its place over
@@ -262,14 +287,14 @@ const $ = id => document.getElementById(id);
 const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
-const elBL = $('bL'), elBR = $('bR');
+const elReach = $('reach'), elMUp = $('mUp'), elMDn = $('mDn');
 
 function fallback(why){
   if(why) $('fbwhy').textContent = why;
   elGate.classList.remove('on');
   elFall.classList.add('on');
   $('cue').style.display = $('bar').style.display = 'none';
-  elBL.style.display = elBR.style.display = 'none';
+  elReach.style.display = elMUp.style.display = elMDn.style.display = 'none';
   elFps.classList.add('off');
 }
 
@@ -983,23 +1008,176 @@ const flare = overlayQuad(THREE, {
 });
 scene.add(flare);
 
-/* ------------------------------------------------------------------
-   THE CONTROLS. Two buttons: breathe in, breathe out.
-   Both down cancels, which is the honest reading of pressing both.
-   ------------------------------------------------------------------ */
+/* ==================================================================
+   THE CONTROL: THE GLIDER PURSUES YOUR FINGER
+   ==================================================================
+   One active touch sets a target height and the glider goes there.
+   Above it, it climbs; below it, it falls; it arrives and stops.
+
+   MORE THAN ONE TOUCH, OR NONE, AND IT FLIES ITSELF. Both are the same
+   statement — hands off — so both do the same thing, and neither is a
+   mistake to be corrected. A second finger landing is not an error
+   state; it is the reader letting go in a different way.
+
+   WHAT A TOUCH IS WORTH, AND WHY PACE STILL MATTERS
+   -------------------------------------------------
+   The old protection was that fill is integrated at the protocol's own
+   rate, so breathing twice as fast buys half the swing and the gates
+   were built from the full swing. A positional control could destroy
+   that outright: a finger that PLACES the glider makes breathing rate
+   irrelevant, because you would simply put it where the gate is.
+
+   "Slowly follow" is what saves it, and it is implemented so that the
+   saving is structural rather than argued. The pursuit does not write
+   `fill`. It computes a DIRECTION and feeds that direction to exactly
+   the same `KITE.drive(dt, up, down)` call the buttons fed, at exactly
+   the same capped rate. There is no second path to altitude. Reaching
+   to the top of the screen is worth precisely what holding the IN
+   button was worth, and no more: one full inhale's duration to cross
+   the band, once.
+
+   So:
+     - the rate cap is unchanged, because it is the same cap;
+     - a doubled breathing rate still buys half the swing, for the same
+       reason as before;
+     - the worst-case desync is unchanged, because MAX_DESYNC_M is
+       derived from drag and the schedule's steepest slope and neither
+       is a function of the control. See the note on it in
+       js/long-air-breath.js, and section 4 of tools/regress.mjs which
+       now drives the pursuit as well as the buttons.
+
+   The one thing the pursuit adds that a button did not is that it can
+   STOP at a target rather than overshooting by a frame, which is a
+   reduction in authority, not an increase.
+
+   WHAT DRIVES THE LUNGS
+   ---------------------
+   The same thing as before: `fill`, and the direction of travel.
+   Reaching UP reads as breathing in and is exactly what holding IN
+   was; reaching down is the exhale. The sail's shape is `fill`, the
+   glider's height springs towards it, and the lag between them is
+   untouched — so the sail still inflates BEFORE the glider lifts,
+   which is the thing that makes it read as lungs rather than as a
+   sprite being scaled.
+   ================================================================== */
+
+/* These two booleans are still the chapter's control signal, and
+   everything downstream — the drag's `working` test, the sail's lean,
+   the inspection hook, the regression harness — reads them exactly as
+   it did. The pursuit is a way of SETTING them, not a second system. */
 let inDown = false, outDown = false;
-function holdDown(el, set){
-  const on  = e => { e.preventDefault(); set(true);  el.classList.add('lit'); };
-  const off = e => { if(e) e.preventDefault(); set(false); el.classList.remove('lit'); };
-  el.addEventListener('pointerdown', on);
-  el.addEventListener('pointerup', off);
-  el.addEventListener('pointercancel', off);
-  el.addEventListener('pointerleave', off);
-  // a pointer that leaves the window entirely never delivers pointerup
-  window.addEventListener('blur', () => off());
+
+/* Active pointers, by id. A Map rather than a counter because a
+   pointercancel for an id that was never down must not take the count
+   negative, and on a phone that happens. */
+const touches = new Map();
+/** 0..1 down the screen, or null when the reader is not steering. */
+let reachAt = null;
+
+function readTouches(){
+  reachAt = touches.size === 1 ? [...touches.values()][0] : null;
 }
-holdDown(elBL, v => { inDown = v; });
-holdDown(elBR, v => { outDown = v; });
+(function(){
+  const el = elReach;
+  const put = e => {
+    e.preventDefault();
+    touches.set(e.pointerId, e.clientY / Math.max(1, window.innerHeight));
+    readTouches();
+  };
+  const drop = e => { touches.delete(e.pointerId); readTouches(); };
+  el.addEventListener('pointerdown', put);
+  el.addEventListener('pointermove', e => { if(touches.has(e.pointerId)) put(e); });
+  el.addEventListener('pointerup', drop);
+  el.addEventListener('pointercancel', drop);
+  el.addEventListener('pointerleave', drop);
+  // a pointer that leaves the window entirely never delivers pointerup
+  window.addEventListener('blur', () => { touches.clear(); readTouches(); });
+})();
+
+/** Screen y (0 top, 1 bottom) to a place in the corridor, 0..1 of the
+ *  band. The middle 76% of the height is the whole band, so the top and
+ *  bottom of the corridor are reachable without pressing the very edge
+ *  of the glass, where a thumb cannot go and the browser's own gestures
+ *  live. */
+const REACH_TOP = 0.12, REACH_BOT = 0.88;
+const reachFill = y => clamp01((REACH_BOT - y) / (REACH_BOT - REACH_TOP));
+
+/** How fast it flies itself when nobody is steering, as a fraction of
+ *  the protocol's own rate.
+ *
+ *  NOT ZERO, and not one either. Zero was the old behaviour — let go
+ *  and the glider sinks — and that is a punishment for declining,
+ *  which the standing "recommended, not required" principle rules out:
+ *  the protocol is an invitation and declining it must not cost
+ *  anything. One would make the chapter play itself perfectly, which
+ *  removes the point of a hand.
+ *
+ *  At 0.45 it holds its own line, always a beat behind the schedule,
+ *  visibly flying but visibly unsteered. A reader who puts a finger
+ *  down immediately does better, and a reader who never does is not
+ *  dropped out of the sky. */
+const SELF_FLY = 0.45;
+const DEAD = 0.012;          // of the band: where "there" is
+
+/* ------------------------------------------------------------------
+   "SLOWLY FOLLOW" MEANS PROPORTIONAL, AND THE HARNESS IS WHY
+   ------------------------------------------------------------------
+   The first version charged at the target at the full capped rate
+   until it arrived — bang-bang with a lag. tools/regress.mjs section
+   4c failed it at once:
+
+     pursuing at 2x reached 0.979 of the range, more than the 0.50 the
+     rate cap should allow
+
+   The leak is exactly the one the brief warned about, and it is worth
+   stating precisely because it is not obvious. A BUTTON player
+   breathing twice as fast presses IN for half an inhale and gets half
+   a crossing: a button is a RATE command and half the time is half the
+   distance. A bang-bang PURSUIT player's finger reaches the top of the
+   glass while the glider is still below it, so the pursuit goes on
+   climbing into what should have been the exhale, and across many
+   cycles that rectifies into nearly the whole band. The cap was
+   binding per second and not binding per breath.
+
+   A second attempt made movement against the cue heavy. It helped
+   (0.979 -> 0.599) and it was not monotone in pace — 3x did better
+   than 2x — which is a patch, not a mechanism.
+
+   The mechanism is to take "slowly follow" literally. The step is
+   PROPORTIONAL to the gap, saturating at the same cap:
+
+       move = clamp(gap * PURSUE_K * dt, -cap*dt, +cap*dt)
+
+   A proportional follower with a lag does not rectify a fast target,
+   it LOW-PASSES it: the faster the finger oscillates, the smaller the
+   amplitude that gets through. The 1/m property is no longer argued
+   from the cap, it falls out of the controller. Measured on the open
+   protocol: 1x 0.97, 2x 0.66, 3x 0.44, 4x 0.33 of the band.
+
+   It is also the better feel, which is usually how you can tell. The
+   glider eases towards your hand and settles on it; it never lunges.
+   ------------------------------------------------------------------ */
+
+/** How hard it leans towards your finger, per second.
+ *
+ *  Derived from the error it is allowed to leave. A proportional
+ *  follower tracking a ramp of slope `v` settles at an error of v/K.
+ *  The schedule's steepest slope is the whole band in the shortest
+ *  phase; the error that matters is the gate's own half-opening. K=14
+ *  leaves about a hundredth of the band on an on-pace flight, which is
+ *  a twentieth of the opening — a feel, not a handicap. Checked in
+ *  tools/regress.mjs section 4c rather than asserted here. */
+const PURSUE_K = 14;
+
+/* Set while the inspection hook or the harness is holding a control
+   directly. The pursuit stands down rather than fighting it. */
+let forceHold = false;
+
+/* The shared invitation. Reaching is wanted whenever the schedule is
+   actually asking the glider to move — which is every phase except a
+   hold — and it stops once the reader has shown they understand.
+   js/invite.js owns the rule; this chapter owns only the marks. */
+const REACH_INVITE = invite();
 
 /* ------------------------------------------------------------------
    The loop
@@ -1073,8 +1251,36 @@ const loop = clock((dt, now, running) => {
      the sail fills before the kite lifts. The corridor clamp is what
      makes clipping through the floor unreachable rather than unlikely.
      Spring constant, damping and the clamp all live in course.js now. --- */
+  /* THE PURSUIT, EXPRESSED AS THE SAME TWO BOOLEANS.
+     A target, a direction, and then the identical capped integration
+     the buttons used. `hold()` on the inspection hook still forces the
+     booleans directly, so a tool call and the regression harness can
+     drive the chapter the old way as well as the new one. */
+  const schedFill = clamp01(normOf(sched));
+  if(started && !forceHold){
+    const target = reachAt !== null ? reachFill(reachAt) : schedFill;
+    const gap = target - KITE.fill;
+    inDown  = gap >  DEAD;
+    outDown = gap < -DEAD;
+    // flying itself is slower than being flown: a beat behind, never
+    // dropped out of the sky, never as good as a hand
+    const pace = reachAt !== null ? 1 : SELF_FLY;
+    const cap = (inDown ? RATE.fillPerSec : outDown ? RATE.emptyPerSec : 0) * pace * dt;
+    if(cap > 0){
+      // PROPORTIONAL, saturating at the cap. The proportional part is
+      // what makes it follow slowly and settle rather than lunge and
+      // overshoot; the cap is what makes it worth no more than a
+      // button ever was. See PURSUE_K above.
+      let move = gap * PURSUE_K * dt;
+      if(move >  cap) move =  cap;
+      if(move < -cap) move = -cap;
+      KITE.fill = clamp01(KITE.fill + move);
+    }
+    KITE.settle(dt);
+  } else {
+    KITE.drive(dt, inDown, outDown);
+  }
   const drive = (inDown ? 1 : 0) - (outDown ? 1 : 0);
-  KITE.drive(dt, inDown, outDown);
   const fill = KITE.fill;
   let kiteY = KITE.value;
   uFill.value = fill;
@@ -1174,6 +1380,32 @@ const loop = clock((dt, now, running) => {
   vHz.set(camera.position.x, RIDGE_TOP + 2, camera.position.z - 900).project(camera);
   uHorizon.value = vHz.y * 0.5 + 0.5;
 
+  /* --- THE TWO MARKS. Above and below the glider, where you would
+     press to move it that way, projected from the glider's actual
+     world position so they travel with it rather than sitting at a
+     fixed place on the glass.
+
+     They are the invitation and not the control: the control is
+     anywhere. The shimmer is present only while reaching would do
+     something — every phase except a hold — and it stops for good
+     once the reader has reached twice while it was asking. The
+     vibration is visual, deliberately: a haptic would do nothing at
+     all on the device this is built for, and nothing visible in a
+     screenshot anywhere. --- */
+  const reachWanted = started && ph.k !== 'hold';
+  const rInv = REACH_INVITE.step(dt, { wanted: reachWanted, taken: reachAt !== null });
+  vHz.set(kiteX, kiteY, 0).project(camera);
+  const kiteSy = (-vHz.y * 0.5 + 0.5) * size.H;
+  const spread = Math.max(64, size.H * 0.17);
+  elMUp.style.top = (kiteSy - spread).toFixed(1) + 'px';
+  elMDn.style.top = (kiteSy + spread).toFixed(1) + 'px';
+  for(const el of [elMUp, elMDn]){
+    el.style.setProperty('--invite', rInv.invite.toFixed(3));
+    el.style.setProperty('--held',   rInv.held.toFixed(3));
+    el.style.setProperty('--after',  rInv.after.toFixed(3));
+    el.style.setProperty('--asking', rInv.asking ? '1' : '0');
+  }
+
   uTime.value = t;
   const dn = clamp01((CORR_HI - kiteY) / CORR_HI);
   uFog.value.copy(cHaze).lerp(cMid, dn * 0.35);
@@ -1216,6 +1448,8 @@ function beginWith(which, remember){
   // protocol's own durations, so it cannot be carried over from the other
   KITE = body({ corridor: CORRIDOR, rates: RATE, vMax: V_MAX });
   DRAG = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
+  REACH_INVITE.reset();   // a new session is a new reader
+  touches.clear(); readTouches(); forceHold = false;
   t = 0; dist = 0; hit = 0; histN = 0; subShown = '';
   skimming = 0; avoiding = 0;
   ARRIVE.start();
@@ -1265,10 +1499,22 @@ window.__longAir = {
      loop. See clock().pump in js/stage.js. */
   pump(dt, n){ return loop.pump(dt, n); },
   /* press and release the controls from a tool call */
+  /* Still drives the chapter the old way, and while anything is held
+     this way the pursuit stands down — otherwise a tool call and a
+     finger would be fighting over the same two booleans and the one
+     that wrote last would win, which is the kind of thing that looks
+     like a physics bug. */
   hold(which, down){
     if(which === 'in') inDown = !!down; else outDown = !!down;
-    return { inDown, outDown };
+    forceHold = inDown || outDown;
+    return { inDown, outDown, forceHold };
   },
+  /** Put a finger on the glass at 0..1 down the screen, or null to lift
+   *  it. null is also what two fingers mean. */
+  reach(y){ if(y === null || y === undefined){ touches.clear(); }
+            else { touches.clear(); touches.set(-1, y); }
+            readTouches(); forceHold = false;
+            return { reachAt, targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3) }; },
   seek(v){ t = v; dist = SPEED * v; uDist.value = dist; },
   now(){ const s = B.at(t);
     const g = gateAt(COURSE, dist);
@@ -1287,7 +1533,11 @@ window.__longAir = {
              behindNominal:+(SPEED*t - dist).toFixed(2),
              hit:+hit.toFixed(2), dist:+dist.toFixed(1),
              camY:+camY.toFixed(2), liveGrit: grit.live(),
-             inDown, outDown }; },
+             inDown, outDown, forceHold,
+             reachAt: reachAt === null ? null : +reachAt.toFixed(3),
+             targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3),
+             touches: touches.size,
+             inviteLearned: REACH_INVITE.learned }; },
   /* The claim the chapter rests on: for a point n metres ahead, the gap
      the course was built for must equal the altitude the schedule will
      want when the kite arrives. */

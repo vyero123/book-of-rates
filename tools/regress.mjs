@@ -757,6 +757,172 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
 }
 
 /* ------------------------------------------------------------------
+   4c. PACE INTEGRITY UNDER THE POSITIONAL CONTROL — 31 October 2026
+   ------------------------------------------------------------------
+   Long Air's buttons became a PURSUIT: one touch sets a target height
+   and the glider goes there. That is exactly the change that could
+   destroy the guarantee above, because a finger that PLACES the glider
+   makes breathing rate irrelevant — you would simply put it where the
+   gate is and the whole cap would be decoration.
+
+   It does not, and this is where that is checked rather than argued.
+   The pursuit never writes fill. It computes a direction and steps at
+   the SAME capped rate, clamped to the remaining gap so it arrives
+   instead of oscillating — which is strictly less authority than the
+   cap allows, never more.
+
+   Three claims, all of them about the worst case rather than about
+   play:
+
+     1. A FINGER PINNED AT THE TOP OF THE GLASS, forever, gets no more
+        swing than one full inhale's worth of climbing. It is the
+        strongest possible input and it is worth exactly what holding
+        the IN button was worth.
+     2. BREATHING m TIMES FASTER still gets 1/m of the range, for the
+        same reason as the buttons: the cap is per second and the phase
+        is shorter.
+     3. A CUE-PERFECT FINGER tracks the schedule at least as well as
+        cue-perfect button play. If the new control were worse the
+        reader would be fighting it, and a control the reader fights is
+        a control that pushes them off their own pace.
+
+   The pursuit rule is reimplemented here rather than imported, because
+   it lives inside a chapter's frame body and there is nothing to
+   import. That is a real weakness of this check and is written down
+   rather than hidden: it tests the RULE as stated, and a chapter that
+   drifted from the rule would pass. The rule is four lines and is
+   quoted in app/long-air.html next to the code that implements it.
+   ------------------------------------------------------------------ */
+const DEAD_BAND = 0.012;
+const PURSUE_K = 14;
+
+/** One step of the pursuit, as the chapter does it: proportional to
+ *  the gap, saturating at the protocol's own rate.
+ *  @param target 0..1 of the band, or null for "nobody is steering" */
+function pursue(kite, rates, target, dt){
+  if(target === null){ kite.settle(dt); return; }
+  const gap = target - kite.fill;
+  const up = gap > DEAD_BAND, down = gap < -DEAD_BAND;
+  const cap = (up ? rates.fillPerSec : down ? rates.emptyPerSec : 0) * dt;
+  if(cap > 0){
+    let move = gap * PURSUE_K * dt;
+    if(move >  cap) move =  cap;
+    if(move < -cap) move = -cap;
+    kite.fill = Math.min(1, Math.max(0, kite.fill + move));
+  }
+  kite.settle(dt);
+}
+
+function pursueAt(proto, m, mode){
+  const b = breath(proto);
+  const kite = kiteBody(proto);
+  const rates = longAir.rates(proto);
+  const dt = 1 / 120;
+  let lo = 1, hi = 0, se = 0, n = 0, worst = 0;
+  for(let t = 0; t < proto.session; t += dt){
+    //  'pinned'  a finger jammed at the top of the glass for ever
+    //  'cue'     a finger exactly where the schedule says, at m pace
+    const target = mode === 'pinned' ? 1 : longAir.normOf(b.value(t * m));
+    pursue(kite, rates, target, dt);
+    const fill = kite.fill;
+    if(t > proto.cycle){
+      lo = Math.min(lo, fill); hi = Math.max(hi, fill);
+      const want = longAir.normOf(b.value(t));
+      se += (fill - want) ** 2; n++;
+      worst = Math.max(worst, Math.abs(fill - want));
+    }
+  }
+  return { m, mode, swing:+(hi - lo).toFixed(3), rms:+Math.sqrt(se / n).toFixed(4),
+           worst:+worst.toFixed(4) };
+}
+
+for(const id of Object.keys(longAir.PROTOCOLS)){
+  const proto = longAir.PROTOCOLS[id];
+  const rates = longAir.rates(proto);
+  const roomFrac = longAir.GATE_HALF / longAir.RANGE;   // the opening, as a fraction of the band
+
+  /* 1. THE STRONGEST POSSIBLE INPUT. A finger jammed at the top of the
+        glass for a whole inhale, starting from the floor, must not
+        cross more than the band once — exactly what holding the IN
+        button was worth, and no more. */
+  {
+    const kite = kiteBody(proto);
+    kite.reset(0);
+    const dt = 1 / 240;
+    for(let t = 0; t < rates.din; t += dt) pursue(kite, rates, 1, dt);
+    if(kite.fill > 1.0001)
+      fail(`long air/${id}: a pinned finger crossed ${kite.fill.toFixed(3)} of the band in one ` +
+           `inhale — more than the rate cap allows`);
+    if(kite.fill < 0.97)
+      fail(`long air/${id}: a pinned finger only reached ${kite.fill.toFixed(3)} of the band in ` +
+           `a full inhale — the pursuit is capped BELOW the protocol's own rate, so a reader ` +
+           `on pace cannot keep up with their own cue`);
+  }
+
+  /* 2. BREATHING FASTER MUST NOT BE REWARDED, and with a positional
+        control the thing to measure is TRACKING, not swing.
+
+        That is a real change from the button test above and it is not
+        a loosening, it is the correct claim for a different kind of
+        control. A button is a RATE command, so half the time is half
+        the distance and 1/m swing follows arithmetically. A finger is
+        a POSITION command: if the cap lets you reach a place, you
+        reach it, and on a protocol with HOLDS a fast breather has the
+        hold's seconds as well to get there. What they cannot do —
+        what actually matters — is be in the right place at the right
+        time, and the course is built from the schedule.
+
+        So: every faster pace must track strictly worse, and no pace
+        may exceed the band. The 1/m shape still appears where there
+        are no holds to borrow time from: on `open`, 0.97 / 0.66 /
+        0.44 / 0.33. */
+  const runs = [1, 2, 3, 4].map(m => pursueAt(proto, m, 'cue'));
+  const onPace = runs[0];
+  for(const r of runs.slice(1)){
+    if(r.rms <= onPace.rms * 2)
+      fail(`long air/${id}: pursuing at ${r.m}x tracks nearly as well as the intended pace ` +
+           `(rms ${r.rms} vs ${onPace.rms}) — the control is not holding the reader to their ` +
+           `own cue`);
+    if(r.swing > 1.02)
+      fail(`long air/${id}: pursuing at ${r.m}x reached ${r.swing} of the range`);
+  }
+
+  /* 3. AND THE WORST-CASE DESYNC, stated rather than hoped for.
+        Three terms, none of which is a function of breathing rate:
+
+          the pursuit's own steady-state error, slope/PURSUE_K, where
+            the steepest slope is the whole band in the shortest phase;
+          the spring's lag at that same slope, which body() derives;
+          MAX_DESYNC_M, the drag feedback bound, unchanged by any of
+            this because it is derived from drag and the schedule.
+
+        All three have to fit inside the gate's opening with room, or
+        a reader doing everything right would be clipping lips. */
+  const slope = 1 / Math.min(...proto.phases.map(ph => ph.d));   // band per second
+  const follow = (slope / PURSUE_K) * longAir.RANGE;             // metres
+  const kite = kiteBody(proto);
+  const springLag = kite.lag(slope * longAir.RANGE);             // metres
+  const total = follow + springLag + longAir.MAX_DESYNC_M;
+  if(total > longAir.GATE_HALF * 0.85)
+    fail(`long air/${id}: worst-case desync ${total.toFixed(2)} m (follow ${follow.toFixed(2)} + ` +
+         `spring ${springLag.toFixed(2)} + drag ${longAir.MAX_DESYNC_M.toFixed(2)}) is not ` +
+         `comfortably inside the ${longAir.GATE_HALF.toFixed(2)} m opening`);
+
+  if(onPace.rms > roomFrac * 0.25)
+    fail(`long air/${id}: a cue-perfect finger is off by ${onPace.rms} of the band rms, more ` +
+         `than a quarter of the ${roomFrac.toFixed(3)} the opening gives it`);
+
+  if(failures === 0)
+    console.log(`    ok    long air/${id}: pursuit — swing ` +
+                runs.map(r => `${r.m}x:${r.swing}`).join(' ') + `; rms ` +
+                runs.map(r => `${r.m}x:${r.rms}`).join(' ') +
+                `; pinned finger one crossing per inhale; worst-case desync ` +
+                `${total.toFixed(2)} m (follow ${follow.toFixed(2)} + spring ` +
+                `${springLag.toFixed(2)} + drag ${longAir.MAX_DESYNC_M.toFixed(2)}) ` +
+                `inside ${longAir.GATE_HALF.toFixed(2)} m of opening`);
+}
+
+/* ------------------------------------------------------------------
    5. EVERY CHAPTER, EVERY PROTOCOL — the claims that are not special
    ------------------------------------------------------------------
    Three things are true of every mapping in the project and none of
