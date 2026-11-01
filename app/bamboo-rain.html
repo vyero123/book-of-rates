@@ -196,6 +196,15 @@ import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
 import { builder, bands, particles,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
+import { arrival } from './js/arrival.js';
+
+/* FALLING IN. The lens starts back and rushes to its place over
+   700 ms when the chapter begins. Built from this chapter's own
+   camera rather than an overlay, because an overlay is a picture
+   of a transition and this is the world moving. Inert under
+   prefers-reduced-motion — not shortened, absent. See
+   js/arrival.js. */
+const ARRIVE = arrival({ dist: 18 });
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
@@ -843,6 +852,10 @@ const loop = clock((dt, now, running) => {
   camera.position.set(0.55, camY + prog * 0.30, back);
   camera.up.set(0, 1, 0);
   camera.lookAt(0.12, camLook + full * 0.10, -14 - front * 0.25);
+  /* The arrival displacement goes HERE: after the chapter has set the
+     pose, and before anything below reads camera.position, so the
+     uniforms see the camera that actually renders. */
+  ARRIVE.apply(camera, now);
 
   vHz.set(camera.position.x, 0.0, camera.position.z - 240).project(camera);
   uHorizon.value = vHz.y * 0.5 + 0.5;
@@ -881,6 +894,7 @@ function beginWith(which, remember){
   elGate.classList.remove('on');
   started = true;
   t = 0; gust = 0; subShown = ''; hintShown = false;
+  ARRIVE.start();
   loop.resync();
 }
 $('gateSigh').addEventListener('click',    () => beginWith('sigh', true));

@@ -122,6 +122,31 @@
   .colophon{margin-top:14px;text-align:center;font:400 8.5px/1.6 ui-sans-serif;
     color:rgba(243,234,215,.22)}
 
+  /* ---------- falling into a chapter ----------
+     The first half of the transition; the second half is the chapter's
+     own camera starting back and rushing in (js/arrival.js). The row the
+     reader chose comes toward them and the rest of the book goes. It is
+     shorter than the camera's half on purpose: it is also dead time, and
+     the only thing it can cost is the part of the chapter's load it
+     hides.
+
+     Under prefers-reduced-motion none of this runs at all — the click
+     handler does not even preventDefault, so the navigation is the
+     ordinary one. */
+  #contents.falling{pointer-events:none;overflow:hidden}
+  #contents.falling .pad > *:not(#list),
+  #contents.falling #list > *:not(.chosen){transition:opacity .18s ease;opacity:0}
+  #contents.falling .bor-tool.page,
+  body.falling #bg,body.falling #bg3d,body.falling #scrim{transition:opacity .2s ease;opacity:0}
+  #contents.falling a.entry.chosen{
+    transition:transform .26s cubic-bezier(.36,0,.66,-0.06);
+    transform:scale(1.7);transform-origin:38% center;
+    border-color:transparent}
+  @media (prefers-reduced-motion: reduce){
+    #contents.falling .pad > *,#contents.falling #list > *,
+    #contents.falling a.entry.chosen{transition:none;opacity:1;transform:none}
+  }
+
   /* ---------- options sheet ---------- */
   #sheet{position:fixed;inset:0;z-index:30;background:rgba(12,7,22,.96);display:none;
     overflow:auto;padding:28px 18px 50px}
@@ -263,6 +288,7 @@ import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
 import { toolHTML, mountPageFrame } from './js/bookframe.js';
+import { fallIntoChapter } from './js/arrival.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { lastNote, clearNote, install as installBlackbox } from './js/blackbox.js';
 installBlackbox();
@@ -681,6 +707,16 @@ $('list').innerHTML =
   // the locked row carries its own "Not in this edition" kicker, so a
   // heading above it would say the same thing twice
   (SHOW_LOCKED ? lockedHTML : '');
+/* CHOOSING A CHAPTER FALLS INTO IT. Wired after the list exists, and
+   the count is CHECKED rather than assumed: a link that silently did
+   not get wired is the same class of fault as a shader that silently
+   did not link, and this project has shipped four of those. */
+const wired = fallIntoChapter($('contents'));
+if(wired < document.querySelectorAll('#list a.entry').length){
+  console.warn('bor: only', wired, 'of',
+    document.querySelectorAll('#list a.entry').length, 'chapter links were wired');
+}
+
 // if the reader flagged a condition, say so on the locked chapter rather
 // than leaving them to wonder
 if (!retentionAllowed() && gatePassed()){
