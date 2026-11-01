@@ -114,7 +114,13 @@
   /* the far page, showing past the fore-edge on a wide screen */
   #contents::after{content:'';position:fixed;top:0;bottom:0;right:0;width:0;
     pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,0))}
-  .pad{max-width:430px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) 15px 24px 26px}
+  /* THE CUSHION. 34 px of air either side at 375, and 40 at the
+     binding edge where the gutter shadow already eats some. The
+     margin is most of what tells you a thing is printed rather than
+     displayed, and the plates have to sit INSIDE the leaf rather than
+     filling it. The bottom clears the stacked page edges. */
+  .pad{max-width:430px;margin:0 auto;
+    padding:max(20px,env(safe-area-inset-top)) 34px calc(42px + env(safe-area-inset-bottom)) 40px}
 
   /* ---------- the heading, as a title page ---------- */
   header.hd{display:flex;align-items:center;gap:10px;margin:0 0 2px}
@@ -131,31 +137,42 @@
   /* ---------- the plates ----------
      A plate is a picture with a caption. The frame is a hairline and a
      hard offset shadow — a print laid on a page, not a card in a UI. */
-  .plates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 13px;margin:0}
-  /* min-width:0 AND minmax(0,1fr), both deliberately. A grid item's
-     default min-width is auto, which is its MIN-CONTENT width — and
-     the min-content width of a plate is the longest word in its
-     caption. At 375 px "Lantern Current" was therefore setting the
-     column width, the two columns came to more than the page, and
-     because #contents clips rather than scrolls sideways the right
-     hand column was simply cut off at the glass. Found by looking at
-     it on a phone-sized viewport, which is the only way this class of
-     fault is ever found. */
-  a.plate{display:block;text-decoration:none;color:inherit;min-width:0}
+  /* ---------- the plates, ONE COLUMN ----------
+     A plate is a picture with a caption. The frame is a hairline and a
+     hard offset shadow — a print laid on a page, not a card in a UI.
+
+     ONE COLUMN, with real cushion either side. Two columns filled the
+     leaf edge to edge and read as a grid of cards that happened to be
+     on paper; one column with air around it reads as a page, because
+     the margin is most of what tells you something is printed rather
+     than displayed. It is also the thing that lets the picture be the
+     entry at a size worth looking at — a plate is now 240 px wide at
+     375 instead of 161.
+
+     AND IT DISPOSES OF A BUG RATHER THAN FIXING IT. The previous
+     version needed minmax(0,1fr) on the track and min-width:0 on the
+     item, because a grid item's default min-width is its min-content
+     width and "Lantern Current" was therefore deciding how wide a
+     column is. With one column there is no track to be over-widened
+     and no second column to be pushed off the glass, so the guard is
+     gone rather than left behind as a workaround for a layout that no
+     longer exists. */
+  .plates{display:block;margin:0}
+  a.plate{display:block;text-decoration:none;color:inherit;margin:0 0 17px}
+  a.plate:last-child{margin-bottom:0}
   a.plate .pic{position:relative;aspect-ratio:96/66;border-radius:1px;overflow:hidden;
     background:#1B2150;
-    box-shadow:0 0 0 1px rgba(42,28,16,.34), 2px 3px 0 rgba(42,28,16,.17)}
+    box-shadow:0 0 0 1px rgba(42,28,16,.34), 3px 4px 0 rgba(42,28,16,.15)}
   a.plate .pic canvas,a.plate .pic svg{display:block;width:100%;height:100%}
-  a.plate .cap{margin:7px 1px 0;font:400 13px/1.2 ui-serif,Georgia,serif;color:#2A1C10;
-    overflow-wrap:break-word}
+  a.plate .cap{margin:8px 2px 0;font:400 15px/1.2 ui-serif,Georgia,serif;color:#2A1C10}
   a.plate.locked{opacity:.55}
   a.plate.locked .pic{background:rgba(42,28,16,.07);display:grid;place-items:center;
     box-shadow:0 0 0 1px rgba(42,28,16,.22)}
-  a.plate.locked .gate{width:26px;height:26px;opacity:.5}
-  .aside{margin:9px 2px 0;font:400 10px/1.5 ui-sans-serif;color:rgba(42,28,16,.52)}
+  a.plate.locked .gate{width:30px;height:30px;opacity:.5}
+  .aside{margin:11px 2px 0;font:400 10px/1.5 ui-sans-serif;color:rgba(42,28,16,.52)}
   .aside b{font-weight:600;color:rgba(42,28,16,.7)}
 
-  .tail{margin-top:20px;display:flex;gap:9px}
+  .tail{margin-top:22px;display:flex;gap:9px}
   .tail button{flex:1;appearance:none;border:0;border-radius:3px;padding:11px 0;
     background:rgba(42,28,16,.09);color:rgba(42,28,16,.78);
     font:600 8.5px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase}
@@ -165,10 +182,26 @@
   .colophon{margin-top:12px;text-align:center;font:400 8px/1.6 ui-sans-serif;
     color:rgba(42,28,16,.36)}
 
-  @media (min-width:560px){
-    .plates{grid-template-columns:repeat(3,1fr)}
-    .pad{max-width:600px}
-  }
+  /* ---------- THE PAGES UNDERNEATH ----------
+     A few stacked edges along the bottom of the glass: the leaves this
+     one is sitting on. It is the detail that makes the leaf an object
+     rather than a background, and the whole trick is RESTRAINT — four
+     edges, each thinner and darker than the one above, with uneven
+     gaps so it reads as paper rather than as a rule. A ream of them is
+     a stripe.
+
+     Fixed to the viewport, not to the content, because the stack is
+     under the book and does not scroll with the page. */
+  #leaves{position:fixed;left:0;right:0;z-index:11;pointer-events:none;
+    bottom:0;height:calc(14px + env(safe-area-inset-bottom));
+    background:
+      linear-gradient(180deg,
+        rgba(42,28,16,.16) 0 1px,   #E6D8B8   1px 5px,
+        rgba(42,28,16,.22) 5px 6px, #DFD0AC   6px 9px,
+        rgba(42,28,16,.30) 9px 10px,#D6C59C  10px 12px,
+        rgba(42,28,16,.42) 12px 13px,#C9B78C 13px 100%)}
+
+  @media (min-width:560px){ .pad{max-width:520px} }
   @media (min-width:820px){
     /* a real facing page, and the gutter down the middle of it */
     #contents{background:
@@ -179,8 +212,7 @@
                       rgba(0,0,0,.26) calc(50% + 14px),
                       rgba(0,0,0,0) calc(50% + 26px)),
       linear-gradient(180deg,#F1E6CC 0%,#E9DCBE 46%,#E2D3B0 100%)}
-    .pad{max-width:860px;padding-left:15px}
-    .plates{grid-template-columns:repeat(4,1fr)}
+    .pad{max-width:560px}
   }
 
   /* ---------- falling into a chapter ----------
@@ -228,6 +260,8 @@
 <canvas id="bg"></canvas>
 <canvas id="bg3d"></canvas>
 <div id="scrim"></div>
+<!-- the leaves this page is sitting on; see #leaves -->
+<div id="leaves" aria-hidden="true"></div>
 
 <!-- ============ cover ============
      A board with two faces and a fore-edge, with the text block behind
@@ -348,7 +382,7 @@ import { JOURNEYS, journeyById, journeyPlan, ENTRY, LENGTHS } from './js/protoco
 import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
-import { toolHTML } from './js/bookframe.js';
+import { toolHTML, mountPageFrame } from './js/bookframe.js';
 import { fallIntoChapter } from './js/arrival.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { lastNote, clearNote, install as installBlackbox } from './js/blackbox.js';
@@ -388,17 +422,18 @@ const coverWrap = $('coverWrap');
    js/bookframe.js — the same four paths and three rules the closing
    board wears on the way out.
 
-   THE CONTENTS NO LONGER TAKES THE PAGE FRAME, and that is a decision
-   rather than a regression. Giving the contents the cover's gold rule
-   was right while the contents was a list on a dark field: the book
-   stopped feeling like a book at the moment the reader was inside it.
-   It is now an open SPREAD — paper, a binding, plates laid on it — and
-   an open book's edge is its gutter and the paper's own edge, not a
-   tooled rule round the glass. Two framings fighting is worse than
-   either. mountPageFrame() is kept in the module and unused here; the
-   rest of that extraction is load-bearing for the cover and the exit. */
+   AND THE CONTENTS KEEPS IT TOO. I took the page frame off when the
+   contents became a spread, reasoning that an open book's edge is its
+   gutter and the paper's own edge and that two framings would fight.
+   That was wrong, and the reader's reason is the better one: the
+   book's back frame should still be there BEHIND everything. It is
+   the binding seen from inside, and it is what stops a leaf of paper
+   from being a sheet of card. With one column of plates and real
+   cushion either side there is room for it, which there was not when
+   the grid ran edge to edge. */
 $('faceFront').insertAdjacentHTML('afterbegin', toolHTML());
 coverWrap.classList.add('ready');
+mountPageFrame($('contents'));
 
 const returning = location.hash === '#contents';
 let opened = false;

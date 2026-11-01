@@ -54,12 +54,20 @@
    seen from inside. The inset is smaller: a frame has to clear the
    notch and the home indicator, and at 375 px the cover's 16/14 leaves
    the list cramped against it. */
+/* z-index 12, above an OPAQUE page. It was 9, from when the contents
+   was a list on a dark field and the frame only had to clear the
+   background. The contents is paper now and paints a background of its
+   own, and a frame that is a child of that element but below it in the
+   stack is a frame nobody can see.
+
+   The bottom clears the stacked page edges at #leaves, so the rule
+   sits on the leaf rather than across the leaves under it. */
 .bor-tool.page{
   position:fixed;
   top:max(8px,calc(env(safe-area-inset-top) * 0.5 + 4px));
-  bottom:max(8px,calc(env(safe-area-inset-bottom) * 0.5 + 4px));
+  bottom:max(20px,calc(env(safe-area-inset-bottom) * 0.5 + 18px));
   left:7px;right:7px;
-  z-index:9;opacity:.62}
+  z-index:12;opacity:.62}
 .bor-tool.page .outer{border-width:1.5px}
 /* The stitch is the detail that says "bound", and at page scale a dashed
    1 px line on all four sides reads as noise over a scrolling list. Kept,
