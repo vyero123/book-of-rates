@@ -29,6 +29,10 @@
   body.deepbg #bg{display:none}
   body.deepbg #bg3d{display:block}
   body.nobg #bg,body.nobg #bg3d{display:none}
+  /* The scrim darkens the living background so the COVER reads against
+     it. The contents is paper now and is opaque, so the scrim is
+     behind it and harmless — but it is also pointless once the cover
+     has gone, and it is one more full-screen layer to composite. */
   #scrim{position:fixed;inset:0;z-index:1;pointer-events:none;
     background:linear-gradient(180deg, rgba(12,7,22,.30) 0%, rgba(12,7,22,.52) 42%, rgba(12,7,22,.80) 100%)}
 
@@ -68,59 +72,106 @@
     border:1px solid rgba(201,162,39,.5);border-radius:999px;padding:11px 22px;
     display:inline-block;background:rgba(0,0,0,.2)}
 
-  /* ---------- contents ---------- */
+  /* ==================================================================
+     THE CONTENTS IS AN OPEN BOOK — 31 October 2026
+     ==================================================================
+     It was a list: nine wide rows, each with a kicker, a title, two
+     lines of blurb and a page number, on the dark background. That is
+     a table of contents, and the thing it is meant to be is a SPREAD
+     in a picture book — plates with captions, laid on paper.
+
+     So: the page is paper with a binding down the left, the entries
+     are small framed plates with air between them, and the text is a
+     caption. Everything that was not doing work is gone — the
+     blurbs, the kickers, the page numbers and the 3-D badge. The two
+     section heads stay, because "in three dimensions" and "flat" are
+     three words that tell you what kind of book this is and the
+     badge was saying the same thing nine times.
+
+     THE BINDING, not a border. js/bookframe.js's page frame — the
+     cover's gold rule held to the viewport — was the right answer for
+     a list on a dark field and is the wrong one for a spread: an open
+     book's edge is the gutter and the paper's own edge, not a tooled
+     rule round the glass. The frame is no longer mounted here. The
+     module is unchanged and still owns the cover's tooling and the
+     closing board, which is where the rest of that work went.
+
+     375 PX FIRST. Two columns of plates at 375, three from 560, and
+     a true facing-page gutter only from 820 where there is room for
+     one. The plate is the unit and it does not change size; the page
+     gets more of them.
+     ================================================================== */
   #contents{position:fixed;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;
-    -webkit-overflow-scrolling:touch;opacity:0;transition:opacity .6s ease .25s}
+    -webkit-overflow-scrolling:touch;opacity:0;transition:opacity .6s ease .25s;
+    background:
+      /* the binding: a hard shadow and a hard highlight at the left,
+         so the paper reads as a leaf hinged out of a spine rather
+         than as a sheet of card */
+      linear-gradient(90deg, rgba(42,22,14,.85) 0 7px, rgba(90,52,30,.55) 7px 11px,
+                      rgba(0,0,0,.30) 11px 20px, rgba(0,0,0,0) 34px),
+      linear-gradient(180deg,#F1E6CC 0%,#E9DCBE 46%,#E2D3B0 100%)}
   #contents.on{opacity:1}
-  .pad{max-width:430px;margin:0 auto;padding:max(22px,env(safe-area-inset-top)) 18px 26px}
+  /* the far page, showing past the fore-edge on a wide screen */
+  #contents::after{content:'';position:fixed;top:0;bottom:0;right:0;width:0;
+    pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,0))}
+  .pad{max-width:430px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) 15px 24px 26px}
 
-  header.hd{display:flex;align-items:center;gap:11px;margin-bottom:4px}
-  header.hd .mk{width:38px;height:38px;flex:0 0 38px}
-  header.hd h1{margin:0;font:300 21px/1.1 ui-serif,Georgia,serif;letter-spacing:.01em}
-  header.hd .of{display:block;font:400 8px/1 ui-serif,Georgia,serif;letter-spacing:.34em;
-    text-transform:uppercase;opacity:.5;margin-bottom:3px}
-  .ct{margin:20px 0 10px;display:flex;align-items:center;gap:10px}
-  .ct span{font:500 8.5px/1 ui-sans-serif;letter-spacing:.3em;text-transform:uppercase;
-    color:rgba(243,234,215,.42);white-space:nowrap}
-  .ct i{flex:1;height:1px;background:rgba(243,234,215,.2)}
+  /* ---------- the heading, as a title page ---------- */
+  header.hd{display:flex;align-items:center;gap:10px;margin:0 0 2px}
+  header.hd .mk{width:34px;height:34px;flex:0 0 34px}
+  header.hd h1{margin:0;font:300 22px/1.05 ui-serif,Georgia,serif;letter-spacing:.01em;
+    color:#2A1C10}
+  header.hd .of{display:block;font:400 7.5px/1 ui-serif,Georgia,serif;letter-spacing:.34em;
+    text-transform:uppercase;color:rgba(42,28,16,.5);margin-bottom:3px}
+  .ct{margin:18px 0 9px;display:flex;align-items:center;gap:9px}
+  .ct span{font:500 8px/1 ui-sans-serif;letter-spacing:.3em;text-transform:uppercase;
+    color:rgba(42,28,16,.46);white-space:nowrap}
+  .ct i{flex:1;height:1px;background:rgba(42,28,16,.2)}
 
-  a.entry{display:flex;gap:13px;align-items:stretch;text-decoration:none;color:inherit;
-    padding:11px 0;border-bottom:1px solid rgba(243,234,215,.12)}
-  a.entry:first-of-type{border-top:1px solid rgba(243,234,215,.12)}
-  a.entry .thumb{flex:0 0 96px;height:66px;border-radius:5px;overflow:hidden;
-    background:rgba(243,234,215,.06);box-shadow:0 0 0 1px rgba(243,234,215,.14)}
-  a.entry canvas{display:block;width:96px;height:66px}
-  a.entry .body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-  a.entry .ch{font:500 7.5px/1 ui-sans-serif;letter-spacing:.26em;text-transform:uppercase;
-    color:rgba(243,234,215,.4);margin-bottom:5px}
-  a.entry .ti{font:400 18px/1.15 ui-serif,Georgia,serif;margin-bottom:4px}
-  a.entry .bl{font:400 11.5px/1.45 ui-sans-serif;color:rgba(243,234,215,.58)}
-  a.entry .pg{flex:0 0 auto;align-self:center;font:400 12px/1 ui-serif,Georgia,serif;
-    color:rgba(243,234,215,.3);padding-left:4px}
+  /* ---------- the plates ----------
+     A plate is a picture with a caption. The frame is a hairline and a
+     hard offset shadow — a print laid on a page, not a card in a UI. */
+  .plates{display:grid;grid-template-columns:repeat(2,1fr);gap:15px 13px;margin:0}
+  a.plate{display:block;text-decoration:none;color:inherit}
+  a.plate .pic{position:relative;aspect-ratio:96/66;border-radius:1px;overflow:hidden;
+    background:#1B2150;
+    box-shadow:0 0 0 1px rgba(42,28,16,.34), 2px 3px 0 rgba(42,28,16,.17)}
+  a.plate .pic canvas,a.plate .pic svg{display:block;width:100%;height:100%}
+  a.plate .cap{margin:7px 1px 0;font:400 13px/1.2 ui-serif,Georgia,serif;color:#2A1C10}
+  a.plate.locked{opacity:.55}
+  a.plate.locked .pic{background:rgba(42,28,16,.07);display:grid;place-items:center;
+    box-shadow:0 0 0 1px rgba(42,28,16,.22)}
+  a.plate.locked .gate{width:26px;height:26px;opacity:.5}
+  .aside{margin:9px 2px 0;font:400 10px/1.5 ui-sans-serif;color:rgba(42,28,16,.52)}
+  .aside b{font-weight:600;color:rgba(42,28,16,.7)}
 
-  /* the three-dimensional chapter: the same entry idiom, marked so it is
-     obviously a sibling of its flat twin rather than a replacement */
-  a.entry .badge{display:inline-block;margin-left:7px;padding:2px 5px;border-radius:3px;
-    background:rgba(70,214,200,.16);color:#46D6C8;font:700 7px/1.3 ui-sans-serif;
-    letter-spacing:.14em;vertical-align:1px}
-  a.entry.three .thumb{display:grid;place-items:stretch;background:#08202C}
-  a.entry.three .dl{display:block;width:96px;height:66px}
+  .tail{margin-top:20px;display:flex;gap:9px}
+  .tail button{flex:1;appearance:none;border:0;border-radius:3px;padding:11px 0;
+    background:rgba(42,28,16,.09);color:rgba(42,28,16,.78);
+    font:600 8.5px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase}
+  #caution{margin-top:16px;font:400 9.5px/1.6 ui-sans-serif;color:rgba(42,28,16,.58);
+    text-align:center;padding:0 4px}
+  #caution b{color:rgba(42,28,16,.8);font-weight:600}
+  .colophon{margin-top:12px;text-align:center;font:400 8px/1.6 ui-sans-serif;
+    color:rgba(42,28,16,.36)}
 
-  .locked{opacity:.62}
-  .locked .ti{color:rgba(243,234,215,.72)}
-  .locked .thumb{display:grid;place-items:center;background:rgba(243,234,215,.04)}
-  .locked .gate{width:30px;height:30px;opacity:.55}
-  .locked .bl em{color:rgba(243,234,215,.5);font-style:normal}
-
-  .tail{margin-top:22px;display:flex;gap:10px}
-  .tail button{flex:1;appearance:none;border:0;border-radius:9px;padding:12px 0;
-    background:rgba(243,234,215,.09);color:rgba(243,234,215,.75);
-    font:600 9px/1 ui-sans-serif;letter-spacing:.2em;text-transform:uppercase}
-  #caution{margin-top:20px;font:400 9.5px/1.6 ui-sans-serif;color:rgba(243,234,215,.36);
-    text-align:center;padding:0 6px}
-  #caution b{color:rgba(243,234,215,.55);font-weight:600}
-  .colophon{margin-top:14px;text-align:center;font:400 8.5px/1.6 ui-sans-serif;
-    color:rgba(243,234,215,.22)}
+  @media (min-width:560px){
+    .plates{grid-template-columns:repeat(3,1fr)}
+    .pad{max-width:600px}
+  }
+  @media (min-width:820px){
+    /* a real facing page, and the gutter down the middle of it */
+    #contents{background:
+      linear-gradient(90deg, rgba(0,0,0,0) calc(50% - 26px),
+                      rgba(0,0,0,.26) calc(50% - 14px),
+                      rgba(42,22,14,.78) calc(50% - 2px),
+                      rgba(42,22,14,.78) calc(50% + 2px),
+                      rgba(0,0,0,.26) calc(50% + 14px),
+                      rgba(0,0,0,0) calc(50% + 26px)),
+      linear-gradient(180deg,#F1E6CC 0%,#E9DCBE 46%,#E2D3B0 100%)}
+    .pad{max-width:860px;padding-left:15px}
+    .plates{grid-template-columns:repeat(4,1fr)}
+  }
 
   /* ---------- falling into a chapter ----------
      The first half of the transition; the second half is the chapter's
@@ -237,7 +288,7 @@
           <rect x="0" y="44" width="64" height="2.4" fill="#46D6C8" opacity=".85"/>
           <polygon points="38,12 50,16 38,18" fill="#F6B04A"/>
         </g>
-        <circle cx="32" cy="32" r="26" fill="none" stroke="#F3EAD7" stroke-width="2.4" opacity=".9"/>
+        <circle cx="32" cy="32" r="26" fill="none" stroke="#2A1C10" stroke-width="2.4" opacity=".75"/>
       </svg>
       <div><span class="of">The Book of</span><h1>Rates</h1></div>
     </header>
@@ -287,7 +338,7 @@ import { JOURNEYS, journeyById, journeyPlan, ENTRY, LENGTHS } from './js/protoco
 import { buildSession, rateTrack } from './js/engine.js';
 import { SCENES, sceneForBeats } from './js/scenes.js';
 import { PageTurn } from './js/pageturn.js';
-import { toolHTML, mountPageFrame } from './js/bookframe.js';
+import { toolHTML } from './js/bookframe.js';
 import { fallIntoChapter } from './js/arrival.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { lastNote, clearNote, install as installBlackbox } from './js/blackbox.js';
@@ -323,18 +374,21 @@ const $ = id => document.getElementById(id);
    inheriting a decision made by a button the reader pressed once. */
 const coverWrap = $('coverWrap');
 
-/* ONE DEFINITION OF THE BINDING, USED TWICE ON THIS PAGE.
-   The cover's gold tooling and the contents' frame are the same four
-   paths and three rules out of js/bookframe.js. The contents one is
-   held to the viewport rather than to the content, because the contents
-   SCROLLS and a frame drawn round the content would scroll away and
-   leave the reader looking at an unframed middle.
+/* THE COVER'S TOOLING, from the one definition of it in
+   js/bookframe.js — the same four paths and three rules the closing
+   board wears on the way out.
 
-   Why the contents gets a frame at all: without it the book stops
-   feeling like a book at the exact moment the reader is inside it. */
+   THE CONTENTS NO LONGER TAKES THE PAGE FRAME, and that is a decision
+   rather than a regression. Giving the contents the cover's gold rule
+   was right while the contents was a list on a dark field: the book
+   stopped feeling like a book at the moment the reader was inside it.
+   It is now an open SPREAD — paper, a binding, plates laid on it — and
+   an open book's edge is its gutter and the paper's own edge, not a
+   tooled rule round the glass. Two framings fighting is worse than
+   either. mountPageFrame() is kept in the module and unused here; the
+   rest of that extraction is load-bearing for the cover and the exit. */
 $('faceFront').insertAdjacentHTML('afterbegin', toolHTML());
 coverWrap.classList.add('ready');
-mountPageFrame($('contents'));
 
 const returning = location.hash === '#contents';
 let opened = false;
@@ -385,65 +439,43 @@ const SHOW_LOCKED = true;
    book's own idiom, and it incidentally explains the thing the previous
    session had to apologise for in a comment: why the page numbers in
    this list do not run in order. */
-const FIRST_EDITION = 'First edition';
-const kicker = j => `${FIRST_EDITION} · ${j.chapter.replace(/^Chapter /, 'chapter ')}`;
+/* A PLATE: a picture and a caption, and nothing else.
+   What went, and why each one failed to justify itself:
+     the blurb      two lines of prose per entry, nine times over, read
+                    before you have seen anything. The picture says it.
+     the kicker     "First edition · chapter three". The section head
+                    above already says which half of the book this is.
+     the page number the list IS the order; a number beside it is the
+                    same fact twice, and these did not run in order.
+     the 3-D badge  the section head says it, nine times less often. */
 function entryHTML(j, i){
-  return `<a class="entry" href="journey.html?j=${j.id}">
-    <div class="thumb"><canvas data-prev="${j.preview}" width="192" height="132"></canvas></div>
-    <div class="body">
-      <div class="ch">${kicker(j)}</div>
-      <div class="ti">${j.title}</div>
-      <div class="bl">${j.blurb}</div>
-    </div>
-    <div class="pg">${i+1}</div>
+  return `<a class="plate" href="journey.html?j=${j.id}">
+    <div class="pic"><canvas data-prev="${j.preview}" width="192" height="132"></canvas></div>
+    <div class="cap">${j.title}</div>
   </a>`;
 }
-const lockedHTML = `<div class="entry locked">
-    <div class="thumb">
+const lockedHTML = `<a class="plate locked">
+    <div class="pic">
       <svg class="gate" viewBox="0 0 32 32" aria-hidden="true">
-        <rect x="3" y="13" width="26" height="3" fill="#F3EAD7" opacity=".8"/>
-        <rect x="3" y="19" width="26" height="3" fill="#F3EAD7" opacity=".6"/>
-        <rect x="3" y="25" width="26" height="3" fill="#F3EAD7" opacity=".4"/>
-        <rect x="2" y="6" width="3" height="24" fill="#F3EAD7" opacity=".9"/>
-        <rect x="27" y="6" width="3" height="24" fill="#F3EAD7" opacity=".9"/>
+        <rect x="3" y="13" width="26" height="3" fill="#2A1C10" opacity=".7"/>
+        <rect x="3" y="19" width="26" height="3" fill="#2A1C10" opacity=".5"/>
+        <rect x="3" y="25" width="26" height="3" fill="#2A1C10" opacity=".35"/>
+        <rect x="2" y="6" width="3" height="24" fill="#2A1C10" opacity=".8"/>
+        <rect x="27" y="6" width="3" height="24" fill="#2A1C10" opacity=".8"/>
       </svg>
     </div>
-    <div class="body">
-      <div class="ch">Not in this edition</div>
-      <div class="ti">The Breath Held</div>
-      <div class="bl"><em>Breath retention is the one practice here that has actually hurt
-        people, so it is left out until it can be introduced properly — with the reasons,
-        and never as something you score.</em></div>
-    </div>
-    <div class="pg">—</div>
-  </div>`;
+    <div class="cap">The Breath Held</div>
+  </a>`;
 
-/* ==================================================================
-   THE BOOK IS A THREE-DIMENSIONAL BOOK FIRST — 24 October 2026
-   ==================================================================
-   Until now the 3-D chapters were siblings: they sat UNDER their flat
-   twins, badged "again", numbered 4ii and 6ii. That ordering said the
-   flat one is the chapter and the 3-D one is a variant of it, which is
-   no longer what the book is.
+/* The locked chapter's reason is the one piece of prose in this page
+   that is doing real work, so it stays — but as a line under the
+   plates rather than as a paragraph inside one. A caption cannot
+   carry it and a plate should not try. */
+const lockedWhy = `<p class="aside"><b>The Breath Held is not in this edition.</b>
+  Breath retention is the one practice here that has actually hurt people, so it is left
+  out until it can be introduced properly — with the reasons, and never as something you
+  score.</p>`;
 
-   So each 3-D chapter now TAKES ITS CHAPTER'S OWN NUMBER AND POSITION,
-   and the flat original is demoted rather than deleted: it keeps its
-   URL, keeps working exactly as it did, and is linked from the archive,
-   which is already where this project puts work that is still readable
-   but is no longer the way in. (The archive's existing precedent runs
-   the other way — Pearl Diver's card there says PROMOTED · NOW CHAPTER ONE
-   — so the pattern for "reachable from the archive, not from the
-   contents" is established and is just being used in both directions.)
-
-   Nothing is deleted and no URL breaks. The flat chapters are reached at
-   journey.html?j=kite-line and ?j=pearl-diver exactly as before.
-
-   Pearl Diver and Long Air are not JOURNEYS — each is its own page with
-   its own engine, so neither can come out of protocols.js. They use the
-   same entry markup. The thumbs are flat drawings rather than live
-   previews: the previews come from SCENES, and these chapters' scenes
-   are not among them.
-   ================================================================== */
 /* ==================================================================
    PEARL DIVER LEADS THE BOOK — 31 October 2026
    ==================================================================
@@ -469,8 +501,8 @@ const lockedHTML = `<div class="entry locked">
       content decision and is left to the reader; it would be one edit,
       in FIRST_EDITION below and the four `.ch` lines in this file.
    ================================================================== */
-const pearlDiverHTML = `<a class="entry three" href="pearl-diver.html">
-    <div class="thumb">
+const pearlDiverHTML = `<a class="plate" href="pearl-diver.html">
+    <div class="pic">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
         <rect width="96" height="66" fill="#246E78"/>
         <rect y="0" width="96" height="9" fill="#93CFC6"/>
@@ -488,14 +520,7 @@ const pearlDiverHTML = `<a class="entry three" href="pearl-diver.html">
         <circle cx="45" cy="13" r="1.1" fill="#DFF3EC" opacity=".6"/>
       </svg>
     </div>
-    <div class="body">
-      <div class="ch">Chapter one <span class="badge">3&#8209;D</span></div>
-      <div class="ti">Pearl Diver</div>
-      <div class="bl">A dive built as a space you move through instead of a picture of one.
-        Box breathing, or the no-holds version — you choose at the start. The flat study it
-        came from is in the archive.</div>
-    </div>
-    <div class="pg">1</div>
+    <div class="cap">Pearl Diver</div>
   </a>`;
 
 /* Long Air, the second 3-D chapter, in exactly the same idiom.
@@ -512,8 +537,8 @@ const pearlDiverHTML = `<a class="entry three" href="pearl-diver.html">
    ahead of you is generated from the breath schedule at the moment you
    will arrive there, so the shape of the gates in front of you is the
    next three breaths. */
-const longAirHTML = `<a class="entry three" href="long-air.html">
-    <div class="thumb">
+const longAirHTML = `<a class="plate" href="long-air.html">
+    <div class="pic">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
         <rect width="96" height="66" fill="#F2E6A0"/>
         <rect y="14" width="96" height="9" fill="#DCE7AE"/>
@@ -537,15 +562,7 @@ const longAirHTML = `<a class="entry three" href="long-air.html">
         <rect x="10.8" y="32.4" width="1.6" height="1.2" fill="#B79A66"/>
       </svg>
     </div>
-    <div class="body">
-      <div class="ch">Chapter four <span class="badge">3&#8209;D</span></div>
-      <div class="ti">Long Air</div>
-      <div class="bl">A kite, two buttons, and a course whose gaps are placed where your
-        breath should have taken you — so flying it well and breathing on pace are the same
-        thing. Box breathing, or the no-holds version. It cannot crash and nothing is counted.
-        The flat Kite Line is in the archive.</div>
-    </div>
-    <div class="pg">4</div>
+    <div class="cap">Long Air</div>
   </a>`;
 
 /* Bamboo Rain — chapter eight, and the first chapter in the book that
@@ -556,8 +573,8 @@ const longAirHTML = `<a class="entry three" href="long-air.html">
    It is here because the rain is a VOLUME with a near face and the
    interaction is pushing that face away through depth. Flat, "further
    off" can only mean smaller or fainter. */
-const bambooHTML = `<a class="entry three" href="bamboo-rain.html">
-    <div class="thumb">
+const bambooHTML = `<a class="plate" href="bamboo-rain.html">
+    <div class="pic">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
         <rect width="96" height="66" fill="#5B4B7A"/>
         <rect y="0" width="96" height="16" fill="#44405F"/>
@@ -584,14 +601,7 @@ const bambooHTML = `<a class="entry three" href="bamboo-rain.html">
         <rect x="41" y="42" width="2.6" height="3.4" fill="#FFF2A8"/>
       </svg>
     </div>
-    <div class="body">
-      <div class="ch">Chapter eight <span class="badge">3&#8209;D</span></div>
-      <div class="ti">Bamboo Rain</div>
-      <div class="bl">A storm, waited out under a roof. Hold anywhere as you breathe out and
-        the rain is driven back across the clearing. It clears on its own schedule whether
-        you push or not.</div>
-    </div>
-    <div class="pg">8</div>
+    <div class="cap">Bamboo Rain</div>
   </a>`;
 
 /* Lantern Current — chapter nine. Design doc §6 row 4: sleepy, a night
@@ -601,8 +611,8 @@ const bambooHTML = `<a class="entry three" href="bamboo-rain.html">
    It is here because a lantern is a light at a DISTANCE, and the pool
    it throws on the water is what makes it read as one. Flat, a lantern
    is a sprite that gets smaller. */
-const lanternHTML = `<a class="entry three" href="lantern-current.html">
-    <div class="thumb">
+const lanternHTML = `<a class="plate" href="lantern-current.html">
+    <div class="pic">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
         <rect width="96" height="66" fill="#0E1230"/>
         <rect y="18" width="96" height="6" fill="#13203F"/>
@@ -626,14 +636,7 @@ const lanternHTML = `<a class="entry three" href="lantern-current.html">
         <rect x="46.8" y="44" width="2.4" height="3" fill="#C9A86A"/>
       </svg>
     </div>
-    <div class="body">
-      <div class="ch">Chapter nine <span class="badge">3&#8209;D</span></div>
-      <div class="ti">Lantern Current</div>
-      <div class="bl">A boat on a night river, lifting with your breath. Rest a finger
-        anywhere and a lantern lights. It gets darker as you go, so the ones you lit become
-        the only light on the water. Nothing is counted.</div>
-    </div>
-    <div class="pg">9</div>
+    <div class="cap">Lantern Current</div>
   </a>`;
 
 /* Each 3-D chapter WITH A FLAT TWIN replaces that twin in the contents, so
@@ -700,13 +703,12 @@ if(leadIdx > 0) taken.unshift(taken.splice(leadIdx, 1)[0]);
    join the 3-D block at the end of it, in chapter order. */
 const three = taken.concat([bambooHTML, lanternHTML]);
 
-const head = label => `<div class="ct"><span>${label}</span><i></i></div>`;
+const head  = label => `<div class="ct"><span>${label}</span><i></i></div>`;
+const grid  = plates => `<div class="plates">${plates.join('')}</div>`;
 $('list').innerHTML =
-  head('In three dimensions') + three.join('') +
-  head('Flat') + flat.join('') +
-  // the locked row carries its own "Not in this edition" kicker, so a
-  // heading above it would say the same thing twice
-  (SHOW_LOCKED ? lockedHTML : '');
+  head('In three dimensions') + grid(three) +
+  head('Flat') + grid(flat.concat(SHOW_LOCKED ? [lockedHTML] : [])) +
+  (SHOW_LOCKED ? lockedWhy : '');
 /* CHOOSING A CHAPTER FALLS INTO IT. Wired after the list exists, and
    the count is CHECKED rather than assumed: a link that silently did
    not get wired is the same class of fault as a shader that silently
@@ -719,10 +721,14 @@ if(wired < document.querySelectorAll('#list a.entry').length){
 
 // if the reader flagged a condition, say so on the locked chapter rather
 // than leaving them to wonder
+/* The blurb this used to append to is gone with the other blurbs, so
+   it goes on the aside, which is where the locked chapter's reason now
+   lives. It must not be dropped: a reader who flagged a condition is
+   told why, rather than left to wonder. */
 if (!retentionAllowed() && gatePassed()){
-  const n = document.querySelector('.locked .bl');
-  if (n) n.innerHTML += `<br><em style="color:rgba(232,71,60,.8)">From what you told us at the
-    start, this chapter would stay closed for you even once it is written.</em>`;
+  const n = document.querySelector('.aside');
+  if (n) n.innerHTML += ` <em style="color:rgba(176,46,36,.95)">From what you told us at the
+    start, it would stay closed for you even once it is written.</em>`;
 }
 
 /* ================= one render loop for everything ================= */
@@ -751,24 +757,50 @@ onResizeDebounced(fitBg); fitBg();
 const ORDER = ['glide','swell','gallop'];
 let bgIdx = 0, bgTurn = new PageTurn(1.6), nextTurnAt = 14;
 
-/* previews: one canvas each, drawn ROUND-ROBIN — one per frame, not all
-   of them every frame — and skipped entirely when off screen. No preview
-   ever creates an audio context. */
-const previews = [...document.querySelectorAll('canvas[data-prev]')].map(cv => ({
-  cv, g: cv.getContext('2d'),
-  scene: SCENES[cv.dataset.prev] || SCENES.glide,
-  visible: true, phase: Math.random()*10
-}));
-if ('IntersectionObserver' in window){
-  const io = new IntersectionObserver(es => {
-    for (const e of es){
-      const p = previews.find(p => p.cv === e.target);
-      if (p) p.visible = e.isIntersecting;
-    }
-  }, { rootMargin: '60px' });
-  previews.forEach(p => io.observe(p.cv));
-}
-let rr = 0;
+/* ==================================================================
+   THE PICTURES ARE PLATES, DRAWN ONCE
+   ==================================================================
+   Nine live previews was the question. Nine WebGL contexts is not
+   viable and was never on the table; nine live 2-D canvases is what
+   this page used to do, one redrawn per frame round-robin, with an
+   IntersectionObserver to skip the off-screen ones.
+
+   Both are answering the wrong question. A plate in a picture book
+   does not move. So each flat chapter's own SCENE is drawn ONCE, at a
+   chosen moment of its own cycle, and then never again: the canvas
+   becomes a still picture and the round-robin, the observer and the
+   per-frame cost all go.
+
+   Why this rather than hand-built SVG panels in each chapter's
+   palette, which was the other candidate: the SCENES are the
+   chapters' actual artwork, by the chapters' actual palettes, already
+   written and already correct. Drawing them once costs nine draws at
+   load and nothing afterwards, which is strictly less than the old
+   page spent, and it cannot drift away from what the chapter looks
+   like because it IS what the chapter looks like. Nine new hand-drawn
+   panels would be nine new things to keep in step.
+
+   The four three-dimensional chapters keep their hand-built SVG
+   plates, which are already static and already cost nothing — there
+   is no SCENE for them to be drawn from.
+
+   `at` is picked per scene so the plate catches the chapter at a
+   moment worth looking at rather than at t=0, where several of them
+   are a flat horizon.
+   ================================================================== */
+(function drawPlatesOnce(){
+  const at = { glide: 3.1, swell: 4.4, gallop: 2.2, kite: 5.0, flight: 1.7, dive: 6.3 };
+  for (const cv of document.querySelectorAll('canvas[data-prev]')){
+    const scene = SCENES[cv.dataset.prev] || SCENES.glide;
+    const t = at[cv.dataset.prev] !== undefined ? at[cv.dataset.prev] : 3.0;
+    const g = cv.getContext('2d');
+    const lv = 0.5 - 0.5*Math.cos(t*2*Math.PI/9);
+    g.save(); g.scale(cv.width/192, cv.height/132);
+    // a plate that throws must not take the contents down with it
+    try { scene.draw({ g, W:192, H:132, t, lv, dlv:0, info:{} }); } catch(e){}
+    g.restore();
+  }
+})();
 
 let bgCost = { ms: 0, n: 0 };
 function frame(now){
@@ -797,22 +829,9 @@ function frame(now){
     bgCost.ms += performance.now() - t0; bgCost.n++;
   }
 
-  /* --- one preview per frame --- */
-  if (previews.length){
-    for (let tries = 0; tries < previews.length; tries++){
-      const p = previews[rr % previews.length];
-      rr++;
-      if (!p.visible) continue;
-      const w = p.cv.width, h = p.cv.height;
-      const lv = 0.5 - 0.5*Math.cos((t + p.phase)*2*Math.PI/9);
-      p.g.setTransform(1,0,0,1,0,0);
-      p.g.save(); p.g.scale(w/192, h/132);
-      try { p.scene.draw({ g: p.g, W: 192, H: 132, t: t + p.phase, lv, dlv: 0, info:{} }); }
-      catch(e){ /* a preview must never take the page down */ }
-      p.g.restore();
-      break;
-    }
-  }
+  /* The plates are drawn once at load and are not touched again — see
+     drawPlatesOnce above. This loop is the background and nothing
+     else now. */
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -961,7 +980,10 @@ let running = true;
 function teardown(){
   running = false;
   bgTurn.release();
-  previews.forEach(p => release(p.cv));
+  // the plate canvases are still backing stores even though nothing
+  // draws to them any more, and iOS will hold this document in the
+  // back/forward cache while the chapter allocates its own
+  document.querySelectorAll('canvas[data-prev]').forEach(release);
   releaseAll();
   // and the WebGL context, for the same reason as every other surface
   // here: iOS may hold this document in the back/forward cache while the
