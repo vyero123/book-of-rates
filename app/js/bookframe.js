@@ -24,13 +24,35 @@ const CSS_HREF = 'css/bookframe.css';
  *  the cover is framed in the first painted frame rather than one or two
  *  frames later. This is for chapter pages, which only need the board at
  *  the moment they are leaving. */
+let cssLink = null;
 export function ensureCss(){
   const want = new URL(CSS_HREF, document.baseURI).href;
-  if([...document.querySelectorAll('link[rel="stylesheet"]')].some(l => l.href === want)) return false;
+  const had = [...document.querySelectorAll('link[rel="stylesheet"]')].find(l => l.href === want);
+  if(had){ cssLink = had; return false; }
   const l = document.createElement('link');
   l.rel = 'stylesheet'; l.href = CSS_HREF;
   document.head.appendChild(l);
+  cssLink = l;
   return true;
+}
+
+/** Has the sheet actually arrived? A <link> appended to the head loads
+ *  ASYNCHRONOUSLY, and until it has, `.bor-board` has no transform rule
+ *  — so a board mounted open is not open, and removing the class
+ *  animates nothing from nothing.
+ *
+ *  Measured: closeBook() called on a chapter that had never loaded the
+ *  sheet read `transform: none` at both ends of the turn. The board was
+ *  there, the classes were right, and the stylesheet was still in
+ *  flight.
+ *
+ *  So chapters call ensureCss() when they WIRE their exits, which gives
+ *  the sheet a whole session to arrive, and closeBook checks anyway. */
+export function cssReady(){
+  if(!cssLink) return false;
+  const want = cssLink.href;
+  for(const s of document.styleSheets) if(s.href === want) return true;
+  return false;
 }
 
 /* The corner ornament. One shape, drawn four times with the class doing
@@ -133,6 +155,13 @@ export function closeBook({ then = () => {}, ms = 760, face = '' } = {}){
   stage.innerHTML = `<div class="bor-book">${boardHTML({ face })}</div>`;
   document.body.appendChild(stage);
 
+  // If the sheet is somehow still in flight, the board is not open yet
+  // and there is nothing to animate FROM. Rather than show a board that
+  // appears already shut, leave immediately: an instant exit is a worse
+  // transition but it is not a broken one. Chapters avoid this by
+  // calling ensureCss() when they wire their exits.
+  if(!cssReady()){ then(); closing = false; stage.remove(); return; }
+
   /* FLUSH THE OPEN STATE SYNCHRONOUSLY, DO NOT WAIT FOR A FRAME.
      The transition needs the open transform to be the committed
      starting style before the class comes off. The obvious way to get
@@ -163,6 +192,10 @@ export function closeBook({ then = () => {}, ms = 760, face = '' } = {}){
  *  shaders have shipped in this project and a silently unwired link is
  *  the same failure in a different medium. */
 export function wireExits(selector = 'a[href*="#contents"]', opts = {}){
+  // Load the sheet NOW, at boot, not at the moment of leaving: a <link>
+  // appended to the head loads asynchronously, and a board whose CSS has
+  // not arrived is a board that is not open.
+  ensureCss();
   const links = [...document.querySelectorAll(selector)];
   for(const a of links){
     a.addEventListener('click', e => {
