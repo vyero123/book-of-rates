@@ -224,6 +224,7 @@ import { builder, bands, particles, scrollGlsl, scrollWholeGlsl,
          nearFadeGlsl } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 import { arrival } from './js/arrival.js';
+import { wireExits } from './js/bookframe.js';
 
 /* FALLING IN. The lens starts back and rushes to its place over
    700 ms when the chapter begins. Built from this chapter's own
@@ -1338,6 +1339,22 @@ window.__longAir = {
     return { kite:put(sail), horizonUv:+uHorizon.value.toFixed(3) };
   }
 };
+
+/* LEAVING READS AS THE BOARD CLOSING.
+   The way in is the cover's board swinging open on its spine — a solid
+   with two faces and a real fore-edge. The way out is that same board,
+   run backwards, out of js/bookframe.js. Not a second mechanism and not
+   a crossfade: the thickness is the point.
+
+   The chapter's own canvas is left underneath and untouched. A snapshot
+   is the obvious alternative and is worse — PageTurn's costs a backing
+   store the size of the viewport, and the board covers the frame within
+   a couple of hundred milliseconds anyway.
+
+   The count is checked. A link that silently did not get wired is the
+   same class of fault as a shader that silently did not link. */
+const exits = wireExits();
+if(exits < 1) console.warn('bor: no exit link was wired on this chapter');
 
 loop.start();
 }
