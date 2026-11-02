@@ -878,6 +878,71 @@ Aku, no recreations of shots. Two practical consequences:
    colour-corrected them. A low-opacity grain over scenery approximates this; keep it off the
    figures and the UI.
 
+### 4.2a A hard edge is not a jagged edge — the resolution rule
+
+*Added 2 November 2026, prompted by the author's note that the 3-D work reads at 3/10 for
+detail, that he wants smooth blending, and that the jagged shapes — "the light on the water"
+especially — are the thing that bothers him. The seven rules above are unchanged and nothing
+below softens them. This section separates the style from the defects that were travelling
+under its name.*
+
+> **A posterised step is resolved at the pixel, not at the fragment.** Every hard edge in a
+> scene — a value step, a terminator, a band boundary, a silhouette — is still hard, and
+> still a step. But it transitions over approximately one pixel rather than landing on
+> whichever side of the pixel grid the arithmetic happened to fall. A one-pixel riser is not
+> a gradient and does not engage rule 5; an unresolved one is a stair, and stairs crawl.
+>
+> **And a thresholded field is evaluated where it is drawn.** A scalar computed per vertex
+> and interpolated across a triangle, then put through `step()` in the fragment shader, does
+> not produce the edge of the thing it describes. It produces a straight line across that
+> triangle. The shape you see is the mesh, not the wave.
+
+**Why this is not a retreat from rule 5.** Rule 5 forbids a *continuous gradient* — a soft
+ramp standing in for form that should have been drawn as shapes. It was never a statement
+about how the boundary between two of those shapes is sampled. The two get confused because
+`step()` is the obvious way to write a hard edge and it happens to be the aliased way; the
+cheapness and the hardness arrived together and have been read as one decision ever since.
+They are separable. A cut-paper edge in the idiom this project works in is *crisp* —
+scissors leave a clean line, not a serrated one. Posterisation done well has clean edges and
+deliberate steps. Done cheaply it has jaggies on curves, banding across the risers, and
+terminators that crawl when the camera moves. Those three are quality defects. They are not
+the style and the style does not need them.
+
+**The measurement that settles it.** The renderer has been requesting MSAA since the kit was
+written, and on 2 November it was confirmed actually granted: 4 samples, `SAMPLE_BUFFERS` 1,
+on the deployed build. So every *geometric* edge in these chapters is already antialiased —
+which means every jagged edge the author can see is a *shader-computed* edge inside a
+triangle, where MSAA cannot reach it by construction. That is a complete account of the
+symptom, and it points at exactly one fix.
+
+**What this licenses, concretely.**
+
+1. `aastep(edge, x)` — a `smoothstep` whose width is one pixel, taken from the screen-space
+   derivative of `x`. Replaces `step()` at every posterised boundary.
+2. `posteriseAA` and `rampPickAA` — identical to `posterise` and `rampPick` away from the
+   risers, and resolved across them. Where the bands become finer than a pixel they fall
+   back to the continuous value, because banding below the sampling rate is moiré, not form.
+3. Fields that are thresholded belong in the fragment shader. Where a chapter computed a
+   wave or a terrain height per vertex and hard-stepped the interpolated result, the field
+   is recomputed per fragment, and the geometry keeps only the job of displacement.
+4. Subdivision where a silhouette reads and none where it does not. A terminator on a
+   ten-ring sphere is a polygon however well the step is resolved.
+
+**What it does not license.** Soft shadows, a lighting model, gradient ramps standing in for
+modelling, outlines, or any softening of the flat lineless character in rule 1. The number
+of values per object does not go up. The bands do not become blends. Nothing here is
+permission to make the picture smoother; it is permission to make the same picture cleanly.
+
+**THE DECISION THAT IS NOT MINE TO MAKE.** It is possible that "smooth blending, no jagged
+shapes" means something larger than this, and that what is wanted is continuous shading —
+real gradients, soft terminators, a lighting model — with posterisation dropped as the
+book's visual identity. That would be a coherent choice and the engine would support it.
+It is not what this amendment does, because that is an identity decision rather than a
+quality one, and it belongs to the author rather than to whoever happened to be reading the
+complaint. **Stated plainly so it can be answered: this amendment keeps the flat, graphic,
+lineless, stepped look and removes the artefacts of implementing it cheaply. If the look
+itself is the problem, say so and §4.2 gets rewritten rather than annotated.**
+
 ### 4.3 Palettes per emotional theme
 
 All hex values are derived for this project from descriptions and reference, not lifted from

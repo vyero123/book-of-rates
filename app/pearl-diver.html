@@ -207,7 +207,7 @@
 import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice, Y_AIR, Y_BOTTOM } from './js/deep-light-breath.js';
-import { ramp, FOG_GLSL, RAMP_GLSL, GRAIN_GLSL,
+import { ramp, AA_GLSL, FOG_AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CAUSTIC_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, polyBillboard, triBillboard, particles,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
@@ -297,10 +297,86 @@ const uCamX    = { value: 0 };
 const uCamY    = { value: 0 };
 const uRamp    = { value: ramp6 };
 
-/* the posterised prelude, from palette.js: rampPick(), fogAmount(),
-   posterise(), grainAt(). Deep Light's third pass had four hand-copied
-   fog functions in four shaders, kept in agreement by hand. */
-const PRE = RAMP_GLSL + FOG_GLSL + GRAIN_GLSL;
+/* The posterised prelude, from palette.js — now the §4.2a RESOLVED
+   variants: aastep(), posteriseAA(), rampPickAA(), fogAmount() over
+   posteriseAA, plus caustic(). Deep Light's third pass had four
+   hand-copied fog functions in four shaders, kept in agreement by hand.
+
+   §4.2a, 2 November 2026. MSAA is granted on this build (SAMPLES 4,
+   measured), so every geometric edge was already clean and every jagged
+   edge the reader can see is a shader-computed edge inside a triangle,
+   where MSAA cannot reach. These preludes are what reaches them. The
+   look does not change: the steps are in the same places and there are
+   the same number of them. Only the riser between two steps moves, from
+   "wherever the pixel grid put it" to "one pixel wide, here".
+
+   Three preludes rather than one, because a shader that declares a
+   uniform it never reads still has to have it supplied, and uRamp[6] is
+   not free on a four-vertex quad. */
+const PRE_AA   = AA_GLSL;                                     // aastep/posteriseAA only
+const PRE_FOG  = AA_GLSL + FOG_AA_GLSL;                       // + fogAmount
+const PRE_SKY  = AA_GLSL + RAMP_AA_GLSL + GRAIN_GLSL;         // + the ramp, + grain
+const PRE      = AA_GLSL + RAMP_AA_GLSL + FOG_AA_GLSL + GRAIN_GLSL + CAUSTIC_GLSL;
+
+/* ------------------------------------------------------------------
+   THE WAVE FIELD, SHARED BY THE VERTEX AND THE FRAGMENT STAGE
+   ------------------------------------------------------------------
+   This is the §4.2a item that matters most on this chapter and the one
+   the reader named: the light on the water.
+
+   The surface used to compute `chop` and `swell` PER VERTEX and pass
+   them down as varyings, and the fragment shader then put the
+   interpolated result through step(). A varying is interpolated
+   LINEARLY across a triangle, so `step(vChop, -0.22)` does not draw the
+   edge of a wave trough — it draws a STRAIGHT LINE ACROSS A TRIANGLE.
+   On a plane with 4.8 m between vertices that is a polygon the size of
+   a room. Every "jagged shape" on the water was the mesh showing
+   through its own shading.
+
+   So the field is defined once, here, and evaluated in BOTH stages: the
+   vertex stage displaces the geometry with it, and the fragment stage
+   re-evaluates it at the pixel to decide colour. The thresholds then
+   follow the wave, because they are being asked about the wave.
+
+   The swell gains a second component at a different wavelength and
+   crossing direction. One sine is legible as one sine within about a
+   second, which is the other half of why the water read as cheap.
+
+   `w` is PLANE coordinates: the plane lies in XY and is rotated -90
+   degrees about X, so local x is world x and local y is world -z.
+   Both stages must agree about that, which is why the conversion is
+   written here and nowhere else.
+   ------------------------------------------------------------------ */
+const WAVE_GLSL = `
+  float chopAt(vec2 w, float t){
+    return sin(w.x * 0.42 + t * 0.55) * 0.26
+         + sin(w.y * 0.33 - t * 0.41) * 0.22
+         + sin((w.x + w.y) * 0.19 + t * 0.23) * 0.18;
+  }
+  float swellAt(vec2 w, float t){
+    return sin(w.y * 0.055 - t * 0.16) * 0.55
+         + sin((w.x * 0.78 + w.y * 0.62) * 0.031 + t * 0.11) * 0.38;
+  }
+`;
+
+/* The seabed's height field, same arrangement and for the same reason:
+   it was a per-vertex value stepped in the fragment shader, on a 4.25 m
+   grid, so the floor's value bands were the triangulation. */
+const BED_GLSL = `
+  float bedH(vec2 w){
+    return sin(w.x * 0.21) * 0.5 + sin(w.y * 0.17 + 1.3) * 0.4
+         + sin((w.x - w.y) * 0.09) * 0.6;
+  }
+  float bedQ(vec2 w){ return floor(bedH(w) / 0.3) * 0.3; }
+`;
+/** The same quantised seabed height, on the CPU, for placing the
+ *  diver's contact shadow. Kept next to the GLSL it mirrors. */
+const bedQjs = (x, z) => {
+  const w = [x, -z];
+  const h = Math.sin(w[0] * 0.21) * 0.5 + Math.sin(w[1] * 0.17 + 1.3) * 0.4
+          + Math.sin((w[0] - w[1]) * 0.09) * 0.6;
+  return Math.floor(h / 0.3) * 0.3;
+};
 
 const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
   canvas,
@@ -323,23 +399,28 @@ const waterUniforms = {
 onFit(() => { waterUniforms.uAspect.value = camera.aspect; });
 const waterQuad = screenQuad(THREE, {
   uniforms: waterUniforms,
-  prelude: RAMP_GLSL + GRAIN_GLSL,
+  prelude: PRE_SKY,
   fragment:`
     varying vec2 vUv;
     uniform float uTime, uDepth, uAspect, uAbove, uHorizon, uCamX;
     uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo1, uHalo2, uCloud;
 
+    /* a disc with its edge resolved — every circle in this shader used
+       to be a step() on a radius, which on a four-vertex screen quad is
+       the most visible aliasing in the chapter: MSAA has two triangles
+       to work with and the circle is not on either of their edges */
+    float disc(float d, float r){ return 1.0 - aastep(r, d); }
+
     vec3 belowWater(){
       float y = clamp((1.0 - vUv.y) * 0.45 + uDepth * 0.55, 0.0, 1.0);
-      return rampPick(y);
+      return rampPickAA(y);
     }
 
     vec3 aboveWater(){
       float h = vUv.y - uHorizon;                 // positive = sky
       // five hard bands, pale at the horizon and hot at the top: the
       // inverse of the column below, where the pale end is overhead
-      float b = floor(clamp(h / 0.85, 0.0, 0.999) * 5.0) / 4.0;
-      vec3 sky = mix(uSkyLow, uSkyHigh, b);
+      vec3 sky = mix(uSkyLow, uSkyHigh, posteriseAA(h / 0.85, 5.0));
 
       // a low sun, three hard steps, sitting just over the horizon on
       // the same azimuth as the glitter path on the water
@@ -348,10 +429,10 @@ const waterQuad = screenQuad(THREE, {
       float sd = length(q);
       // kept small: at the first radii the three steps read as a
       // bullseye rather than as a sun
-      float up = step(-0.004, h);
-      sky = mix(sky, uHalo2, step(sd, 0.092) * up);
-      sky = mix(sky, uHalo1, step(sd, 0.058) * up);
-      sky = mix(sky, uSun,   step(sd, 0.030) * up);
+      float up = aastep(-0.004, h);
+      sky = mix(sky, uHalo2, disc(sd, 0.092) * up);
+      sky = mix(sky, uHalo1, disc(sd, 0.058) * up);
+      sky = mix(sky, uSun,   disc(sd, 0.030) * up);
 
       // three flat cloud lobes, wide and hard-edged, drifting slowly
       float cl = 0.0;
@@ -360,9 +441,9 @@ const waterQuad = screenQuad(THREE, {
         float cx = fract(0.16 + fi * 0.31 + uTime * 0.0045) * 1.7 - 0.35;
         vec2 cc = vec2(cx, uHorizon + 0.26 + fi * 0.075);
         vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.30, vUv.y - cc.y);
-        cl = max(cl, step(length(d2), 0.030));
+        cl = max(cl, disc(length(d2), 0.030));
       }
-      sky = mix(sky, uCloud, cl * step(0.03, h));
+      sky = mix(sky, uCloud, cl * aastep(0.03, h));
       return sky;
     }
 
@@ -411,26 +492,32 @@ const surfUniforms = {
   uTime, uCam:{value:new THREE.Vector3()}, uFog, uAbove, uRamp,
   uCream:{value:C(PAL.cream)},
   uSeaNear:{value:C(AIR.seaNear)}, uSeaFar:{value:C(AIR.seaFar)},
-  uTrough:{value:C(AIR.trough)}, uGlint:{value:C(AIR.glint)}
+  uTrough:{value:C(AIR.trough)}, uGlint:{value:C(AIR.glint)},
+  /* the air palette, for the Snell window: what is overhead when the
+     lens is under the water is the SKY, and it has to be painted with
+     the sky's own colours rather than with a pale version of the
+     water's */
+  uAirHi:{value:C(AIR.skyHigh)}, uAirLo:{value:C(AIR.skyLow)}
 };
-const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 54, 54), posterMat(THREE, {
-  uniforms: surfUniforms, side: THREE.DoubleSide, prelude: PRE,
-  vertex:`
+/* 54 -> 112 segments. At 260 m across, 54 put 4.8 m between vertices,
+   which is the size of the room the old straight-line thresholds were
+   drawing. The quantised displacement (0.17 m) now lands on 2.3 m
+   plates, which is what "flat bands with stylised crests" wanted to be
+   in the first place. 5,832 -> 25,088 triangles on a vertex shader
+   that is four sines; measured cost is in the report. */
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 112, 112), posterMat(THREE, {
+  uniforms: surfUniforms, side: THREE.DoubleSide, prelude: PRE + WAVE_GLSL,
+  vertex: WAVE_GLSL + `
     uniform float uTime;
-    varying vec3 vWorld; varying float vCrest; varying float vChop; varying float vDist;
+    varying vec3 vWorld; varying float vDist;
     void main(){
       vec3 p = position;
       // The long slow swell moves the geometry — above water the motion
-      // should read as huge and slow. But the SHADING must key off the
-      // short chop only: keyed off the sum, one swell trough turned the
-      // whole foreground into a single flat slab.
-      float chop = sin(p.x * 0.42 + uTime * 0.55) * 0.26
-                 + sin(p.y * 0.33 - uTime * 0.41) * 0.22
-                 + sin((p.x + p.y) * 0.19 + uTime * 0.23) * 0.18;
-      float swell = sin(p.y * 0.055 - uTime * 0.16) * 0.55;
-      float w = chop + swell;
-      vCrest = w; vChop = chop;
-      p.z += floor(w / 0.17) * 0.17;
+      // should read as huge and slow. The SHADING is no longer computed
+      // here at all: see WAVE_GLSL. It is re-evaluated per fragment, so
+      // a threshold draws the wave instead of the triangle.
+      vec2 w = vec2(p.x, p.y);
+      p.z += floor((chopAt(w, uTime) + swellAt(w, uTime)) / 0.17) * 0.17;
       vec4 wp = modelMatrix * vec4(p, 1.0);
       vWorld = wp.xyz;
       vec4 mv = viewMatrix * wp;
@@ -439,33 +526,104 @@ const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 54, 54), poster
     }
   `,
   fragment:`
-    varying vec3 vWorld; varying float vCrest; varying float vChop; varying float vDist;
-    uniform vec3 uCam, uCream, uSeaNear, uSeaFar, uTrough, uGlint;
-    uniform float uAbove;
+    varying vec3 vWorld; varying float vDist;
+    uniform vec3 uCam, uCream, uSeaNear, uSeaFar, uTrough, uGlint, uAirHi, uAirLo;
+    uniform float uAbove, uTime;
     float hash1(vec2 p){ return fract(sin(dot(p, vec2(12.98, 78.23))) * 43758.5453); }
 
     void main(){
+      // plane coordinates, matching the vertex stage exactly
+      vec2 w = vec2(vWorld.x, -vWorld.z);
+      float chop  = chopAt(w, uTime);
+      float swell = swellAt(w, uTime);
+      float crest = chop + swell;
       float r = length(vWorld.xz - uCam.xz);
 
-      // --- seen from underneath: a small bright window overhead ---
-      float d = clamp(-uCam.y, 0.0, 20.0);
-      float win = 1.0 - smoothstep(1.2 + d * 0.22, 4.5 + d * 0.60, r);
-      vec3 under = rampPick((1.0 - win) * 0.78);
-      under = mix(under, uCream, step(0.52, vCrest) * step(0.2, win) * 0.45);
+      /* ============================================================
+         SEEN FROM UNDERNEATH — THE SNELL WINDOW
+         ============================================================
+         What was here was 1.0 - smoothstep(1.2 + d*0.22, 4.5 + d*0.60, r):
+         a soft grey smudge whose size came from two numbers that had
+         been tuned until the picture was acceptable. It was the one
+         continuous gradient in the chapter, it had no edge, and it was
+         the dimmest thing in a frame where it should have been the
+         brightest.
+
+         It is now the real thing, and the real thing has an EDGE,
+         which is what makes it worth drawing in this idiom at all.
+         Light leaving water into air refracts away from the normal;
+         past the critical angle it cannot leave at all and the surface
+         becomes a mirror. For water and air that angle is 48.6 deg, so
+         a lens at depth d sees the entire sky compressed into a disc of
+         radius tan(48.6) * d = 1.1343 d, with total internal reflection
+         everywhere outside it.
+
+         That is a HARD BOUNDARY arriving for free out of the physics —
+         a §4.2 shape rather than a §4.2 shape imposed on something that
+         did not have one. The size is now derived rather than tuned:
+         she rises, the window opens; she descends, it closes.
+         ============================================================ */
+      float depth = max(0.80, -uCam.y);
+      float rho   = r / (1.1343 * depth);
+      // the surface is not flat, so the rim is not a circle. Pushing
+      // the boundary around with the wave the fragment is standing on
+      // is what stops it reading as a vignette.
+      rho += chop * 0.10 + swell * 0.04;
+
+      // INSIDE: the whole sky squashed into the disc, zenith at the
+      // centre and horizon at the rim. Washed well toward the chapter's
+      // own accent on the way through the water, so it is a warm pale
+      // hole in a teal world rather than a piece of sunset pasted into
+      // one — §4.2 rule 3, one hue family per scene.
+      float elev = 1.0 - clamp(rho, 0.0, 1.0);
+      vec3  air  = mix(uAirLo, uAirHi, posteriseAA(elev, 4.0));
+      air = mix(air, uCream, 0.46);
+      // the caustic net seen on the underside of the surface itself —
+      // the SAME field the seabed is lit by, so the window and the
+      // floor are demonstrably one light and not two effects
+      air = mix(air, uCream, posteriseAA(caustic(w * 0.40, uTime), 3.0) * 0.40);
+
+      // OUTSIDE: total internal reflection. The surface is a mirror of
+      // the dark column below it, so it has to go DARK at the rim
+      // rather than fade away.
+      vec3 tir = rampPickAA(0.60 + chop * 0.16 + (1.0 - aastep(0.0, crest)) * 0.16);
+
+      vec3 under = mix(tir, air, 1.0 - aastep(1.0, rho));
+      // the rim: a disproportionate amount of the sky's light arrives
+      // in the last few degrees before the critical angle
+      under = mix(under, uCream, aaband(rho, 0.90, 1.00) * 0.55);
       under = mix(under, uFog, fogAmount(vDist));
 
-      // --- seen from above: dark violet close, amber to the horizon,
-      //     and a hard glitter path running out under the sun ---
-      float db = floor(clamp(1.0 - exp(-r * 0.065), 0.0, 0.999) * 5.0) / 4.0;
-      vec3 over = mix(uSeaNear, uSeaFar, db);
-      over = mix(over, uTrough, step(vChop, -0.22));
-      // A path, not a field. Widening it with distance and dropping the
-      // crest test turned the whole foreground into a checkerboard:
-      // keep it narrow, keep the cells small, and only let wave tops
-      // actually catch the light.
-      float path = 1.0 - smoothstep(0.8, 2.6 + r * 0.10, abs(vWorld.x));
-      float chip = step(0.76, hash1(vec2(floor(vWorld.x * 5.0), floor(vWorld.z * 5.0))));
-      over = mix(over, uGlint, path * chip * step(0.20, vChop));
+      /* ============================================================
+         SEEN FROM ABOVE
+         ============================================================ */
+      vec3 over = mix(uSeaNear, uSeaFar, posteriseAA(1.0 - exp(-r * 0.065), 5.0));
+      over = mix(over, uTrough, 1.0 - aastep(-0.22, chop));
+
+      /* THE GLITTER PATH — the reader's named example.
+         The old cell was floor(world * 5.0), i.e. 0.2 m square. Two
+         metres from the lens — which is where the water meets the
+         bottom edge of the frame — 0.2 m subtends about seventy pixels,
+         so the near half of every above-water frame was filled with
+         cream RECTANGLES marching at the camera. It was not a glitter
+         path, it was a quantisation grid seen at point-blank range.
+
+         Three things were wrong and all three are fixed here:
+           - the cell is more than halved, to 0.085 m, which is a chip
+             rather than a tile at the only distance it is ever seen;
+           - the crest test ran on an interpolated varying, so a chip
+             appeared or did not according to which triangle it was in,
+             and the boundary was a straight line across that triangle.
+             chop is now the real per-fragment value;
+           - nothing faded it out, so it carried on to the horizon where
+             a cell is a small fraction of a pixel. A pattern below the
+             sampling rate is not detail, it is noise, and it crawls.
+             It now ends at 22 m and is gone by 60. */
+      float path  = 1.0 - smoothstep(0.8, 2.6 + r * 0.10, abs(vWorld.x));
+      float chip  = aastep(0.80, hash1(floor(vec2(vWorld.x, vWorld.z) / 0.085)));
+      float tilt  = aastep(0.20, chop) * aastep(-0.28, swell);
+      float reach = 1.0 - smoothstep(22.0, 60.0, r);
+      over = mix(over, uGlint, path * chip * tilt * reach);
 
       gl_FragColor = vec4(mix(under, over, uAbove), 1.0);
     }
@@ -477,28 +635,53 @@ scene.add(surface);
 /* ------------------------------------------------------------------
    4. THE SEABED
    ------------------------------------------------------------------ */
-const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 40, 40), posterMat(THREE, {
-  uniforms:{ uA:{value:C(R.at(DEEP))}, uB:{value:C(PAL.indigo)}, uC:{value:C(R.at(BODY))}, uFog },
-  prelude: FOG_GLSL,
-  vertex:`
-    varying float vH; varying float vDist;
+/* 40 -> 72 segments, and the height field moved into the fragment
+   stage for shading exactly as the surface's wave was: `vH` was one
+   value per vertex on a 4.25 m grid, so the floor's three value bands
+   were drawn as straight lines across 4.25 m triangles. The plane
+   coordinate `vW` IS linear, so interpolating THAT and evaluating the
+   sines per fragment is both correct and no more expensive. */
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 72, 72), posterMat(THREE, {
+  uniforms:{ uTime, uA:{value:C(R.at(DEEP))}, uB:{value:C(PAL.indigo)},
+             uC:{value:C(R.at(BODY))}, uLit:{value:C(PAL.cream)}, uFog },
+  prelude: PRE_FOG + CAUSTIC_GLSL + BED_GLSL,
+  vertex: BED_GLSL + `
+    varying vec2 vW; varying float vDist;
     void main(){
       vec3 p = position;
-      float h = sin(p.x * 0.21) * 0.5 + sin(p.y * 0.17 + 1.3) * 0.4 + sin((p.x - p.y) * 0.09) * 0.6;
-      h = floor(h / 0.3) * 0.3;
-      p.z += h; vH = h;
+      vW = vec2(p.x, p.y);
+      p.z += bedQ(vW);
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragment:`
-    varying float vH; varying float vDist;
-    uniform vec3 uA, uB, uC;
+    varying vec2 vW; varying float vDist;
+    uniform float uTime;
+    uniform vec3 uA, uB, uC, uLit;
     void main(){
-      float v = floor(clamp(vH * 0.45 + 0.5, 0.0, 0.999) * 3.0) / 2.0;
+      float h = bedQ(vW);
+      float v = posteriseAA(h * 0.45 + 0.5, 3.0);
       vec3 col = mix(uB, uA, v);
-      col = mix(col, uC, step(0.95, v) * 0.5);
+      col = mix(col, uC, aastep(0.95, v) * 0.5);
+
+      /* THE CAUSTIC NET. The seabed had no light on it at all: it was a
+         near-black plane with three value bands nobody could see, which
+         is a large part of why the underwater half of this chapter
+         reads as empty. This is the thing that is actually missing from
+         a dive, and it is the same field the Snell window overhead is
+         painted with, at the same scale, so the two agree.
+
+         Posterised to three steps like everything else — a caustic is a
+         high-frequency field that MOVES, which is the exact recipe for
+         a crawling edge, so the risers are resolved (§4.2a) and the
+         whole thing dissolves out past 40 m where the filaments go
+         finer than a pixel. */
+      float lit = posteriseAA(caustic(vW * 0.30, uTime), 3.0)
+                * 0.52 * (1.0 - smoothstep(26.0, 72.0, vDist));
+      col = mix(col, uLit, lit);
+
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
@@ -510,33 +693,85 @@ scene.add(bed);
 /* ------------------------------------------------------------------
    5. LIGHT SHAFTS (below only)
    ------------------------------------------------------------------ */
-const shafts = new THREE.Mesh(new THREE.PlaneGeometry(90, 44, 1, 1), posterMat(THREE, {
+/* ONE PLANE IS NOT A VOLUME, AND IT LOOKED LIKE ONE PLANE.
+   ------------------------------------------------------------------
+   This was a single 90x44 quad carrying a product of two sines
+   quantised to three steps. Everything wrong with it follows from
+   being flat: there is no parallax between the near shafts and the far
+   ones, so the whole thing slides with the camera as one sheet; all
+   the shafts are necessarily at the same depth, so none of them can
+   pass in front of or behind anything; and a quantised wedge on a flat
+   additive plane reads as a SLAB, which is what it did — inspected on
+   the deployed build on 2 November, the underwater frame has hard
+   rectangular bars in it and this is one of the things making them.
+
+   Shafts are a volume. Seven quads at staggered depths and widths,
+   splaying away from the window overhead, built into ONE merged mesh
+   so it is still one draw call and 14 triangles. Now the near ones
+   cross the far ones, things pass between them, and the camera moving
+   separates them.
+
+   The brightness along each shaft is driven by the SAME caustic field
+   as the seabed and the Snell window, evaluated at the shaft's own
+   footprint. That is the point: a shaft is a column of light under a
+   patch of surface that happens to be focusing, so when the surface
+   brightens, the shaft under it brightens and the floor under THAT
+   brightens. One light, three places, rather than three effects.
+
+   Peak alpha per shaft is 0.095, down from 0.20. Additively, two
+   crossing shafts were reaching almost a third of full scale on a
+   near-black field, which is where "slab" comes from.
+   ------------------------------------------------------------------ */
+const SHAFT_TOP = -0.45, SHAFT_BOT = -19.0;
+function shaftGeometry(n){
+  const b = builder(THREE, { aX:1, aSeed:1 });
+  for(let i = 0; i < n; i++){
+    const seed = (i * 2.399) % 6.283;
+    const x0 = -15 + (i / (n - 1)) * 30 + Math.sin(seed * 3.1) * 1.8;
+    const z  = -19 + ((i * 7919) % 53) / 53 * 26;
+    const wT = 0.75 + ((i * 6367) % 41) / 41 * 1.4;
+    const wB = wT * 2.4;
+    const dx = x0 * 0.26;                       // they splay as they descend
+    const base = b.count;
+    b.vertex(x0 - wT,      SHAFT_TOP, z, { aX:-1, aSeed:seed });
+    b.vertex(x0 + wT,      SHAFT_TOP, z, { aX: 1, aSeed:seed });
+    b.vertex(x0 + dx - wB, SHAFT_BOT, z, { aX:-1, aSeed:seed });
+    b.vertex(x0 + dx + wB, SHAFT_BOT, z, { aX: 1, aSeed:seed });
+    b.tri(base, base + 1, base + 2);
+    b.tri(base + 1, base + 3, base + 2);
+  }
+  return b.geometry();
+}
+const shafts = new THREE.Mesh(shaftGeometry(7), posterMat(THREE, {
   uniforms:{ uTime, uCream:{value:C(PAL.cream)}, uPale:{value:C(R.at(PALE))} },
   transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide,
+  prelude: PRE_AA + CAUSTIC_GLSL,
   vertex:`
-    varying vec3 vW;
-    void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
-      gl_Position = projectionMatrix * viewMatrix * wp; }
+    attribute float aX; attribute float aSeed;
+    varying float vX; varying float vSeed; varying vec3 vW;
+    void main(){
+      vX = aX; vSeed = aSeed;
+      vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
   `,
   fragment:`
-    varying vec3 vW;
+    varying float vX; varying float vSeed; varying vec3 vW;
     uniform float uTime;
     uniform vec3 uCream, uPale;
     void main(){
-      float x = vW.x + vW.y * 0.26;
-      float s = sin(x * 0.46 + uTime * 0.035) * 0.5 + 0.5;
-      s *= sin(x * 0.19 - uTime * 0.022 + 1.9) * 0.5 + 0.5;
-      s = smoothstep(0.30, 0.78, s);
-      s = floor(clamp(s, 0.0, 0.999) * 3.0) / 2.0;
-      // hard-stopped below the surface: the plane is tall enough that
-      // its top reached into the air, and an additive cream wedge was
-      // rendering in the sky
-      float a = s * smoothstep(-15.0, -2.0, vW.y) * 0.20 * (1.0 - step(-0.6, vW.y));
+      float across = 1.0 - abs(vX);
+      float cs = causticField(vec2(vW.x, vW.z) * 0.26 + vec2(vSeed * 3.0, 0.0), uTime, 2);
+      // fade in under the surface and out well above the bed, so a
+      // shaft never ends on a line; posterised AFTER the envelope so
+      // the terraces are the shape of the whole shaft (§4.2 rule 5)
+      float env = smoothstep(-0.4, -3.0, vW.y) * (1.0 - smoothstep(-10.0, -18.0, vW.y));
+      float a = posteriseAA(across * (0.42 + 0.58 * cs) * env, 3.0) * 0.095;
+      if(a < 0.004) discard;
       gl_FragColor = vec4(mix(uPale, uCream, 0.5) * a, a);
     }
   `
 }));
-shafts.position.set(0, -9, -9);
 shafts.renderOrder = 5;
 scene.add(shafts);
 
@@ -568,7 +803,7 @@ function kelpGeometry(n, seg){
 }
 scene.add(new THREE.Mesh(kelpGeometry(22, 10), posterMat(THREE, {
   uniforms:{ uTime, uFog, uA:{value:C(PAL.indigo)}, uB:{value:C(R.at(BODY))}, uC:{value:C(R.at(MID))} },
-  side: THREE.DoubleSide, prelude: FOG_GLSL,
+  side: THREE.DoubleSide, prelude: PRE_FOG,
   vertex:`
     attribute float aH; attribute float aPhase; attribute float aSide;
     uniform float uTime;
@@ -588,9 +823,9 @@ scene.add(new THREE.Mesh(kelpGeometry(22, 10), posterMat(THREE, {
     varying float vH; varying float vSide; varying float vDist;
     uniform vec3 uA, uB, uC;
     void main(){
-      float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
+      float v = posteriseAA(vH, 3.0);
       vec3 col = mix(uA, uB, v);
-      col = mix(col, uC, step(0.5, vSide) * 0.3 * v);
+      col = mix(col, uC, aastep(0.5, vSide) * 0.3 * v);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
@@ -622,7 +857,15 @@ function coralGeometry(){
                   y: BED_Y + 1.0, h: 2.6 + (i % 3) * 1.1, tier: 2, blades: 4,
                   lean: Math.cos(a) * 0.5 });
   }
-  const SEG = 5;
+  /* 5 -> 8 segments, and the taper taken from 0.65 to 0.94 so a blade
+     actually closes to a point. Inspected on the deployed build on
+     2 November, the mid-field coral is a row of flat rose RECTANGLES
+     with hard flat tops across the middle of the frame: at 5 segments
+     and a 35% residual width the taper is invisible, so a blade is a
+     bar. Tapering it is the cheapest "jagged shapes" fix in the
+     chapter — 44 extra triangles per clump on a mesh that is already
+     merged, and the silhouette is the entire read at 375 px. */
+  const SEG = 8;
   for(let ci = 0; ci < clumps.length; ci++){
     const cl = clumps[ci];
     const root = [cl.x, cl.y, cl.z];
@@ -631,7 +874,7 @@ function coralGeometry(){
       const ph = (ci * 2.1 + bl * 0.8) % 6.283;
       const w0 = 0.20 + (bl % 2) * 0.12;
       for(let s = 0; s <= SEG; s++){
-        const f = s / SEG, w = w0 * (1 - f * 0.65);
+        const f = s / SEG, w = w0 * (1 - f * 0.94);
         const dx = cl.x + spread * f * 1.3 + cl.lean * f * f * 1.2;
         const dy = cl.y + f * cl.h;
         for(const sd of [-1, 1]){
@@ -648,7 +891,7 @@ scene.add(new THREE.Mesh(coralGeometry(), posterMat(THREE, {
   uniforms:{ uTime, uDiver, uFog,
     uT0:{value:C(PAL.indigoDeep)}, uT1:{value:C(R.at(BODY))}, uT2:{value:C(R.at(MID))},
     uRose:{value:C(PAL.rose)}, uInd:{value:C(PAL.indigo)} },
-  side: THREE.DoubleSide, prelude: FOG_GLSL,
+  side: THREE.DoubleSide, prelude: PRE_FOG,
   vertex:`
     attribute float aH; attribute float aPhase; attribute float aTier; attribute vec3 aRoot;
     uniform float uTime; uniform vec3 uDiver;
@@ -671,11 +914,18 @@ scene.add(new THREE.Mesh(coralGeometry(), posterMat(THREE, {
     varying float vH; varying float vTier; varying float vDist; varying float vShy;
     uniform vec3 uT0, uT1, uT2, uRose, uInd;
     void main(){
+      // the tier selects stay step(): aTier is a per-object identity,
+      // not a field, and resolving a boundary that does not exist
+      // inside any primitive buys nothing
       vec3 bodyCol = mix(uT0, uT1, step(0.5, vTier));
       bodyCol = mix(bodyCol, uT2, step(1.5, vTier));
-      float v = floor(clamp(vH, 0.0, 0.999) * 3.0) / 2.0;
+      float v = posteriseAA(vH, 3.0);
       vec3 col = mix(uInd, bodyCol, max(v, 0.35));
-      col = mix(col, uRose, step(0.9, v) * step(0.5, vTier) * 0.55);
+      // the rose accent used to be step(0.9, v), which with v quantised
+      // to thirds put a hard horizontal band across every blade at
+      // exactly the same height. On the tip, resolved, so it reads as a
+      // tip rather than as a stripe.
+      col = mix(col, uRose, aastep(0.72, vH) * step(0.5, vTier) * 0.6);
       col = mix(col, uInd, vShy * 0.3);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * step(0.5, vTier)), 1.0);
     }
@@ -705,7 +955,7 @@ function fishGeometry(n){
 scene.add(new THREE.Mesh(fishGeometry(28), posterMat(THREE, {
   uniforms:{ uTime, uDiver, uFog,
     uLight:{value:C(PAL.fish)}, uDark:{value:C(PAL.fishDark)}, uCream:{value:C(PAL.cream)} },
-  side: THREE.DoubleSide, prelude: FOG_GLSL,
+  side: THREE.DoubleSide, prelude: PRE_FOG,
   vertex:`
     attribute vec2 aCorner; attribute float aSeed; attribute float aLane; attribute float aDark;
     uniform float uTime; uniform vec3 uDiver;
@@ -736,7 +986,7 @@ scene.add(new THREE.Mesh(fishGeometry(28), posterMat(THREE, {
     uniform vec3 uLight, uDark, uCream;
     void main(){
       vec3 col = mix(uLight, uDark, vDark);
-      col = mix(col, uCream, step(0.0, -vBelly) * 0.20);
+      col = mix(col, uCream, (1.0 - aastep(0.0, vBelly)) * 0.20);
       col = mix(col, uCream, vFlee * 0.30);
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
@@ -758,8 +1008,13 @@ function stackGeometry(){
     { x:-14, w: 5, h: 6.0, z:-142, tone:1 }
   ];
   for(const f of forms){
-    // a hard angular profile: five quantised steps across the top
-    const n = 6;
+    /* a hard angular profile: quantised steps across the top.
+       6 columns across a 52 m headland is one facet every nine metres,
+       which at 130 m away is a lump rather than a silhouette — and the
+       silhouette is the only thing these are for. 16 columns, with the
+       1.6 m quantisation left alone so they stay cut paper and do not
+       become a smooth curve. 96 extra triangles in total. */
+    const n = 16;
     for(let i = 0; i <= n; i++){
       const u = i / n;
       const x = f.x - f.w + u * f.w * 2;
@@ -835,7 +1090,7 @@ const puffs = particles(THREE, {
   n: NP, renderOrder: 6,
   material: posterMat(THREE, {
     uniforms:{ uPale:{value:C(PAL.bubble)}, uCream:{value:C(PAL.cream)}, uSpray:{value:C(AIR.spray)} },
-    transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    transparent:true, depthWrite:false, side:THREE.DoubleSide, prelude: PRE_AA,
     vertex:`
       attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
       varying vec2 vC; varying float vSize; varying float vKind;
@@ -852,11 +1107,17 @@ const puffs = particles(THREE, {
       void main(){
         if(vSize <= 0.0) discard;
         float d = length(vC);
-        if(d > 1.0) discard;
-        float rim  = step(0.76, d);
-        float chip = step(length(vC - vec2(-0.33, 0.33)), 0.26);
+        // a bubble is a CIRCLE, and a circle made with a discard is the
+        // most obviously aliased shape in the frame — there are up to
+        // 130 of them and MSAA cannot see any of their edges, because
+        // every one of those edges is inside a quad. Resolved, with the
+        // discard kept only to skip the corners of the quad entirely.
+        float body = 1.0 - aastep(1.0, d);
+        if(body <= 0.0) discard;
+        float rim  = aastep(0.76, d);
+        float chip = 1.0 - aastep(0.26, length(vC - vec2(-0.33, 0.33)));
         vec3 col = mix(mix(uPale, uCream, chip), uSpray, vKind);
-        float a = mix(0.40 + rim * 0.22 + chip * 0.33, 0.9, vKind);
+        float a = mix(0.40 + rim * 0.22 + chip * 0.33, 0.9, vKind) * body;
         gl_FragColor = vec4(col, a);
       }
     `
@@ -900,6 +1161,7 @@ function stepPuffs(dt, tt){
    ------------------------------------------------------------------ */
 const meniscus = overlayQuad(THREE, {
   uniforms:{ uHorizon, uCamY, uCream:{value:C(PAL.cream)}, uPale:{value:C(R.at(PALE))} },
+  prelude: PRE_AA,
   fragment:`
     varying vec2 vUv;
     uniform float uHorizon, uCamY;
@@ -908,8 +1170,8 @@ const meniscus = overlayQuad(THREE, {
       float near = 1.0 - smoothstep(0.0, 0.95, abs(uCamY));
       if(near <= 0.01) discard;
       float d = abs(vUv.y - uHorizon);
-      float core = step(d, 0.004 + near * 0.013);
-      float edge = step(d, 0.010 + near * 0.030);
+      float core = 1.0 - aastep(0.004 + near * 0.013, d);
+      float edge = 1.0 - aastep(0.010 + near * 0.030, d);
       float a = (core * 0.85 + (edge - core) * 0.30) * near;
       if(a < 0.02) discard;
       gl_FragColor = vec4(mix(uPale, uCream, core), a);
@@ -929,15 +1191,24 @@ const matWrap = new THREE.MeshBasicMaterial({ color: PAL.rose });
 const matLens = new THREE.MeshBasicMaterial({ color: PAL.cream });
 const matCord = new THREE.MeshBasicMaterial({ color: PAL.indigo });
 
-const SPH = new THREE.SphereGeometry(1, 12, 9);
+/* SUBDIVISION WHERE THE SILHOUETTE READS, AND NONE WHERE IT DOES NOT.
+   She is the only figure in the frame and she is small, so her outline
+   is the whole of her: at 12x9 the head and the torso are visibly
+   polygons, and no amount of edge resolution helps, because the edge
+   being resolved is genuinely a straight line. The four parts that
+   carry the read get 24x16; the limbs, which are thin and in motion
+   and never seen in isolation, stay cheap. About 1,100 extra triangles
+   on a figure already drawn with sixteen MeshBasicMaterial primitives. */
+const SPH = new THREE.SphereGeometry(1, 14, 10);
+const SPH_HI = new THREE.SphereGeometry(1, 24, 16);
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => part(THREE, geo, mat, sx, sy, sz, px, py, pz, rz);
 
 const diver = new THREE.Group();
-const torso = mk(SPH, matBody, 0.25, 0.46, 0.19,  0,  0.10, 0);
-const hips  = mk(SPH, matWrap, 0.24, 0.20, 0.19,  0, -0.32, 0);
-const head  = mk(SPH, matBody, 0.165, 0.185, 0.16, 0, 0.72, 0);
-const hair  = mk(SPH, matHair, 0.185, 0.165, 0.175, 0, 0.80, -0.03);
+const torso = mk(SPH_HI, matBody, 0.25, 0.46, 0.19,  0,  0.10, 0);
+const hips  = mk(SPH_HI, matWrap, 0.24, 0.20, 0.19,  0, -0.32, 0);
+const head  = mk(SPH_HI, matBody, 0.165, 0.185, 0.16, 0, 0.72, 0);
+const hair  = mk(SPH_HI, matHair, 0.185, 0.165, 0.175, 0, 0.80, -0.03);
 const lensL = mk(SPH, matLens, 0.062, 0.050, 0.05, -0.065, 0.715, 0.125);
 const lensR = mk(SPH, matLens, 0.062, 0.050, 0.05,  0.065, 0.715, 0.125);
 const strap = mk(BOX, matHair, 0.30, 0.040, 0.20,  0, 0.725, 0);
@@ -959,8 +1230,17 @@ scene.add(diver);
    chest, in her own frame, so it rolls and pitches with her */
 const PEARL_CHEST = new THREE.Vector3(0, 0.16, 0.30);
 
-const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), posterMat(THREE, {
+/* The pearl is the object the whole chapter is about and it was a
+   10-ring sphere with a step() terminator on an interpolated normal:
+   the two-value split ran as a visible polygon down the front of it,
+   which is the §4.2a case in miniature — the step is correct, the
+   geometry under it is not fine enough for the step to land anywhere
+   sensible, and no resolution of the edge fixes a terminator that is
+   genuinely made of ten straight pieces. 32x22, and the terminator
+   resolved on top of that. */
+const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 22), posterMat(THREE, {
   uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(R.at(MID))} },
+  prelude: PRE_AA,
   vertex:`
     varying vec3 vN;
     void main(){ vN = normalize(normalMatrix * normal);
@@ -971,11 +1251,54 @@ const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), posterMat(T
     uniform vec3 uWarm, uMid;
     void main(){
       float l = dot(normalize(vN), normalize(vec3(-0.35, 0.8, 0.5)));
-      gl_FragColor = vec4(mix(uMid, uWarm, step(0.12, l)), 1.0);
+      gl_FragColor = vec4(mix(uMid, uWarm, aastep(0.12, l)), 1.0);
     }
   `
 }));
 scene.add(pearl);
+
+/* ------------------------------------------------------------------
+   13a. THE CONTACT SHADOW — so she sits on the floor rather than
+   in front of it.
+   ------------------------------------------------------------------
+   Nothing in this scene is lit, so nothing casts anything, and the
+   consequence is that when she is on the seabed she reads as a cut-out
+   pasted over it. One flat posterised disc under her, fading in only
+   as she comes down, puts her in the picture. Two steps and an edge,
+   not a soft blob: it is a shape like everything else here.
+
+   It sits at the seabed's own QUANTISED height sampled at her
+   position, which is why bedQ exists in JavaScript as well as in GLSL.
+   Depth test on and depth write off, so where the floor rises over it
+   the floor simply wins — which is the correct picture anyway.
+
+   One extra draw call, two triangles' worth of geometry in a 28-sided
+   disc, and it only renders while she is within about five metres of
+   the bottom.
+   ------------------------------------------------------------------ */
+const contactMat = posterMat(THREE, {
+  uniforms:{ uDark:{value:C(PAL.indigoDeep)}, uNear:{value:0} },
+  transparent:true, depthWrite:false, prelude: PRE_AA,
+  vertex:`
+    varying vec2 vP;
+    void main(){ vP = position.xy;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying vec2 vP;
+    uniform vec3 uDark; uniform float uNear;
+    void main(){
+      float a = posteriseAA(1.0 - length(vP), 3.0) * uNear * 0.55;
+      if(a < 0.012) discard;
+      gl_FragColor = vec4(uDark, a);
+    }
+  `
+});
+const contact = new THREE.Mesh(new THREE.CircleGeometry(1.0, 28), contactMat);
+contact.rotation.x = -Math.PI / 2;
+contact.renderOrder = 1;
+contact.visible = false;
+scene.add(contact);
 
 /* ------------------------------------------------------------------
    The loop
@@ -1139,6 +1462,20 @@ const loop = clock((dt, now, running) => {
 
   uDiver.value.copy(diver.position);
   diver.updateMatrixWorld(true);
+
+  /* --- the contact shadow. Fades in over the last five metres of the
+     descent and is simply not drawn above that, so it costs nothing
+     for most of the cycle. --- */
+  const offBed = diver.position.y - (BED_Y + 1.0);
+  const onBed = Math.max(0, Math.min(1, 1 - offBed / 5.0));
+  contact.visible = onBed > 0.02;
+  if(contact.visible){
+    contact.position.set(diver.position.x,
+                         BED_Y + bedQjs(diver.position.x, diver.position.z) + 0.07,
+                         diver.position.z);
+    contact.scale.setScalar(1.0 + (1 - onBed) * 1.5);
+    contactMat.uniforms.uNear.value = onBed;
+  }
 
   /* --- the pearl: on the bed, or held at her chest --- */
   vBed.fromArray(B.proto.pearl);
