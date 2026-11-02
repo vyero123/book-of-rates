@@ -960,6 +960,28 @@ scene.add(spars);
    `position` no longer holds anything the shader can use for it. */
 const shadowMat = posterMat(THREE, {
   uniforms:{ uDeepS:{value:C(ROCK.shadowDeep)}, uAmt:{value:0} },
+  /* DoubleSide, and it is not belt-and-braces — it is the fault.
+     THREE'S ATTEMPTS AT THIS SHADOW ALL REPORTED coverage() EXACTLY 0,
+     and the first two diagnoses were wrong in a way worth recording.
+     Off the bottom of the frame: true, and fixed, and it still drew
+     nothing. Buried in the hill: also true, and fixed, and it STILL
+     drew nothing. The third time the vertices were projected and
+     checked instead of reasoned about — every one of them inside the
+     frustum at ndc y = -0.42, which killed both remaining theories in
+     one call and left only the material.
+
+     CircleGeometry is wound counter-clockwise in its own XY plane.
+     Writing world positions that map the disc's y to world Z is a
+     handedness flip, so every triangle ends up back-facing seen from
+     above, and FrontSide — the default — culls the lot. Nothing
+     throws, nothing warns, the draw call is still issued and still
+     counted: the same silent class as an unlinked shader, which is
+     why coverage() rather than a screenshot is what found it.
+
+     Project the geometry and look at the numbers before theorising
+     about why something cannot be seen. Two turns were spent not
+     doing that. */
+  side: THREE.DoubleSide,
   transparent:true, depthWrite:false, prelude: PRE_AA,
   vertex:`
     attribute vec2 aP;
