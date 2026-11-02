@@ -1626,16 +1626,45 @@ const loop = clock((dt, now, running) => {
   pushHistory(kiteX, kiteY, dist);
   updateTail(dist);
 
-  /* --- the shadow on the ridge. Altitude above the terrain is what
-     sizes and fades it, which is the whole of what it is for. --- */
-  const ridgeY = ridgeAt(dist, worlds[B.proto.id].period);
-  const alt = Math.max(0, kiteY - ridgeY);
+  /* --- the shadow on the ridge.
+     THE FIRST VERSION PUT IT DIRECTLY UNDER THE GLIDER AND IT DREW
+     NOTHING. Not faintly — nothing: flashMeter's coverage(), which
+     renders the scene with and without one mesh and counts the samples
+     that changed, returned exactly 0. The reason is geometry, not
+     alpha. At 22 m over the ridge with the lens sitting a metre above
+     the glider, the ground immediately below is about 62 degrees under
+     the view axis and the half-angle of the lens is 33. The terrain
+     filling the lower half of the frame is the ridge forty to eighty
+     metres AHEAD; the ground underneath is simply not in shot, ever,
+     at any altitude in this corridor.
+
+     So the light is high and BEHIND rather than overhead, and the
+     shadow falls forward onto the part of the ridge that can be seen.
+     There is no world sun to contradict: the sky's sun is painted at a
+     fixed place in SCREEN space on a background quad, so the chapter
+     had never committed to a direction. This picks one.
+
+     THE FORWARD OFFSET IS THE WHOLE INFORMATION. It is proportional to
+     altitude — climb and the shadow runs away ahead of you and fades,
+     descend and it comes back under you and darkens — which is both
+     what a shadow does under a fixed sun and the one continuous cue in
+     this chapter to a height the reader otherwise cannot judge.
+
+     Finding the terrain height under it needs the scroll arithmetic
+     rather than a guess: a vertex with base z appears at world z =
+     period*BEHIND - ((z - dist) mod period), so the ridge at world
+     z = -F has base coordinate dist + period*BEHIND + F. Getting this
+     wrong would float the shadow above the hill or bury it, and both
+     look like the shadow being broken rather than misplaced. --- */
+  const period = worlds[B.proto.id].period;
+  const alt = Math.max(0, kiteY - ridgeAt(dist + period * BEHIND, period));
   const far = clamp01(alt / 30);
-  kiteShadow.visible = alt < 34;
+  const fwd = clamp(alt * 2.4, 20, 72);
+  kiteShadow.visible = alt < 40;
   if(kiteShadow.visible){
-    kiteShadow.position.set(kiteX, ridgeY + 0.12, 0);
-    kiteShadow.scale.setScalar(1.15 + far * 2.9);
-    shadowMat.uniforms.uAmt.value = 0.52 * (1 - far * 0.72);
+    kiteShadow.position.set(kiteX, ridgeAt(dist + period * BEHIND + fwd, period) + 0.12, -fwd);
+    kiteShadow.scale.setScalar(2.2 + far * 1.6);
+    shadowMat.uniforms.uAmt.value = 0.55 * (1 - far * 0.55);
   }
 
   /* --- the camera. Behind, and leaning the way the phase is going, so
