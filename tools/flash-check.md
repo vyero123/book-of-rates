@@ -301,6 +301,56 @@ unlike every pixel instrument here it cannot be fooled by a readback.
 - **Pearl Diver no holds: three new single-frame events.** Lead three
   above. Unattributed.
 
+## A SIXTH INSTRUMENT FAILURE, AND THE WORST ONE — 2 November 2026
+
+`coverage()` gridded the frame at a stride HARDCODED to 24. On the
+562x1218 drawing buffer this project measures at, that is about 1,150
+samples standing in for 685,000 pixels.
+
+Long Air's new glider shadow covers roughly 1,500 device pixels — a
+plainly visible mark, about a quarter the screen area of the glider
+itself. It lands on about **three** of those samples, and `.toFixed(3)`
+rounded that to `0.000`, which is bit-for-bit what a mesh that is not
+being drawn at all reports.
+
+So coverage() said the shadow was absent, and **four separate changes
+went in against that number before the number was questioned**: moved
+out from under the glider, conformed to the terrain, switched to
+DoubleSide, conformed to the mesh's own interpolation rather than to
+the analytic function. Exactly one of those — the first — was a real
+fault, and it was the only one established by a different instrument
+(projecting the vertices and reading their ndc). The other three were
+arguments with a ruler too coarse to see the thing being measured.
+
+What settled it, and the order that should have been used from the
+start:
+
+1. **Project the geometry and read the numbers.** Five vertices, one
+   call, and it killed "off-frame" outright: every one inside the
+   frustum at ndc y = -0.42.
+2. **Bisect the pipeline rather than theorising about it.** depthTest
+   off, alpha forced to 1, both: all still ~0 at stride 24, which is
+   the result that should have indicted the meter instead of the mesh.
+3. **Re-measure at a stride that can resolve the thing.** 0.00216 of
+   43,005 samples at stride 4, 0.00224 of 171,129 at stride 2 — two
+   strides agreeing is what makes it a measurement rather than a
+   number.
+4. **Render without advancing the clock.** The first fine-grained
+   attempt used `pump()` between the two grabs and therefore measured
+   a frame of world motion as well as the mesh, reporting 5%. Use
+   `bench(1)`, which renders and does not move time. This document
+   already warned about exactly that confound two sections up and it
+   still caught me.
+
+`coverage(mesh, stride)` now takes the stride, reports five decimals,
+and has `coverageDetail()` beside it returning the raw sample counts
+and a plain `drawing: true|false`.
+
+**THE RULE: a zero from coverage() is not evidence of absence unless
+the stride can resolve the thing being asked about.** A fraction on its
+own hides whether it rests on two samples or four hundred, which is why
+the counts now travel with it.
+
 ## A fifth instrument failure, logged
 
 While verifying the fix I sampled `P.coverage()` every 20 frames inside

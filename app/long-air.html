@@ -987,30 +987,59 @@ scene.add(spars);
    triangles' worth of geometry in a 24-sided disc, and it is not
    drawn at all when it would be invisible.
    ------------------------------------------------------------------ */
-/* IT HAS TO LIE ON THE TERRAIN, WHICH MEANS THE TERRAIN'S REAL HEIGHT
-   AND NOT THE SPINE'S. The second attempt placed a flat disc at
-   ridgeAt() + 0.12 and coverage() still returned 0, because the ridge
-   MESH is ridgeAt() plus the profile's own dy plus gradeAt() — up to
-   0.45 m above the spine — and ridgeAt itself steps in 0.85 m
-   quantums, so across the disc's own width the hill routinely rises
-   over it. Lifting it until it cleared the worst case would have left
-   it floating a metre in the air.
+/* ==================================================================
+   THE INSTRUMENT, NOT THE SHADOW — 2 November 2026
+   ==================================================================
+   This mesh was reported absent by flashMeter.coverage() five times
+   running, and four changes went in against that number. The number
+   was wrong. The shadow was drawing the whole time.
 
-   So the disc is written in WORLD coordinates every frame, one vertex
-   at a time, each at the height the hill actually has underneath it.
-   Twenty-five vertices and a handful of sines: cheaper than being
-   wrong. `aP` carries the radial parameter the falloff needs, because
-   `position` no longer holds anything the shader can use for it. */
+   coverage() gridded the frame at a HARDCODED stride of 24, which on
+   a 562x1218 drawing buffer is about 1,150 samples for 685,000
+   pixels. This shadow covers roughly 1,500 device pixels — a plainly
+   visible mark, about a quarter the screen area of the glider — and
+   lands on about three of those samples. Rounded to three decimals
+   that is 0.000, which is exactly what a mesh that is not being drawn
+   at all reports. Re-measured at stride 4 and stride 2, with
+   `bench(1)` rendering so the clock does not advance between the two
+   grabs: 0.00216 of 43,005 samples and 0.00224 of 171,129, agreeing
+   with each other and with a screenshot. It was always there.
+
+   WHAT THE FOUR CHANGES WERE WORTH, honestly:
+
+     1. Moved out from under the glider. REAL. At 22 m over the ridge
+        the ground directly below is about 62 degrees under the view
+        axis against a 33 degree half-angle; that one was genuinely
+        off-frame, confirmed by projecting the vertices.
+     2. Conformed to the terrain rather than floating at the spine
+        height. Correct, and the right way to place a decal, but never
+        shown to have been the reason for a zero.
+     3. DoubleSide. Necessary for the winding, changed no measurement.
+     4. meshRidgeY, conforming to the mesh's own interpolation rather
+        than to the function it is built from. Same: right, unproven.
+
+   Two and four are kept because a decal placed on the surface that is
+   actually drawn is correct whether or not it was ever the bug, and
+   because the next person to put something on this terrain will need
+   meshRidgeY. But the ledger says what it says: one real diagnosis
+   out of five, and the other four were me arguing with a ruler that
+   was too coarse to see what I was measuring.
+
+   `coverage()` now takes a stride and `coverageDetail()` reports the
+   raw sample counts, so a zero from it means something. The rule, for
+   js/stage.js and for this document: A ZERO IS NOT EVIDENCE OF
+   ABSENCE UNLESS THE STRIDE CAN RESOLVE THE THING BEING ASKED ABOUT.
+   ================================================================== */
+/* `aP` carries the radial parameter the falloff needs, because
+   `position` holds world coordinates rewritten every frame and no
+   longer has anything the shader can use for it. */
 const shadowMat = posterMat(THREE, {
   uniforms:{ uDeepS:{value:C(ROCK.shadowDeep)}, uAmt:{value:0} },
   /* DoubleSide because mapping the disc's own y to world Z is a
-     handedness flip and every triangle would otherwise be back-facing
-     from above. Necessary, and — recorded because it was asserted as
-     the fix and tested before being believed — NOT SUFFICIENT: flipped
-     at runtime on the deployed page, coverage() stayed at exactly 0.
-     See the note on the loop that places this mesh for what it
-     actually was. Four wrong diagnoses on one shadow, every one of
-     them killed by a measurement rather than by argument. */
+     handedness flip, so every triangle would otherwise be back-facing
+     seen from above. Kept, but NOT the fix for anything: flipping it
+     at runtime on the deployed page did not change the measurement.
+     See THE INSTRUMENT, not the shadow, below. */
   side: THREE.DoubleSide,
   transparent:true, depthWrite:false, prelude: PRE_AA,
   vertex:`
@@ -1708,16 +1737,17 @@ const loop = clock((dt, now, running) => {
   updateTail(dist);
 
   /* --- the shadow on the ridge.
-     THE FIRST VERSION PUT IT DIRECTLY UNDER THE GLIDER AND IT DREW
-     NOTHING. Not faintly — nothing: flashMeter's coverage(), which
-     renders the scene with and without one mesh and counts the samples
-     that changed, returned exactly 0. The reason is geometry, not
-     alpha. At 22 m over the ridge with the lens sitting a metre above
-     the glider, the ground immediately below is about 62 degrees under
-     the view axis and the half-angle of the lens is 33. The terrain
-     filling the lower half of the frame is the ridge forty to eighty
-     metres AHEAD; the ground underneath is simply not in shot, ever,
-     at any altitude in this corridor.
+     THE FIRST VERSION PUT IT DIRECTLY UNDER THE GLIDER AND THAT WAS
+     GENUINELY OFF-FRAME — the one diagnosis in this sequence that
+     held up, and it held up because the vertices were PROJECTED and
+     read rather than reasoned about. At 22 m over the ridge with the
+     lens a metre above the glider, the ground immediately below sits
+     about 62 degrees under the view axis against a lens half-angle of
+     33. The terrain filling the lower half of the frame is the ridge
+     forty to eighty metres AHEAD; the ground underneath is not in
+     shot at any altitude in this corridor.
+     (The four changes that followed were made against a broken
+     measurement — see THE INSTRUMENT, NOT THE SHADOW above.)
 
      So the light is high and BEHIND rather than overhead, and the
      shadow falls forward onto the part of the ridge that can be seen.

@@ -479,17 +479,68 @@ export function flashMeter({ renderer, scene, camera, step, canvas }){
                worstSpread:+worstSpread.toFixed(1), period: uP };
     },
 
-    /** What fraction of the frame does this one mesh own right now? */
-    coverage(mesh){
-      renderer.render(scene, camera); const withIt = grid(24);
+    /** What fraction of the frame does this one mesh own right now?
+     *
+     *  THE STRIDE IS A RESOLUTION LIMIT AND IT HAS TO BE AN ARGUMENT —
+     *  2 November 2026, and this one cost five wrong diagnoses in a row.
+     *
+     *  It was hardcoded at 24, which on a 562x1218 drawing buffer is
+     *  about 1,150 samples for 685,000 pixels. Long Air's new glider
+     *  shadow covers roughly 1,500 device pixels — a real, plainly
+     *  visible mark, about a quarter the screen area of the glider
+     *  itself — and it lands on about THREE of those samples. Rounded,
+     *  that is 0.000, which is indistinguishable from a mesh that is
+     *  not being drawn at all.
+     *
+     *  So coverage() reported exactly 0 for a shadow that was working,
+     *  and four separate "fixes" went in against it: moved out from
+     *  under the glider, conformed to the terrain, switched to
+     *  DoubleSide, then conformed to the mesh's own interpolation
+     *  rather than to the function it is built from. Three of those
+     *  were real improvements and none of them was the reason the
+     *  number was zero. The number was zero because of the stride.
+     *
+     *  This instrument is for "one layer is filling the screen", which
+     *  is what it was written for and what 24 is fine for. For "is
+     *  this small thing drawing at all", pass 4 or 2 — and read the
+     *  sample count, not just the fraction, because a fraction of
+     *  0.002 out of 1,150 samples is two samples and means nothing
+     *  while the same fraction out of 171,000 is four hundred and
+     *  means something.
+     *
+     *  A zero from this function is not evidence of absence unless the
+     *  stride can resolve the thing being asked about.
+     */
+    coverage(mesh, stride = 24){
+      renderer.render(scene, camera); const withIt = grid(stride);
       const was = mesh.visible; mesh.visible = false;
-      renderer.render(scene, camera); const without = grid(24);
+      renderer.render(scene, camera); const without = grid(stride);
       mesh.visible = was;
       let diff = 0;
       for(let i = 0; i < withIt.length; i += 3){
         if(Math.abs(withIt[i]-without[i]) + Math.abs(withIt[i+1]-without[i+1]) > 12) diff++;
       }
-      return +(diff / (withIt.length / 3)).toFixed(3);
+      // five decimals, not three: at stride 24 a small mark is a
+      // handful of samples and three decimals rounds it to nothing,
+      // which is exactly how the shadow read as absent
+      return +(diff / (withIt.length / 3)).toFixed(5);
+    },
+
+    /** The counts behind coverage(), for when the question is "is this
+     *  drawing at all" rather than "how much of the frame is this". */
+    coverageDetail(mesh, stride = 4){
+      renderer.render(scene, camera); const withIt = grid(stride);
+      const was = mesh.visible; mesh.visible = false;
+      renderer.render(scene, camera); const without = grid(stride);
+      mesh.visible = was;
+      let diff = 0;
+      for(let i = 0; i < withIt.length; i += 3){
+        if(Math.abs(withIt[i]-without[i]) + Math.abs(withIt[i+1]-without[i+1]) > 12) diff++;
+      }
+      const samples = withIt.length / 3;
+      return { stride, samples, changed: diff,
+               frac: +(diff / samples).toFixed(5),
+               drawing: diff > 0 };
     },
 
     /** The worst any single mesh covers over a run — the number that
