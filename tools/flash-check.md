@@ -120,7 +120,64 @@ threshold 25, cluster gap 2. Measured on the deployed build,
 | Lantern Current · drift | idle | 0 | 0 | 0.00 | 0 | 0.8 | 0.08 |
 | Lantern Current · slower | idle | 0 | 0 | 0.00 | 0 | 0.9 | 0.08 |
 
-For comparison, the figures this table replaces (12 October, same
+### After the §4.2a quality pass — 2 November 2026
+
+Same parameters, same instrument, same session, on the deployed build,
+measured immediately after the pass described in design doc §4.2a (edge
+resolution, the wave and seabed fields moved into the fragment stage,
+the Snell window, caustics, shafts as a volume).
+
+| chapter | drive | frames | clusters | per s | longest | worst | mean |
+|---|---|---|---|---|---|---|---|
+| Pearl Diver · box | — | 13 | 6 | 0.38 | 4 | **167.7** | **1.89** |
+| Pearl Diver · no holds | — | 17 | 8 | 0.50 | 5 | **101.1** | **1.93** |
+
+Against the 31 October rows above: box 14/5/274.2/2.34 and no holds
+28/6/115.0/2.99.
+
+**Every magnitude measure improved and one count got worse.** Worst
+single frame 274.2 -> 167.7 on box and 115.0 -> 101.1 on no holds; mean
+2.34 -> 1.89 and 2.99 -> 1.93; over-threshold frames 14 -> 13 and
+28 -> 17; longest cluster 5 -> 4 and 10 -> 5. The 274.2 that was the
+largest number in the project is gone, and it is gone for a reason
+rather than by luck: it was the waterline crossing, where the old
+overhead surface popped between a tuned smoothstep and the above-water
+treatment. The Snell window's radius is now a continuous function of
+depth, so the same crossing is spread over more frames at lower
+amplitude — which is also why box's longest cluster did not shrink as
+much as its peak did.
+
+**The count that went the wrong way, recorded rather than explained
+away.** No holds goes 6 clusters to 8. Two of those eight are the
+crossing read as two, split by a quiet frame at a gap of 2 (297 for
+three frames, then 304 for five). The other three are new SINGLE-FRAME
+clusters, at 241, 659 and 899, peaks 42.2, 41.1 and 31.6. Per the
+"count clusters, not frames" rule above, a one-frame cluster is the
+flash signature, so these are the right shape to take seriously even
+though they are at the low end of the range — Long Air's genuine pops
+sit at 26 to 44.
+
+They have NOT been attributed. The honest statement is that they may be
+new, or they may be events that sat just under the threshold of 25
+before and have been nudged over it by a scene with more contrast in
+it than it used to have. Distinguishing those needs the per-mesh
+isolation this document prescribes, run across each of the three frame
+pairs, and that was not done.
+
+### LEAD THREE, OPEN: three single-frame events on Pearl Diver no holds
+
+Frames 241, 659, 899 of a 1200-frame run at dt 1/60, peaks 42.2, 41.1,
+31.6. Box does not have them. The procedure is the one at the top of
+this document: replay to each frame, **check the jump reproduces**,
+then render one mesh at a time across the pair and read that mesh's own
+change. Do not hide one layer at a time; `begin()` re-asserts
+visibility. Candidates worth isolating first, in order of how much they
+changed in this pass: the seabed (the caustic field is new, it is high
+frequency and it moves), the surface plane (112 segments where there
+were 54), and the shaft mesh (seven quads where there was one, so it
+can now cross things).
+
+For comparison, the figures the 31 October table replaces (12 October, same
 parameters, frames only): Long Air box on cue 12 / worst 135.4 / mean
 1.99; Long Air idle 15 / 121.3 / 3.13; Pearl Diver box 14 / 274.4 /
 2.33; no holds 28 / 115.0 / 2.99.
@@ -236,9 +293,13 @@ unlike every pixel instrument here it cannot be fooled by a readback.
   strikes. That is one lightning event plus its tail, and it should
   probably be counted as one. The cluster merge gap of 2 frames does not
   catch it; a gap sized to the strike's decay would.
-- **Pearl Diver box's 274.2** is the waterline crossing, as designed, and
-  is the largest single number in the project. It is a 5-frame cluster,
-  not a pop.
+- **Pearl Diver box's 274.2** was the waterline crossing, as designed, and
+  was the largest single number in the project. It is a 5-frame cluster,
+  not a pop. **Down to 167.7 on 2 November** — see the quality-pass
+  table above; the window's size is now continuous in depth, so the
+  crossing is spread rather than stepped.
+- **Pearl Diver no holds: three new single-frame events.** Lead three
+  above. Unattributed.
 
 ## A fifth instrument failure, logged
 
