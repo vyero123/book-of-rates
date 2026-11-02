@@ -1010,7 +1010,31 @@ scene.add(kiteShadow);
    across it. The ribbon now banks through turns, which is the whole
    reason a glider has one.
    ================================================================== */
-const TAIL_SEG = 18, TAIL_STRIDE = 3;
+/* AND THEN IT HAS TO BE SHORT ENOUGH NOT TO REACH THE LENS.
+   -------------------------------------------------------------------
+   Recording the real forward travel fixed the ANGLE and made the
+   length wrong, which only became visible once the angle was right.
+   TAIL_SEG * TAIL_STRIDE was 54 frames: 0.9 s, which at 14 m/s is
+   12.6 m of trail — and the camera rides CAM_BACK_MIN = 11.5 m behind
+   the glider. The tail was therefore longer than the distance to the
+   lens and reached past it, filling the frame, which is a second way
+   to produce the same vertical stripe. Inspected on the deployed
+   build after the first fix: still a pole, for a different reason.
+
+   A streamer on a glider is a couple of body-lengths, not twelve
+   metres. Stride 1: eighteen frames, 0.3 s, 4.2 m of trail against
+   about 1.5 m of fall — a shallow ribbon behind and slightly above,
+   which is what it is supposed to be. The cost is that the tail now
+   remembers a third of a second rather than nine tenths, so it lags
+   less through a turn; that is the right trade when the alternative
+   is that it does not read as a tail at all.
+
+   The clamp is for the slow-device case rather than this one: clock()
+   caps dt at 0.05, so eighteen frames could in principle span 0.9 s
+   and 12.6 m again on a device dropping to 20 fps. Six metres is the
+   most it may ever be, which keeps it clear of the lens by five. */
+const TAIL_SEG = 18, TAIL_STRIDE = 1;
+const TAIL_MAX_BACK = 6.0;
 const histLen = TAIL_SEG * TAIL_STRIDE + 2;
 /* four per sample: x, y, and the COURSE DISTANCE it was taken at.
    (The fourth slot is kept for alignment and readability.) */
@@ -1087,7 +1111,7 @@ function updateTail(nowDist){
     const i = h * 4;
     // metres of real forward travel between then and now. This is the
     // number the old code replaced with a flat 0.30 per segment.
-    const back = nowDist - hist[i+2];
+    const back = Math.min(TAIL_MAX_BACK, nowDist - hist[i+2]);
     for(let v = 0; v < 2; v++){
       const o = (s*2 + v) * 3;
       tailPos.array[o]   = hist[i];
