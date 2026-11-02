@@ -457,6 +457,49 @@ function gradeAt(zb, x, period){
   return Math.max(-1.6, Math.min(0.45, Math.round(g / 0.3) * 0.3));
 }
 
+/* THE HEIGHT OF THE SURFACE THAT IS ACTUALLY DRAWN, which is not the
+   same number as the height of the function it is built from.
+   -------------------------------------------------------------------
+   This is what the glider's shadow needed and what three attempts at
+   it got wrong. ridgeGeometry samples ridgeAt + gradeAt at rows every
+   period/n metres (n = period/4, so about four metres apart) and at a
+   handful of profile columns, and the GPU then draws flat triangles
+   between those samples. ridgeAt is quantised to 0.85 m steps, so
+   between two rows the analytic value can stand most of a full
+   quantum above the chord the mesh actually renders.
+
+   A decal placed at the ANALYTIC height is therefore below the drawn
+   surface about as often as it is above it, and the depth test throws
+   it away — silently, with the draw call still issued and still
+   counted. That is what coverage() was reporting as 0.
+
+   So: reproduce the mesh's own interpolation. Find the two rows the
+   point falls between, evaluate the same way ridgeGeometry does at
+   each, interpolate across the same profile columns in x, and lerp.
+   The result is the surface the GPU is drawing, to within floating
+   point, so a lift of a few centimetres is all it takes.
+
+   Only valid for |x| <= 13, which is the lane the glider flies in and
+   the only place anything asks. */
+function meshRidgeY(x, zb, period, rows){
+  const rowY = zr => {
+    // the columns are SHIFTED IN X by the course's wander, so the
+    // interpolation parameter is measured from the shifted spine. The
+    // grade is still evaluated at the column's nominal x, because that
+    // is what ridgeGeometry passes it.
+    const dx = x - wanderAt(zr, period);
+    const k  = Math.min(13, Math.abs(dx)) / 13;
+    const sx = dx < 0 ? -13 : 13;
+    return ridgeAt(zr, period)
+         + gradeAt(zr, 0, period) * (1 - k) + gradeAt(zr, sx, period) * k
+         + 0.4 * k;            // the profile's own dy, 0 on the spine
+  };
+  const f  = (((zb % period) + period) % period) / period * rows;
+  const i0 = Math.floor(f), fr = f - i0;
+  return rowY((i0 / rows) * period) * (1 - fr)
+       + rowY(((i0 + 1) / rows) * period) * fr;
+}
+
 function ridgeGeometry(proto){
   const period = periodOf(proto);
   const n = Math.round(period / 4);
@@ -960,27 +1003,14 @@ scene.add(spars);
    `position` no longer holds anything the shader can use for it. */
 const shadowMat = posterMat(THREE, {
   uniforms:{ uDeepS:{value:C(ROCK.shadowDeep)}, uAmt:{value:0} },
-  /* DoubleSide, and it is not belt-and-braces — it is the fault.
-     THREE'S ATTEMPTS AT THIS SHADOW ALL REPORTED coverage() EXACTLY 0,
-     and the first two diagnoses were wrong in a way worth recording.
-     Off the bottom of the frame: true, and fixed, and it still drew
-     nothing. Buried in the hill: also true, and fixed, and it STILL
-     drew nothing. The third time the vertices were projected and
-     checked instead of reasoned about — every one of them inside the
-     frustum at ndc y = -0.42, which killed both remaining theories in
-     one call and left only the material.
-
-     CircleGeometry is wound counter-clockwise in its own XY plane.
-     Writing world positions that map the disc's y to world Z is a
-     handedness flip, so every triangle ends up back-facing seen from
-     above, and FrontSide — the default — culls the lot. Nothing
-     throws, nothing warns, the draw call is still issued and still
-     counted: the same silent class as an unlinked shader, which is
-     why coverage() rather than a screenshot is what found it.
-
-     Project the geometry and look at the numbers before theorising
-     about why something cannot be seen. Two turns were spent not
-     doing that. */
+  /* DoubleSide because mapping the disc's own y to world Z is a
+     handedness flip and every triangle would otherwise be back-facing
+     from above. Necessary, and — recorded because it was asserted as
+     the fix and tested before being believed — NOT SUFFICIENT: flipped
+     at runtime on the deployed page, coverage() stayed at exactly 0.
+     See the note on the loop that places this mesh for what it
+     actually was. Four wrong diagnoses on one shadow, every one of
+     them killed by a measurement rather than by argument. */
   side: THREE.DoubleSide,
   transparent:true, depthWrite:false, prelude: PRE_AA,
   vertex:`
@@ -1713,14 +1743,19 @@ const loop = clock((dt, now, running) => {
   const fwd = clamp(alt * 2.4, 20, 72);
   kiteShadow.visible = alt < 40;
   if(kiteShadow.visible){
+    /* ON THE SURFACE THAT IS DRAWN, not the one the function describes
+       — meshRidgeY, and the long note next to it, is the whole of why
+       this took four tries. 0.06 m of lift is enough once the height
+       is the right height; 0.10 m was not enough when it was not. */
     const rad = 2.2 + far * 1.6;
+    const rows = Math.round(period / 4);
     for(let i = 0; i < shN; i++){
       const wx = kiteX + shUnit[i*3] * rad;
       const wz = -fwd  + shUnit[i*3+1] * rad;
       // world z = period*BEHIND - ((zb - dist) mod period), inverted
       const zb = dist + period * BEHIND - wz;
       shPos.array[i*3]     = wx;
-      shPos.array[i*3 + 1] = ridgeAt(zb, period) + gradeAt(zb, wx, period) + 0.10;
+      shPos.array[i*3 + 1] = meshRidgeY(wx, zb, period, rows) + 0.06;
       shPos.array[i*3 + 2] = wz;
     }
     shPos.needsUpdate = true;
