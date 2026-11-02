@@ -1153,12 +1153,67 @@ const sprayDrop = (x, y, z) => puffs.spawn(p => {
   p.r = 0.045 + Math.random()*0.085;
   p.vx = Math.cos(a)*sp*0.55; p.vy = 1.6 + Math.random()*2.6; p.vz = Math.sin(a)*sp*0.4;
 });
+/* ==================================================================
+   THE EXHALE'S BUBBLES END WITH THE EXHALE — 2 November 2026
+   ==================================================================
+   EMISSION already stopped dead at the phase boundary: `ph.bubbles` is
+   a per-phase flag and the hold simply does not have it. That was
+   never the problem. The problem was the bubbles ALREADY IN FLIGHT.
+
+   The arithmetic, which is why it was so visible: she empties on the
+   seabed at -14.4, a bubble retires at -0.35, and they rise at between
+   0.9 and 2.4 m/s. Fourteen metres at about two metres a second is
+   SEVEN SECONDS. The exhale is four. So the bubbles released in the
+   last second of the exhale were still crossing the frame through the
+   whole of the four-second hold and most of the ascent — which is
+   exactly the thing the hold is supposed to be legible as the absence
+   of. The design note in js/deep-light-breath.js says "bubbles belong
+   to the exhale alone, which is what keeps a hold legible as a hold",
+   and the scene was not honouring it.
+
+   WHAT I CHOSE, and the alternatives I did not.
+
+   Not deletion: forty bubbles vanishing on one frame is a cut, it is
+   visible as a cut, and it is the kind of single-frame whole-field
+   change tools/flash-check.md exists to catch.
+
+   Not letting them run: that is the bug.
+
+   They are RELEASED — accelerated hard upward and shrunk away at the
+   same time. Rising faster and getting smaller is what a bubble
+   leaving looks like from below, so it reads as them going rather than
+   as them being switched off, and it costs no new machinery because a
+   zero-sized slot is already how this pool retires anything.
+
+   The clear-out is staggered by each slot's own random phase, over
+   roughly 0.45 to 0.95 seconds. Staggering is not decoration: it is
+   what stops the clear-out being the single-frame event that deleting
+   them would have been. Measured on the deployed build afterwards and
+   the flash meter does not see it.
+
+   The hold is bubble-free within about a second of the exhale ending,
+   against seven seconds before. Spray (kind 1) is untouched — it
+   belongs to the surface break, not to the breath.
+   ================================================================== */
+let bubblesLive = false;          // is the current phase an exhale?
+const RELEASE_RISE  = 7.0;        // m/s^2 of extra lift once released
+const RELEASE_SHRINK = 4.6;       // e-folds a second
+
 function stepPuffs(dt, tt){
   puffs.step(dt, (p, d) => {
     if(p.kind === 0){
+      if(!bubblesLive){
+        // each slot leaves on its own beat, so the clear-out is a
+        // dispersal rather than a cut
+        const eager = 0.70 + (p.ph / 6.283) * 0.6;
+        p.vy += d * RELEASE_RISE * eager;
+        p.r  *= Math.exp(-d * RELEASE_SHRINK * eager);
+        if(p.r < 0.012) return false;
+      } else {
+        p.vy = Math.min(2.4, p.vy + d*0.5);
+        p.r += d * 0.012;
+      }
       p.y += p.vy * d;
-      p.vy = Math.min(2.4, p.vy + d*0.5);
-      p.r += d * 0.012;
       p.x += Math.sin(tt*2.0 + p.ph) * d * 0.35;
       return !(p.y > SURFACE_Y - 0.35);
     }
@@ -1240,8 +1295,10 @@ diver.add(torso, hips, head, hair, lensL, lensR, strap,
 diver.scale.setScalar(0.95);
 scene.add(diver);
 
-/* where the pearl sits when she has both hands on it: in front of the
-   chest, in her own frame, so it rolls and pitches with her */
+/* Where the hands gather to: in front of the chest, in her own frame,
+   so it rolls and pitches with her. The pearl is no longer placed here
+   directly — it rides between the hands, and this is where the hands
+   go. One source of truth for one point. */
 const PEARL_CHEST = new THREE.Vector3(0, 0.16, 0.30);
 
 /* The pearl is the object the whole chapter is about and it was a
@@ -1326,6 +1383,70 @@ let prevY = Y_AIR;
 const vBed   = new THREE.Vector3();
 const vChest = new THREE.Vector3();
 const vH     = new THREE.Vector3();
+
+/* ==================================================================
+   TAKING THE PEARL — a gesture, not a scalar. 2 November 2026
+   ==================================================================
+   What was here: `grip` ran 0 to 1 across the exhale, the arms
+   interpolated between two poses on it, and the pearl was lerped from
+   the seabed to a fixed point at her chest on the same number. One
+   curve drove everything, so there was no moment at which she REACHED
+   and no moment at which she CLOSED — the pearl simply migrated.
+
+   The gesture has three beats and they overlap, because a real one
+   does:
+
+     REACH   she pitches down, turns a shoulder toward it and extends
+             both arms at it. Driven by the exhale's own phase
+             progress, not by grip.
+     CLOSE   the two hands converge on it laterally at the end of the
+             reach, and that is the moment the pearl starts following
+             them instead of lying on the bed.
+     GATHER  arms fold it in to the chest. This is `grip`, unchanged.
+
+   THE HANDOFF IS AUTOMATIC AND THAT IS THE POINT. The reach target is
+   multiplied by (1 - grip), so the reach retracts exactly as fast as
+   the gather takes over and there is no frame where the two fight. No
+   second schedule to keep in step with the first.
+
+   WHY THE TIMING IS NOT MINE TO SET. `grip` is `scalar` in
+   js/deep-light-breath.js, which tools/regress.mjs freezes against
+   tools/fixtures — 6822 samples, zero differences, and it gates every
+   push. So the gather's timing is fixed and the gesture is built
+   AROUND it rather than by editing it. On the box protocol grip
+   reaches 1 at 85% of a four-second exhale, so the hold at the chest
+   is settled 0.6 s before the ascent starts, which is what was asked
+   for and was already true. On no-holds it is 0.95, so 0.2 s — tight,
+   but it is the frozen curve and I am not the one who gets to move it.
+
+   THE PEARL NOW RIDES IN THE HANDS rather than lerping to a constant.
+   `PEARL_CHEST` was (0, 0.16, 0.30) and the gathered hands sit at
+   (0, 0.18, 0.30), so the two were describing the same point by two
+   different routes and could drift apart if either was edited. The
+   hands are the single source of truth; PEARL_CHEST is kept only as
+   the thing the hands gather to.
+
+   REACH IS CLAMPED TO ARM LENGTH. The pearl lies about 1.2 m below
+   her and her arm is about 0.55 m, so an unclamped "put the hands on
+   the pearl" detaches them from the shoulders. The target is clamped
+   to 0.78 m from her origin, which reads as reaching AT something
+   rather than as teleporting onto it.
+   ================================================================== */
+const vPL    = new THREE.Vector3();   // the pearl, in her own frame
+const vHL    = new THREE.Vector3();
+const vHR    = new THREE.Vector3();
+const vHands = new THREE.Vector3();
+const pL     = new THREE.Vector3();
+const pR     = new THREE.Vector3();
+/* the gathered hand positions, which are also where the pearl ends up.
+   These are the values the old code reached at grip = 1, kept exactly. */
+const GATHER_L = new THREE.Vector3(-0.085,  0.18, 0.30);
+const GATHER_R = new THREE.Vector3( 0.085,  0.18, 0.30);
+const FREE_L   = new THREE.Vector3(-0.300, -0.02, 0.00);
+const FREE_R   = new THREE.Vector3( 0.300, -0.02, 0.00);
+const ARM_SPAN = 0.78;
+let reachAmt = 0;
+const sstep = x => { const c = Math.min(1, Math.max(0, x)); return c*c*(3 - 2*c); };
 const cBodyUp = C(PAL.bodyUp), cBodyDown = C(PAL.bodyDown);
 const cBody = C(R.at(BODY)), cDeep = C(R.at(DEEP)), cInd = C(PAL.indigo);
 let subShown = '';
@@ -1439,13 +1560,29 @@ const loop = clock((dt, now, running) => {
 
   /* --- the diver --- */
   diver.position.set(Math.sin(t * 0.21) * 0.30, dyNow, Math.cos(t * 0.17) * 0.26);
+
+  /* THE REACH (see the gesture note above). It lives entirely inside
+     the exhale, it is driven by that phase's own progress rather than
+     by grip, and it is multiplied by (1 - grip) so it retracts exactly
+     as the gather takes over. Eased per frame as well, so a phase
+     change cannot snap it. */
+  vBed.fromArray(B.proto.pearl);
+  const wantReach = (ph.k === 'out')
+    ? sstep((st.pr - 0.05) / 0.34) * (1 - grip) : 0;
+  reachAmt += (wantReach - reachAmt) * Math.min(1, dt * 5.0);
+  const sideP = Math.sign(vBed.x - diver.position.x) || 1;
+
   const aim = ph.aim !== undefined ? ph.aim
             : ph.cam === 'air'  ? -0.15
             : ph.cam === 'line' ?  0.06
             : travel < 0 ? 0.60 : -0.45;
-  diver.rotation.x += (aim - diver.rotation.x) * Math.min(1, dt * 1.8);
-  diver.rotation.y  = Math.sin(t * 0.13) * 0.35;
-  diver.rotation.z  = Math.sin(t * 0.31) * 0.06;
+  // she pitches down over it and turns a shoulder toward it. A full
+  // look-at was tried on paper and rejected: the pearl sits behind and
+  // below her, so aiming at it properly is a 148-degree yaw, which is
+  // a spin, not a reach — and it would fight the camera's framing.
+  diver.rotation.x += ((aim + reachAmt * 0.42) - diver.rotation.x) * Math.min(1, dt * 1.8);
+  diver.rotation.y  = Math.sin(t * 0.13) * 0.35 - sideP * reachAmt * 0.24;
+  diver.rotation.z  = Math.sin(t * 0.31) * 0.06 + sideP * reachAmt * 0.16;
 
   /* kick: she swims when she is going somewhere, idles when she is not */
   const swim = Math.abs(travel) > 2 ? 1.0 : 0.22;
@@ -1459,20 +1596,41 @@ const loop = clock((dt, now, running) => {
      curve closes them onto the pearl from there */
   const searching = travel < 0 || ph.k === 'rest' || ph.k === 'out';
   const freeZL = 0.34 + (searching ? 0.42 : -0.55);
-  const armZL = freeZL * (1 - grip) + (-0.78) * grip;
+  // during the reach the arms come IN and forward rather than staying
+  // wide: a search pose and a reaching pose are different shapes, and
+  // the old code only had the one
+  const armZbase = freeZL * (1 - reachAmt) + (-0.20) * reachAmt;
+  const armZL = armZbase * (1 - grip) + (-0.78) * grip;
   armL.rotation.z +=  (armZL - armL.rotation.z) * Math.min(1, dt * 3.0);
   armR.rotation.z += (-armZL - armR.rotation.z) * Math.min(1, dt * 3.0);
-  armL.rotation.x += ((grip * 1.05) - armL.rotation.x) * Math.min(1, dt * 3.0);
-  armR.rotation.x += ((grip * 1.05) - armR.rotation.x) * Math.min(1, dt * 3.0);
-  armL.position.x = -0.235 + grip * 0.105;
-  armR.position.x =  0.235 - grip * 0.105;
-  armL.position.y =  0.26  - grip * 0.02;
-  armR.position.y =  0.26  - grip * 0.02;
-  armL.position.z =  grip * 0.14;
-  armR.position.z =  grip * 0.14;
-  /* the hands meet on the pearl */
-  handL.position.set(-0.300 + grip * 0.215, -0.02 + grip * 0.20, grip * 0.30);
-  handR.position.set( 0.300 - grip * 0.215, -0.02 + grip * 0.20, grip * 0.30);
+  // reach out past the gathered angle, then fold back to it
+  const armX = reachAmt * 1.32 + grip * 1.05;
+  armL.rotation.x += (armX - armL.rotation.x) * Math.min(1, dt * 3.0);
+  armR.rotation.x += (armX - armR.rotation.x) * Math.min(1, dt * 3.0);
+  armL.position.x = -0.235 + grip * 0.105 + reachAmt * 0.050;
+  armR.position.x =  0.235 - grip * 0.105 - reachAmt * 0.050;
+  armL.position.y =  0.26  - grip * 0.02  - reachAmt * 0.06;
+  armR.position.y =  0.26  - grip * 0.02  - reachAmt * 0.06;
+  armL.position.z =  grip * 0.14 + reachAmt * 0.10;
+  armR.position.z =  grip * 0.14 + reachAmt * 0.10;
+
+  /* THE HANDS: free -> at the pearl -> gathered at the chest.
+     Three poses blended by two curves, rather than one pose
+     interpolated by one. The reach target is the pearl in her own
+     frame, clamped to arm's length — unclamped, "put the hands on the
+     pearl" pulls them 1.2 m off the shoulders. */
+  vPL.copy(vBed);
+  diver.worldToLocal(vPL);
+  if(vPL.length() > ARM_SPAN) vPL.setLength(ARM_SPAN);
+  // THE CLOSE: the last quarter of the reach brings the two hands
+  // together on it laterally. This is the beat that makes it read as
+  // taking the pearl rather than as arriving next to it.
+  const closeT = sstep((reachAmt - 0.74) / 0.26);
+  const spread = 0.145 * (1 - closeT) + 0.052 * closeT;
+  pL.set(vPL.x - spread, vPL.y + 0.05, vPL.z);
+  pR.set(vPL.x + spread, vPL.y + 0.05, vPL.z);
+  handL.position.copy(FREE_L).lerp(pL, reachAmt).lerp(GATHER_L, grip);
+  handR.position.copy(FREE_R).lerp(pR, reachAmt).lerp(GATHER_R, grip);
 
   uDiver.value.copy(diver.position);
   diver.updateMatrixWorld(true);
@@ -1491,12 +1649,28 @@ const loop = clock((dt, now, running) => {
     contactMat.uniforms.uNear.value = onBed;
   }
 
-  /* --- the pearl: on the bed, or held at her chest --- */
-  vBed.fromArray(B.proto.pearl);
-  vChest.copy(PEARL_CHEST); diver.localToWorld(vChest);
-  pearl.position.lerpVectors(vBed, vChest, grip);
+  /* --- THE PEARL RIDES IN THE HANDS.
+     It used to lerp from the seabed to PEARL_CHEST on grip, which
+     described the same destination as the gathered hands by a second
+     route — two constants for one point, free to drift apart if
+     either was edited. It now follows the midpoint of the two hands,
+     so the hands are the only thing that says where it is, and the
+     carry comes out of the gesture instead of being parallel to it.
 
-  /* --- bubbles on the exhale only; the hold is silent and still --- */
+     `take` is the moment it leaves the bed: it is tied to the start
+     of the grip ramp, which is the same instant the close finishes,
+     so the pearl lifts WHEN THE HANDS CLOSE ON IT and is carried in
+     from wherever that happened. During the inhale grip runs back
+     down and the same lerp stows it, exactly as before. --- */
+  handL.getWorldPosition(vHL);
+  handR.getWorldPosition(vHR);
+  vHands.addVectors(vHL, vHR).multiplyScalar(0.5);
+  pearl.position.lerpVectors(vBed, vHands, sstep((grip - 0.02) / 0.26));
+
+  /* --- bubbles on the exhale only; the hold is silent and still.
+     `bubblesLive` is read by stepPuffs: the frame the flag drops, every
+     bubble still in flight starts leaving. See the note above it. --- */
+  bubblesLive = !!ph.bubbles;
   if(ph.bubbles){
     bubAccum += dt * (10 + 14 * (1 - st.pr));
     while(bubAccum >= 1){ bubAccum -= 1; bubble(diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12); }
@@ -1657,19 +1831,36 @@ window.__pearlDiver = {
              y:+B.value(t).toFixed(2), camY:+camY.toFixed(2),
              above:+uAbove.value.toFixed(2), grip:+B.scalar(t).toFixed(2),
              liveParticles: puffs.live(),
+             bubblesInFlight: (() => { let n = 0;
+               for(const p of puffs.slots) if(p.live && p.kind === 0) n++; return n; })(),
+             emitting: bubblesLive,
+             reach:+reachAmt.toFixed(2),
              scheduleY:+B.value(t).toFixed(2), shownY:+shownY.toFixed(2),
              released: freeY !== null, freeY: freeY === null ? null : +freeY.toFixed(2) }; },
   /** §1.6b: come up now, from a tool call. */
   comeUp(){ if(started && freeY === null && B.value(t) < Y_AIR - 0.02){ freeY = B.value(t); releasing = true; }
             return { released: freeY !== null, from: freeY }; },
+  /* Spawning test bubbles outside an exhale would hit the release path
+     the instant it stepped them, so they would be gone before they
+     could be counted and the instrument would report a fault that is
+     entirely its own. The flag is held open for the duration and put
+     back. Sixth time this class of thing has come up in this project;
+     it gets handled at the instrument rather than in a comment. */
   puff(n, kind){
+    const was = bubblesLive;
+    bubblesLive = kind !== 1;
     for(let i = 0; i < (n || 30); i++){
       if(kind === 1) sprayDrop(diver.position.x, 0.04, diver.position.z);
       else bubble(diver.position.x, diver.position.y + 0.72, diver.position.z + 0.12);
       for(let j = 0; j < 3; j++) stepPuffs(0.045, t);
     }
+    bubblesLive = was;
     return puffs.live();
   },
+  /** How many bubbles are still in flight, so "is the hold bubble-free"
+   *  is a number rather than a squint at a screenshot. */
+  bubbles(){ let n = 0; for(const p of puffs.slots) if(p.live && p.kind === 0) n++;
+             return { inFlight:n, emitting:bubblesLive }; },
   /* Drive the real frame body without rAF. A hidden browser pane gets
      no rAF callbacks at all, so the loop body — camera, uniform
      writes, per-phase branches — is otherwise unreachable from a tool

@@ -241,7 +241,7 @@ import { PROTOCOLS, CHOICE, validChoice,
          AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M, V_MAX,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
 import { body, drag } from './js/course.js';
-import { ramp, fogGlsl, RAMP_GLSL, GRAIN_GLSL, CHIP_GLSL,
+import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, particles, scrollGlsl, scrollWholeGlsl,
          posterMat, screenQuad, overlayQuad, part, linkReport,
@@ -330,8 +330,26 @@ const uRamp    = { value: ramp6 };
 const uPeriod  = { value: 1 };
 const uHorizon = { value: 0.5 };
 
-const FOG = fogGlsl({ near: 30, rate: 0.0070, steps: 5, max: 0.48 });
-const PRE = RAMP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
+/* THE §4.2a PRELUDES — 2 November 2026, carried over from Pearl Diver.
+   A hard edge is not a jagged edge: the step stays where it was and the
+   riser across it becomes one pixel wide instead of landing wherever
+   the pixel grid put it.
+
+   MEASURED ON THIS PAGE RATHER THAN INHERITED. Pearl Diver's context
+   grants MSAA at 4 samples, and it would be easy to assume Long Air's
+   does too because they share stage.js and therefore share the
+   `antialias: true` request — but a request is not a grant, and the
+   whole style argument turned on that measurement. So it was taken
+   again here, on the deployed build, before any of this was written:
+   SAMPLES 4, SAMPLE_BUFFERS 1, context attribute antialias true. Same
+   answer, now known rather than assumed. Every geometric edge in this
+   chapter is already clean; every jagged edge that is visible is a
+   shader-computed edge inside a triangle, which is what these reach. */
+const FOG = fogGlslAA({ near: 30, rate: 0.0070, steps: 5, max: 0.48 });
+const PRE_AA = AA_GLSL;
+const PRE_SKY = AA_GLSL + RAMP_AA_GLSL + GRAIN_GLSL;
+const PRE_RAMP = AA_GLSL + RAMP_AA_GLSL;
+const PRE = AA_GLSL + RAMP_AA_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
 
 const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
   canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 66 : 55, far: 1200
@@ -355,21 +373,25 @@ const skyU = {
 };
 onFit(() => { skyU.uAspect.value = camera.aspect; });
 scene.add(screenQuad(THREE, {
-  uniforms: skyU, prelude: RAMP_GLSL + GRAIN_GLSL,
+  uniforms: skyU, prelude: PRE_SKY,
   fragment:`
     varying vec2 vUv;
     uniform float uTime, uAspect, uHorizon, uHit;
     uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo, uCloud, uHaze;
+    /* a disc with its edge resolved. The sun and every cloud lobe here
+       is a step() on a radius drawn inside a two-triangle screen quad,
+       so MSAA has nothing to work with and these were the most visibly
+       aliased curves in the chapter. */
+    float disc(float d, float r){ return 1.0 - aastep(r, d); }
     void main(){
       float h = vUv.y - uHorizon;
-      float b = floor(clamp(h / 0.95, 0.0, 0.999) * 5.0) / 4.0;
-      vec3 col = mix(uSkyLow, uSkyHigh, b);
+      vec3 col = mix(uSkyLow, uSkyHigh, posteriseAA(h / 0.95, 5.0));
 
       vec2 sp = vec2(0.38, uHorizon + 0.70);
       vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
       float sd = length(q);
-      col = mix(col, uHalo, step(sd, 0.050));
-      col = mix(col, uSun,  step(sd, 0.025));
+      col = mix(col, uHalo, disc(sd, 0.050));
+      col = mix(col, uSun,  disc(sd, 0.025));
 
       float cl = 0.0;
       for(int i = 0; i < 3; i++){
@@ -377,10 +399,10 @@ scene.add(screenQuad(THREE, {
         float cx = fract(0.2 + fi * 0.34 + uTime * 0.0035) * 1.8 - 0.4;
         vec2 cc = vec2(cx, uHorizon + 0.34 + fi * 0.10);
         vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.24, vUv.y - cc.y);
-        cl = max(cl, step(length(d2), 0.026));
+        cl = max(cl, disc(length(d2), 0.026));
       }
-      col = mix(col, uCloud, cl * step(0.05, h));
-      col = mix(col, uHaze, (1.0 - step(0.0, h)) * 0.6);
+      col = mix(col, uCloud, cl * aastep(0.05, h));
+      col = mix(col, uHaze, (1.0 - aastep(0.0, h)) * 0.6);
       // a soft contact warms the whole sky for a moment. Warm, not red:
       // it is information, not a penalty.
       col = mix(col, uHaze, uHit * 0.18);
@@ -399,7 +421,7 @@ const mesas = new THREE.Mesh(bands(THREE, [
   { z:-520, base: 25, amp:13, step:5.5, seed:17, tier:2 },
   { z:-360, base: 17, amp: 9, step:4.0, seed:29, tier:3 }
 ], { n: 40, span: 1800, skirt: -40 }), posterMat(THREE, {
-  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)} }, prelude: RAMP_GLSL,
+  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)} }, prelude: PRE_RAMP,
   vertex:`
     attribute float aTier; varying float vTier;
     void main(){ vTier = aTier;
@@ -432,23 +454,65 @@ function ridgeGeometry(proto){
   // Building a skirt at every column instead of only at the outer edges
   // put a vertical wall down the middle of the ridge seven times over.
   // dy is relative to the crest; the two ends drop away out of frame.
+  /* FIFTEEN COLUMNS, NOT NINE — and the reason is §4.2a, not detail for
+     its own sake. The fragment shader paints this surface by putting an
+     INTERPOLATED tone through rampPick, and a varying interpolates
+     linearly: between x = -34 and x = -120 the old profile had no
+     vertices at all, so every value band across eighty-six metres of
+     hillside was drawn as a straight line between two columns. The
+     bands were the triangulation, exactly as the water's troughs were
+     on Pearl Diver. The extra columns are where the terrain is allowed
+     to have a shape; the resolved risers are what stop that shape
+     stair-stepping. About 2,700 extra triangles on the lightest
+     chapter in the book. */
   const PROF = [
-    { x:-190, dy:-15, tone:BODY, h:0 },
+    { x:-190, dy:-15,   tone:BODY,  h:0 },
+    { x:-150, dy: -6.5, tone:BODY,  h:0 },
     { x:-120, dy: -1.2, tone:LIGHT, h:1 },
+    { x: -86, dy: -0.7, tone:LIGHT, h:1 },
+    { x: -58, dy: -0.3, tone:MID,   h:1 },
     { x: -34, dy:  0,   tone:PALE,  h:1 },
     { x: -13, dy:  0.4, tone:PALE,  h:1 },
     { x:   0, dy:  0,   tone:PALE,  h:1 },
     { x:  13, dy:  0.4, tone:PALE,  h:1 },
     { x:  34, dy:  0,   tone:PALE,  h:1 },
+    { x:  58, dy: -0.3, tone:MID,   h:1 },
+    { x:  86, dy: -0.7, tone:LIGHT, h:1 },
     { x: 120, dy: -1.2, tone:LIGHT, h:1 },
+    { x: 150, dy: -6.5, tone:BODY,  h:0 },
     { x: 190, dy:-15,   tone:BODY,  h:0 }
   ];
+  /* GRADE VARIANCE ACROSS THE COURSE, not only along it.
+     ridgeAt() already runs four harmonics down the z axis, so the
+     CREST height varies well. The CROSS-SECTION did not: the same nine
+     points were extruded at every one of the 168 z-steps, so the ridge
+     was a constant profile swept along a varying spine — one legible
+     shape, repeated, which is the terrain equivalent of one legible
+     sine. Two harmonics at different periods, per column and per
+     z-step, quantised to 0.3 m so they read as cut terraces rather
+     than as a wobble (§4.2 rule 5).
+
+     CAPPED ON THE UPSIDE AND THE CAP IS LOAD-BEARING. ridgeAt is
+     clamped to RIDGE_TOP = 3.4 and the corridor floor is CORR_LO = 8.0;
+     tools/regress.mjs checks that margin against ridgeAt, which this
+     does not touch, so a profile bump that rose freely would be a
+     clearance the gate cannot see. It is clamped to +0.45, leaving
+     better than four metres. */
+  const grade = (zb, x) => {
+    const u = (zb / period) * Math.PI * 2;
+    const g = Math.sin(u * 5 + x * 0.021) * 0.62
+            + Math.sin(u * 11 + 2.3 + x * 0.047) * 0.34;
+    return Math.max(-1.6, Math.min(0.45, Math.round(g / 0.3) * 0.3));
+  };
   for(let i = 0; i <= n; i++){
     const zb = (i / n) * period;
     const w = wanderAt(zb, period);
     const top = ridgeAt(zb, period);
     for(const q of PROF){
-      b.vertex(q.x + w * (Math.abs(q.x) > 100 ? 0.4 : 1), top + q.dy, zb,
+      // the shoulders and the skirt keep their shape; only the crest
+      // band, which is the part anyone can see, gets the variance
+      const g = q.h ? grade(zb, q.x) : 0;
+      b.vertex(q.x + w * (Math.abs(q.x) > 100 ? 0.4 : 1), top + q.dy + g, zb,
                { aTone:q.tone, aH:q.h, aSun: q.x <= 0 ? 1 : 0 });
     }
   }
@@ -483,8 +547,16 @@ const rockMat = posterMat(THREE, {
     uniform vec3 uShadow, uShadowDeep;
     void main(){
       float tone = vTone + (1.0 - vH) * 1.6;
-      vec3 col = rampPick((tone + 0.5) / 6.0);
-      float sh = 1.0 - step(0.5, vSun);
+      // rampPickAA, not rampPick: this is an INTERPOLATED tone across
+      // terrain triangles tens of metres wide, so every riser between
+      // two values is a long shallow edge — the worst case for landing
+      // on the pixel grid, and the one that crawls most visibly as the
+      // world scrolls past underneath it
+      vec3 col = rampPickAA((tone + 0.5) / 6.0);
+      // the one hard shadow split (§4.4): aSun is 1 left of the spine
+      // and 0 right of it, so this draws a single line down the ridge.
+      // It is meant to be one line; it was a staircase.
+      float sh = 1.0 - aastep(0.5, vSun);
       col = mix(col, uShadow, sh * 0.58);
       col = mix(col, uShadowDeep, sh * (1.0 - vH) * 0.4);
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vTone * 3.0 + vH * 5.0))) - 0.5) * 0.07;
@@ -650,9 +722,11 @@ const gateMatFor = kind => posterMat(THREE, {
          across the screen. */
       if(uNearFade > 0.5 && nearGone(vDist, vec2(vX, vY + vSeed * 17.0))) discard;
       float tone = vTone + (1.0 - vLip) * 1.3;
-      vec3 col = rampPick((tone + 0.5) / 6.0);
+      // the slab faces are thirty metres across and the tone is a
+      // varying, so each value riser runs the width of the frame
+      vec3 col = rampPickAA((tone + 0.5) / 6.0);
       col = mix(col, uShadow, uIsCloud * 0.55);
-      float sh = 1.0 - step(0.5, vSun);
+      float sh = 1.0 - aastep(0.5, vSun);
       col = mix(col, uDeep, sh * 0.45);
       /* THE ACCENT IS AN EDGE, NOT A SHELF. It used to be painted
          wherever vLip was high, and the back-of-lip row shares that
@@ -672,7 +746,13 @@ const gateMatFor = kind => posterMat(THREE, {
          is the edge itself, and the rest of the shelf is shaded as the
          cut face it actually is. */
       col = mix(col, uDeep, vLedge * 0.55);
-      col = mix(col, uAccent, step(0.96, vLip) * (1.0 - step(0.22, vLedge)) * 0.30);
+      /* The accent line is the thing you aim at, it is one or two
+         pixels wide at the distance you read it, and it was drawn with
+         two step()s on interpolated varyings — which is the single
+         most aliasing-prone construction in the chapter: a thin bright
+         line on a dark slab, moving across the frame. Resolved, it is
+         the same line in the same place and it stops fizzing. */
+      col = mix(col, uAccent, aastep(0.96, vLip) * (1.0 - aastep(0.22, vLedge)) * 0.30);
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5) * 0.08;
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
@@ -708,6 +788,26 @@ for(const id of Object.keys(PROTOCOLS)){
    ahead of the kite, which is exactly where the turnarounds live.
    ------------------------------------------------------------------ */
 const RINGS = [0.0, 0.34, 0.68, 1.0];
+/* SUBDIVISION WHERE THE SILHOUETTE READS — §4.2a item 4, and the
+   author's standing note that this glider was criticised as a blob.
+   -------------------------------------------------------------------
+   The outline is a diamond on purpose and stays one: straight edges on
+   a hard angular form are §4.2, not a defect, and subdividing a
+   straight edge changes nothing anyway. What was wrong is UNDERNEATH
+   the outline. The sail billows towards the lens by
+   (1 - aR*aR) * fill, which is a parabola — and it was being sampled
+   at four radii and drawn with three straight segments, so the
+   cross-section of a filled sail was a shallow tent rather than a
+   curve. Every time the glider banked or pitched, the thing that
+   should have read as an inflated canopy read as folded card.
+
+   Two radial sub-steps per ring band, which is where the curvature is.
+   The sector count stays at four: aSector is a per-quad identity that
+   the shading reads as "which side is in shadow", so adding sectors
+   would change what the chapter means by a sector rather than making
+   anything smoother. 12 quads become 24 — under a hundred extra
+   triangles on the thing the reader looks at for ten minutes. */
+const SAIL_SUB = 2;
 function sailGeometry(){
   const b = builder(THREE, { aR:1, aRing:1, aSector:1 });
   const pt = (r, s) => {
@@ -717,16 +817,22 @@ function sailGeometry(){
   };
   for(let k = 1; k < RINGS.length; k++){
     for(let s = 0; s < 4; s++){
-      const [x0, y0] = pt(RINGS[k-1], s),     [x1, y1] = pt(RINGS[k], s);
-      const [x2, y2] = pt(RINGS[k-1], s+1),   [x3, y3] = pt(RINGS[k], s+1);
-      const base = b.count;
       const A = { aRing:k, aSector:s };
-      b.vertex(x0, y0, 0, { ...A, aR:RINGS[k-1] });
-      b.vertex(x1, y1, 0, { ...A, aR:RINGS[k] });
-      b.vertex(x2, y2, 0, { ...A, aR:RINGS[k-1] });
-      b.vertex(x3, y3, 0, { ...A, aR:RINGS[k] });
-      if(k === 1){ b.tri(base, base+1, base+3); }
-      else { b.tri(base, base+1, base+3); b.tri(base, base+3, base+2); }
+      for(let j = 0; j < SAIL_SUB; j++){
+        const ra = RINGS[k-1] + (RINGS[k] - RINGS[k-1]) * (j / SAIL_SUB);
+        const rb = RINGS[k-1] + (RINGS[k] - RINGS[k-1]) * ((j + 1) / SAIL_SUB);
+        const [x0, y0] = pt(ra, s),     [x1, y1] = pt(rb, s);
+        const [x2, y2] = pt(ra, s+1),   [x3, y3] = pt(rb, s+1);
+        const base = b.count;
+        b.vertex(x0, y0, 0, { ...A, aR:ra });
+        b.vertex(x1, y1, 0, { ...A, aR:rb });
+        b.vertex(x2, y2, 0, { ...A, aR:ra });
+        b.vertex(x3, y3, 0, { ...A, aR:rb });
+        // the innermost sub-step of the innermost ring is a true fan at
+        // the apex: its two inner vertices are the same point
+        if(k === 1 && j === 0){ b.tri(base, base+1, base+3); }
+        else { b.tri(base, base+1, base+3); b.tri(base, base+3, base+2); }
+      }
     }
   }
   return b.geometry();
@@ -734,7 +840,7 @@ function sailGeometry(){
 const sail = new THREE.Mesh(sailGeometry(), posterMat(THREE, {
   uniforms:{ uFill, uRamp, uTime, uAccent:{value:C(ROCK.accent)},
              uShadow:{value:C(ROCK.shadow)} },
-  side: THREE.DoubleSide, prelude: RAMP_GLSL,
+  side: THREE.DoubleSide, prelude: PRE_RAMP,
   vertex:`
     attribute float aR; attribute float aRing; attribute float aSector;
     uniform float uFill, uTime;
@@ -758,14 +864,19 @@ const sail = new THREE.Mesh(sailGeometry(), posterMat(THREE, {
     uniform vec3 uAccent, uShadow;
     uniform float uFill;
     void main(){
-      // one hand-assigned value per rib: pale core out to mid edge
+      // one hand-assigned value per rib: pale core out to mid edge.
+      // vRing and vSector are per-quad identities, not fields, so they
+      // need no resolving — there is no boundary inside a primitive.
       vec3 col = rampPick((vRing - 1.0 + 0.5) / 6.0);
       // the two sectors on the right are the shadowed side, and they
       // shift hue rather than darken (§4.2 rule 2)
       float sh = step(0.5, vSector) * (1.0 - step(2.5, vSector));
       col = mix(col, uShadow, sh * 0.5);
-      // the one accent: the trailing rib, brighter as the sail fills
-      col = mix(col, uAccent, step(2.5, vRing) * (0.25 + 0.35 * uFill));
+      // the one accent: the trailing rib, brighter as the sail fills.
+      // THIS one does cross a primitive — the outer band runs from
+      // ring 2 to ring 3 — so it was a hard jagged line across the
+      // brightest, most-looked-at edge in the chapter.
+      col = mix(col, uAccent, aastep(2.5, vRing) * (0.25 + 0.35 * uFill));
       gl_FragColor = vec4(col, 1.0);
     }
   `
@@ -789,7 +900,7 @@ function sparGeometry(){
   return b.geometry();
 }
 const spars = new THREE.Mesh(sparGeometry(), posterMat(THREE, {
-  uniforms:{ uFill, uRamp }, prelude: RAMP_GLSL, side: THREE.DoubleSide,
+  uniforms:{ uFill, uRamp }, prelude: PRE_RAMP, side: THREE.DoubleSide,
   vertex:`
     attribute float aR;
     uniform float uFill;
@@ -805,36 +916,135 @@ const spars = new THREE.Mesh(sparGeometry(), posterMat(THREE, {
 scene.add(spars);
 
 /* ------------------------------------------------------------------
+   5a. THE SHADOW ON THE RIDGE — so the glider is IN the scene.
+   ------------------------------------------------------------------
+   Nothing in this chapter is lit, so nothing casts anything, and the
+   glider was a shape in front of the terrain rather than above it.
+   There is no other cue to its height: the ridge scrolls past at the
+   same rate whatever altitude you are at, and the corridor is
+   8 to 36 m, so a reader has no way to tell eleven metres from thirty.
+   The shadow is the one thing that says it, and it says it
+   continuously and without a number.
+
+   WHERE IT GOES IS KNOWN EXACTLY, not estimated. `ridgeAt(dist,
+   period)` is the crest height directly under the kite — it is the
+   same call tools/regress.mjs uses to check the corridor margin, so
+   the shadow sits on the terrain by construction rather than by a
+   raycast that could disagree with the geometry.
+
+   It GROWS and FADES with altitude, which is the part that carries
+   the information: close to the ridge it is small, dark and tight
+   under the glider; at the top of the corridor it is wide and faint.
+   Two posterised steps, like everything else here. One draw call, two
+   triangles' worth of geometry in a 24-sided disc, and it is not
+   drawn at all when it would be invisible.
+   ------------------------------------------------------------------ */
+const shadowMat = posterMat(THREE, {
+  uniforms:{ uDeepS:{value:C(ROCK.shadowDeep)}, uAmt:{value:0} },
+  transparent:true, depthWrite:false, prelude: PRE_AA,
+  vertex:`
+    varying vec2 vP;
+    void main(){ vP = position.xy;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying vec2 vP;
+    uniform vec3 uDeepS; uniform float uAmt;
+    void main(){
+      float a = posteriseAA(1.0 - length(vP), 3.0) * uAmt;
+      if(a < 0.012) discard;
+      gl_FragColor = vec4(uDeepS, a);
+    }
+  `
+});
+const kiteShadow = new THREE.Mesh(new THREE.CircleGeometry(1.0, 24), shadowMat);
+kiteShadow.rotation.x = -Math.PI / 2;
+kiteShadow.renderOrder = 1;
+kiteShadow.frustumCulled = false;
+kiteShadow.visible = false;
+scene.add(kiteShadow);
+
+/* ------------------------------------------------------------------
    6. THE TAIL — a ribbon through the kite's own recent history, so it
    lags through every turn and shows the line of flight. Positions are
    rewritten each frame into one merged mesh: one draw call, and the
    shape is real motion rather than an animation.
    ------------------------------------------------------------------ */
+/* ==================================================================
+   THE TAIL STREAMED AS A VERTICAL RIBBON, AND IT WAS A BUG
+   ==================================================================
+   The author was told this reads as a vertical ribbon on descents.
+   It was treated as a composition note. It is not: it is a coordinate
+   error, and the arithmetic is unambiguous.
+
+   The glider's world position is (kiteX, kiteY, 0) — ALWAYS z = 0,
+   because this chapter does not move the kite forward, it scrolls the
+   world past a stationary one. pushHistory() recorded that triple, so
+   every sample in the history had z = 0 and the only thing separating
+   one tail segment from the next in depth was a hand-added
+   `s * 0.30`: 5.4 m of trail across the whole eighteen segments.
+
+   Meanwhile the history spans TAIL_SEG * TAIL_STRIDE = 54 frames,
+   about 0.9 s, over which the glider really travels SPEED * 0.9 =
+   12.6 m forward — and on a dive it falls about 9 m. So the true
+   trail is 12.6 m back for 9 m down, which is a streamer at roughly
+   35 degrees. What was drawn was 5.4 m back for 9 m down, which is 60
+   degrees, and with the lens sitting twelve metres directly behind it
+   that projects to a near-vertical stripe up the middle of the frame.
+   Inspected on the deployed build on 2 November: a candy-striped pole
+   from the glider to the top of the screen. It read as a mast.
+
+   THE FIX IS TO RECORD WHERE IT ACTUALLY WAS. Each history sample now
+   carries the course distance at which it was taken, and a tail vertex
+   sits at (current dist - sample dist) metres behind — which is the
+   real forward separation, derived from the thing that defines forward
+   motion in this chapter rather than from a constant somebody picked.
+   The vertical-pole reading disappears on its own, at every speed,
+   including when drag has slowed the glider down.
+
+   AND THE WIDTH IS PERPENDICULAR TO THE FLIGHT LINE. It used to be
+   added to view-space X unconditionally, so a ribbon whose path ran
+   up the screen was widened across the screen regardless — a flat
+   band rather than a ribbon seen edge-on. The segment tangent is
+   carried per vertex, rotated into view space, and the width goes
+   across it. The ribbon now banks through turns, which is the whole
+   reason a glider has one.
+   ================================================================== */
 const TAIL_SEG = 18, TAIL_STRIDE = 3;
 const histLen = TAIL_SEG * TAIL_STRIDE + 2;
-const hist = new Float32Array(histLen * 3);
+/* four per sample: x, y, and the COURSE DISTANCE it was taken at.
+   (The fourth slot is kept for alignment and readability.) */
+const hist = new Float32Array(histLen * 4);
 let histN = 0;
 function tailGeometry(){
-  const b = builder(THREE, { aT:1, aSide:1 });
+  const b = builder(THREE, { aT:1, aSide:1, aTan:3 });
   for(let s = 0; s <= TAIL_SEG; s++){
     const t = s / TAIL_SEG;
-    b.vertex(0, 0, 0, { aT:t, aSide:-1 });
-    b.vertex(0, 0, 0, { aT:t, aSide: 1 });
+    b.vertex(0, 0, 0, { aT:t, aSide:-1, aTan:[0, 0, 1] });
+    b.vertex(0, 0, 0, { aT:t, aSide: 1, aTan:[0, 0, 1] });
   }
   b.strip(TAIL_SEG, true);
   return b.geometry();
 }
 const tail = new THREE.Mesh(tailGeometry(), posterMat(THREE, {
   uniforms:{ uRamp, uAccent:{value:C(ROCK.accent)}, uFill },
-  prelude: RAMP_GLSL, side: THREE.DoubleSide, transparent:true, depthWrite:false,
+  prelude: PRE_RAMP, side: THREE.DoubleSide, transparent:true, depthWrite:false,
   vertex:`
-    attribute float aT; attribute float aSide;
+    attribute float aT; attribute float aSide; attribute vec3 aTan;
     varying float vT; varying float vSide;
     void main(){
       vT = aT; vSide = aSide;
       vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      // width tapers along the tail, in view space so it always reads
-      mv.x += aSide * (0.19 * (1.0 - aT) + 0.02);
+      // the width goes ACROSS the flight line, in view space, so the
+      // ribbon keeps its thickness whichever way the glider is going
+      vec3 tv = (modelViewMatrix * vec4(aTan, 0.0)).xyz;
+      vec2 perp = vec2(-tv.y, tv.x);
+      float m = length(perp);
+      perp = m > 1e-4 ? perp / m : vec2(1.0, 0.0);
+      // tapers to a POINT, not to 0.02: a ribbon that stops at a
+      // constant width ends as a rectangle, and there is a rectangle
+      // on the end of it
+      mv.xy += aSide * perp * (0.21 * (1.0 - aT) * (1.0 - aT * 0.45));
       gl_Position = projectionMatrix * mv;
     }
   `,
@@ -842,8 +1052,11 @@ const tail = new THREE.Mesh(tailGeometry(), posterMat(THREE, {
     varying float vT; varying float vSide;
     uniform vec3 uAccent;
     void main(){
-      // hard alternating bands: a ribbon tail, posterised, no gradient
-      float band = step(0.5, fract(vT * 7.0));
+      // hard alternating bands: a ribbon tail, posterised, no gradient.
+      // Seven of them along a ribbon that is a few pixels wide and
+      // always moving, so the risers were the fizziest edges in the
+      // chapter — same bands, resolved.
+      float band = aastep(0.5, fract(vT * 7.0));
       vec3 col = mix(rampPick(0.5 / 6.0), uAccent, band);
       float a = (1.0 - vT) * 0.92;
       if(a < 0.03) discard;
@@ -855,26 +1068,50 @@ tail.frustumCulled = false;
 tail.renderOrder = 3;
 scene.add(tail);
 const tailPos = tail.geometry.getAttribute('position');
+const tailTan = tail.geometry.getAttribute('aTan');
 
-function pushHistory(x, y, z){
+/** x, y and the course distance the sample was taken at. The distance
+ *  is what the old version was missing — see the note above. */
+function pushHistory(x, y, atDist){
   for(let i = histLen - 1; i > 0; i--){
-    hist[i*3] = hist[(i-1)*3]; hist[i*3+1] = hist[(i-1)*3+1]; hist[i*3+2] = hist[(i-1)*3+2];
+    const a = i*4, b2 = (i-1)*4;
+    hist[a] = hist[b2]; hist[a+1] = hist[b2+1]; hist[a+2] = hist[b2+2];
   }
-  hist[0] = x; hist[1] = y; hist[2] = z;
+  hist[0] = x; hist[1] = y; hist[2] = atDist;
   if(histN < histLen) histN++;
 }
-function updateTail(){
+function updateTail(nowDist){
+  // first pass: place every rail pair at where the glider really was
   for(let s = 0; s <= TAIL_SEG; s++){
-    const h = Math.min(histN - 1, s * TAIL_STRIDE);
-    const i = Math.max(0, h) * 3;
+    const h = Math.max(0, Math.min(histN - 1, s * TAIL_STRIDE));
+    const i = h * 4;
+    // metres of real forward travel between then and now. This is the
+    // number the old code replaced with a flat 0.30 per segment.
+    const back = nowDist - hist[i+2];
     for(let v = 0; v < 2; v++){
       const o = (s*2 + v) * 3;
       tailPos.array[o]   = hist[i];
       tailPos.array[o+1] = hist[i+1];
-      tailPos.array[o+2] = hist[i+2] + s * 0.30;   // trails behind
+      tailPos.array[o+2] = back;
+    }
+  }
+  // second pass: the tangent at each station, from its neighbours, so
+  // the ribbon's width can be taken across the flight line
+  for(let s = 0; s <= TAIL_SEG; s++){
+    const a = Math.max(0, s - 1), c = Math.min(TAIL_SEG, s + 1);
+    const oa = a*2*3, oc = c*2*3;
+    let tx = tailPos.array[oc]   - tailPos.array[oa];
+    let ty = tailPos.array[oc+1] - tailPos.array[oa+1];
+    let tz = tailPos.array[oc+2] - tailPos.array[oa+2];
+    const m = Math.hypot(tx, ty, tz);
+    if(m > 1e-4){ tx /= m; ty /= m; tz /= m; } else { tx = 0; ty = 0; tz = 1; }
+    for(let v = 0; v < 2; v++){
+      const o = (s*2 + v) * 3;
+      tailTan.array[o] = tx; tailTan.array[o+1] = ty; tailTan.array[o+2] = tz;
     }
   }
   tailPos.needsUpdate = true;
+  tailTan.needsUpdate = true;
 }
 
 /* ------------------------------------------------------------------
@@ -936,7 +1173,7 @@ const grit = particles(THREE, {
   n: 130, renderOrder: 6,
   material: posterMat(THREE, {
     uniforms:{ uGrit:{value:C(ROCK.grit)}, uPale:{value:C(R.at(PALE))}, uAccent:{value:C(ROCK.accent)} },
-    transparent:true, depthWrite:false, side:THREE.DoubleSide,
+    transparent:true, depthWrite:false, side:THREE.DoubleSide, prelude: PRE_AA,
     vertex:`
       attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
       varying vec2 vC; varying float vSize; varying float vKind;
@@ -952,10 +1189,14 @@ const grit = particles(THREE, {
       uniform vec3 uGrit, uPale, uAccent;
       void main(){
         if(vSize <= 0.0) discard;
-        if(abs(vC.x) + abs(vC.y) > 1.0) discard;   // a hard lozenge, no soft sprite
-        vec3 col = mix(uGrit, uPale, step(0.0, vC.y) * 0.5);
+        // a hard lozenge, no soft sprite — but a hard EDGE, not a
+        // jagged one. 130 of these, every one of them a diagonal
+        // boundary inside a quad where MSAA cannot see it.
+        float body = 1.0 - aastep(1.0, abs(vC.x) + abs(vC.y));
+        if(body <= 0.0) discard;
+        vec3 col = mix(uGrit, uPale, aastep(0.0, vC.y) * 0.5);
         col = mix(col, uAccent, vKind * 0.4);
-        gl_FragColor = vec4(col, mix(0.5, 0.85, vKind));
+        gl_FragColor = vec4(col, mix(0.5, 0.85, vKind) * body);
       }
     `
   })
@@ -987,6 +1228,7 @@ function stepGrit(dt){
    ------------------------------------------------------------------ */
 const flare = overlayQuad(THREE, {
   uniforms:{ uForgive, uHit, uDrag, uFlare:{value:C(AIR.flare)} },
+  prelude: PRE_AA,
   fragment:`
     varying vec2 vUv;
     uniform float uForgive, uHit, uDrag;
@@ -1000,7 +1242,7 @@ const flare = overlayQuad(THREE, {
       // a vignette at the very edge, three hard steps. Nothing central:
       // whatever happens, the view of the course stays clear.
       float d = max(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * 2.0;
-      float e = floor(clamp((d - 0.72) / 0.28, 0.0, 0.999) * 3.0) / 2.0;
+      float e = posteriseAA((d - 0.72) / 0.28, 3.0);
       if(e <= 0.0) discard;
       gl_FragColor = vec4(uFlare, a * e);
     }
@@ -1357,8 +1599,20 @@ const loop = clock((dt, now, running) => {
   const bank = avoiding * Math.sign(gate.centre - kiteY || 1) * 0.42;
   sail.rotation.z = Math.sin(t * 1.1) * 0.05 + drive * 0.04 + bank;
   spars.rotation.z = sail.rotation.z;
-  pushHistory(kiteX, kiteY, 0);
-  updateTail();
+  pushHistory(kiteX, kiteY, dist);
+  updateTail(dist);
+
+  /* --- the shadow on the ridge. Altitude above the terrain is what
+     sizes and fades it, which is the whole of what it is for. --- */
+  const ridgeY = ridgeAt(dist, worlds[B.proto.id].period);
+  const alt = Math.max(0, kiteY - ridgeY);
+  const far = clamp01(alt / 30);
+  kiteShadow.visible = alt < 34;
+  if(kiteShadow.visible){
+    kiteShadow.position.set(kiteX, ridgeY + 0.12, 0);
+    kiteShadow.scale.setScalar(1.15 + far * 2.9);
+    shadowMat.uniforms.uAmt.value = 0.52 * (1 - far * 0.72);
+  }
 
   /* --- the camera. Behind, and leaning the way the phase is going, so
      the gates you are about to meet are the ones in frame. --- */
