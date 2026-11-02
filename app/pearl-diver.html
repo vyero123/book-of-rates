@@ -581,7 +581,7 @@ const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 112, 112), post
       // the caustic net seen on the underside of the surface itself —
       // the SAME field the seabed is lit by, so the window and the
       // floor are demonstrably one light and not two effects
-      air = mix(air, uCream, posteriseAA(caustic(w * 0.40, uTime), 3.0) * 0.40);
+      air = mix(air, uCream, posteriseAA(caustic(w * 1.50, uTime), 3.0) * 0.40);
 
       // OUTSIDE: total internal reflection. The surface is a mirror of
       // the dark column below it, so it has to go DARK at the rim
@@ -598,7 +598,15 @@ const surface = new THREE.Mesh(new THREE.PlaneGeometry(260, 260, 112, 112), post
          SEEN FROM ABOVE
          ============================================================ */
       vec3 over = mix(uSeaNear, uSeaFar, posteriseAA(1.0 - exp(-r * 0.065), 5.0));
-      over = mix(over, uTrough, 1.0 - aastep(-0.22, chop));
+      /* THREE VALUES ON THE WATER, NOT TWO. Once the cream rectangles
+         came off, the near half of the above-water frame was a flat
+         empty field — the trough step at -0.22 almost never fires close
+         to the lens, so the water had no waves ON it, only the depth
+         bands running across it. A trough and a crest, which is three
+         values counting the body, and §4.2 rule 2 allows up to four.
+         Both evaluated per fragment, so they are wave-shaped. */
+      over = mix(over, uTrough, 1.0 - aastep(-0.12, chop));
+      over = mix(over, mix(uSeaFar, uGlint, 0.30), aastep(0.34, chop) * 0.38);
 
       /* THE GLITTER PATH — the reader's named example.
          The old cell was floor(world * 5.0), i.e. 0.2 m square. Two
@@ -678,8 +686,14 @@ const bed = new THREE.Mesh(new THREE.PlaneGeometry(170, 170, 72, 72), posterMat(
          a crawling edge, so the risers are resolved (§4.2a) and the
          whole thing dissolves out past 40 m where the filaments go
          finer than a pixel. */
-      float lit = posteriseAA(caustic(vW * 0.30, uTime), 3.0)
-                * 0.52 * (1.0 - smoothstep(26.0, 72.0, vDist));
+      /* THE SCALE IS NOT A TASTE SETTING. Shipped at 0.30 and looked at
+         on the deployed build: causticField's first octave multiplies
+         by 1.83, so 0.30 put the dominant feature at about eleven
+         metres across. That is not a caustic, it is dappling — the
+         floor came out as large flat beige patches. A caustic cell is
+         sub-metre to a couple of metres, which is 1.9 here. */
+      float lit = posteriseAA(caustic(vW * 1.90, uTime), 3.0)
+                * 0.40 * (1.0 - smoothstep(26.0, 72.0, vDist));
       col = mix(col, uLit, lit);
 
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
@@ -761,12 +775,12 @@ const shafts = new THREE.Mesh(shaftGeometry(7), posterMat(THREE, {
     uniform vec3 uCream, uPale;
     void main(){
       float across = 1.0 - abs(vX);
-      float cs = causticField(vec2(vW.x, vW.z) * 0.26 + vec2(vSeed * 3.0, 0.0), uTime, 2);
+      float cs = causticField(vec2(vW.x, vW.z) * 0.55 + vec2(vSeed * 3.0, 0.0), uTime, 2);
       // fade in under the surface and out well above the bed, so a
       // shaft never ends on a line; posterised AFTER the envelope so
       // the terraces are the shape of the whole shaft (§4.2 rule 5)
       float env = smoothstep(-0.4, -3.0, vW.y) * (1.0 - smoothstep(-10.0, -18.0, vW.y));
-      float a = posteriseAA(across * (0.42 + 0.58 * cs) * env, 3.0) * 0.095;
+      float a = posteriseAA(across * (0.42 + 0.58 * cs) * env, 3.0) * 0.13;
       if(a < 0.004) discard;
       gl_FragColor = vec4(mix(uPale, uCream, 0.5) * a, a);
     }
