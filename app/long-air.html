@@ -446,6 +446,17 @@ scene.add(mesas);
    CORR_LO. The first pass let the figure clip through the floor; this
    cannot, and tools/regress.mjs checks the margin rather than trusting it.
    ------------------------------------------------------------------ */
+/* The cross-course grade, hoisted out of ridgeGeometry because the
+   glider's shadow has to land on the SAME surface the mesh draws, and
+   a second copy of this that drifted would bury the shadow in the hill
+   without anything reporting it. One definition, two callers. */
+function gradeAt(zb, x, period){
+  const u = (zb / period) * Math.PI * 2;
+  const g = Math.sin(u * 5 + x * 0.021) * 0.62
+          + Math.sin(u * 11 + 2.3 + x * 0.047) * 0.34;
+  return Math.max(-1.6, Math.min(0.45, Math.round(g / 0.3) * 0.3));
+}
+
 function ridgeGeometry(proto){
   const period = periodOf(proto);
   const n = Math.round(period / 4);
@@ -498,12 +509,6 @@ function ridgeGeometry(proto){
      does not touch, so a profile bump that rose freely would be a
      clearance the gate cannot see. It is clamped to +0.45, leaving
      better than four metres. */
-  const grade = (zb, x) => {
-    const u = (zb / period) * Math.PI * 2;
-    const g = Math.sin(u * 5 + x * 0.021) * 0.62
-            + Math.sin(u * 11 + 2.3 + x * 0.047) * 0.34;
-    return Math.max(-1.6, Math.min(0.45, Math.round(g / 0.3) * 0.3));
-  };
   for(let i = 0; i <= n; i++){
     const zb = (i / n) * period;
     const w = wanderAt(zb, period);
@@ -511,7 +516,7 @@ function ridgeGeometry(proto){
     for(const q of PROF){
       // the shoulders and the skirt keep their shape; only the crest
       // band, which is the part anyone can see, gets the variance
-      const g = q.h ? grade(zb, q.x) : 0;
+      const g = q.h ? gradeAt(zb, q.x, period) : 0;
       b.vertex(q.x + w * (Math.abs(q.x) > 100 ? 0.4 : 1), top + q.dy + g, zb,
                { aTone:q.tone, aH:q.h, aSun: q.x <= 0 ? 1 : 0 });
     }
@@ -939,12 +944,27 @@ scene.add(spars);
    triangles' worth of geometry in a 24-sided disc, and it is not
    drawn at all when it would be invisible.
    ------------------------------------------------------------------ */
+/* IT HAS TO LIE ON THE TERRAIN, WHICH MEANS THE TERRAIN'S REAL HEIGHT
+   AND NOT THE SPINE'S. The second attempt placed a flat disc at
+   ridgeAt() + 0.12 and coverage() still returned 0, because the ridge
+   MESH is ridgeAt() plus the profile's own dy plus gradeAt() — up to
+   0.45 m above the spine — and ridgeAt itself steps in 0.85 m
+   quantums, so across the disc's own width the hill routinely rises
+   over it. Lifting it until it cleared the worst case would have left
+   it floating a metre in the air.
+
+   So the disc is written in WORLD coordinates every frame, one vertex
+   at a time, each at the height the hill actually has underneath it.
+   Twenty-five vertices and a handful of sines: cheaper than being
+   wrong. `aP` carries the radial parameter the falloff needs, because
+   `position` no longer holds anything the shader can use for it. */
 const shadowMat = posterMat(THREE, {
   uniforms:{ uDeepS:{value:C(ROCK.shadowDeep)}, uAmt:{value:0} },
   transparent:true, depthWrite:false, prelude: PRE_AA,
   vertex:`
+    attribute vec2 aP;
     varying vec2 vP;
-    void main(){ vP = position.xy;
+    void main(){ vP = aP;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
   `,
   fragment:`
@@ -957,8 +977,17 @@ const shadowMat = posterMat(THREE, {
     }
   `
 });
-const kiteShadow = new THREE.Mesh(new THREE.CircleGeometry(1.0, 24), shadowMat);
-kiteShadow.rotation.x = -Math.PI / 2;
+const shadowGeo = new THREE.CircleGeometry(1.0, 24);
+/* the unit-disc coordinates, kept before `position` is repurposed */
+const shUnit = Float32Array.from(shadowGeo.getAttribute('position').array);
+const shN = shadowGeo.getAttribute('position').count;
+{
+  const ap = new Float32Array(shN * 2);
+  for(let i = 0; i < shN; i++){ ap[i*2] = shUnit[i*3]; ap[i*2+1] = shUnit[i*3+1]; }
+  shadowGeo.setAttribute('aP', new THREE.BufferAttribute(ap, 2));
+}
+const shPos = shadowGeo.getAttribute('position');
+const kiteShadow = new THREE.Mesh(shadowGeo, shadowMat);
 kiteShadow.renderOrder = 1;
 kiteShadow.frustumCulled = false;
 kiteShadow.visible = false;
@@ -1662,8 +1691,17 @@ const loop = clock((dt, now, running) => {
   const fwd = clamp(alt * 2.4, 20, 72);
   kiteShadow.visible = alt < 40;
   if(kiteShadow.visible){
-    kiteShadow.position.set(kiteX, ridgeAt(dist + period * BEHIND + fwd, period) + 0.12, -fwd);
-    kiteShadow.scale.setScalar(2.2 + far * 1.6);
+    const rad = 2.2 + far * 1.6;
+    for(let i = 0; i < shN; i++){
+      const wx = kiteX + shUnit[i*3] * rad;
+      const wz = -fwd  + shUnit[i*3+1] * rad;
+      // world z = period*BEHIND - ((zb - dist) mod period), inverted
+      const zb = dist + period * BEHIND - wz;
+      shPos.array[i*3]     = wx;
+      shPos.array[i*3 + 1] = ridgeAt(zb, period) + gradeAt(zb, wx, period) + 0.10;
+      shPos.array[i*3 + 2] = wz;
+    }
+    shPos.needsUpdate = true;
     shadowMat.uniforms.uAmt.value = 0.55 * (1 - far * 0.55);
   }
 
