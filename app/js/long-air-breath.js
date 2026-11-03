@@ -499,6 +499,58 @@ export const forgiveness = (kiteY, targetY) =>
  *
  *  Still clamped under RIDGE_TOP, and the corridor floor is still
  *  checked against it in tools/regress.mjs rather than trusted. */
+/** SMOOTH SATURATION, because a clamp is a jut.
+ *
+ *  Math.min(hi, Math.max(lo, x)) is continuous in value and
+ *  discontinuous in SLOPE: the derivative drops from 1 to 0 over no
+ *  distance at all, wherever the clamp bites. On a surface that is a
+ *  crease, and a crease is exactly what the reader was describing.
+ *
+ *  A quintic with zero first and second derivative at both ends, so
+ *  the result is C2: no kink where the range ends and no sudden change
+ *  of curvature either. Flat at the bottom, flat at the top, steeper
+ *  than linear in between — which is what terrain looks like anyway.
+ *
+ *  Lives here rather than in long-air-terrain.js so that module can
+ *  import it without the two forming a cycle. */
+export function sat(x, lo, hi, inLo, inHi){
+  const t = (x - inLo) / (inHi - inLo);
+  if(t <= 0) return lo;
+  if(t >= 1) return hi;
+  return lo + (hi - lo) * (t * t * t * (t * (t * 6 - 15) + 10));
+}
+
+/* QUANTISATION REMOVED — 2 November 2026, and the measurement is why.
+   ------------------------------------------------------------------
+   This was `Math.min(RIDGE_TOP, Math.max(0, Math.round(h / 0.85) * 0.85))`:
+   a step function with two hard clamps on top of it. The intent was
+   cut terraces (§4.2 rule 5) and the result was not terraces, because
+   the mesh samples this every four metres and the steps land wherever
+   they land relative to that grid — so an 0.85 m riser arrives as a
+   random 0.85 m lurch inside one row rather than as an architectural
+   edge. The reader called the chapter a jutting, discontinuous mess
+   and asked for it to be sampled.
+
+   Sampled, by tools/continuity.mjs, which classifies a field by how
+   its measured derivatives behave when the sample spacing is halved:
+
+     ridgeAt   VALUE JUMP   slope x4, curvature x16 over two halvings
+     crest line as drawn    a 25.14 degree turn at a single knot
+
+   A ratio of 4 and 16 is a value discontinuity — the derivative is
+   diverging, not merely large — and 25 degrees in four metres is the
+   jut itself. Note that this is NOT fixed by more knots: the kink
+   angle at a knot is about f'' times the spacing, and for a quantised
+   field f'' is unbounded, so subdividing achieves nothing. Going from
+   nine profile columns to fifteen was the same mistake in x.
+
+   §4.2a already draws this line for shading: a hard edge is not a
+   jagged edge, and posterised VALUE steps stay. This is geometry, not
+   shading — the terraces were never legible as terraces — so the
+   field is now smooth and the hard steps continue to live where they
+   always worked, in the value bands the fragment shader paints on top
+   of it. Still bounded by the same [0, RIDGE_TOP], now by saturation
+   rather than by a clamp. */
 export function ridgeAt(z, period){
   const u = (z / period) * Math.PI * 2;
   const h = Math.sin(u * 3) * 1.55
@@ -506,13 +558,39 @@ export function ridgeAt(z, period){
           + Math.sin(u * 13 + 1.7) * 0.6
           + Math.sin(u * 23 + 4.2) * 0.3
           + 1.3;
-  return Math.min(RIDGE_TOP, Math.max(0.0, Math.round(h / 0.85) * 0.85));
+  // the four harmonics span +-3.5 about 1.3
+  return sat(h, 0.0, SPINE_TOP, -2.2, 4.8);
 }
 
-/** The flat underside of the cloud ceiling, well above the corridor. */
+/* RIDGE_TOP NOW MEANS WHAT ITS NAME SAYS — 2 November 2026.
+   ------------------------------------------------------------------
+   It was documented as "the highest any ridge crest reaches" and
+   ridgeAt was clamped to it, but ridgeAt is only the SPINE: the mesh
+   adds the profile's own dy (up to +0.4 at the x = +-13 columns) and
+   the cross-course grade (up to +0.45) on top. So the surface a glider
+   could actually touch reached 4.22 m while the constant claimed 3.4,
+   and tools/regress.mjs has been checking the corridor margin against
+   the wrong number since the ridge was built.
+
+   Measured, not reasoned about: tools/continuity.mjs samples the DRAWN
+   surface across the whole strip and reports its peak.
+
+   The guarantee is re-derived rather than the check loosened, which is
+   what was asked for. The spine is saturated 0.85 m lower — exactly
+   max(dy) + max(grade) — so the drawn peak lands on RIDGE_TOP and the
+   name is true again. This moves the terrain DOWN, so every clearance
+   in tools/regress.mjs gets larger: the on-pace guarantee is
+   strengthened, never weakened. */
+export const SPINE_TOP = RIDGE_TOP - 0.85;
+
+/** The underside of the cloud ceiling, well above the corridor.
+ *  Was quantised to 1.6 m steps and measured the same way: VALUE JUMP,
+ *  slope x4, curvature x16, a 21.8 degree turn at one knot. It is a
+ *  single harmonic and needs no clamp at all, so dropping the
+ *  quantisation leaves a pure sine. */
 export function ceilAt(z, period){
   const u = (z / period) * Math.PI * 2;
-  return CORR_HI + 7.0 + Math.round((Math.sin(u * 7 + 0.6) * 2.4) / 1.6) * 1.6;
+  return CORR_HI + 7.0 + Math.sin(u * 7 + 0.6) * 2.4;
 }
 
 /** Lateral wander, for the ridge and the far scenery only. The kite has

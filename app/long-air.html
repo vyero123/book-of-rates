@@ -240,6 +240,16 @@ import { PROTOCOLS, CHOICE, validChoice,
          DRAG_MAX_LOSS, DRAG_GAIN, DRAG_CLEAR,
          AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M, V_MAX,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
+/* THE TERRAIN IS A MODULE NOW — 2 November 2026.
+   The reader asked for the scene to be sampled for continuity rather
+   than eyeballed, and a sampler has to run in Node, which cannot
+   import a <script type="module"> block out of an HTML page. So the
+   profile, the grade and the mesh's own interpolation moved to
+   js/long-air-terrain.js and tools/continuity.mjs samples EXACTLY the
+   functions this page draws. One definition, not two that can drift —
+   the same argument that hoisted gradeAt out of ridgeGeometry when the
+   glider's shadow needed it. */
+import { PROF, gradeAt, meshY, rowsOf } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
@@ -446,63 +456,15 @@ scene.add(mesas);
    CORR_LO. The first pass let the figure clip through the floor; this
    cannot, and tools/regress.mjs checks the margin rather than trusting it.
    ------------------------------------------------------------------ */
-/* The cross-course grade, hoisted out of ridgeGeometry because the
-   glider's shadow has to land on the SAME surface the mesh draws, and
-   a second copy of this that drifted would bury the shadow in the hill
-   without anything reporting it. One definition, two callers. */
-function gradeAt(zb, x, period){
-  const u = (zb / period) * Math.PI * 2;
-  const g = Math.sin(u * 5 + x * 0.021) * 0.62
-          + Math.sin(u * 11 + 2.3 + x * 0.047) * 0.34;
-  return Math.max(-1.6, Math.min(0.45, Math.round(g / 0.3) * 0.3));
-}
-
-/* THE HEIGHT OF THE SURFACE THAT IS ACTUALLY DRAWN, which is not the
-   same number as the height of the function it is built from.
-   -------------------------------------------------------------------
-   This is what the glider's shadow needed and what three attempts at
-   it got wrong. ridgeGeometry samples ridgeAt + gradeAt at rows every
-   period/n metres (n = period/4, so about four metres apart) and at a
-   handful of profile columns, and the GPU then draws flat triangles
-   between those samples. ridgeAt is quantised to 0.85 m steps, so
-   between two rows the analytic value can stand most of a full
-   quantum above the chord the mesh actually renders.
-
-   A decal placed at the ANALYTIC height is therefore below the drawn
-   surface about as often as it is above it, and the depth test throws
-   it away — silently, with the draw call still issued and still
-   counted. That is what coverage() was reporting as 0.
-
-   So: reproduce the mesh's own interpolation. Find the two rows the
-   point falls between, evaluate the same way ridgeGeometry does at
-   each, interpolate across the same profile columns in x, and lerp.
-   The result is the surface the GPU is drawing, to within floating
-   point, so a lift of a few centimetres is all it takes.
-
-   Only valid for |x| <= 13, which is the lane the glider flies in and
-   the only place anything asks. */
-function meshRidgeY(x, zb, period, rows){
-  const rowY = zr => {
-    // the columns are SHIFTED IN X by the course's wander, so the
-    // interpolation parameter is measured from the shifted spine. The
-    // grade is still evaluated at the column's nominal x, because that
-    // is what ridgeGeometry passes it.
-    const dx = x - wanderAt(zr, period);
-    const k  = Math.min(13, Math.abs(dx)) / 13;
-    const sx = dx < 0 ? -13 : 13;
-    return ridgeAt(zr, period)
-         + gradeAt(zr, 0, period) * (1 - k) + gradeAt(zr, sx, period) * k
-         + 0.4 * k;            // the profile's own dy, 0 on the spine
-  };
-  const f  = (((zb % period) + period) % period) / period * rows;
-  const i0 = Math.floor(f), fr = f - i0;
-  return rowY((i0 / rows) * period) * (1 - fr)
-       + rowY(((i0 + 1) / rows) * period) * fr;
-}
-
+/* gradeAt, meshY and the profile itself now live in
+   js/long-air-terrain.js — see the import note at the top. The copies
+   that used to be here were quantised and hard-clamped, which
+   tools/continuity.mjs measures as a VALUE JUMP (slope x4, curvature
+   x16 over two halvings of the sample spacing) and the drawn crest
+   line as a 24 degree turn at a single knot. That was the jut. */
 function ridgeGeometry(proto){
   const period = periodOf(proto);
-  const n = Math.round(period / 4);
+  const n = rowsOf(period);
   const b = builder(THREE, { aTone:1, aH:1, aSun:1 });
   // ONE open profile across the width, extruded along z: a single ribbon.
   // Building a skirt at every column instead of only at the outer edges
@@ -519,39 +481,25 @@ function ridgeGeometry(proto){
      to have a shape; the resolved risers are what stop that shape
      stair-stepping. About 2,700 extra triangles on the lightest
      chapter in the book. */
-  const PROF = [
-    { x:-190, dy:-15,   tone:BODY,  h:0 },
-    { x:-150, dy: -6.5, tone:BODY,  h:0 },
-    { x:-120, dy: -1.2, tone:LIGHT, h:1 },
-    { x: -86, dy: -0.7, tone:LIGHT, h:1 },
-    { x: -58, dy: -0.3, tone:MID,   h:1 },
-    { x: -34, dy:  0,   tone:PALE,  h:1 },
-    { x: -13, dy:  0.4, tone:PALE,  h:1 },
-    { x:   0, dy:  0,   tone:PALE,  h:1 },
-    { x:  13, dy:  0.4, tone:PALE,  h:1 },
-    { x:  34, dy:  0,   tone:PALE,  h:1 },
-    { x:  58, dy: -0.3, tone:MID,   h:1 },
-    { x:  86, dy: -0.7, tone:LIGHT, h:1 },
-    { x: 120, dy: -1.2, tone:LIGHT, h:1 },
-    { x: 150, dy: -6.5, tone:BODY,  h:0 },
-    { x: 190, dy:-15,   tone:BODY,  h:0 }
-  ];
   /* GRADE VARIANCE ACROSS THE COURSE, not only along it.
-     ridgeAt() already runs four harmonics down the z axis, so the
-     CREST height varies well. The CROSS-SECTION did not: the same nine
-     points were extruded at every one of the 168 z-steps, so the ridge
-     was a constant profile swept along a varying spine — one legible
-     shape, repeated, which is the terrain equivalent of one legible
-     sine. Two harmonics at different periods, per column and per
-     z-step, quantised to 0.3 m so they read as cut terraces rather
-     than as a wobble (§4.2 rule 5).
+     ridgeAt runs four harmonics down the z axis, so the CREST height
+     varies well. The CROSS-SECTION did not: the same profile was
+     extruded at every one of the 168 rows, so the ridge was a constant
+     shape swept along a varying spine.
 
-     CAPPED ON THE UPSIDE AND THE CAP IS LOAD-BEARING. ridgeAt is
-     clamped to RIDGE_TOP = 3.4 and the corridor floor is CORR_LO = 8.0;
-     tools/regress.mjs checks that margin against ridgeAt, which this
-     does not touch, so a profile bump that rose freely would be a
-     clearance the gate cannot see. It is clamped to +0.45, leaving
-     better than four metres. */
+     BOTH THE PROFILE AND THE GRADE ARE IMPORTED now, and both are
+     smooth. The grade used to be quantised to 0.3 m and hard-clamped
+     to [-1.6, +0.45] in the name of cut terraces; it is saturated into
+     the same range instead, because a clamp is a slope discontinuity
+     wherever it bites and a quantised field cannot be smoothed by
+     subdividing it.
+
+     THE CAP IS STILL LOAD-BEARING and is now honest. RIDGE_TOP used to
+     bound ridgeAt alone, while the drawn surface added dy (+0.4) and
+     grade (+0.45) on top and reached 4.22 m. The spine saturates
+     0.85 m lower so the DRAWN peak lands on RIDGE_TOP, which moves the
+     terrain down and strengthens every clearance in
+     tools/regress.mjs rather than loosening any of them. */
   for(let i = 0; i <= n; i++){
     const zb = (i / n) * period;
     const w = wanderAt(zb, period);
@@ -1015,13 +963,13 @@ scene.add(spars);
         height. Correct, and the right way to place a decal, but never
         shown to have been the reason for a zero.
      3. DoubleSide. Necessary for the winding, changed no measurement.
-     4. meshRidgeY, conforming to the mesh's own interpolation rather
-        than to the function it is built from. Same: right, unproven.
+     4. meshY, conforming to the mesh's own interpolation rather than
+        to the function it is built from. Same: right, unproven.
 
    Two and four are kept because a decal placed on the surface that is
    actually drawn is correct whether or not it was ever the bug, and
    because the next person to put something on this terrain will need
-   meshRidgeY. But the ledger says what it says: one real diagnosis
+   meshY. But the ledger says what it says: one real diagnosis
    out of five, and the other four were me arguing with a ruler that
    was too coarse to see what I was measuring.
 
@@ -1774,18 +1722,17 @@ const loop = clock((dt, now, running) => {
   kiteShadow.visible = alt < 40;
   if(kiteShadow.visible){
     /* ON THE SURFACE THAT IS DRAWN, not the one the function describes
-       — meshRidgeY, and the long note next to it, is the whole of why
-       this took four tries. 0.06 m of lift is enough once the height
-       is the right height; 0.10 m was not enough when it was not. */
+       — meshY, in js/long-air-terrain.js, is the mesh's own
+       interpolation and therefore the triangles the GPU renders. */
     const rad = 2.2 + far * 1.6;
-    const rows = Math.round(period / 4);
+    const rows = rowsOf(period);
     for(let i = 0; i < shN; i++){
       const wx = kiteX + shUnit[i*3] * rad;
       const wz = -fwd  + shUnit[i*3+1] * rad;
       // world z = period*BEHIND - ((zb - dist) mod period), inverted
       const zb = dist + period * BEHIND - wz;
       shPos.array[i*3]     = wx;
-      shPos.array[i*3 + 1] = meshRidgeY(wx, zb, period, rows) + 0.06;
+      shPos.array[i*3 + 1] = meshY(wx, zb, period, rows) + 0.06;
       shPos.array[i*3 + 2] = wz;
     }
     shPos.needsUpdate = true;

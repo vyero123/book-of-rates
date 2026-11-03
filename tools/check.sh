@@ -97,6 +97,28 @@ if ! node "$ROOT/tools/regress.mjs"; then
   FAIL=1
 fi
 
+# --- 4b. the scenery must be continuous ---
+# The reader's verdict on Long Air was "a jutting, discontinuous mess"
+# and the instruction was to SAMPLE for continuity rather than adjust
+# things that looked suspect. tools/continuity.mjs does that: it
+# classifies every terrain field by how its measured derivatives behave
+# when the sample spacing is halved (smooth stays put, a slope kink
+# doubles in curvature, a value jump doubles in slope), reports the
+# kink angle at every mesh knot, checks the wrap seam for a DERIVATIVE
+# match and not only a value match, and re-derives the corridor margin
+# from the drawn surface instead of from the spine.
+#
+# It proves itself on five controls with known answers before it says
+# anything about the scene, and it keeps the pre-fix definitions as a
+# negative control so the check is known to be able to fail.
+if ! node "$ROOT/tools/continuity.mjs" > /dev/null 2>&1; then
+  say "  FAIL  the scenery has a measured discontinuity"
+  node "$ROOT/tools/continuity.mjs" 2>&1 | grep -E "FAIL" | head -10
+  FAIL=1
+else
+  say "  ok    scenery continuous: every field smooth under refinement"
+fi
+
 # --- 5. no credential may ever reach the index ---
 PAT="github""_pat_"
 if [ -d "$ROOT/.git" ]; then
