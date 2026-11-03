@@ -170,6 +170,45 @@ export function meshY(x, zb, period, rows = rowsOf(period)){
        + rowY(((i0 + 1) / rows) * period) * fr;
 }
 
+/* ------------------------------------------------------------------
+   THE GATE LIP PROFILE
+   ------------------------------------------------------------------
+   The columns the opening is built across, and how far each one steps
+   away from the centre lane. Shared with tools/continuity.mjs for the
+   usual reason: a replica in the sampler could drift from the thing it
+   is sampling, which makes the measurement worthless at exactly the
+   moment it matters.
+
+   IT WAS THE WORST JUT IN THE CHAPTER AND IT IS ON THE EDGE YOU FLY
+   THROUGH. Every column except the middle took an independent
+   quantised random offset of up to 1.8 m, over spans of 4.6 m, with
+   the centre pinned — so the lip turned up to 36 degrees at the knot
+   directly in front of the reader. Measured at the knots, exactly,
+   because sampling a piecewise-linear profile on some other grid
+   dilutes the angle and hides it.
+
+   The shape is now a smooth U with a small per-column jitter on top:
+   zero slope at the centre, so the knot the reader looks straight at
+   is flat, and the sides still visibly rougher than the lane. Both
+   terms are non-negative in the gate's own direction, which preserves
+   the invariant that variation only ever makes the hole BIGGER.
+   ------------------------------------------------------------------ */
+export const GX = [-15, -9.5, -4.6, 0, 4.6, 9.5, 15];
+
+export function lipOffset(gateI, k){
+  const x = GX[k];
+  // the smooth part: a U across the opening, quantised per gate so a
+  // gate still has one decided size rather than a continuum
+  const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8) / 0.6) * 0.6;
+  const t = Math.abs(x) / 15;
+  const u = t * t * (3 - 2 * t);           // zero slope at x = 0
+  // the rough part: small, non-negative, and bounded so that the worst
+  // slope change it can contribute at a 4.6 m span stays well inside
+  // the budget
+  const j = Math.round((((gateI * 17 + k * 29) % 7) / 7 * 0.30) / 0.15) * 0.15;
+  return vmax * u + j;
+}
+
 /** The highest the drawn surface ever reaches, sampled rather than
  *  reasoned about. The corridor floor has to clear this, and the
  *  guarantee is re-derived from the geometry rather than from

@@ -51,10 +51,11 @@
  * instrument failed its own controls.
  */
 
-import { periodOf, PROTOCOLS, ridgeAt, ceilAt, wanderAt,
+import { periodOf, PROTOCOLS, ridgeAt, ceilAt, wanderAt, courseOf,
          CORR_LO, CORR_HI, RIDGE_TOP, GROUND } from '../app/js/long-air-breath.js';
+import { breath } from '../app/js/breath.js';
 import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
-         highestDrawn, PROF } from '../app/js/long-air-terrain.js';
+         highestDrawn, PROF, GX, lipOffset } from '../app/js/long-air-terrain.js';
 
 const VERBOSE = process.argv.includes('--verbose');
 let FAIL = 0;
@@ -284,6 +285,52 @@ seam('ceilAt',   z => ceilAt(z, period));
 seam('wanderAt', z => wanderAt(z, period));
 seam('gradeAt',  z => gradeAt(z, 0, period));
 seam('terrainY', z => terrainY(0, z, period));
+
+/* ------------------------------------------------------------------
+   3b. THE GATE SLABS AGAINST THE TERRAIN
+   ------------------------------------------------------------------
+   A slab that FLOATS over the hill leaves a gap you can see under, and
+   the line where it almost meets the ground wanders about as the ridge
+   scrolls past: a jut of a different kind. A slab buried in the hill
+   is correct and invisible. So the question is not "do they intersect"
+   — they must — but "is the slab's far edge below the LOWEST the
+   terrain gets anywhere across the opening at that z".
+
+   Same for the cloud bank at the top against the ceiling.
+   ------------------------------------------------------------------ */
+say('');
+say('GATE SLABS AGAINST THE TERRAIN');
+{
+  const probe = breath(proto);
+  const course = courseOf(proto, t => probe.value(t));
+  const ROCK_FAR = GROUND - 3.0;
+  let worstGap = -Infinity, gapAt = null;
+  let lipKink = 0, lipAt = null;
+  for(const g of course.gates){
+    // the drawn terrain right across the opening at this gate's z
+    let lowest = Infinity;
+    for(let x = -20; x <= 20; x += 1) lowest = Math.min(lowest, meshY(x, g.zb, period));
+    // positive gap = the slab stops ABOVE the ground and you can see under
+    const gap = ROCK_FAR - lowest;
+    if(gap > worstGap){ worstGap = gap; gapAt = { z:+g.zb.toFixed(1), lowest:+lowest.toFixed(2) }; }
+    // the lip profile is seven knots across thirty metres; measure its
+    // own kink the exact way, at the knots
+    // the profile itself, imported, not replicated
+    const lipFor = k => lipOffset(g.i, k);
+    for(let k = 1; k < GX.length - 1; k++){
+      const s1 = (lipFor(k) - lipFor(k-1)) / (GX[k] - GX[k-1]);
+      const s2 = (lipFor(k+1) - lipFor(k)) / (GX[k+1] - GX[k]);
+      const d = Math.abs(Math.atan(s2) - Math.atan(s1)) * 180 / Math.PI;
+      if(d > lipKink){ lipKink = d; lipAt = { gate:g.i, x:GX[k] }; }
+    }
+  }
+  const gl = `rock slab far edge vs lowest terrain across the opening: ` +
+             `worst gap ${worstGap.toFixed(2)} m at z=${gapAt.z}`;
+  if(worstGap < 0) ok(gl + '  (buried everywhere, as it must be)');
+  else bad(gl + '  — the slab floats and you can see under it');
+  const ll = `gate lip profile, worst knot ${lipKink.toFixed(2)} deg at x=${lipAt.x}`;
+  if(lipKink <= 26) ok(ll); else bad(ll + '  (budget 26)');
+}
 
 /* ------------------------------------------------------------------
    4. THE CORRIDOR MARGIN, RE-DERIVED FROM THE GEOMETRY

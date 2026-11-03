@@ -249,7 +249,7 @@ import { PROTOCOLS, CHOICE, validChoice,
    functions this page draws. One definition, not two that can drift —
    the same argument that hoisted gradeAt out of ridgeGeometry when the
    glider's shadow needed it. */
-import { PROF, gradeAt, meshY, rowsOf } from './js/long-air-terrain.js';
+import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
@@ -575,7 +575,9 @@ const rockMat = posterMat(THREE, {
    off pace (§6.1) while the far ends of the slabs stay put. The world
    makes room; the kite is never in question.
    ------------------------------------------------------------------ */
-const GX = [-15, -9.5, -4.6, 0, 4.6, 9.5, 15];
+/* GX lives in js/long-air-terrain.js with the lip profile that uses
+   it, so the sampler and the geometry cannot disagree about where the
+   opening's columns are. */
 const SLAB_Z = 2.6;
 
 /* THE NEAR DISSOLVE, sized from the camera's own lag rather than by eye.
@@ -608,16 +610,24 @@ function gateGeometry(course, which){
        increases the contrast swing as it goes past rather than reducing
        it. So the mechanism is not "a big opaque area moving" and the
        slab goes back to reaching past the corridor. */
-    const far = which < 0 ? GROUND - 1.5 : ceilAt(g.zb, course.period) + 2.0;
+    /* THREE METRES, NOT ONE AND A HALF. The slab has to be buried in
+       the hill at its far edge or you can see under it, and the
+       terrain dips to -1.6 where the cross-course grade is at its
+       lowest. tools/continuity.mjs measured the worst gate as buried
+       by SIX CENTIMETRES — true, but with no margin at all, so any
+       future change to the grade would have shown daylight under a
+       gate. Now buried by better than a metre everywhere, and the
+       sampler checks it rather than the comment claiming it. */
+    const far = which < 0 ? GROUND - 3.0 : ceilAt(g.zb, course.period) + 2.0;
     const seed = ((g.i * 7919) % 97) / 97;
-    // the lip is level in the kite's own lane and steps away from it to
-    // the sides, so the centre lane is visibly the route and the sides
-    // are visibly rougher. Variation only ever makes the hole BIGGER.
-    const lipAt = k => {
-      if(k === 3) return lip;
-      const v = Math.round((((g.i * 31 + k * 17) % 11) / 11 * 1.8) / 0.6) * 0.6;
-      return lip + which * v;
-    };
+    /* the lip is level in the kite's own lane and steps away from it to
+       the sides, so the centre lane is visibly the route and the sides
+       are visibly rougher. Variation only ever makes the hole BIGGER.
+       The profile itself is in js/long-air-terrain.js, shared with the
+       sampler: it used to turn 36 degrees at the knot directly in
+       front of the reader, which was the sharpest jut in the chapter
+       and on the one edge you actually aim at. */
+    const lipAt = k => lip + which * lipOffset(g.i, k);
     const base = b.count;
     for(let k = 0; k < GX.length; k++){
       b.vertex(GX[k], lipAt(k), g.zb,
