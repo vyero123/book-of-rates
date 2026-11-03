@@ -58,6 +58,13 @@ import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset } from '../app/js/long-air-terrain.js';
 
 const VERBOSE = process.argv.includes('--verbose');
+
+/* ONE BAR FOR THE WHOLE CHAPTER, in degrees of turn at a knot AS SEEN
+   from the lens. Four degrees is about three pixels of deviation
+   across a knot at the distance the ridge is read at on a 375 px
+   screen, which is below the point where an edge reads as a corner
+   rather than as a line. */
+const TARGET_DEG = 4.0;
 let FAIL = 0;
 const say = s => console.log(s);
 const ok   = s => say('  ok    ' + s);
@@ -230,10 +237,10 @@ function kink(name, f, a, b, step, budget){
   if(k.deg <= budget) ok(line); else bad(line);
 }
 // along the course, at the crest and on each shoulder
-kink('crest line along z (x=0)',   z => meshY(0,   z, period), 0, period, rowStep, 12);
-kink('shoulder along z (x=-13)',   z => meshY(-13, z, period), 0, period, rowStep, 12);
-kink('flank along z (x=-58)',      z => meshY(-58, z, period), 0, period, rowStep, 12);
-kink('cloud floor along z',        z => ceilAt(z, period),     0, period, rowStep, 12);
+kink('crest line along z (x=0)',   z => meshY(0,   z, period), 0, period, rowStep, TARGET_DEG);
+kink('shoulder along z (x=-13)',   z => meshY(-13, z, period), 0, period, rowStep, TARGET_DEG);
+kink('flank along z (x=-58)',      z => meshY(-58, z, period), 0, period, rowStep, TARGET_DEG);
+kink('cloud floor along z',        z => ceilAt(z, period),     0, period, rowStep, TARGET_DEG);
 /* ACROSS THE RIDGE, MEASURED AT THE COLUMNS THEMSELVES.
    Sampling the cross-section on an arbitrary grid dilutes the kink,
    because the breakpoint falls somewhere between two samples and the
@@ -253,10 +260,10 @@ function columnKink(z){
 }
 for(const z of [0, period * 0.17, period * 0.41, period * 0.73]){
   const k = columnKink(z);
-  kinks.push({ name:`cross-section z=${z.toFixed(0)}`, ...k, budget:26 });
+  kinks.push({ name:`cross-section z=${z.toFixed(0)}`, ...k, budget:TARGET_DEG });
   const line = `cross-section at z=${z.toFixed(0)}`.padEnd(34) +
-               `${String(k.deg).padStart(6)} deg at x=${k.at}   (budget 26)`;
-  if(k.deg <= 26) ok(line); else bad(line);
+               `${String(k.deg).padStart(6)} deg at x=${k.at}   (budget ${TARGET_DEG})`;
+  if(k.deg <= TARGET_DEG) ok(line); else bad(line);
 }
 
 /* ------------------------------------------------------------------
@@ -329,7 +336,86 @@ say('GATE SLABS AGAINST THE TERRAIN');
   if(worstGap < 0) ok(gl + '  (buried everywhere, as it must be)');
   else bad(gl + '  — the slab floats and you can see under it');
   const ll = `gate lip profile, worst knot ${lipKink.toFixed(2)} deg at x=${lipAt.x}`;
-  if(lipKink <= 26) ok(ll); else bad(ll + '  (budget 26)');
+  if(lipKink <= TARGET_DEG) ok(ll); else bad(ll + `  (budget ${TARGET_DEG})`);
+}
+
+/* ------------------------------------------------------------------
+   3c. EVERY MESH, BOTH AXES, AGAINST ONE BAR
+   ------------------------------------------------------------------
+   A surface smooth in one direction and coarse in the other still
+   juts, so each mesh is swept along z AND across x and reports the
+   worse of the two. One target for the whole chapter.
+
+   DISTANT GEOMETRY IS EXCLUDED BY MEASUREMENT, NOT BY ASSERTION. The
+   far mesas sit 360 to 780 m away and their profile is deliberately
+   quantised into hard steps — that is the §4.2 rule-5 background
+   silhouette and it is not up for smoothing. What matters is what the
+   step SUBTENDS: a 7 m riser at 780 m is 0.5 degrees, which is half a
+   pixel at this viewport. So the sweep reports both the world angle
+   and the angle subtended from the lens, and the bar is applied to
+   the second.
+   ------------------------------------------------------------------ */
+say('');
+say(`EVERY MESH, WORST KNOT — target ${TARGET_DEG} deg as seen`);
+{
+  const CAM = { y: 22, z: 13 };          // where the lens actually rides
+  const seen = (deg, dist) => deg * Math.min(1, 40 / Math.max(1, dist));
+  const sweep = [];
+
+  // the ridge, along the course and across it
+  let zWorst = 0, xWorst = 0;
+  for(let x of [-120, -58, -13, 0, 13, 58, 120]){
+    const k = maxKinkDeg(z => meshY(x, z, period), 0, period, rowStep);
+    if(k.deg > zWorst) zWorst = k.deg;
+  }
+  for(const z of [0, period*0.17, period*0.41, period*0.73, period*0.91]){
+    const c = columnsAt(z, period);
+    for(let i = 1; i < c.length - 1; i++){
+      const s1 = (c[i].y - c[i-1].y) / (c[i].x - c[i-1].x);
+      const s2 = (c[i+1].y - c[i].y) / (c[i+1].x - c[i].x);
+      const d = Math.abs(Math.atan(s2) - Math.atan(s1)) * 180 / Math.PI;
+      if(d > xWorst) xWorst = d;
+    }
+  }
+  sweep.push({ mesh:'ridge', along:zWorst, across:xWorst, dist:45 });
+
+  // the gate lips, across the opening
+  {
+    const probe2 = breath(proto);
+    const course2 = courseOf(proto, t => probe2.value(t));
+    let w = 0;
+    for(const g of course2.gates){
+      for(let k = 1; k < GX.length - 1; k++){
+        const s1 = (lipOffset(g.i, k) - lipOffset(g.i, k-1)) / (GX[k] - GX[k-1]);
+        const s2 = (lipOffset(g.i, k+1) - lipOffset(g.i, k)) / (GX[k+1] - GX[k]);
+        const d = Math.abs(Math.atan(s2) - Math.atan(s1)) * 180 / Math.PI;
+        if(d > w) w = d;
+      }
+    }
+    sweep.push({ mesh:'gate lip', along:0, across:w, dist:20 });
+  }
+
+  // the cloud ceiling the cloud slab hangs from
+  sweep.push({ mesh:'cloud ceiling',
+               along: maxKinkDeg(z => ceilAt(z, period), 0, period, rowStep).deg,
+               across: 0, dist:40 });
+
+  // the far mesas — quantised on purpose, judged by what they subtend
+  for(const L of [{z:780, step:7.0}, {z:520, step:5.5}, {z:360, step:4.0}]){
+    const span = 1800, n = 40;
+    const deg = Math.atan(L.step / (span / n)) * 180 / Math.PI;
+    sweep.push({ mesh:`far mesa z=${L.z}`, along:0, across:deg, dist:L.z });
+  }
+
+  for(const s of sweep){
+    const worst = Math.max(s.along, s.across);
+    const app = seen(worst, s.dist);
+    const line = `${s.mesh.padEnd(18)} along ${s.along.toFixed(2).padStart(6)}  ` +
+                 `across ${s.across.toFixed(2).padStart(6)}  ` +
+                 `worst ${worst.toFixed(2).padStart(6)} deg at ~${s.dist} m ` +
+                 `= ${app.toFixed(2)} as seen`;
+    if(app <= TARGET_DEG) ok(line); else bad(line);
+  }
 }
 
 /* ------------------------------------------------------------------

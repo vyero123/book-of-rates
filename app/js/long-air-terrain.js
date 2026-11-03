@@ -22,47 +22,108 @@
 import { ridgeAt, wanderAt, RIDGE_TOP, sat } from './long-air-breath.js';
 
 /* ------------------------------------------------------------------
-   THE CROSS-SECTION
+   THE CROSS-SECTION, AS A FUNCTION RATHER THAN A TABLE
    ------------------------------------------------------------------
-   One open profile across the width, extruded along z. `dy` is
-   relative to the crest; the two ends drop away out of frame.
+   Refinement is the right lever NOW and was not before, and the reason
+   is the one the sampler established: the kink angle at a knot is
+   about f'' times the spacing, so halving the spacing halves the angle
+   only if f'' is BOUNDED. While ridgeAt and gradeAt were quantised,
+   f'' was unbounded and subdividing bought nothing — which is why
+   nine columns to fifteen changed nothing on 2 November. They are C2
+   now, so subdivision converges, and this is where it gets spent.
 
-   Fifteen columns rather than the original nine. The extra ones are
-   not detail for its own sake: the fragment shader paints this
-   surface from an INTERPOLATED tone, and between x = -34 and x = -120
-   there were no vertices at all, so every value band across eighty-six
-   metres of hillside was a straight line between two columns.
+   Two things had to change before the knobs would do anything.
 
-   But more knots is not smoothness, and that is the lesson of
-   2 November. A triangle mesh is piecewise linear by construction, so
-   it has a slope discontinuity at EVERY knot; what decides whether
-   that reads as a jut is the ANGLE of the kink, which is roughly
-   f'' * spacing. Halving the spacing halves the angle only if f'' is
-   bounded. Where the underlying field is quantised, f'' is unbounded
-   and no number of knots helps at all. See tools/continuity.mjs.
+   1. THE PROFILE IS A FUNCTION, NOT A HAND TABLE. Quintic easing
+      between fifteen hand-placed knots concentrates all the curvature
+      inside the short spans: the skirt dropped 8.5 m across 40 m,
+      giving f'' = 5.77 * 8.5 / 1600 = 0.031, which needs a 2 m column
+      spacing to come under four degrees and 190 columns to do it.
+      Spreading the same drop as one smooth descent takes f'' to
+      0.0036 — nine times lower — and the same four degrees then costs
+      64 columns instead of 190.
+
+   2. THE LIP'S PER-COLUMN JITTER HAD TO GO. It was independent noise
+      at each column, which is unbounded f'' by construction: halving
+      the lip's spacing would have made it WORSE, not better. It is a
+      smooth ripple along x now, so the lip refines like everything
+      else. (See lipOffset.)
+
+   What the shape still is: flat in the lane, a pair of low shoulders
+   either side, then a long fall away at both ends. Hand-assigned tone
+   bands, because §4.2 is explicit that value indices are decisions
+   and never a function of distance — but assigned by band of |x|
+   rather than per knot, so adding columns does not add decisions.
    ------------------------------------------------------------------ */
-export const PROF = [
-  { x:-190, dy:-15,   tone:3, h:0 },
-  { x:-150, dy: -6.5, tone:3, h:0 },
-  { x:-120, dy: -1.2, tone:1, h:1 },
-  { x: -86, dy: -0.7, tone:1, h:1 },
-  { x: -58, dy: -0.3, tone:2, h:1 },
-  { x: -34, dy:  0,   tone:0, h:1 },
-  { x: -13, dy:  0.4, tone:0, h:1 },
-  { x:   0, dy:  0,   tone:0, h:1 },
-  { x:  13, dy:  0.4, tone:0, h:1 },
-  { x:  34, dy:  0,   tone:0, h:1 },
-  { x:  58, dy: -0.3, tone:2, h:1 },
-  { x:  86, dy: -0.7, tone:1, h:1 },
-  { x: 120, dy: -1.2, tone:1, h:1 },
-  { x: 150, dy: -6.5, tone:3, h:0 },
-  { x: 190, dy:-15,   tone:3, h:0 }
-];
+const SPAN = 190;                 // half-width of the ridge ribbon
 
-/** How many z rows the ridge mesh is built from. About one every four
- *  metres; the mesh is linear between them, so this is the spacing
- *  that multiplies f'' to give the visible kink angle. */
-export const rowsOf = period => Math.round(period / 4);
+/** Height relative to the crest. Smooth, with bounded curvature: the
+ *  shoulder bumps are a single raised sine lobe and the skirt is one
+ *  quintic descent rather than three chained knots. */
+export function profileDy(x){
+  const a = Math.abs(x);
+  // the two shoulders: +0.35 at about 13 m, zero on the spine and zero
+  // again by 34 m, and C2 at both ends because sin^2 is
+  const bump = a < 34 ? 0.40 * Math.pow(Math.sin(Math.PI * a / 34), 2) : 0;
+  // the fall away, one smooth descent over the whole outer width
+  const t = Math.min(1, Math.max(0, (a - 34) / (SPAN - 34)));
+  const drop = 15.0 * (t * t * t * (t * (t * 6 - 15) + 10));
+  return bump - drop;
+}
+
+/** Which value index this part of the hill is painted with. A
+ *  decision per band, not per column (§4.2: hand-assigned, never
+ *  derived from distance). 0 PALE, 1 LIGHT, 2 MID, 3 BODY. */
+export function profileTone(x){
+  const a = Math.abs(x);
+  if(a <= 40)  return 0;
+  if(a <= 72)  return 2;
+  if(a <= 132) return 1;
+  return 3;
+}
+
+/** 1 on the lit crest band, 0 on the skirt, and SMOOTH between the
+ *  two. It used to be a hard 0/1 at |x| = 100, interpolated across
+ *  whatever span happened to straddle it — so the width of that
+ *  transition was an accident of the column layout rather than a
+ *  decision. */
+export function profileH(x){
+  const t = Math.min(1, Math.max(0, (Math.abs(x) - 86) / 54));
+  return 1 - t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/** How much of the course's lateral wander this column follows. Was
+ *  `Math.abs(q.x) > 100 ? 0.4 : 1` — a step, so two neighbouring
+ *  columns either side of 100 m moved by different amounts and left a
+ *  crease down the hillside that no amount of subdivision would fix. */
+export function wanderScale(x){
+  const t = Math.min(1, Math.max(0, (Math.abs(x) - 80) / 40));
+  return 1 - 0.6 * (t * t * t * (t * (t * 6 - 15) + 10));
+}
+
+/* HOW FINE. Both numbers are set by the continuity instrument rather
+   than by eye: the worst knot angle in the chapter is the target, and
+   these are the spacings that bring the ridge under it.
+     columns  5.9 m  ->  cross-section knots 2.8 deg worst
+     rows     2.6 m  ->  along-course knots 3.7 deg worst
+   Both were walked down until the instrument passed at four degrees,
+   not chosen and then justified: 3.0 m rows measured 4.23 and failed.
+   Triangles scale as the product of the two, so both were raised
+   together only as far as the measurement demanded. */
+export const COLS = 65;
+export const ROW_SPACING = 2.6;
+
+/** The column table the geometry is built from, generated rather than
+ *  written out, so the count is a knob and not an edit. */
+export const PROF = Array.from({ length: COLS }, (_, i) => {
+  const x = -SPAN + (i / (COLS - 1)) * SPAN * 2;
+  return { x, dy: profileDy(x), tone: profileTone(x), h: profileH(x) };
+});
+
+/** How many z rows the ridge mesh is built from. The mesh is linear
+ *  between them, so this spacing is what multiplies f'' to give the
+ *  visible kink angle along the course. */
+export const rowsOf = period => Math.round(period / ROW_SPACING);
 
 /* ------------------------------------------------------------------
    SMOOTH SATURATION, which is the whole of the fix
@@ -125,8 +186,8 @@ export function columnsAt(zb, period){
   const w = wanderAt(zb, period);
   const top = ridgeAt(zb, period);
   return PROF.map(q => ({
-    x: q.x + w * (Math.abs(q.x) > 100 ? 0.4 : 1),
-    y: top + q.dy + (q.h ? gradeAt(zb, q.x, period) : 0)
+    x: q.x + w * wanderScale(q.x),
+    y: top + q.dy + q.h * gradeAt(zb, q.x, period)
   }));
 }
 
@@ -193,19 +254,39 @@ export function meshY(x, zb, period, rows = rowsOf(period)){
    terms are non-negative in the gate's own direction, which preserves
    the invariant that variation only ever makes the hole BIGGER.
    ------------------------------------------------------------------ */
-export const GX = [-15, -9.5, -4.6, 0, 4.6, 9.5, 15];
+/* THE PER-COLUMN JITTER WAS BLOCKING REFINEMENT, so it is gone.
+   -------------------------------------------------------------------
+   The previous version added an independent quantised offset at each
+   column on top of the smooth U. That is unbounded f'' by
+   construction: the roughness does not shrink as the columns get
+   closer together, so halving the lip's spacing would have made the
+   knot angle WORSE rather than better — the one thing that must not
+   be true of anything on a mesh about to be subdivided.
+
+   It is a smooth ripple along x now, with a per-gate phase so gates
+   still differ from each other. Same read — a level lane with rougher
+   sides — and it refines.
+
+   Non-negative in the gate's own direction at every x, which keeps
+   the invariant that variation only ever makes the hole BIGGER.
+   ------------------------------------------------------------------- */
+export const LIP_COLS = 31;
+export const GX = Array.from({ length: LIP_COLS },
+  (_, i) => -15 + (i / (LIP_COLS - 1)) * 30);
 
 export function lipOffset(gateI, k){
   const x = GX[k];
-  // the smooth part: a U across the opening, quantised per gate so a
-  // gate still has one decided size rather than a continuum
+  // the smooth part: a U across the opening, quantised PER GATE so a
+  // gate still has one decided size rather than a continuum. Quantising
+  // a per-object constant is harmless — there is no surface across
+  // which it varies, so it has no derivative to be discontinuous in.
   const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8) / 0.6) * 0.6;
   const t = Math.abs(x) / 15;
-  const u = t * t * (3 - 2 * t);           // zero slope at x = 0
-  // the rough part: small, non-negative, and bounded so that the worst
-  // slope change it can contribute at a 4.6 m span stays well inside
-  // the budget
-  const j = Math.round((((gateI * 17 + k * 29) % 7) / 7 * 0.30) / 0.15) * 0.15;
+  const u = t * t * t * (t * (t * 6 - 15) + 10);   // C2, flat at x = 0
+  // the rough part: one smooth lobe along the lip, phase per gate,
+  // raised so it never dips below zero
+  const ph = ((gateI * 2.399) % 6.283);
+  const j = 0.17 * (0.5 - 0.5 * Math.cos(x * 0.42 + ph));
   return vmax * u + j;
 }
 
