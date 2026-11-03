@@ -164,6 +164,27 @@ it than it used to have. Distinguishing those needs the per-mesh
 isolation this document prescribes, run across each of the three frame
 pairs, and that was not done.
 
+### After the gesture, the bubble release and Long Air's pass — 2 November 2026
+
+| chapter | drive | frames | clusters | per s | longest | worst | mean |
+|---|---|---|---|---|---|---|---|
+| Pearl Diver · box | — | 15 | 6 | 0.38 | 7 | 163.7 | 1.90 |
+| Long Air · box | idle | 4 | **4** | **0.25** | 1 | **78.4** | **1.41** |
+
+Long Air's own before, measured in the same session immediately prior
+to its §4.2a pass: 6 events, 6 clusters, 0.38/s, longest 1, worst 80.8,
+mean 1.45. Four of its six events are the same four, at 569, 657, 1086
+and 1093; the two at 927 and 1006 (peaks 30.0 and 26.0) are gone. The
+pass removed two and added none.
+
+Pearl Diver is unchanged within the noise of the run before it (6
+clusters either way, worst 167.7 -> 163.7, mean 1.89 -> 1.90). Its
+longest cluster goes 4 -> 7, which is the waterline transition taking a
+few more frames and not a new event. **The bubble release does not
+register at all**, which was the thing to check: forty bubbles leaving
+together would have been a whole-field single-frame change, and
+staggering them over 0.45 to 0.95 s is why it is not one.
+
 ### LEAD THREE, OPEN: three single-frame events on Pearl Diver no holds
 
 Frames 241, 659, 899 of a 1200-frame run at dt 1/60, peaks 42.2, 41.1,
