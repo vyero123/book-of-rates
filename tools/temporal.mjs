@@ -57,6 +57,7 @@
 import { PROTOCOLS, periodOf, ridgeAt, ceilAt, wanderAt, courseOf, gateAt,
          forgiveness, rates, SPEED, BEHIND, CORRIDOR, RANGE, normOf,
          GATE_HALF, FORGIVE_MAX, V_MAX, AVOID_MARGIN, AVOID_STRENGTH,
+         CLOUD_LIFT, CLOUD_REACH,
          DRAG_MAX_LOSS, DRAG_GAIN, DRAG_CLEAR } from '../app/js/long-air-breath.js';
 import { breath } from '../app/js/breath.js';
 import { body, drag } from '../app/js/course.js';
@@ -251,7 +252,28 @@ const FAIL_BAR = 1.00;
 const EXPECTED = {
   gateCentre: 'identity of the approaching gate; no vertex reads it',
   gateHalf:   'gate.half + forgive; the drawn lip follows `forgive`',
-  forgiveRaw: 'the quantised DECISION (§6.1); `forgive` is what ships'
+  forgiveRaw: 'the quantised DECISION (§6.1); `forgive` is what ships',
+  /* ADDED 4 November 2026, with the reason stated precisely because
+     this one is NOT harmless in the way the two above are.
+
+     `cloud` is the enveloped depth into a bank. It is zero on most
+     frames and non-zero in bursts, so its step ratio is infinite by
+     construction -- the median frame is zero -- which is the same
+     artefact the DV_FLOOR note describes for camBack and not a
+     property of the signal. And it moves fast for an honest reason:
+     the glider flies into a bank at fourteen metres a second, so a
+     quintic ramp over the envelope's 6.6 m is half a second long and
+     a few units a second of velocity change is its CURVATURE rather
+     than a step.
+
+     It is excluded here because the two things it is responsible for
+     are BOTH judged on their own. What the force produces is kiteY,
+     which is measured on the climbing run below and has to pass.
+     What it draws is cloudSoft, the second-order smoothed 0..1 the
+     overlay reads, which is measured there too. Nothing about this
+     field escapes measurement; it is only measured where it has
+     units that mean something. */
+  cloud: 'the force\'s input; kiteY is what it produces and cloudSoft is what it draws, both judged'
 };
 
 /* ------------------------------------------------------------------
@@ -520,7 +542,7 @@ function lensBefore(){
    Each asserts its own precondition. If the on-pace reader skims even
    once, it is not on pace and its numbers are withdrawn.
    ------------------------------------------------------------------ */
-function sampleChapter(clk, { makeLens = lens, offPace = false } = {}){
+function sampleChapter(clk, { makeLens = lens, offPace = false, climb = false } = {}){
   const B = breath(proto);
   const K = body({ corridor: CORRIDOR, rates: RATE, vMax: V_MAX });
   const D = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
@@ -530,9 +552,11 @@ function sampleChapter(clk, { makeLens = lens, offPace = false } = {}){
      is what the vertex shader gets and what the collision test uses,
      so it is what has to be measured */
   const FORG = tracker(0, 3.5);
+  /* the page's own softening follower, same module and same w */
+  const CLOUDIN = tracker(0, 2.6);
   const S = { dist:[], kiteY:[], fill:[], forgiveRaw:[], forgive:[],
               camY:[], camBack:[], lookY:[], gateCentre:[], gateHalf:[],
-              ridgeUnder:[], ceilUnder:[], speedF:[] };
+              ridgeUnder:[], ceilUnder:[], speedF:[], cloud:[], cloudSoft:[] };
 
   for(const dt of clk){
     t += dt; wall += dt;
@@ -549,7 +573,18 @@ function sampleChapter(clk, { makeLens = lens, offPace = false } = {}){
        the chapter's own controls do when the reader presses on the
        cue. OFF PACE: chase a schedule half a second stale, so the
        error wanders across the forgiveness boundaries. */
-    if(offPace){
+    if(climb){
+      /* A READER HOLDING THE INHALE. This is what actually puts a
+         glider into a cloud bank -- the off-pace reader chases a
+         stale schedule and so stays near the opening, which is why
+         the first run of the cloud check read `still` and was
+         measuring nothing. A check nobody has watched fire is not
+         known to be able to fire: eight times in this project a
+         reported fault has been the instrument, and a reported PASS
+         can be the instrument just as easily. */
+      K.fill = Math.min(1, K.fill + RATE.fillPerSec * dt);
+      K.settle(dt);
+    } else if(offPace){
       const lagged = normOf(B.value(Math.max(0, t - 0.55)));
       const gap = lagged - K.fill;
       const cap = (ph.k === 'in' ? RATE.fillPerSec : RATE.emptyPerSec) * dt;
@@ -568,7 +603,20 @@ function sampleChapter(clk, { makeLens = lens, offPace = false } = {}){
     const half = gate.half + FORG.value;
     K.avoid({ centre: gate.centre, half, bodyHalf: 0.78, dt,
               margin: AVOID_MARGIN, strength: AVOID_STRENGTH });
-    if(K.skim({ centre: gate.centre, half, bodyHalf: 0.78 }) > 0) skims++;
+    if(K.skim({ centre: gate.centre, half, bodyHalf: 0.78, side: -1 }) > 0) skims++;
+    /* THE BUOYANCY, which is a NEW INTEGRATOR and therefore exactly
+       the thing this file exists for. A force applied per frame
+       rather than per second is the class of bug that made 58 fps
+       look worse than 60, and a boundary that bit discontinuously
+       would show here as a velocity step however smooth it looked.
+       Driven through the real module, not a replica. */
+    const { ahead } = gateAt(course, dist);
+    const reach = 2.6 + CLOUD_REACH;
+    const qq = Math.min(1, Math.abs(ahead) / reach);
+    const env = 1 - qq * qq * qq * (qq * (qq * 6 - 15) + 10);
+    const into = env > 0
+      ? K.buoy({ base: gate.centre + half, bodyHalf: 0.78, dt, lift: CLOUD_LIFT, env })
+      : 0;
 
     L.step(dt, { kiteY: K.value, cam: ph.cam });
 
@@ -588,6 +636,13 @@ function sampleChapter(clk, { makeLens = lens, offPace = false } = {}){
     S.ridgeUnder.push({ t: wall, v: ridgeAt(dist + period * BEHIND, period) });
     S.ceilUnder.push ({ t: wall, v: ceilAt(dist + period * BEHIND, period) });
     S.speedF.push    ({ t: wall, v: D.speedFactor });
+    S.cloud.push     ({ t: wall, v: into });
+    /* WHAT THE READER ACTUALLY SEES. The overlay's opacity, not the
+       depth: this is the quantity a step in which would white the
+       frame out between two frames, and it is the one that has to be
+       smooth on the reader's jittered clock. */
+    CLOUDIN.step(dt, Math.min(1, Math.max(0, into / 6.0)));
+    S.cloudSoft.push ({ t: wall, v: CLOUDIN.value });
   }
   S.skims = skims;
   return S;
@@ -599,6 +654,8 @@ const jitterRun = sampleChapter(JITTER(FRAMES));
 const beforeRun = sampleChapter(JITTER(FRAMES), { makeLens: lensBefore });
 const offSteady = sampleChapter(STEADY(FRAMES), { offPace: true });
 const offJitter = sampleChapter(JITTER(FRAMES), { offPace: true });
+const upSteady  = sampleChapter(STEADY(FRAMES), { climb: true });
+const upJitter  = sampleChapter(JITTER(FRAMES), { climb: true });
 
 /* THE PRECONDITION, ASSERTED RATHER THAN ASSUMED. */
 say('');
@@ -702,7 +759,7 @@ say('not judged here: course.js places the body on a lip on purpose.');
 /* kiteY is deliberately absent from this list rather than exempted in
    EXPECTED: it IS judged on the on-pace run, where a placement cannot
    happen, and listing it globally would have quietly stopped that. */
-for(const k of ['forgiveRaw', 'forgive', 'camY', 'lookY', 'camBack']){
+for(const k of ['forgiveRaw', 'forgive', 'camY', 'lookY', 'camBack', 'cloud']){
   const a = analyse(offSteady[k]), b = analyse(offJitter[k]);
   const r = verdict(a, b);
   const line = `${k.padEnd(16)} ` +
@@ -717,6 +774,52 @@ say('');
 say('  For scale: the raw decision steps FORGIVE_MAX/3 = 1.53 m between');
 say('  two frames and moves every lip in the course by it. The smoothed');
 say('  value reaches the same four sizes over about a third of a second.');
+
+/* ------------------------------------------------------------------
+   THE CLIMBING READER — the run that exercises the cloud
+   ------------------------------------------------------------------
+   The buoyancy that replaced the hard ceiling on 4 November is a new
+   integrator, and the only one in this chapter applied as a FORCE
+   outside the spring's own substepped loop. A force applied per frame
+   rather than per second is precisely the fault this file was built
+   to find, and a cubic that bit discontinuously at the boundary would
+   show here as a velocity step however smooth it looks written down.
+
+   It needs a reader who actually goes in. Neither of the two above
+   does: the on-pace one is guaranteed not to by tools/regress.mjs,
+   and the off-pace one chases a stale schedule and therefore stays
+   near the opening. This one holds the inhale, which is what a reader
+   with a finger at the top of the glass does, and climbs into the
+   bank.
+
+   The depth is ASSERTED NON-ZERO first. Without that this whole
+   section passes trivially on a day the mechanic is broken.
+   ------------------------------------------------------------------ */
+say('');
+say('A READER HOLDING THE INHALE — the run that goes into the cloud');
+{
+  const d = analyse(upJitter.cloud);
+  if(d.maxSpeed > 1e-9 || Math.max(...upJitter.cloud.map(q => q.v)) > 0.05){
+    const deepest = Math.max(...upJitter.cloud.map(q => q.v));
+    ok(`the climbing reader goes ${deepest.toFixed(2)} m into a bank, so the ` +
+       `measurements below are of something that happens`);
+  } else {
+    bad('the climbing reader never enters a cloud — the buoyancy is unreachable, ' +
+        'and every cloud number in this file is measuring nothing');
+  }
+  for(const k of ['cloud', 'cloudSoft', 'kiteY', 'camY', 'lookY']){
+    const a = analyse(upSteady[k]), b = analyse(upJitter[k]);
+    const r = verdict(a, b);
+    const line = `${k.padEnd(16)} ` +
+      `${(b.stepRatio === Infinity ? 'inf' : b.stepRatio.toFixed(1)).padStart(9)}  ` +
+      `${(b.dvRatio === Infinity ? 'inf' : b.dvRatio.toFixed(1)).padStart(9)}  ` +
+      `${b.maxDV.toFixed(3).padStart(9)}   ${r.kind}` +
+      `   fr x${r.frRatio === Infinity ? 'inf' : r.frRatio.toFixed(2)}`;
+    if(EXPECTED[k])   say('  --    ' + line + `   EXPECTED: ${EXPECTED[k]}`);
+    else if(r.fails)  bad(line);
+    else              ok(line);
+  }
+}
 
 say('');
 say(`CAMERA EASE CONSTANTS, for the record: ${JSON.stringify(CAM_EASE)}`);

@@ -239,6 +239,7 @@ import { PROTOCOLS, CHOICE, validChoice,
          courseOf, gateAt, forgiveness, GATE_HALF, FORGIVE_MAX,
          DRAG_MAX_LOSS, DRAG_GAIN, DRAG_CLEAR,
          AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M, V_MAX,
+         CLOUD_LIFT, CLOUD_REACH,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
 /* THE TERRAIN IS A MODULE NOW — 2 November 2026.
    The reader asked for the scene to be sampled for continuity rather
@@ -396,6 +397,9 @@ const uHorizon = { value: 0.5 };
    it (see the shadow block in the loop) — this is the same number,
    taken from the same line, rather than a second derivation of it. */
 const uWake    = { value: new THREE.Vector3(0, 0, 2.2) };
+/* 0 in clear air, 1 well inside a cloud bank. Softens the picture and
+   hushes the streaks; it is never a warning and never a score. */
+const uInCloud = { value: 0 };
 
 /* THE §4.2a PRELUDES — 2 November 2026, carried over from Pearl Diver.
    A hard edge is not a jagged edge: the step stays where it was and the
@@ -2235,6 +2239,67 @@ const flare = overlayQuad(THREE, {
 });
 scene.add(flare);
 
+/* ------------------------------------------------------------------
+   9a. INSIDE A CLOUD — and it should be a nice place to be
+   ------------------------------------------------------------------
+   The reader may fly up into a bank and nothing stops them, so what
+   it is like in there is a design question rather than an edge case.
+   The answer is: soft, quiet, and a little lovely. Nothing flashes,
+   nothing warns, nothing is counted, and it does not read as a
+   penalty — the whole point of removing the ceiling was that going
+   up is allowed.
+
+   WHAT IT DOES. The frame washes towards the bank's own lit value,
+   strongest at the edges and present but light in the middle so the
+   course never stops being readable; the wool from the gate banks
+   runs across it, in SCREEN space deliberately, because losing your
+   reference is the thing that actually happens inside a cloud and a
+   world-anchored texture would still be telling you where you are.
+   It drifts on the chapter's one wind, so even in here the breath is
+   what moves the air.
+
+   THE HUSH is in the loop: uRush is scaled down by uInCloud, so the
+   speed streaks fade out as the reader goes in. It is the nearest
+   thing this silent chapter has to a sound.
+   ------------------------------------------------------------------ */
+const cloudIn = overlayQuad(THREE, {
+  uniforms:{ uInCloud, uTime, uFill, uAspect:{value:1},
+             uLit:{value:C(AIR.cloudLit)}, uSoft:{value:C(AIR.cloud)} },
+  prelude: PRE_AA + GRAIN_GLSL + WIND_GLSL,
+  fragment:`
+    varying vec2 vUv;
+    uniform float uInCloud, uTime, uFill, uAspect;
+    uniform vec3 uLit, uSoft;
+    float wool2(vec2 p){
+      float s = 0.0, amp = 1.0, tot = 0.0;
+      for(int i = 0; i < 3; i++){
+        p = mat2(0.8018, -0.5976, 0.5976, 0.8018) * p * 1.87;
+        s   += amp * sin(p.x + sin(p.y * 1.27));
+        tot += amp;
+        amp *= 0.55;
+      }
+      return clamp(s / tot * 0.5 + 0.5, 0.0, 1.0);
+    }
+    void main(){
+      if(uInCloud < 0.004) discard;
+      vec2 q = vec2((vUv.x - 0.5) * uAspect, vUv.y - 0.5);
+      /* thicker at the edges of the frame than in the middle: you can
+         always see where you are going, you just cannot see much else */
+      float edge = 0.34 + 0.66 * smoothstep(0.16, 0.62, length(q));
+      vec2 wp = q * 5.2 + windDir() * (uTime * 0.16 * windGust(uFill));
+      float band = posteriseAA(wool2(wp), 3.0);
+      vec3 col = mix(uSoft, uLit, band);
+      col += (grainAt(vUv * 520.0) - 0.5) * 0.020;
+      float al = uInCloud * edge * (0.40 + 0.26 * band);
+      if(al < 0.01) discard;
+      gl_FragColor = vec4(col, al);
+    }
+  `
+});
+onFit(() => { cloudIn.material.uniforms.uAspect.value = camera.aspect; });
+cloudIn.renderOrder = 21;
+scene.add(cloudIn);
+
 /* ==================================================================
    THE CONTROL: THE GLIDER PURSUES YOUR FINGER
    ==================================================================
@@ -2441,6 +2506,10 @@ let DRAG = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
    is no longer constant. Everything that reads the strip reads this. */
 let dist = 0;
 let skimming = 0, avoiding = 0;
+/* how deep into a cloud bank the glider is, in metres, and the
+   smoothed 0..1 the picture is softened by */
+let inCloudDepth = 0;
+const CLOUDIN = tracker(0, 2.6);
 let COURSE = null;
 let subShown = '';
 
@@ -2524,7 +2593,13 @@ const loop = clock((dt, now, running) => {
   // the streaks are FORWARD SPEED now, not sink rate: this is the
   // chapter's one reading of how much friction is on, and it is the
   // thing that comes back when the reader breathes
-  uRush.value = clamp01(0.25 + 0.75 * DRAG.speedFactor) * (started ? 1 : 0);
+  /* THE HUSH. The streaks fade as the reader goes into a bank: you
+     cannot see the air going past when you are inside it, and the
+     quiet is most of what makes in there a pleasant place rather
+     than a place you have been put. uInCloud is the SMOOTHED depth,
+     so this cannot flick. */
+  uRush.value = clamp01(0.25 + 0.75 * DRAG.speedFactor) * (started ? 1 : 0)
+              * (1 - 0.85 * uInCloud.value);
 
   /* --- how far off pace, and therefore how much room the course makes.
      §6.1: the gap widens rather than the kite crashing. Measured against
@@ -2588,9 +2663,27 @@ const loop = clock((dt, now, running) => {
     avoiding = KITE.avoid({ centre: gate.centre, half, bodyHalf: KITE_HALF, dt,
                             margin: AVOID_MARGIN, strength: AVOID_STRENGTH });
   }
+  /* ==================================================================
+     THE TWO LIPS ARE NO LONGER THE SAME KIND OF THING
+     ==================================================================
+     4 November 2026. The lower lip is rock and keeps the skim: a
+     reader rides it, loses forward speed, and their next breath takes
+     the friction off. The upper lip is cloud and is not a surface at
+     all any more.
+
+     Going up into it costs NOTHING. No drag, no grit, no contact
+     flash, nothing counted — §1.6b, and a reader who wants to fly
+     into a cloud is not doing anything wrong. What they get instead
+     is buoyancy that grows as the cube of how deep they are, which is
+     zero in value, slope and curvature at the boundary, so there is
+     no instant at which the world starts objecting. And the picture
+     softens, because that is what being inside a cloud is like.
+     ================================================================== */
+  inCloudDepth = 0;
   if(Math.abs(ahead) < SLAB_Z + 1.4){
     const off = kiteY - gate.centre;
-    const over = KITE.skim({ centre: gate.centre, half, bodyHalf: KITE_HALF });
+    /* side -1: the floor only. */
+    const over = KITE.skim({ centre: gate.centre, half, bodyHalf: KITE_HALF, side: -1 });
     if(over > 0){
       kiteY = KITE.value;
       skimming = 1;
@@ -2601,6 +2694,29 @@ const loop = clock((dt, now, running) => {
                                    gate.centre + Math.sign(off) * half, 0.6, 1);
     }
   }
+  /* THE CLOUD, over a wider and SMOOTHER window than the floor's.
+     The envelope is a quintic in the approach distance with zero
+     slope and curvature at its edge, so the bank fades in rather than
+     switching on — a gate on this would put back exactly the
+     discontinuity the cubic in depth exists to remove. */
+  {
+    const reach = SLAB_Z + CLOUD_REACH;
+    const q = clamp01(Math.abs(ahead) / reach);
+    const env = 1 - q * q * q * (q * (q * 6 - 15) + 10);
+    if(env > 0){
+      inCloudDepth = KITE.buoy({ base: gate.centre + half, bodyHalf: KITE_HALF,
+                                 dt, lift: CLOUD_LIFT, env });
+      kiteY = KITE.value;
+    }
+  }
+  /* How far in, as a 0..1 for the picture. Six metres is where the
+     field is firm; by then the reader is well inside and the frame
+     should say so. The follower is what stops the softening flicking
+     on and off as the glider crosses the boundary — and it is the
+     kit's exact second-order one, so a step in its target cannot
+     produce a step in the picture. */
+  CLOUDIN.step(dt, clamp01(inCloudDepth / 6.0));
+  uInCloud.value = CLOUDIN.value;
   hit = Math.max(0, hit - dt * 1.7);
   uHit.value = hit;
   uDrag.value = DRAG.value;
@@ -2804,6 +2920,7 @@ function beginWith(which, remember){
   REACH_INVITE.reset();   // a new session is a new reader
   /* the lens and the room, put where they belong with no motion */
   L.reset(KITE.value); FORG.set(0);
+  CLOUDIN.set(0); uInCloud.value = 0; inCloudDepth = 0;
   touches.clear(); readTouches(); forceHold = false;
   t = 0; dist = 0; hit = 0; histN = 0; subShown = '';
   skimming = 0; avoiding = 0;
@@ -2885,6 +3002,7 @@ window.__longAir = {
              clearanceOverRidge:+(KITE.value - ridgeAt(dist, worlds[B.proto.id].period)).toFixed(2),
              drag:+DRAG.value.toFixed(3), speed:+(SPEED*DRAG.speedFactor).toFixed(2),
              skimming:!!skimming, avoiding:+avoiding.toFixed(2),
+             inCloud:+inCloudDepth.toFixed(2), cloudSoft:+CLOUDIN.value.toFixed(3),
              behindNominal:+(SPEED*t - dist).toFixed(2),
              hit:+hit.toFixed(2), dist:+dist.toFixed(1),
              camY:+L.camY.toFixed(2), lookY:+L.lookY.toFixed(2),

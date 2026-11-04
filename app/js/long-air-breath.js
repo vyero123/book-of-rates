@@ -403,6 +403,50 @@ export const DRAG_CLEAR = 1.6;
 /** How near a lip the glider starts steering away, in metres, and how
  *  hard. The margin is large relative to the gap because the avoidance
  *  is meant to be a bend, not a save. */
+/* ==================================================================
+   THE TOP OF THE COURSE IS CLOUD, NOT A CEILING — 4 November 2026
+   ==================================================================
+   The reader's instruction: no hard upper boundary; fluffy clouds
+   that gently push you away, but you can go into them if you want.
+   That is §1.6b — recommended, not required — applied to the geometry
+   rather than to the schedule, and it is the same conviction as the
+   soft skim on the floor. The sky stops being a limit and becomes an
+   opinion.
+
+   So the upper lip of every gate stops being a surface. The lower one
+   does not: rock is rock, and a reader who cannot fly through a hill
+   is not being refused anything. Only the weather yields.
+
+   CLOUD_LIFT is the coefficient of a CUBIC in depth, in m/s^2 per
+   cubic metre. Cubic because d^3 is zero in value, slope AND
+   curvature at d = 0, so the field is C2 across the boundary by
+   construction — no span to tune, no instant at which anything
+   begins. See buoy() in js/course.js.
+
+   WHAT THE NUMBER COMES TO, since a coefficient on a cube is not
+   readable by eye. Acceleration at depth d is 0.06 d^3:
+
+       1 m in    0.06 m/s^2    a suggestion; the reader may not notice
+       3 m in    1.6           a lean, clearly the world's opinion
+       6 m in    13            firm, and still not a stop
+      10 m in    60            the spring cannot hold against it
+
+   And the equilibrium: the altitude spring pulls up with k(want - y)
+   at k = 64 towards a target that tops out at ALT_HIGH, so a reader
+   holding a full inhale over a gate whose opening is low settles
+   about twelve metres into the bank and hangs there. That is deep
+   enough to be a place rather than a rebuff, which is what "you can
+   go into them if you want" has to mean to be true.
+
+   CLOUD_REACH is how far either side of a gate the bank is felt,
+   beyond the slab's own depth. The envelope across it is a quintic,
+   so the onset is C2 in the approach distance as well as in depth —
+   the force is a product of two smooth factors and a gate on either
+   of them would put back the discontinuity the cubic exists to
+   remove. */
+export const CLOUD_LIFT = 0.06;
+export const CLOUD_REACH = 4.0;
+
 export const AVOID_MARGIN = 4.2;
 export const AVOID_STRENGTH = 30;
 

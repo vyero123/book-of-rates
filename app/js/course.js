@@ -258,6 +258,62 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0, vMax 
       return near;
     },
 
+    /** BUOYANCY — a boundary that is an opinion rather than a wall.
+     *
+     *  §1.6b says a rhythm is recommended and not required, and the
+     *  principle has only ever been applied to the SCHEDULE. This
+     *  applies it to the geometry: the top of the course is no longer
+     *  something you are stopped by, it is something that would rather
+     *  you came down. You may go in. Nothing prevents it, nothing
+     *  costs anything, nothing is counted.
+     *
+     *  THE FIELD IS CUBIC IN DEPTH, and that is the whole of the care
+     *  here. A clamp is a derivative discontinuity wherever it bites,
+     *  and this project has twice shipped one and spent a session
+     *  finding it — the quantised terrain, the stepped forgiveness. A
+     *  cubic in the depth past the boundary is exactly zero in VALUE,
+     *  in SLOPE and in CURVATURE at the boundary itself, so there is
+     *  no instant at which anything starts: the field is C2 across
+     *  the edge by construction rather than by a span that was tuned
+     *  until it felt smooth. It then grows without bound, so there is
+     *  an equilibrium at every drive instead of an escape at some
+     *  drive — the cloud always wins eventually and never suddenly.
+     *
+     *  It is a FORCE, integrated against dt. A per-frame displacement
+     *  is the class of bug that made 58 fps look worse than 60, and
+     *  the velocity clamp is the body's existing one rather than a
+     *  second cap of this field's own.
+     *
+     *  `env` is 0..1, for a caller whose cloud is not everywhere. It
+     *  multiplies the force rather than gating it, so it must be
+     *  smooth in whatever the caller varies it with — a gate on this
+     *  would put back exactly the discontinuity the cubic removes.
+     *
+     *  Returns the ENVELOPED depth in metres — depth times env — and 0
+     *  when clear, so a chapter can soften the picture by how far in
+     *  the figure is.
+     *
+     *  Returning the enveloped depth rather than the raw one is a
+     *  correction, and tools/temporal.mjs is what found it. The raw
+     *  depth STEPS at the edge of the envelope: a glider already high
+     *  above the schedule is nine metres "deep" the instant a bank
+     *  comes within reach, so the reported number jumped 507 units a
+     *  second between two frames while the FORCE, which carries the
+     *  env factor, did not move at all. Nothing physical was wrong —
+     *  but that number drives the picture, and a frame that whited
+     *  out in one step would be the fault this whole design is built
+     *  to avoid, arriving through the reporting channel instead of
+     *  through the mechanics. The enveloped depth is a product of two
+     *  C2 factors and is C2.
+     */
+    buoy({ base, bodyHalf = 0, dt, lift, env = 1 }){
+      const d = (b.value + bodyHalf) - base;
+      if(d <= 0 || env <= 0) return 0;
+      b.v -= lift * d * d * d * env * dt;
+      if(b.v < -vMax) b.v = -vMax;
+      return d * env;
+    },
+
     /** SKIMMING, which replaces touch() in Long Air.
      *
      *  Past the lip the body RIDES THE SURFACE: it is placed exactly on
@@ -273,9 +329,18 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0, vMax 
      *  Returns how far past the lip it would have been, so a chapter
      *  can throw a little grit, and 0 when it is clear.
      */
-    skim({ centre, half, bodyHalf = 0 }){
+    /** `side` restricts it to one lip: -1 the lower, +1 the upper, 0
+     *  (the default) both, which is what it always was.
+     *
+     *  Long Air now passes -1, because its two lips stopped being the
+     *  same kind of thing: the lower one is rock and the upper one is
+     *  cloud. Rock is a surface you ride; cloud is buoy() above. The
+     *  asymmetry is the point rather than an inconsistency — a reader
+     *  cannot fly through a hill and should not be stopped by weather. */
+    skim({ centre, half, bodyHalf = 0, side = 0 }){
       const off = b.value - centre;
       const lip = half - bodyHalf;
+      if(side && Math.sign(off || 1) !== side) return 0;
       const over = Math.abs(off) - lip;
       if(over <= 0) return 0;
       const s = Math.sign(off || 1);

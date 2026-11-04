@@ -560,6 +560,11 @@ function fly(proto, press){
   const dt = 1 / 120;
   let dist = 0, skims = 0, worstMargin = Infinity, worstAt = null, maxV = 0;
   let minRidge = Infinity, maxDrag = 0, minSpeed = Infinity, maxBehind = 0;
+  /* 4 November 2026: the upper lip is cloud now, not a surface, so
+     "touched something" and "went into a cloud" are two different
+     questions and both are asked. maxY is here to prove the body's
+     remaining hard ceiling is INERT rather than to check it works. */
+  let maxCloud = 0, cloudFrames = 0, maxY = -Infinity;
   for(let t = 0; t < proto.session; t += dt){
     const kind = b.at(t).p.k;
     const { inDown, outDown } = press(t, kind);
@@ -584,17 +589,35 @@ function fly(proto, press){
                    margin: longAir.AVOID_MARGIN, strength: longAir.AVOID_STRENGTH });
     }
     if(Math.abs(ahead) < 2.6 + 1.4){
-      if(kite.skim({ centre: gate.centre, half, bodyHalf: KITE_HALF }) > 0){
+      /* side -1: the FLOOR only. The upper lip stopped being a surface
+         on 4 November — see buoy() in course.js and CLOUD_LIFT. */
+      if(kite.skim({ centre: gate.centre, half, bodyHalf: KITE_HALF, side: -1 }) > 0){
         skims++; fric.skim(dt);
       }
       // the BASE gap, with forgiveness left unspent
       const margin = gate.half - Math.abs(kite.value - gate.centre) - KITE_HALF;
       if(margin < worstMargin){ worstMargin = margin; worstAt = +t.toFixed(2); }
     }
+    /* THE CLOUD BANK. Same field, same envelope and the same module
+       the page drives — not a replica of it, which is the standing
+       rule in this project and the reason the terrain sampler was
+       once measuring a surface nobody drew. */
+    {
+      const reach = 2.6 + longAir.CLOUD_REACH;
+      const q = Math.min(1, Math.abs(ahead) / reach);
+      const env = 1 - q * q * q * (q * (q * 6 - 15) + 10);
+      if(env > 0){
+        const into = kite.buoy({ base: gate.centre + half, bodyHalf: KITE_HALF,
+                                 dt, lift: longAir.CLOUD_LIFT, env });
+        if(into > 0){ cloudFrames++; maxCloud = Math.max(maxCloud, into); }
+      }
+    }
+    maxY = Math.max(maxY, kite.value);
     minRidge = Math.min(minRidge, kite.value - longAir.ridgeAt(dist, course.period));
     maxV = Math.max(maxV, Math.abs(kite.v));
   }
-  return { skims, worstMargin:+worstMargin.toFixed(2), worstAt,
+  return { skims, maxCloud:+maxCloud.toFixed(2), cloudFrames, maxY:+maxY.toFixed(2),
+           worstMargin:+worstMargin.toFixed(2), worstAt,
            minRidge:+minRidge.toFixed(2), maxDrag:+maxDrag.toFixed(3),
            minSpeed:+minSpeed.toFixed(2), maxBehind:+maxBehind.toFixed(2),
            maxV:+maxV.toFixed(2), dist:+dist.toFixed(1) };
@@ -610,6 +633,7 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
   const proto = longAir.PROTOCOLS[id];
 
   /* (a) THE PROMISE, re-derived: on-pace play never touches anything. */
+  let cloudReach = 0;
   const cue = fly(proto, ON_CUE);
   if(cue.skims)
     fail(`long air/${id}: an ON-PACE player skims a surface ${cue.skims} times — the promise ` +
@@ -625,6 +649,36 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
     fail(`long air/${id}: an on-pace player clears by only ${cue.worstMargin} m`);
   if(cue.minRidge < 1.0)
     fail(`long air/${id}: an on-pace player comes within ${cue.minRidge} m of the ridge`);
+
+  /* (a2) THE GUARANTEE THAT REPLACES THE CEILING MARGIN.
+         ----------------------------------------------------------
+         Until 4 November the upper bound was a wall and what was
+         checked was a clearance against it. The wall is gone, so a
+         clearance against it would be a check whose subject no
+         longer exists — and deleting it and saying the feature
+         changed would be worse. The invariant that still means
+         something is the one the removal was FOR:
+
+             entering a cloud is always a CHOICE, never a
+             consequence of breathing correctly.
+
+         Which is exactly: an on-pace reader's depth into a bank is
+         zero, for the whole session, in both protocols. Not "shallow"
+         and not "within a margin" — zero frames, like the skim
+         promise beside it, because the two are the same claim about
+         the same geometry and a reader who followed the cue and found
+         themselves in cloud would have been put there by the app.
+
+         It is strictly stronger than the margin it replaces. The old
+         check asked whether the SCHEDULE stayed below a fixed
+         ceiling; this asks whether a reader actually flying the
+         protocol, with the spring's lag and its overshoot and the
+         drag model underneath them, ever crosses a boundary that
+         moves with every gate. */
+  if(cue.cloudFrames)
+    fail(`long air/${id}: an ON-PACE player is inside a cloud on ${cue.cloudFrames} frames ` +
+         `(${cue.maxCloud} m deep) — going in has to be a choice, and following the cue ` +
+         `put them there`);
 
   /* (b) THE GLIDER CANNOT CRASH, and this is what that means now: no
          reader, however adversarial, leaves the corridor, stops dead,
@@ -649,6 +703,33 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
     if(f.maxV > longAir.V_MAX + 1e-6)
       fail(`long air/${id}: a reader ${name} reaches ${f.maxV} m/s, past the ` +
            `${longAir.V_MAX.toFixed(1)} m/s the schedule's own steepest sweep allows`);
+    /* THE REMAINING HARD CEILING MUST BE INERT. The body still clamps
+       at CORRIDOR.hi inside settle(), and the reader's instruction was
+       no hard upper boundary at any altitude. Rather than deleting a
+       backstop -- which would be removing a guard on the strength of
+       an argument -- it is kept and PROVED never to engage: the
+       buoyancy is the only thing that bounds the top now, and it has
+       to bound it before the clamp can. Checked on the three
+       adversarial readers, because the on-pace one never goes near it
+       and would prove nothing. */
+    if(f.maxY > longAir.CORR_HI - 1.5)
+      fail(`long air/${id}: a reader ${name} reaches ${f.maxY} m, within 1.5 m of the ` +
+           `${longAir.CORR_HI} m hard clamp — the clamp would be doing the work the ` +
+           `buoyancy is supposed to, which is the wall this change removed`);
+    /* AND THE OTHER HALF OF THE CLAIM. "You can go into them if you
+       want" is a promise about what is REACHABLE, and a check that
+       only ever asserts the on-pace reader stays out would pass
+       perfectly on a build where the cloud is an impenetrable wall --
+       which is exactly the feature this replaced. So the reader who
+       holds the inhale has to actually get in. A metre is the bar:
+       enough to be unambiguously inside rather than grazing. */
+    if(name === 'holding in for ever'){
+      if(f.maxCloud < 1.0)
+        fail(`long air/${id}: a reader holding the inhale only reaches ${f.maxCloud} m into ` +
+             `a cloud — going in is supposed to be possible, and this build has put the ` +
+             `ceiling back`);
+      cloudReach = Math.max(cloudReach, f.maxCloud);
+    }
   }
 
   /* (c) THE FEEDBACK LOOP IS OPEN. Friction slows the glider, so a
@@ -690,6 +771,8 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
   if(failures === 0){
     const m = fly(proto, MASHING);
     console.log(`    ok    long air/${id}: on-pace play never touches a surface (0 skims, ` +
+                `never enters a cloud while a reader holding the inhale gets ` +
+                `${cloudReach.toFixed(1)} m into one, ` +
                 `drag 0, ${cue.dist} m covered, clears by ${cue.worstMargin} m with ` +
                 `forgiveness unspent, ${cue.minRidge} m over the ridge); mashing skims ` +
                 `${m.skims}x, bottoms out at ${m.minSpeed} m/s and stays ${m.minRidge} m ` +
