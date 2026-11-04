@@ -691,8 +691,18 @@ for(const r of rows){
    because that moves vertices in every gate at once.
    ------------------------------------------------------------------ */
 say('');
-say('OFF PACE — the opening, which is the only thing this run judges.');
-for(const k of ['forgiveRaw', 'forgive']){
+say('OFF PACE — the opening, AND the lens, which is the addition that');
+say('the deployed build forced. The on-pace run above cannot see this:');
+say('an on-pace glider never skims, so it never asks whether a surface');
+say('placement gets multiplied into the frame. Driven through the real');
+say('frame body on the deployed page with nobody steering, it did —');
+say('kiteY jumped 36.54 m/s on 4 frames of 1800, and a first-order lens');
+say('turned that into 2.90 m/s of WHOLE-FRAME movement. kiteY itself is');
+say('not judged here: course.js places the body on a lip on purpose.');
+/* kiteY is deliberately absent from this list rather than exempted in
+   EXPECTED: it IS judged on the on-pace run, where a placement cannot
+   happen, and listing it globally would have quietly stopped that. */
+for(const k of ['forgiveRaw', 'forgive', 'camY', 'lookY', 'camBack']){
   const a = analyse(offSteady[k]), b = analyse(offJitter[k]);
   const r = verdict(a, b);
   const line = `${k.padEnd(16)} ` +

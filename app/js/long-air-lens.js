@@ -65,7 +65,11 @@
  * it. The page asks for the pose and applies it.
  */
 
-import { approach, tracker } from './follow.js';
+/* `approach` is no longer used here — every follower in this lens is
+   second order now, for the reasons above — but follow.js keeps it,
+   because it is the right tool for a target that is already smooth
+   and other chapters want it. */
+import { tracker } from './follow.js';
 
 /* ------------------------------------------------------------------
    WHY THE FOLLOWERS ARE SECOND ORDER — the measurement that changed
@@ -92,10 +96,38 @@ import { approach, tracker } from './follow.js';
    continuous position and continuous velocity. The lens accelerates
    into a new phase instead of being yanked into it.
 
-   The glider height still uses a first-order `approach`, deliberately:
-   its target is the glider's own altitude, which is already a damped
-   spring and does not step, so a second order filter there would only
-   add lag.
+   THE GLIDER HEIGHT IS SECOND ORDER TOO, and that was decided by the
+   DEPLOYED page rather than by the Node sampler — which is the whole
+   argument for checking both.
+
+   tools/temporal.mjs drives an ON-PACE reader for its free-flight
+   numbers, deliberately: tools/regress.mjs proves that configuration
+   never touches a surface, so the measurement is of the integrators
+   and not of the design's own surface placements. That choice is
+   sound and it hid this, because an on-pace glider never skims.
+
+   Driven through the real frame body on the deployed build with
+   NOBODY STEERING — the glider self-flying at SELF_FLY, which is the
+   ordinary state of an unattended page and close to a distracted
+   reader — the numbers came out:
+
+     frames skimming          4 of 1800
+     kiteY worst jump     36.54 m/s
+     lookY worst jump      2.90 m/s
+     camY  worst jump      2.38 m/s
+
+   KITE.skim() PLACES the body exactly on a lip, by design ("riding
+   the surface", course.js), so the 36.54 is intended and stays. What
+   is not intended is that a first-order lens multiplied it straight
+   into the frame: a 0.6 m placement times k = 4.5 is a 2.7 m/s
+   velocity step of the ENTIRE PICTURE. Four times in thirty seconds
+   the whole view lurched, with nothing on screen to explain it, which
+   is as good a description of "disorienting" as the measurement is
+   going to produce.
+
+   A camera rig has mass. Second order gives it some, so a placement
+   of the figure becomes an acceleration of the lens instead of a jolt
+   — and the lag it costs is the lag a real rig has.
    ------------------------------------------------------------------ */
 
 /** Per-phase lens behaviour. `look` is where the lens aims relative to
@@ -118,11 +150,14 @@ export const CAM_EASE = {
   level: { look:  0.2, back: 11.5, ease: 3.2 }
 };
 
-/** How fast the lens height follows the glider. The old number, kept
- *  deliberately: it was never the fault, the integrator was, and
- *  changing a constant at the same time as fixing the maths would make
- *  it impossible to say afterwards which did what. */
-export const K_HEIGHT = 4.5;
+/** How fast the lens height follows the glider, now as a critical
+ *  frequency. The old first-order k was 4.5 and this is 4.5: a
+ *  first-order k and a critical w of the same value settle in about
+ *  the same time, so the lens rides where it always did and the
+ *  change is confined to HOW it gets there. Keeping the number was
+ *  deliberate — changing a constant in the same pass as the maths
+ *  would make it impossible to say afterwards which did what. */
+export const W_HEIGHT = 4.5;
 
 /** The trailing distance's second-order rate, in radians per second.
  *  2.0 as a first-order rate and 2.0 as a critical frequency settle in
@@ -141,24 +176,26 @@ export function lens({ camBack = 13.0, kiteY = 11.5 } = {}){
      second-order state. That is the whole of fix 1. */
   const aim  = tracker(CAM_EASE.level.look, CAM_EASE.level.ease);
   const back = tracker(camBack, W_BACK);
+  /* the glider's height, smoothed ONCE and used for both the lens
+     position and the lens aim — these were two different numbers
+     before, and they disagreed through every turnaround */
+  const foll = tracker(kiteY, W_HEIGHT);
 
   const L = {
-    camY: kiteY + 1.0,
-    /* The glider's height, smoothed ONCE and used for both the lens
-       position and the lens aim. That is fix 3: these were two
-       different numbers, and they disagreed through every turnaround. */
-    followY: kiteY,
-
+    /* All three are getters off the followers, so there is no second
+       copy of any of them to fall out of step with its own state. */
+    get followY(){ return foll.value; },
+    get camY(){ return foll.value + 1.0; },
     get camBack(){ return back.value; },
     get lookOff(){ return aim.value; },
     /** the world y the lens aims at */
-    get lookY(){ return L.followY + aim.value; },
+    get lookY(){ return foll.value + aim.value; },
 
     /** Put the lens where it belongs with no motion, for a protocol
      *  change: easing across from the other protocol's pose would be a
      *  claim of continuity between two things that are not continuous. */
     reset(kiteY){
-      L.followY = kiteY; L.camY = kiteY + 1.0;
+      foll.set(kiteY);
       aim.set(CAM_EASE.level.look);
       back.set(CAM_EASE.level.back);
       return L;
@@ -171,8 +208,7 @@ export function lens({ camBack = 13.0, kiteY = 11.5 } = {}){
       aim.w = C.ease;
       aim.step(dt, C.look);
       back.step(dt, C.back);
-      L.followY = approach(L.followY, kiteY, K_HEIGHT, dt);
-      L.camY    = L.followY + 1.0;
+      foll.step(dt, kiteY);
       return L;
     }
   };
