@@ -2019,8 +2019,16 @@ const motes = new THREE.Mesh(moteGeometry(MOTE_N), posterMat(THREE, {
   uniforms:{ uDist, uTime, uFill, uKite,
              uDown:{value:C(ROCK.sheen)}, uSeedC:{value:C(ROCK.grit)} },
   transparent:true, depthWrite:false, side:THREE.DoubleSide,
-  prelude: PRE_AA + WIND_GLSL,
-  vertex:`
+  /* WIND_GLSL GOES ON THE VERTEX SHADER, NOT IN THE PRELUDE. posterMat's
+     `prelude` is prepended to the FRAGMENT stage only -- that is what it
+     is for, the posterised colour helpers -- and both of the layers
+     added here read the wind in the VERTEX stage. Shipped without it
+     and caught by linkReport, which is the fourth time a shader in this
+     project has silently failed to link and the first time the check
+     for it was already in place. The tree material had it right
+     because it was written second. */
+  prelude: PRE_AA,
+  vertex: WIND_GLSL + `
     attribute vec2 aCorner; attribute float aSeed; attribute float aSize;
     attribute float aSlow;
     uniform float uDist, uTime, uFill; uniform vec3 uKite;
@@ -2102,9 +2110,9 @@ function streamerGeometry(){
 const streamers = new THREE.Mesh(streamerGeometry(), posterMat(THREE, {
   uniforms:{ uFill, uTime, uRamp, uAccent:{value:C(ROCK.accent)},
              uSheen:{value:C(ROCK.sheen)} },
-  prelude: PRE_RAMP + WIND_GLSL, side: THREE.DoubleSide,
+  prelude: PRE_RAMP, side: THREE.DoubleSide,
   transparent:true, depthWrite:false,
-  vertex:`
+  vertex: WIND_GLSL + `
     attribute float aT; attribute float aSide; attribute float aIdx;
     uniform float uFill, uTime;
     varying float vT; varying float vIdx;
