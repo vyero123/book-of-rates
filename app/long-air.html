@@ -1271,7 +1271,17 @@ const gateMatFor = kind => posterMat(THREE, {
          seen from the inside. uInCloud is second-order smoothed, so
          this cannot flick on. */
       if(uIsCloud > 0.5 && uInCloud > 0.01){
-        vec2 cc = floor(vec2(vX, vY + vSeed * 23.0) * 0.7);
+        /* 0.17 m CELLS, not the near fade's 1.4 m ones. Looked at on
+           the deployed build: at the near fade's cell size this
+           dissolve reads as torn card — the slab is thirty metres
+           across and eleven from the lens, so a 1.4 m cell is a
+           rectangle tens of pixels wide, and a frame full of them is
+           broken glass rather than mist. The near fade gets away with
+           that size because it happens for a moment at close range on
+           a thing already leaving; this one is sustained and fills
+           the frame. A chip at this distance is about eleven pixels,
+           which reads as texture. */
+        vec2 cc = floor(vec2(vX, vY + vSeed * 23.0) * 6.0);
         if(fract(sin(dot(cc, vec2(41.3, 289.1))) * 43758.5453) < uInCloud * 0.94) discard;
       }
       float tone = vTone + (1.0 - vLip) * 1.3;
