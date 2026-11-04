@@ -163,6 +163,23 @@ one of them resolved by DELETION rather than by decision:
   the bar is cheap to hold: billboards (no interior knot at all) and one silhouette profile
   that lives in `long-air-terrain.js` so `continuity.mjs` measures what the GPU draws.
 
+## Long Air — the inside of a cloud still needs the reader's eye, 4 Nov 2026
+
+The ceiling became buoyancy and the mechanic is right and gated: on-pace play never
+enters a bank (asserted, 0 frames), a reader holding the inhale gets 8.6 m in (asserted,
+so a build where the cloud is secretly a wall cannot pass), going in costs no drag and no
+skim, and `cloudSoft` — the thing the overlay reads — measures `still` on both clocks.
+
+What is NOT settled is what it LOOKS like in there. The bank is an opaque merged mesh and
+the lens rides eleven metres back, so inside one the slab filled the whole frame and the
+course was unreadable. It now dissolves in hard cells by `uInCloud`, which fixed the
+blackout; at 1.4 m cells that read as torn card, at 0.17 m it reads as a speckled dither.
+Better, and still not soft. A stochastic per-cell discard on an opaque surface IS a dither
+pattern — the honest fix is a transparent blend for this one material, which means
+sorting a large merged mesh and is a real change rather than a constant.
+
+Do not tune the cell size again hoping it resolves. Either blend it or ask the reader.
+
 ## Other standing constraints for this project
 
 - **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**
