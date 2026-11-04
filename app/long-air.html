@@ -254,7 +254,7 @@ import { PROTOCOLS, CHOICE, validChoice,
    places, so continuity.mjs was measuring a 2.94 degree surface while
    the page drew a 20.00 degree one. See the note in ridgeGeometry. */
 import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset,
-         columnsAt } from './js/long-air-terrain.js';
+         columnsAt, TREES, TREE_SEG, treeWidth, treeLean } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
 /* The lens is a module for the same reason the terrain is: a jerk can
    only be measured in Node, and tools/temporal.mjs has to drive the
@@ -494,21 +494,36 @@ scene.add(screenQuad(THREE, {
       vec2 sp = vec2(0.30, uHorizon + 0.343);
       vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
       float sd = length(q);
-      /* THE RADII, AND WHY THE FIRST SET WERE WRONG. They were
-         0.105/0.055/0.026 at full strength, which deployed as a
-         saturated apricot disc a quarter of the sky across: a sunset
-         poster rather than a sun. Two things were wrong. The outer
-         ring has to be a WASH rather than a replacement, because a
-         halo is the sky seen through more light and not a second
-         object; and 0.105 of frame height through a 66 degree field is
-         a seven degree disc, which is fourteen times the half degree a
-         sun actually subtends. These are still generous — a literal
-         half degree would be three pixels and this chapter does not
-         draw anything three pixels across — but the ratio between the
-         three is now a sun with glare around it rather than a target. */
-      col = mix(col, uHalo2, disc(sd, 0.070) * 0.55);
-      col = mix(col, uHalo,  disc(sd, 0.036) * 0.80);
-      col = mix(col, uSun,   disc(sd, 0.017));
+      /* ==============================================================
+         NO DISC. THE SUN IS THE LIGHT ON THE CLOUDS.
+         ==============================================================
+         The reader's verdict on the drawn sun was that it read as a
+         cameo — a medallion pasted on the sky — and that is what a
+         hard-edged disc in a flat idiom is always going to be. The
+         three posterised rings make it a target; shrinking it made it
+         a smaller target. It is not a size problem.
+
+         So the disc is gone and what is left is everything it was
+         there to say. sp is now a LIGHT POSITION rather than an
+         object: the clouds below are lit from it, brightest on the
+         lobes nearest it, and the sky around it carries a warm wash
+         banded into three steps — hard risers like every other value
+         in this chapter, so it is not a gradient standing in for
+         form, but no outline and nothing to read as a thing.
+
+         AND IT DISPOSES OF THE AZIMUTH PROBLEM. The disc was painted
+         in the sky ahead while the glider's shadow is thrown forward
+         down the course, which puts the light behind the reader —
+         only one of those could be true, and it was flagged for the
+         reader to choose between. With no disc there is nothing in
+         frame asserting a direction, so the forward shadow stands
+         unopposed and the question simply stops existing. The warmth
+         and the low angle — the two things worth keeping — survive in
+         the wash and in the lighting of the lobes.
+         ============================================================== */
+      float glow = posteriseAA(1.0 - clamp(sd / 0.52, 0.0, 1.0), 3.0);
+      col = mix(col, uHalo2, glow * 0.26 * aastep(-0.02, h));
+      col = mix(col, uHalo,  glow * glow * 0.22 * aastep(-0.02, h));
 
       /* ==============================================================
          THE CLOUDS ARE LOBED AND THEY HAVE AN UNDERSIDE
@@ -532,11 +547,17 @@ scene.add(screenQuad(THREE, {
          the sky is not indifferent, not that anything happens.
          ============================================================== */
       float drift = uTime * 0.0035 * (0.55 + 0.85 * windGust(uFill));
-      float cl = 0.0, clTop = 0.0, clLo = 0.0;
-      for(int i = 0; i < 3; i++){
+      float cl = 0.0, clTop = 0.0, clLo = 0.0, clWarm = 0.0;
+      /* FIVE, NOT THREE, and they are what the part of the sky the
+         disc used to occupy is made of now. No lobe is pinned to the
+         light: they drift through it, so the warm side of a cloud
+         arrives and passes rather than sitting there, and the sun is
+         veiled by whichever one is crossing it. That is the reading
+         the disc was standing in for. */
+      for(int i = 0; i < 5; i++){
         float fi = float(i);
-        float cx = fract(0.2 + fi * 0.34 + drift) * 1.8 - 0.4;
-        vec2 cc = vec2(cx, uHorizon + 0.30 + fi * 0.09);
+        float cx = fract(0.13 + fi * 0.21 + drift) * 1.8 - 0.4;
+        vec2 cc = vec2(cx, uHorizon + 0.26 + fi * 0.075);
         vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.24, vUv.y - cc.y);
         float ang = atan(d2.y, d2.x);
         float rr = 0.026 * (1.0 + 0.34 * sin(ang * 3.0 + fi * 2.1)
@@ -544,14 +565,27 @@ scene.add(screenQuad(THREE, {
         float inLobe = disc(length(d2), rr);
         /* 0 at the bottom of this lobe, 1 at the top of it */
         float up = clamp(d2.y / max(rr, 1e-4) * 0.5 + 0.5, 0.0, 1.0);
-        cl    = max(cl,    inLobe);
-        clTop = max(clTop, inLobe * aastep(0.62, up));
-        clLo  = max(clLo,  inLobe * (1.0 - aastep(0.30, up)));
+        /* how near this lobe is to the light. The sunlit face of a
+           cloud is the face turned towards the sun, so the warm value
+           is taken on the side of each lobe that points at sp rather
+           than on its top — which is what makes it read as lit from a
+           direction instead of lit from nowhere. */
+        vec2 toSun = normalize(vec2((sp.x - cc.x) * uAspect, sp.y - cc.y) + 1e-5);
+        float facing = clamp(dot(normalize(d2 + 1e-5), toSun), 0.0, 1.0);
+        float nearSun = 1.0 - smoothstep(0.10, 0.46,
+                          length(vec2((cc.x - sp.x) * uAspect, cc.y - sp.y)));
+        cl     = max(cl,     inLobe);
+        clTop  = max(clTop,  inLobe * aastep(0.62, up));
+        clLo   = max(clLo,   inLobe * (1.0 - aastep(0.30, up)));
+        clWarm = max(clWarm, inLobe * aastep(0.45, facing) * nearSun);
       }
       float skyCl = aastep(0.05, h);
-      col = mix(col, uCloud,    cl    * skyCl);
-      col = mix(col, uCloudLit, clTop * skyCl * 0.75);
-      col = mix(col, uCloudLo,  clLo  * skyCl * 0.55);
+      col = mix(col, uCloud,    cl     * skyCl);
+      col = mix(col, uCloudLit, clTop  * skyCl * 0.75);
+      col = mix(col, uCloudLo,  clLo   * skyCl * 0.55);
+      /* the one warm value, and it is the warmest thing in the frame —
+         which is what the sun was for */
+      col = mix(col, uSun,      clWarm * skyCl * 0.78);
       col = mix(col, uHaze, (1.0 - aastep(0.0, h)) * 0.6);
       // a soft contact warms the whole sky for a moment. Warm, not red:
       // it is information, not a penalty.
@@ -1277,6 +1311,108 @@ const gateMatFor = kind => posterMat(THREE, {
 const rockGateMat = gateMatFor('rock');
 const cloudGateMat = gateMatFor('cloud');
 
+/* ------------------------------------------------------------------
+   3a. THE TREELINE on the shoulders
+   ------------------------------------------------------------------
+   The one layer in this pass that is a SILHOUETTE AGAINST SKY, which
+   is where a polygonal outline shows worst: a facet on the hill is
+   hidden by the hill's own value bands, a facet on an edge against a
+   flat sky is the only thing in that part of the frame.
+
+   So the profile is in js/long-air-terrain.js — the module the
+   sampler already measures — and tools/continuity.mjs projects this
+   outline through the chapter's own lens and holds it to the same
+   pixel bar the ridge is held to. Nothing about the shape is computed
+   here; this loop asks the module and pushes what it is given, which
+   is the rule that came out of ridgeGeometry having its own drifted
+   copy of the terrain.
+
+   THEY STAND ON meshY, not on ridgeAt. ridgeAt is the spine; the
+   shoulders are the spine plus the profile plus the cross-course
+   grade, and a tree planted on the spine's height would float a metre
+   above the hill at x = 60 or be buried in it. meshY is the surface
+   the GPU actually renders.
+
+   ONE MERGED MESH, scrolled PER OBJECT. A tree is an object, not a
+   continuous surface, so it uses scrollWholeGlsl: a per-vertex modulo
+   would stretch any triangle straddling the wrap across the entire
+   strip period for a frame, which was this chapter's worst measured
+   single event (see js/mesh.js).
+
+   THEY BEND WITH THE BREATH. The sway is the chapter's one wind field
+   sampled at the tree's own root, so the treeline leans when the
+   grass combs and when the sail fills — the same gust, a third place.
+   ------------------------------------------------------------------ */
+function treeGeometry(proto){
+  const period = periodOf(proto);
+  const rows = rowsOf(period);
+  const b = builder(THREE, { aF:1, aSide:1, aSeed:1, aBaseZ:1, aRoot:2 });
+  for(const T of TREES){
+    const zb = T.zf * period;
+    const base = meshY(T.x, zb, period, rows);
+    for(let s = 0; s <= TREE_SEG; s++){
+      const f = s / TREE_SEG;
+      const w = treeWidth(f, T.wT, T.wC);
+      const cx = T.x + treeLean(f, T.lean);
+      const y = base + f * T.h;
+      for(const sd of [-1, 1]){
+        b.vertex(cx + sd * w, y, zb,
+                 { aF:f, aSide:sd, aSeed:T.seed, aBaseZ:zb, aRoot:[T.x, zb] });
+      }
+    }
+    b.strip(TREE_SEG, true);
+  }
+  return b.geometry();
+}
+const treeMat = posterMat(THREE, {
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uTime, uFill,
+             uFogLow:{value:C(AIR.hazeLow)},
+             uSheen:{value:C(ROCK.sheen)},
+             uShadow:{value:C(ROCK.shadow)} },
+  side: THREE.DoubleSide, prelude: PRE + WIND_GLSL,
+  vertex: SCROLL_WHOLE_GLSL + WIND_GLSL + `
+    attribute float aF; attribute float aSide; attribute float aSeed;
+    attribute vec2 aRoot;
+    uniform float uTime, uFill;
+    varying float vF; varying float vSide; varying float vDist; varying float vY;
+    void main(){
+      vec3 p = position;
+      /* THE SWAY IS QUADRATIC IN HEIGHT, like the lean: a trunk does
+         not pivot at the root. It is the chapter's one wind field
+         sampled at the tree's ROOT rather than at the moving vertex,
+         so a tree sways as one object instead of rippling through
+         itself — the same reason the gates wrap per object. */
+      vec2 lay = windLay(aRoot, uTime + aSeed, windGust(uFill));
+      p.x += lay.x * aF * aF * 0.52;
+      p.z += lay.y * aF * aF * 0.30;
+      p = scrolledWhole(p);
+      vF = aF; vSide = aSide; vY = p.y;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vF; varying float vSide; varying float vDist; varying float vY;
+    uniform vec3 uSheen, uShadow, uFogLow;
+    void main(){
+      /* three values up the tree: a dark base, the body of the crown,
+         and a lit crest where the light reaches the top. Hand-picked
+         ramp indices, resolved risers, like everything else here. */
+      vec3 col = rampPickAA((3.4 - posteriseAA(vF, 3.0) * 1.1 + 0.5) / 6.0);
+      /* the downwind face is in shadow — one hard split, and it is on
+         the side the wind leans them towards, so the lighting and the
+         bend agree about where the sun is */
+      col = mix(col, uShadow, (1.0 - aastep(0.0, vSide)) * 0.42);
+      col = mix(col, uSheen, aastep(0.80, vF) * 0.22);
+      float lowAir = 1.0 - smoothstep(-7.0, 2.5, vY);
+      vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
+      gl_FragColor = vec4(
+        mix(col, haze, min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir))), 1.0);
+    }
+  `
+});
+
 /* Both protocols' courses are built at boot and one is shown. Rebuilding
    on the gate meant disposing live geometry from inside an event
    handler, which is how a megabyte-per-switch leak happens. */
@@ -1286,10 +1422,11 @@ for(const id of Object.keys(PROTOCOLS)){
   const probe = breath(proto);
   const course = courseOf(proto, t => probe.value(t));
   const ridge = new THREE.Mesh(ridgeGeometry(proto), rockMat);
+  const trees = new THREE.Mesh(treeGeometry(proto), treeMat);
   const rock  = new THREE.Mesh(gateGeometry(course, -1), rockGateMat);
   const cloud = new THREE.Mesh(gateGeometry(course, +1), cloudGateMat);
-  for(const m of [ridge, rock, cloud]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
-  worlds[id] = { course, period: course.period, meshes:[ridge, rock, cloud] };
+  for(const m of [ridge, trees, rock, cloud]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
+  worlds[id] = { course, period: course.period, meshes:[ridge, trees, rock, cloud] };
 }
 
 /* ------------------------------------------------------------------
@@ -1770,13 +1907,26 @@ function updateTail(nowDist){
    7. WIND STREAKS — world-space slivers, so they parallax correctly.
    Present in proportion to how fast the kite is sinking.
    ------------------------------------------------------------------ */
+/* CALMED, 3 November 2026. Inspected on the deployed build, the
+   streaks were the busiest thing in the frame and sat near maximum
+   for the whole session — uRush became FORWARD SPEED when the drag
+   model changed, and forward speed is near 1 almost always, where the
+   old sink rate was near 0 almost always. The same constants
+   therefore mean something completely different from what they were
+   chosen for. Seventy of them, up to twenty metres long, at 0.38
+   alpha, in a chapter whose whole subject is slowing down.
+
+   Fewer, shorter, fainter: 44, up to eleven metres, at 0.19. They
+   still say how fast the air is going past, which is their job and
+   the one reading of the friction the reader has; they no longer
+   shout it. Nothing structural changed. */
 const LINE_Q = 90;
 function lineGeometry(n){
   const b = builder(THREE, { aEnd:1, aLen:1, aSeed:1, aRad:1 });
   for(let i = 0; i < n; i++){
     const a = (i * 2.399) % 6.283;
     const rad = 2.2 + ((i * 7919) % 83) / 83 * 9.0;
-    const len = 6.0 + ((i * 6367) % 59) / 59 * 14.0;
+    const len = 4.0 + ((i * 6367) % 59) / 59 * 7.0;
     const hw = 0.04 + ((i * 5281) % 31) / 31 * 0.045;
     const cx = Math.cos(a) * rad, cy = Math.sin(a) * rad;
     const tx = -Math.sin(a) * hw, ty = Math.cos(a) * hw;
@@ -1791,7 +1941,7 @@ function lineGeometry(n){
   }
   return b.geometry();
 }
-const lines = new THREE.Mesh(lineGeometry(70), posterMat(THREE, {
+const lines = new THREE.Mesh(lineGeometry(44), posterMat(THREE, {
   uniforms:{ uDist, uRush, uKite, uDrag, uPale:{value:C(AIR.flare)} },
   transparent:true, depthWrite:false, side:THREE.DoubleSide,
   vertex:`
@@ -1803,7 +1953,7 @@ const lines = new THREE.Mesh(lineGeometry(70), posterMat(THREE, {
       float s = mod(p.z + aSeed * 7.3 - uDist * 1.3, ${LINE_Q}.0);
       p.z = 12.0 - s + aEnd * aLen * uRush;
       p.x += uKite.x; p.y += uKite.y;
-      vA = floor(clamp(uRush * (1.0 - aRad / 12.0), 0.0, 0.999) * 3.0) / 2.0 * 0.38;
+      vA = floor(clamp(uRush * (1.0 - aRad / 12.0), 0.0, 0.999) * 3.0) / 2.0 * 0.19;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
     }
   `,
@@ -1815,6 +1965,181 @@ const lines = new THREE.Mesh(lineGeometry(70), posterMat(THREE, {
 lines.frustumCulled = false;
 lines.renderOrder = 4;
 scene.add(lines);
+
+/* ------------------------------------------------------------------
+   7a. DOWN AND SEED HEADS — what makes air read as air
+   ------------------------------------------------------------------
+   The chapter had exactly one thing in the air between the kite and
+   the hill, and it was the speed streaks, which are about velocity
+   rather than about the medium. Thistledown and grass seed lifted off
+   the plateau is the opposite reading: slow, aimless, carried, and
+   present whether anything is happening or not.
+
+   A MERGED BILLBOARD MESH, 120 motes, 240 triangles, one draw call.
+   They have no silhouette curvature to measure — a billboard is two
+   triangles facing the lens, so there is no interior knot for the
+   chapter's angular bar to hold — which is why this is the shape
+   chosen for the one layer here that does add geometry.
+
+   THEY ARE CARRIED BY THE SHARED WIND, so they drift in the same
+   direction the grass is combed and the trees are bent, and they
+   drift FASTER as the reader breathes in. One wind, a fourth place.
+
+   AND THE KITE PUSHES THEM. Each mote's offset from the glider is
+   computed in the vertex shader and, inside a couple of metres, it is
+   displaced radially away — so passing through a drift of down parts
+   it. This is the coral's "shy" move from Pearl Diver, which is the
+   thing in that chapter the reader responded to most, and it is the
+   only cue in Long Air that the glider is a body with a size: it
+   otherwise never touches anything.
+   ------------------------------------------------------------------ */
+const MOTE_N = 120, MOTE_Q = 70;
+function moteGeometry(n){
+  const b = builder(THREE, { aCorner:2, aSeed:1, aSize:1, aSlow:1 });
+  for(let i = 0; i < n; i++){
+    const ang = (i * 2.399) % 6.283;
+    const rad = 1.6 + ((i * 7919) % 89) / 89 * 11.0;
+    const hgt = -5.0 + ((i * 6367) % 71) / 71 * 11.0;
+    const zb  = (i / n) * MOTE_Q;
+    const A = { aSeed:(i * 1.91) % 6.283,
+                aSize: 0.030 + ((i * 5281) % 37) / 37 * 0.055,
+                /* some of them are seed heads and heavier, some are
+                   down and barely fall at all */
+                aSlow: 0.25 + ((i * 4409) % 43) / 43 * 0.75 };
+    const base = b.count;
+    for(const [cx, cy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+      b.vertex(Math.cos(ang) * rad, hgt, zb + Math.sin(ang) * rad * 0.4,
+               { ...A, aCorner:[cx, cy] });
+    }
+    b.tri(base, base+1, base+2); b.tri(base, base+2, base+3);
+  }
+  return b.geometry();
+}
+const motes = new THREE.Mesh(moteGeometry(MOTE_N), posterMat(THREE, {
+  uniforms:{ uDist, uTime, uFill, uKite,
+             uDown:{value:C(ROCK.sheen)}, uSeedC:{value:C(ROCK.grit)} },
+  transparent:true, depthWrite:false, side:THREE.DoubleSide,
+  prelude: PRE_AA + WIND_GLSL,
+  vertex:`
+    attribute vec2 aCorner; attribute float aSeed; attribute float aSize;
+    attribute float aSlow;
+    uniform float uDist, uTime, uFill; uniform vec3 uKite;
+    varying float vSlow; varying vec2 vC; varying float vFade;
+    void main(){
+      vec3 p = position;
+      /* the endless strip, in the motes' own short period: they live
+         in a volume that travels with the glider rather than with the
+         world, because they are the air AROUND it */
+      float s = mod(p.z + aSeed * 5.1 - uDist * 0.22, ${MOTE_Q}.0);
+      p.z = 14.0 - s;
+      float gust = windGust(uFill);
+      vec2 lay = windLay(vec2(p.x, p.z), uTime * 0.5 + aSeed, gust);
+      p.x += uKite.x + lay.x * 2.2;
+      p.z += lay.y * 1.4;
+      /* down falls slowly and rises again on the gust; a seed head
+         falls faster and is lifted less. One line, two kinds. */
+      p.y += uKite.y + sin(uTime * (0.21 + aSlow * 0.3) + aSeed) * (1.4 - aSlow)
+           + gust * (1.0 - aSlow) * 1.1;
+      /* AND THE KITE PARTS THEM. Radial, inside a couple of metres,
+         smooth in the distance so nothing can pop. */
+      vec3 d = p - uKite;
+      float r = length(d);
+      float push = 1.0 - smoothstep(0.9, 3.4, r);
+      p += (r > 0.001 ? d / r : vec3(0.0, 1.0, 0.0)) * push * 1.7;
+      vFade = 1.0 - smoothstep(26.0, 44.0, abs(p.z));
+      vSlow = aSlow; vC = aCorner;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      mv.xy += aCorner * aSize;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vSlow; varying vec2 vC; varying float vFade;
+    uniform vec3 uDown, uSeedC;
+    void main(){
+      /* a hard lozenge with a resolved edge, like the grit: a soft
+         sprite would be the one blurred thing in a scene made of cut
+         shapes */
+      float body = 1.0 - aastep(1.0, abs(vC.x) + abs(vC.y));
+      float al = body * vFade * (0.34 + 0.26 * (1.0 - vSlow));
+      if(al < 0.02) discard;
+      gl_FragColor = vec4(mix(uDown, uSeedC, vSlow), al);
+    }
+  `
+}));
+motes.frustumCulled = false;
+motes.renderOrder = 5;
+scene.add(motes);
+
+/* ------------------------------------------------------------------
+   7b. THE STREAMERS on the line
+   ------------------------------------------------------------------
+   Four short ribbons off the sail's lower corners. They are the
+   cheapest reading of the wind there is — the thing you actually tie
+   to a kite to see which way the air is going — and they are the only
+   part of the kite that answers the gust rather than the fill.
+
+   They taper to a POINT, for the reason the tail does: a ribbon that
+   stops at a constant width ends in a rectangle, and there is a
+   rectangle on the end of it.
+   ------------------------------------------------------------------ */
+const STREAM_SEG = 6, STREAM_N = 4;
+function streamerGeometry(){
+  const b = builder(THREE, { aT:1, aSide:1, aIdx:1 });
+  for(let k = 0; k < STREAM_N; k++){
+    const x0 = (k < 2 ? -1 : 1) * (0.30 + (k % 2) * 0.26);
+    const y0 = -0.62 - (k % 2) * 0.16;
+    for(let s = 0; s <= STREAM_SEG; s++){
+      const f = s / STREAM_SEG;
+      for(const sd of [-1, 1]){
+        b.vertex(x0, y0, 0, { aT:f, aSide:sd, aIdx:k });
+      }
+    }
+    b.strip(STREAM_SEG, true);
+  }
+  return b.geometry();
+}
+const streamers = new THREE.Mesh(streamerGeometry(), posterMat(THREE, {
+  uniforms:{ uFill, uTime, uRamp, uAccent:{value:C(ROCK.accent)},
+             uSheen:{value:C(ROCK.sheen)} },
+  prelude: PRE_RAMP + WIND_GLSL, side: THREE.DoubleSide,
+  transparent:true, depthWrite:false,
+  vertex:`
+    attribute float aT; attribute float aSide; attribute float aIdx;
+    uniform float uFill, uTime;
+    varying float vT; varying float vIdx;
+    void main(){
+      float gust = windGust(uFill);
+      /* a streamer is an arc hanging back and down from its anchor:
+         straighter and longer the harder the air is moving past, and
+         it ripples along its own length rather than swinging rigidly */
+      float len = 0.55 + 0.75 * gust;
+      vec3 p = position;
+      p.z += aT * len * 0.80;
+      p.y -= aT * aT * len * (0.52 - 0.30 * gust);
+      p.x += sin(uTime * (3.1 + aIdx * 0.4) + aIdx * 2.1 + aT * 5.2)
+           * aT * 0.17 * (0.4 + gust);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      // width across the screen, tapering to a point
+      mv.x += aSide * 0.030 * (1.0 - aT) * (1.0 - aT * 0.5);
+      vT = aT; vIdx = aIdx;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vT; varying float vIdx;
+    uniform vec3 uAccent, uSheen;
+    void main(){
+      float band = aastep(0.5, fract(vT * 4.0 + vIdx * 0.37));
+      vec3 col = mix(uSheen, uAccent, band * 0.55);
+      float al = (1.0 - vT * 0.35) * 0.9;
+      if(al < 0.03) discard;
+      gl_FragColor = vec4(col, al);
+    }
+  `
+}));
+streamers.renderOrder = 3;
+scene.add(streamers);
 
 /* ------------------------------------------------------------------
    8. GRIT — a puff when the kite brushes a lip, and a little coming off
@@ -2294,6 +2619,9 @@ const loop = clock((dt, now, running) => {
   const bank = avoiding * Math.sign(gate.centre - kiteY || 1) * 0.42;
   sail.rotation.z = Math.sin(t * 1.1) * 0.05 + drive * 0.04 + bank;
   spars.rotation.z = sail.rotation.z;
+  /* the streamers hang off the sail and go wherever it does */
+  streamers.position.copy(sail.position);
+  streamers.rotation.copy(sail.rotation);
   pushHistory(kiteX, kiteY, dist);
   updateTail(dist);
 

@@ -113,7 +113,14 @@ export const WIND = {
   DIR_Z: 0.3714,
   CROSS_ROT: 0.42,        // radians the short component is rotated by
   K1: 0.075,              // 1/m — the long comb
-  K2: 0.260,              // 1/m — the short ripple
+  /* RAISED FROM 0.26 — 3 November 2026. At 24 m the short ripple was
+     a tenth of the width of the near field and the grass read coarse
+     at 375 px: the long swell was doing almost all the work. 0.55 is
+     11.4 m between ripples, which is still 21 px across at the far
+     edge of the fog and about 140 px at the near edge, so it is
+     nowhere near the sampling rate and cannot crawl. There was
+     headroom and this is spending it. */
+  K2: 0.550,              // 1/m — the short ripple
   S1: 0.95,               // rad/s — how fast the long comb travels
   S2: 1.70,               // rad/s — the short one
   FOLD: 0.80,             // how far the long comb warps the short one

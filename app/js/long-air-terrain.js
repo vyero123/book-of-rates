@@ -347,3 +347,89 @@ export function highestDrawn(period, dz = 1.0, dx = 2.0){
   }
   return { peak:+peak.toFixed(3), at, ridgeTop: RIDGE_TOP };
 }
+
+/* ==================================================================
+   THE TREELINE — 3 November 2026
+   ==================================================================
+   Wind-bent trees standing on the ridge's shoulders. They are the one
+   thing added in this detail pass that is a SILHOUETTE AGAINST SKY,
+   which is the worst case for a polygonal outline: a facet on a hill
+   is hidden by the hill's own value bands, and a facet on an edge
+   against a flat sky is the only thing there is to look at.
+
+   So the profile lives here, next to the terrain it stands on and
+   inside the module tools/continuity.mjs already samples, and the
+   sampler projects the drawn outline through the chapter's own lens
+   and holds it to the same pixel bar as the ridge. A replica of this
+   in the page would be the exact fault that made the whole continuity
+   campaign of 2 November meaningless.
+
+   THE WIDTH PROFILE. A trunk term that tapers linearly to nothing and
+   a crown term that is a power of sin(pi f), so the outline is zero
+   at the ground-level edge of the trunk, bulges through the crown and
+   closes to a POINT at the top. A blade that stops at a constant
+   width ends in a rectangle, which is what Pearl Diver's coral did
+   before its taper was taken from 0.65 to 0.94; a tree that does it
+   is a lollipop. Both terms are C-infinity in f, so the curvature is
+   bounded and subdivision converges -- which is the property that
+   makes SEG a knob rather than a wish.
+
+   THE LEAN is quadratic in height, which is what a wind-bent trunk
+   is: no bend at the root, most of it in the top third. It is a
+   per-tree constant times f*f, so it adds no curvature of its own
+   beyond a constant second derivative.
+   ================================================================== */
+
+/** How many segments up a tree. Eight: measured through the chapter's
+ *  own lens by tools/continuity.mjs, which reports the worst
+ *  silhouette knot in the whole treeline in pixels off its own chord
+ *  and holds it to the same 2 px bar the ridge is held to. */
+export const TREE_SEG = 8;
+
+/** Half-width of the silhouette at height fraction f, for a tree with
+ *  trunk half-width wT and crown half-width wC. */
+export function treeWidth(f, wT, wC){
+  return wT * (1 - f) * 0.30 + wC * Math.pow(Math.sin(Math.PI * f), 2.2);
+}
+
+/** Lateral offset of the trunk's centre at height fraction f. */
+export function treeLean(f, lean){ return lean * f * f; }
+
+/* WHERE THEY STAND. On the shoulders and the upper skirt only:
+   inside |x| = 30 is the lane the gates are cut through and the
+   reader's own flight path, and past |x| = 82 the hill has fallen far
+   enough that a tree is below the frame at every altitude in the
+   corridor.
+
+   THE HEIGHT IS CAPPED SO NOTHING EVER ENTERS THE CORRIDOR. The drawn
+   terrain peaks at RIDGE_TOP (3.4 m, re-derived and checked by the
+   sampler) and the corridor floor is CORR_LO. A cap of 4.2 m puts the
+   tallest possible treetop at 7.6 m, which is under the floor with
+   four tenths of a metre to spare -- so this is scenery that cannot
+   become geometry the glider has to be protected from, and
+   tools/regress.mjs's clearances are untouched by construction rather
+   than by re-measurement.
+
+   Deterministic from the index, like every other quantity-item in
+   this project: no Math.random anywhere, so the sampler measures the
+   trees the page draws. */
+export const TREE_N = 56;
+export const TREE_MAX_H = 4.2;
+export const TREES = Array.from({ length: TREE_N }, (_, i) => {
+  const side = (i % 2) ? 1 : -1;
+  const r = k => ((i * k) % 97) / 97;
+  return {
+    i,
+    x:    side * (30 + r(7919) * 52),
+    zf:   (i / TREE_N + r(6367) * 0.012) % 1,      // fraction of the strip
+    h:    2.4 + r(5281) * (TREE_MAX_H - 2.4),
+    wT:   0.26 + r(4409) * 0.16,
+    wC:   0.42 + r(3779) * 0.34,
+    /* all of them lean the same way, because a prevailing wind is
+       what bends a treeline and trees leaning at random would read
+       as damage rather than as weather. +x is downwind: it is the
+       sign of WIND.DIR_X in js/long-air-wind.js. */
+    lean: 0.30 + r(2749) * 0.24,
+    seed: (i * 1.91) % 6.283
+  };
+});

@@ -143,28 +143,25 @@ Practical consequences, learned doing the Deep Light remap:
   mapping is kept in `tools/fixtures` as the negative control, so the check is known to be
   able to fail.
 
-## Long Air detail pass — what is left, 3 November 2026
+## Long Air detail pass — 3 November 2026
 
-Written down rather than opened, because the budget ran out. None of it is a fault.
+The open items recorded here on the first pass are all closed. For the record, and because
+one of them resolved by DELETION rather than by decision:
 
-- **The sun's AZIMUTH still contradicts the shadow.** `fwd = alt * 2.4` throws the shadow
-  forward down the course, which puts the light behind the reader; the disc is painted in
-  the sky ahead of them. The ELEVATION was fixed (22.6 deg, derived from that same 2.4) and
-  the sun is visible on a phone for the first time. Resolving the azimuth means giving up
-  either the visible sun or the visible shadow, which is the user's call, not a bug fix.
-- **Not built from the brief's list:** drifting seed heads and down displaced by the kite
-  (a ~120-mote billboard mesh in the kit's `particles` idiom, ~240 triangles); streamers on
-  the kite's line; a distant wind-bent treeline on the shoulders standing on `meshY`. All
-  three were designed to hang off `WIND_GLSL` and are cheap; none was started.
-- **The grass reads coarse at 375 px.** The long component (84 m) dominates the near field
-  and the short one (24 m) is barely resolved there. If it wants finer combing, raise
-  `WIND.K2` — it is nowhere near the sampling rate, so there is headroom.
-- **The wind streaks are the busiest thing in the frame** and were not touched. `uRush`
-  is forward speed now, so they sit near maximum for the whole session.
-- **The brief's triangle figure (41,696) is stale.** Measured on the deployed build at
-  375x812: 74,720 triangles, 12 draw calls, before and after this pass. Everything added
-  here is in the fragment stage, deliberately — new geometry is new knots, and every knot
-  has to hold the 1 px angular bar.
+- **The sun's azimuth problem evaporated with the disc.** The drawn sun contradicted the
+  forward shadow (a shadow thrown down the course means a light behind the reader) and was
+  flagged for the user to choose between. The user's verdict on the disc was that it read as
+  a cameo, so it is gone: `sp` is a light POSITION now, the cloud lobes are lit on the face
+  turned towards it and drift through it, and a three-step warm wash carries the glow. With
+  nothing in frame asserting a direction there is nothing left to contradict, so the
+  forward shadow stands unopposed. A resolved question does not stay on the list.
+- **The brief's triangle figure (41,696) is stale.** Measured: 74,720 before this pass,
+  76,264 after.
+- **Standing principle this pass is built on:** detail goes in the FRAGMENT stage by
+  default, because new geometry is new knots and every knot has to hold the chapter's 1 px
+  angular bar through its own lens. The three things that did add geometry were chosen so
+  the bar is cheap to hold: billboards (no interior knot at all) and one silhouette profile
+  that lives in `long-air-terrain.js` so `continuity.mjs` measures what the GPU draws.
 
 ## Other standing constraints for this project
 

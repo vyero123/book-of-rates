@@ -58,7 +58,8 @@ import * as D from '../app/js/dove-shape.js';
 import { PROTOCOLS as DL } from '../app/js/deep-light-breath.js';
 import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset,
-         profileTone, profileH } from '../app/js/long-air-terrain.js';
+         profileTone, profileH,
+         TREES, TREE_SEG, treeWidth, treeLean } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
 import { readFileSync } from 'node:fs';
 
@@ -820,6 +821,68 @@ for(const [name, w] of [['ridge across (columns)', worstAcross],
   const line = `${name.padEnd(24)} worst ${w.px.toFixed(2).padStart(5)} px off the chord` +
                ` at ${w.dist.toFixed(0)} m, x=${(w.x ?? 0).toFixed(0)}  (bar ${PX_BAR} px)`;
   if(w.px <= PX_BAR) ok(line); else bad(line);
+}
+
+/* ==================================================================
+   THE TREELINE, AGAINST THE SKY
+   ==================================================================
+   The treeline is the only thing added in the 3 November detail pass
+   that is a silhouette against a flat sky, which is the worst case
+   for a polygonal outline: a facet on the hillside is masked by the
+   hill's own value bands, a facet on an edge against nothing is the
+   only thing there is to look at in that part of the frame.
+
+   So it is projected through the same lens, measured the same way,
+   and held to the same pixel bar as the ridge. Both edges of every
+   tree, at the mesh's own knots, with the lean included — the lean is
+   part of the drawn outline and measuring the width profile alone
+   would be measuring something that is not on screen.
+
+   The trees stand on meshY, so this also catches a tree planted at a
+   height the hill does not have.
+   ================================================================== */
+{
+  let worst = { px: 0 }, inFrame = 0;
+  const rowsT = rowsOf(period);
+  for(const T of TREES){
+    const zb = T.zf * period;
+    const zw = zWorldOf(zb);
+    if(zw > 0 || zw < -140) continue;         // not in front of the lens
+    const base = meshY(T.x, zb, period, rowsT);
+    const P = (s, sd) => {
+      const f = s / TREE_SEG;
+      return [T.x + treeLean(f, T.lean) + sd * treeWidth(f, T.wT, T.wC),
+              base + f * T.h, zw];
+    };
+    for(const sd of [-1, 1]){
+      for(let s = 1; s < TREE_SEG; s++){
+        const r = sagittaPx(P(s - 1, sd), P(s, sd), P(s + 1, sd));
+        if(r){ inFrame++; if(r.px > worst.px) worst = { ...r, tree: T.i, s, sd }; }
+      }
+    }
+  }
+  if(inFrame === 0){
+    bad('treeline: nothing projected — the instrument saw no trees, so this measures nothing');
+  } else {
+    const line = `treeline silhouette      worst ${worst.px.toFixed(2).padStart(5)} px off the chord` +
+                 ` at ${worst.dist.toFixed(0)} m (tree ${worst.tree}, knot ${worst.s}),` +
+                 ` ${inFrame} knots in frame  (bar ${PX_BAR} px)`;
+    if(worst.px <= PX_BAR) ok(line); else bad(line);
+  }
+  /* AND THEY MUST NEVER REACH THE CORRIDOR. Scenery that pokes into
+     the flight band would be geometry the glider has to be protected
+     from, and tools/regress.mjs's clearances do not know it exists.
+     Checked against the DRAWN terrain they stand on rather than
+     against RIDGE_TOP, because that is what sets their feet. */
+  let top = -Infinity, atT = null;
+  for(const T of TREES){
+    const zb = T.zf * period;
+    const y = meshY(T.x, zb, period, rowsT) + T.h;
+    if(y > top){ top = y; atT = T.i; }
+  }
+  const tl = `tallest treetop ${top.toFixed(2)} m against the corridor floor ${CORR_LO} ` +
+             `(tree ${atT}); clears by ${(CORR_LO - top).toFixed(2)} m`;
+  if(top < CORR_LO) ok(tl); else bad(tl + '  — a tree is in the flight band');
 }
 
 /* PROVE THE PROJECTOR. A tool that reports pixels has to be shown to
