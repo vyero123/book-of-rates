@@ -565,20 +565,77 @@ say('PEARL DIVER — THE DOVE');
      than the same one with dead air after it. The check is that no
      beat is short enough to snap: the morph is the tightest and is the
      one that has to read as a transformation rather than a cut. */
+  /* ================================================================
+     THE EXIT IS ASSERTED, NOT HOPED FOR — 3 November 2026
+     ================================================================
+     The reader's requirement is that the bird leaves the frame
+     EXACTLY when she dives: the departure and the start of the
+     descent are one moment. The old flight could not be held to that
+     and was not: it integrated a velocity, so its position at the
+     phase boundary depended on the frame clock and the whole history
+     of the flight, and nothing computed it. Measured afterwards, box
+     came out at 3.52 s of a 3.55 s window — right by luck — and
+     no-holds at 4.85 s against a 4.55 s window, which OVERRAN, with
+     the bird still crossing the frame as she started down.
+
+     doveTiming() makes the identity structural: `span` is defined as
+     whatever is left between the release and the end of the inhale,
+     so launchAt + span === d for any protocol, and doveFlight() is a
+     pure function of that normalised time. Three things are checked
+     here, and the first is the requirement itself.
+
+       1. launchAt + span === d, to floating-point exactness, for
+          every protocol that exists.
+       2. The flight is long enough to read as a flight rather than
+          as a dart. "Gracefully" is the reader's word.
+       3. The arc's endpoint is actually OUTSIDE the frame at u = 1,
+          computed against the chapter's own fov and trailing
+          distance rather than asserted. Without this the first two
+          would only prove the bird stops being drawn on time, which
+          is not the same as leaving.
+     ================================================================ */
   {
-    const T0 = 0.30, TAIL = 0.15, MIN_MORPH = 0.60;
+    const MIN_MORPH = 0.60, MIN_FLIGHT = 1.50;
+    /* the chapter's own lens, read out of the page as text, for the
+       same reason the rock shader's band edges are: a second copy of
+       a constant in a tool is a constant free to drift from the thing
+       it is measuring. */
+    const pd = readFileSync(new URL('../app/pearl-diver.html', import.meta.url), 'utf8');
+    const fovM = pd.match(/fov:\s*a\s*=>\s*a\s*<\s*0\.75\s*\?\s*(\d+)\s*:\s*(\d+)/);
+    const backM = pd.match(/let camBack\s*=\s*([\d.]+)/);
+    if(!fovM || !backM) bad('dove: could not read the chapter\'s fov / camBack out of the page');
+    const FOV = fovM ? +fovM[1] : 62;            // the phone branch
+    const CAM_BACK = backM ? +backM[1] : 9;
+    const END = D.doveFlight(1, 1, 0);
+    /* along-axis range at the exit: the lens trails by CAM_BACK and
+       the bird has travelled DOVE_RANGE.back further away again */
+    const range = CAM_BACK + D.DOVE_RANGE.back;
+    const halfH = Math.tan(FOV / 2 * Math.PI / 180) * range;
+    const clears = END[1] / halfH;
+    const fl = `dove exit geometry      climbs ${END[1].toFixed(1)} m against a ` +
+               `${halfH.toFixed(1)} m half-frame at ${range.toFixed(1)} m ` +
+               `(fov ${FOV}, camBack ${CAM_BACK}) = clears by x${clears.toFixed(2)}`;
+    if(clears >= 1.25) ok(fl); else bad(fl + '  — the bird is still in frame at u = 1');
+
     for(const id of Object.keys(DL)){
       const inPh = DL[id].phases.find(p => p.k === 'in');
-      const W = inPh.d - T0 - TAIL;
-      const at = f => T0 + f * W;
+      const TM = D.doveTiming(inPh.d);
+      const W = TM.W;
+      const at = f => D.DOVE_T0 + f * W;
       const morphLen = (0.52 - 0.22) * W;
+      const exitErr = Math.abs(TM.launchAt + TM.span - inPh.d);
       const line = `dove fits ${(DL[id].id + ' ' + inPh.d + 's').padEnd(12)}` +
                    `W ${W.toFixed(2)}  raise ${at(0).toFixed(2)}-${at(0.30).toFixed(2)}` +
                    `  opens ${at(0.22).toFixed(2)}-${at(0.52).toFixed(2)}` +
-                   `  released ${at(0.45).toFixed(2)}` +
-                   `  gone ${at(1).toFixed(2)} of ${inPh.d}`;
-      const fits = W > 0 && morphLen >= MIN_MORPH && at(1) <= inPh.d - TAIL + 1e-9;
-      if(fits) ok(line); else bad(line + `  — morph only ${morphLen.toFixed(2)}s`);
+                   `  released ${TM.launchAt.toFixed(3)}` +
+                   `  flies ${TM.span.toFixed(3)}s` +
+                   `  EXITS ${(TM.launchAt + TM.span).toFixed(3)} of ${inPh.d.toFixed(3)}`;
+      const fits = W > 0 && morphLen >= MIN_MORPH &&
+                   exitErr < 1e-9 && TM.span >= MIN_FLIGHT;
+      if(fits) ok(line);
+      else if(exitErr >= 1e-9) bad(line + `  — exit misses the dive by ${exitErr.toExponential(1)}s`);
+      else if(TM.span < MIN_FLIGHT) bad(line + `  — only ${TM.span.toFixed(2)}s of flight, that is a dart`);
+      else bad(line + `  — morph only ${morphLen.toFixed(2)}s`);
       // and the inhale must be stationary at the surface, or the
       // gesture would be cut short by the descent starting (§1.6a
       // already requires this; it is asserted rather than assumed)

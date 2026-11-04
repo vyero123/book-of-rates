@@ -200,3 +200,107 @@ export function morphPoint(u, w, m){
 export const wAt = j => -1 + (j / NW) * 2;
 /** The angle parameter at column i of the grid. */
 export const uAt = i => i / NU;
+
+/* ==================================================================
+   THE FLIGHT — 3 November 2026
+   ==================================================================
+   The bird used to be flown by integrating a velocity: launched at
+   5.2 m/s upward with a constant 0.7 m/s^2 added to it every frame,
+   plus a sine on x, and it was declared gone when a separate eased
+   scalar reached 1. Three things were wrong with that and all three
+   are the same thing.
+
+   1. THE EXIT WAS NOT DERIVED, IT WAS COINCIDENCE. "Out of frame"
+      was a flag reaching 1 at the end of the gesture window, and the
+      gesture window ends DOVE_TAIL before the phase does. Whether the
+      bird's integrated position was actually outside the frustum at
+      that instant was never computed. Measured: box was gone at
+      3.52 s of a 3.55 s window, which looks right and arrived by
+      luck; no-holds ran to 4.85 s against a 4.55 s window, which
+      OVERRUNS — the bird was still crossing the frame when she
+      started down.
+
+   2. A VELOCITY THAT ACCELERATES UPWARD FOR EVER IS NOT A GLIDE. It
+      is a launch. The reader's word is "gracefully".
+
+   3. AN INTEGRATOR CANNOT BE ASSERTED ON. Its endpoint depends on
+      the frame clock, the start instant and the whole history in
+      between, so no tool can state in advance where the bird will be
+      when the dive begins.
+
+   So the flight is a PARAMETERISED ARC in the window's own normalised
+   time. u = 0 is the instant it leaves her hands, u = 1 is the
+   instant the inhale ends and she starts down, and the span between
+   them is whatever the protocol's own inhale leaves after the
+   gesture — longer inhale, longer flight, same shape. There is no
+   integration anywhere, so the position at u = 1 is a pure function
+   of the constants below and tools/continuity.mjs can and does assert
+   that it is outside the frame.
+
+   THE ARC. It eases out of her hands, climbs, and leans away and
+   back as it levels into a glide: a smoothstep on the near half for
+   the ease, a linear term that keeps it travelling to the end so it
+   never appears to stall, and a bounded lateral wander that is a
+   function of u rather than of wall-clock time. All of it is smooth
+   in u, so the heading taken from its derivative is smooth too.
+   ================================================================== */
+
+/** Seconds into the inhale before anything moves, and how long before
+ *  the phase ends the GESTURE on the figure must be finished. The
+ *  flight is deliberately not subject to the tail: the bird leaves
+ *  the frame at the boundary itself, which is the point. */
+export const DOVE_T0 = 0.30;
+export const DOVE_TAIL = 0.15;
+
+/** Every instant of the release, derived from one number: the
+ *  duration of the protocol's inhale.
+ *
+ *  `span` is the flight, and it is exactly what is left between the
+ *  bird leaving her hands and the dive starting — so `launchAt +
+ *  span === d`, identically, for any protocol. That identity is the
+ *  whole mechanism and it is asserted rather than described. */
+export function doveTiming(d){
+  const W = Math.max(0.6, d - DOVE_T0 - DOVE_TAIL);
+  const launchAt = DOVE_T0 + 0.45 * W;
+  return { W, t0: DOVE_T0, launchAt, span: d - launchAt, exitAt: d };
+}
+
+/** How far the arc travels, in metres, by the time it ends. Up is
+ *  much the largest because a bird leaving the water's surface
+ *  against a sky is read against the sky, and because the lens is
+ *  looking very slightly down: leaving upward puts it out of frame
+ *  soonest and never brings it at the camera, which would be a large
+ *  shape sweeping the lens (tools/flash-check.md). */
+export const DOVE_RANGE = { up: 16.0, out: 9.0, back: 7.5 };
+
+/** The arc, as an offset in metres from wherever it left her hands.
+ *  `side` is +-1 and `seed` varies the wander per cycle, so ten to
+ *  fourteen of these in a session are not one replay. */
+export function doveFlight(u, side = 1, seed = 0){
+  const c = Math.min(1, Math.max(0, u));
+  const e = c * c * (3 - 2 * c);
+  /* 0.72 of the climb on the eased term and 0.28 on a linear one: the
+     ease is what makes it leave her hands softly instead of jumping,
+     and the linear part is what stops it appearing to stall near the
+     top, which an ease alone does. */
+  const y = DOVE_RANGE.up * (e * 0.72 + c * 0.28);
+  const x = DOVE_RANGE.out * side * e + Math.sin(c * 4.1 + seed) * 0.85 * c;
+  const z = -DOVE_RANGE.back * e;
+  return [x, y, z];
+}
+
+/** The wingbeat, as a function of turns rather than of seconds, so
+ *  the rate is set at the call site and the SHAPE lives here.
+ *
+ *  A real wingbeat is not a sine: the downstroke is the power stroke
+ *  and is quick, the recovery is slower. That asymmetry is what the
+ *  eye reads as a bird rather than as a flapping triangle. It is made
+ *  by warping the phase with a sine of itself rather than by joining
+ *  two half-cycles, because a join would be a slope kink in TIME —
+ *  the same class of fault tools/temporal.mjs exists to find — and
+ *  this is C-infinity and exactly periodic. */
+export function doveFlap(turns){
+  const s = turns - Math.floor(turns);
+  const w = s + 0.16 * Math.sin(2 * Math.PI * s);
+  return Math.sin(2 * Math.PI * w);
+}

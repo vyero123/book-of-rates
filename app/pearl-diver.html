@@ -213,7 +213,8 @@ import { builder, bands, polyBillboard, triBillboard, particles,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
 import { NU, NW, uAt, wAt, dovePoint, spherePoint,
-         doveNormal, sphereNormal, HALF_SPAN } from './js/dove-shape.js';
+         doveNormal, sphereNormal, HALF_SPAN,
+         DOVE_T0, DOVE_TAIL, doveTiming, doveFlight, doveFlap } from './js/dove-shape.js';
 import { arrival } from './js/arrival.js';
 import { wireExits } from './js/bookframe.js';
 
@@ -1369,7 +1370,17 @@ function doveGeometry(){
   return b.geometry();
 }
 const doveMat = posterMat(THREE, {
+  /* THE BIRD IS WHITE, THE PEARL IS NOT, AND IT IS ONE MESH.
+     The two values were the chapter's cream and its MID ramp step —
+     a teal-shadowed bird, which is right for a pearl in this water
+     and wrong for a dove. But morph 0 IS the pearl and must stay
+     exactly what it was, so the two colours are LERPED BY uMorph:
+     at 0 the lit and shadowed faces are the cream and the teal they
+     have always been, at 1 they are white and the faintest cool
+     grey. There is still no second object and no crossfade between
+     two of them — the same two mixes, with their endpoints moving. */
   uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(R.at(MID))},
+             uWhite:{value:C(0xFFFFFF)}, uWhiteLo:{value:C(0xD6E2E0)},
              uMorph:{value:0}, uFlap:{value:0} },
   prelude: PRE_AA, side: THREE.DoubleSide,
   vertex:`
@@ -1404,12 +1415,15 @@ const doveMat = posterMat(THREE, {
   `,
   fragment:`
     varying vec3 vN;
-    uniform vec3 uWarm, uMid;
+    uniform vec3 uWarm, uMid, uWhite, uWhiteLo;
+    uniform float uMorph;
     void main(){
       vec3 n = normalize(vN);
       if(!gl_FrontFacing) n = -n;
       float l = dot(n, normalize(vec3(-0.35, 0.8, 0.5)));
-      gl_FragColor = vec4(mix(uMid, uWarm, aastep(0.12, l)), 1.0);
+      vec3 hi = mix(uWarm, uWhite,   uMorph);
+      vec3 lo = mix(uMid,  uWhiteLo, uMorph);
+      gl_FragColor = vec4(mix(lo, hi, aastep(0.12, l)), 1.0);
     }
   `
 });
@@ -1577,14 +1591,37 @@ const sstep = x => { const c = Math.min(1, Math.max(0, x)); return c*c*(3 - 2*c)
    one cycle to the next. The gesture on the figure is the same; the
    flight is not.
    ================================================================== */
-const DOVE_T0 = 0.30;        // seconds into the inhale before anything moves
-const DOVE_TAIL = 0.15;      // and gone this long before the phase ends
+/* THE TIMING AND THE ARC ARE IN js/dove-shape.js NOW, with the rest of
+   the bird, for the reason every other module in this project was
+   pulled out of a page: a Node tool cannot import a script block, and
+   the exit instant is the one thing about this gesture that has to be
+   ASSERTED rather than described. See the flight note there. */
 const DOVE_FWD = new THREE.Vector3(0, 0, 1);   // the bird's own nose
 const dv = {
-  n: 0, seed: 0, flying: false, gone: false,
-  lift: 0, open: 0, morph: 0, flap: 0, bank: 0,
-  pos: new THREE.Vector3(), vel: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0)
+  n: 0, seed: 0, side: 1, armed: false, flying: false, gone: false,
+  u: 0, lift: 0, open: 0, morph: 0, flap: 0, bank: 0,
+  from: new THREE.Vector3(), pos: new THREE.Vector3(),
+  prev: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0)
 };
+/* ==================================================================
+   SHE HAS TO HAVE A PEARL BEFORE SHE CAN GIVE ONE AWAY
+   ==================================================================
+   Both protocols open with an inhale at the surface, before she has
+   ever been down — so the chapter's FIRST breath was releasing a
+   pearl she did not have. Worse, the carry lerp pinned `take` to 1
+   through any inhale, so the pearl still lying on the seabed was
+   dragged up into her empty hands on that opening breath and then
+   flown away.
+
+   This is the same family as the resetDove() fault: a gesture armed
+   by a phase change with no state saying whether the thing it acts on
+   exists. The flag is set when the hands actually close on the pearl
+   (the same `take` that lifts it off the bed) and cleared the instant
+   the bird leaves them, so it is a statement about the object rather
+   than about the clock, and every entry point that resets the chapter
+   clears it with everything else.
+   ================================================================== */
+let hasPearl = false;
 const qDir = new THREE.Quaternion(), qBank = new THREE.Quaternion();
 let lastPhaseK = '';
 /* A NEW BIRD IS ARMED BY THE PHASE CHANGING INTO 'in', which is right
@@ -1597,9 +1634,12 @@ let lastPhaseK = '';
    the trace showed flying true at t = 0.02 with morph still 0.
    Resume, "choose a different breath" and seek() all land here. */
 function resetDove(){
-  dv.flying = false; dv.gone = false; dv.wantLaunch = false;
+  dv.armed = false; dv.flying = false; dv.gone = false; dv.wantLaunch = false;
+  dv.u = 0;
   dv.lift = dv.open = dv.morph = dv.flap = dv.bank = 0;
-  dv.vel.set(0, 0, 0);
+  dv.from.set(0, 0, 0); dv.prev.set(0, 0, 0);
+  /* a fresh start is a reader who has not been down yet */
+  hasPearl = false;
   lastPhaseK = '';
 }
 /* the raised, opened hand pose: up, forward and apart. It is a
@@ -1724,35 +1764,66 @@ const loop = clock((dt, now, running) => {
   /* --- THE RELEASE's own clock. One new bird per inhale. --- */
   const inhale = ph.k === 'in';
   if(inhale && lastPhaseK !== 'in'){
+    /* ARMED ONLY IF SHE IS HOLDING ONE. The opening inhale of a fresh
+       session is not, so the chapter begins with no bird — which is
+       what the first breath actually is: she has not been down yet. */
+    dv.armed = hasPearl;
     dv.n++; dv.seed = (dv.n * 2.399) % 6.283;
+    dv.side = (dv.n % 2) ? 1 : -1;
+    dv.u = 0;
     dv.flying = false; dv.gone = false;
     dv.lift = dv.open = dv.morph = dv.flap = dv.bank = 0;
   }
   lastPhaseK = ph.k;
-  if(inhale && started){
+  if(inhale && started && dv.armed){
     const inT = st.pr * ph.d;
-    const W = Math.max(0.6, ph.d - DOVE_T0 - DOVE_TAIL);
-    const beat = (lo, hi) => sstep((inT - DOVE_T0 - lo * W) / ((hi - lo) * W));
+    const TM = doveTiming(ph.d);
+    const beat = (lo, hi) => sstep((inT - TM.t0 - lo * TM.W) / ((hi - lo) * TM.W));
     const settle = beat(0.52, 0.90);          // arms come back down
     dv.lift  = beat(0.00, 0.30) * (1 - settle);
     dv.open  = beat(0.22, 0.40);              // the hands part: the release
     dv.morph = beat(0.22, 0.52);
-    const depart = beat(0.45, 1.00);
     // the launch itself happens in the pearl block below, where the
     // hands' world position is fresh rather than a frame stale
-    dv.wantLaunch = !dv.flying && !dv.gone && inT >= DOVE_T0 + 0.45 * W;
+    dv.wantLaunch = !dv.flying && !dv.gone && inT >= TM.launchAt;
     if(dv.flying && !dv.gone){
-      dv.vel.y += dt * 0.7;                                   // keeps climbing
-      dv.vel.x += Math.sin(t * 1.3 + dv.seed) * dt * 1.6;     // and wanders
-      dv.pos.addScaledVector(dv.vel, dt);
-      dv.bank = Math.sin(t * 0.9 + dv.seed) * 0.38;
-      if(depart >= 1) dv.gone = true;
+      /* ==========================================================
+         THE ARC, IN THE WINDOW'S OWN TIME
+         ==========================================================
+         u runs 0 at the instant it left her hands to 1 at the
+         instant the inhale ends and she starts down. There is no
+         integration, so where it is at u = 1 is a pure function of
+         DOVE_RANGE and tools/continuity.mjs asserts that that point
+         is outside the frame — in BOTH protocols, which the old
+         integrated flight was not: no-holds overran its window by
+         three tenths of a second with the bird still crossing.
+
+         The heading comes from the arc's own derivative rather than
+         from a stored velocity, so it is correct by construction at
+         every u and cannot drift from the path being drawn.
+         ========================================================== */
+      dv.u = Math.min(1, (inT - TM.launchAt) / TM.span);
+      const P = doveFlight(dv.u, dv.side, dv.seed);
+      dv.pos.set(dv.from.x + P[0], dv.from.y + P[1], dv.from.z + P[2]);
+      const Q = doveFlight(Math.min(1, dv.u + 0.01), dv.side, dv.seed);
+      dv.dir.set(Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]);
+      if(dv.dir.lengthSq() < 1e-12) dv.dir.set(0, 1, 0);
+      dv.dir.normalize();
+      /* it banks INTO its own turn rather than rolling on a timer:
+         the lateral component of the heading is the turn. */
+      dv.bank = Math.max(-0.5, Math.min(0.5, -dv.dir.x * 0.75));
+      if(dv.u >= 1) dv.gone = true;
     }
-    // the beat: a stretch while it is still in her hands, then flight
-    const rate = 8.4 + Math.sin(dv.seed * 2.3) * 1.6;
-    dv.flap = Math.sin(t * rate + dv.seed) * (dv.flying ? 0.95 : 0.22);
-  } else if(!inhale){
-    dv.flying = false; dv.gone = false;
+    /* THE BEAT. 2.1 turns a second with an asymmetric stroke
+       (js/dove-shape.js), not 1.3 of a pure sine: a sine is a
+       flapping triangle and the power stroke is what reads as a
+       bird. It eases down towards the end as the arc flattens into a
+       glide, which is the other half of "gracefully". */
+    const rate = 2.1 + Math.sin(dv.seed * 2.3) * 0.25;
+    dv.flap = doveFlap(t * rate + dv.seed)
+            * (dv.flying ? 0.95 * (1 - 0.35 * dv.u * dv.u) : 0.20);
+  } else if(!inhale || !dv.armed){
+    dv.flying = false; dv.gone = false; dv.u = 0;
     dv.lift = dv.open = dv.morph = dv.flap = dv.bank = 0;
   }
 
@@ -1890,20 +1961,18 @@ const loop = clock((dt, now, running) => {
 
   if(dv.wantLaunch){
     dv.wantLaunch = false; dv.flying = true;
+    /* the arc is an OFFSET from wherever the hands were at the
+       instant of release, so the flight starts exactly where the
+       gesture ended and the two cannot disagree */
+    dv.from.copy(vHands);
     dv.pos.copy(vHands);
-    /* Seeded per inhale, so ten to fourteen of these in a session are
-       not ten to fourteen replays of one arc. It leaves UP and AWAY
-       rather than toward the lens: a bird that grew as it came at the
-       camera would be a large shape sweeping the frame, which is the
-       exact thing tools/flash-check.md exists to catch. */
-    dv.vel.set(Math.sin(dv.seed) * 2.6,
-               5.2 + Math.sin(dv.seed * 1.7) * 1.1,
-               -(0.9 + ((dv.n * 7919) % 53) / 53 * 1.3));
+    dv.u = 0;
+    /* and she no longer has it */
+    hasPearl = false;
   }
 
   if(dv.flying && !dv.gone){
     pearl.position.copy(dv.pos);
-    dv.dir.copy(dv.vel).normalize();
     qDir.setFromUnitVectors(DOVE_FWD, dv.dir);
     qBank.setFromAxisAngle(DOVE_FWD, dv.bank);
     pearl.quaternion.copy(qDir).multiply(qBank);
@@ -1914,7 +1983,15 @@ const loop = clock((dt, now, running) => {
        Once the bird has gone the mesh is parked back at the seabed
        position for the next descent, which happens while the lens is
        above water and the seabed is not in frame. */
-    const take = inhale ? 1 : sstep((grip - 0.02) / 0.26);
+    /* `take` is pinned through an inhale ONLY if she is carrying one.
+       Without that test the pearl still lying on the seabed was
+       hauled up into her empty hands on the chapter's opening
+       breath — the carry describing a journey that had not happened.
+       It is also where the capture is recorded: `take` reaching 1 IS
+       the hands closing on it, so there is one statement of that
+       moment rather than a second clock agreeing with this one. */
+    const take = inhale ? (hasPearl ? 1 : 0) : sstep((grip - 0.02) / 0.26);
+    if(!inhale && take >= 0.999) hasPearl = true;
     pearl.position.lerpVectors(vBed, vHands, take);
     pearl.quaternion.copy(diver.quaternion);
   }
