@@ -249,8 +249,18 @@ import { PROTOCOLS, CHOICE, validChoice,
    functions this page draws. One definition, not two that can drift —
    the same argument that hoisted gradeAt out of ridgeGeometry when the
    glider's shadow needed it. */
-import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset } from './js/long-air-terrain.js';
+/* columnsAt, NOT the profile arithmetic. ridgeGeometry used to rebuild
+   the vertex positions itself and had drifted from this module in two
+   places, so continuity.mjs was measuring a 2.94 degree surface while
+   the page drew a 20.00 degree one. See the note in ridgeGeometry. */
+import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset,
+         columnsAt } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
+/* The lens is a module for the same reason the terrain is: a jerk can
+   only be measured in Node, and tools/temporal.mjs has to drive the
+   real thing rather than a replica of it. */
+import { lens } from './js/long-air-lens.js';
+import { tracker } from './js/follow.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
 import { builder, bands, particles, scrollGlsl, scrollWholeGlsl,
@@ -465,7 +475,7 @@ scene.add(mesas);
 function ridgeGeometry(proto){
   const period = periodOf(proto);
   const n = rowsOf(period);
-  const b = builder(THREE, { aTone:1, aH:1, aSun:1 });
+  const b = builder(THREE, { aXp:1, aH:1, aSun:1 });
   // ONE open profile across the width, extruded along z: a single ribbon.
   // Building a skirt at every column instead of only at the outer edges
   // put a vertical wall down the middle of the ridge seven times over.
@@ -500,16 +510,52 @@ function ridgeGeometry(proto){
      0.85 m lower so the DRAWN peak lands on RIDGE_TOP, which moves the
      terrain down and strengthens every clearance in
      tools/regress.mjs rather than loosening any of them. */
+  /* THE VERTICES COME FROM columnsAt(), AND THAT IS THE FIX.
+     ------------------------------------------------------------------
+     3 November 2026. This loop used to compute its own vertex
+     positions, with its own copy of the arithmetic that
+     long-air-terrain.js's columnsAt() also computes. The two had
+     drifted, in two places, and because tools/continuity.mjs samples
+     columnsAt() it was measuring a surface this page does not draw:
+
+       cross-section worst knot, sampled (columnsAt)   2.94 deg
+       cross-section worst knot, DRAWN  (this loop)   20.00 deg at x=102
+
+     The 4 degree bar was never met by the surface the GPU renders. The
+     whole continuity campaign of 2 November was measuring the wrong
+     object, and the reader kept saying the hill was not smooth because
+     the hill was not smooth.
+
+     The two drifts, both of them a hard step where the module has a
+     smooth taper:
+
+       1. `w * (Math.abs(q.x) > 100 ? 0.4 : 1)` — the exact expression
+          wanderScale() was written to replace. Two neighbouring
+          columns 5.94 m apart, either side of x = 100, moved
+          laterally by 0.4w and 1.0w: with w up to 7 m that is a 1.85 m
+          sideways jump between adjacent columns, which is the 20
+          degree knot. A crease down both flanks of the ridge, in the
+          middle distance, for the whole length of the course.
+
+       2. `q.h ? gradeAt(...) : 0` — a boolean test where the module
+          multiplies. profileH tapers smoothly from 1 to 0 across
+          x = 86..140, so `q.h ?` is TRUE for every column until h hits
+          exactly zero: the drawn surface applied the FULL cross-course
+          grade right out to x = 136.6 and then dropped it to nothing
+          at the next column, a 1.41 m cliff.
+
+     So this loop no longer does arithmetic. It asks the module where
+     the columns are and pushes what it is given. A future divergence
+     is not possible, because there is only one definition left. */
   for(let i = 0; i <= n; i++){
     const zb = (i / n) * period;
-    const w = wanderAt(zb, period);
-    const top = ridgeAt(zb, period);
-    for(const q of PROF){
-      // the shoulders and the skirt keep their shape; only the crest
-      // band, which is the part anyone can see, gets the variance
-      const g = q.h ? gradeAt(zb, q.x, period) : 0;
-      b.vertex(q.x + w * (Math.abs(q.x) > 100 ? 0.4 : 1), top + q.dy + g, zb,
-               { aTone:q.tone, aH:q.h, aSun: q.x <= 0 ? 1 : 0 });
+    const cols = columnsAt(zb, period);
+    for(let k = 0; k < PROF.length; k++){
+      const q = PROF[k], c = cols[k];
+      /* aXp: THE COLUMN'S OWN PROFILE COORDINATE, which is what the
+         fragment shader needs to put the value bands on the hill
+         without interpolating them. See rockMat below. */
+      b.vertex(c.x, c.y, zb, { aXp: q.x, aH: q.h, aSun: q.x <= 0 ? 1 : 0 });
     }
   }
   const row = PROF.length;
@@ -527,35 +573,106 @@ const rockMat = posterMat(THREE, {
   uniforms:{ uDist, uPeriod, uRamp, uFog,
              uShadow:{value:C(ROCK.shadow)}, uShadowDeep:{value:C(ROCK.shadowDeep)} },
   side: THREE.DoubleSide, prelude: PRE,
+  /* ------------------------------------------------------------------
+     THE CONTOURS ARE COMPUTED PER FRAGMENT — 3 November 2026
+     ------------------------------------------------------------------
+     The reader said the contours were not smooth. They were not, and
+     the reason is a different one from everything the continuity
+     sampler was looking at: it is not the MESH that was polygonal, it
+     is the value bands painted on it.
+
+     A posterised band boundary is the curve where some field crosses a
+     ramp step. If that field arrives as a VARYING, it has been
+     interpolated linearly across each triangle, so the curve where it
+     crosses a threshold is a straight line inside every triangle and
+     changes direction at every triangle edge it crosses. The result is
+     a polygonal outline, and subdividing the mesh does not fix it —
+     it just makes the polygon finer. That is exactly the fault Pearl
+     Diver had in its water troughs, and the reason some of this
+     chapter's fields were moved to the fragment stage already.
+
+     Three boundaries here were still being thresholded on varyings:
+
+       tone  = vTone + (1.0 - vH) * 1.6      both varyings
+       split = aastep(0.5, vSun)             a varying
+       chip cell = floor(vTone*3 + vH*5)     both varyings
+
+     and the first of them was worse than merely polygonal. aTone is
+     profileTone(), which is a STEP function of |x| — 0, 2, 1, 3 at
+     40 m, 72 m and 132 m. Interpolating a step between two columns
+     5.94 m apart turns a hard edge into a 5.94 m ramp, and running
+     that ramp through a six-step colour ramp paints the intermediate
+     values as SPURIOUS EXTRA BANDS: a stripe of tone 1 several metres
+     wide appeared along the whole hillside at x = 40, where the design
+     says there is one clean line between tone 0 and tone 2. The bands
+     were the triangulation, again.
+
+     So the profile coordinate itself is the varying — aXp, which is
+     genuinely linear along a row because the columns are evenly spaced
+     in it — and profileTone, profileH and the sun split are evaluated
+     from it PER FRAGMENT, in GLSL, from the same numbers
+     long-air-terrain.js uses. The band boundaries are now exact
+     iso-curves of |xp|: they follow the hill's real shape, they are
+     smooth wherever the hill is, and the hard steps land exactly where
+     §4.2 says the decisions are — at 40, 72 and 132 metres — resolved
+     to a pixel by aastep rather than smeared across a column span.
+
+     The constants are duplicated into GLSL and that is a real hazard,
+     so tools/continuity.mjs now checks them against the module's own
+     profileTone and profileH rather than trusting the comment.
+     ------------------------------------------------------------------ */
   vertex: SCROLL_GLSL + `
-    attribute float aTone; attribute float aH; attribute float aSun;
-    varying float vTone; varying float vH; varying float vSun; varying float vDist; varying float vY;
+    attribute float aXp; attribute float aH; attribute float aSun;
+    varying float vXp; varying float vDist; varying float vY;
     void main(){
       vec3 p = scrolled(position);
-      vTone = aTone; vH = aH; vSun = aSun; vY = p.y;
+      vXp = aXp; vY = p.y;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragment:`
-    varying float vTone; varying float vH; varying float vSun; varying float vDist; varying float vY;
+    varying float vXp; varying float vDist; varying float vY;
     uniform vec3 uShadow, uShadowDeep;
+    /* profileTone(), in GLSL. Hand-assigned bands of |x| (§4.2: value
+       indices are decisions, never a function of distance). Hard steps
+       on purpose — but resolved steps, at the exact metre they are
+       decided at, rather than ramps as wide as a column span. */
+    float toneAt(float a){
+      return 0.0
+        + 2.0 * aastep(40.0,  a)        // 0 -> 2 at the lane's edge
+        - 1.0 * aastep(72.0,  a)        // 2 -> 1
+        + 2.0 * aastep(132.0, a);       // 1 -> 3 on the outer skirt
+    }
+    /* profileH(), in GLSL: 1 on the lit crest band, 0 on the skirt,
+       C2 between. Same quintic as the module. */
+    float hAt(float a){
+      float t = clamp((a - 86.0) / 54.0, 0.0, 1.0);
+      return 1.0 - t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+    }
     void main(){
-      float tone = vTone + (1.0 - vH) * 1.6;
-      // rampPickAA, not rampPick: this is an INTERPOLATED tone across
-      // terrain triangles tens of metres wide, so every riser between
-      // two values is a long shallow edge — the worst case for landing
-      // on the pixel grid, and the one that crawls most visibly as the
-      // world scrolls past underneath it
+      float a = abs(vXp);
+      float h = hAt(a);
+      float tone = toneAt(a) + (1.0 - h) * 1.6;
+      /* rampPickAA still, and still for the original reason: the risers
+         that remain are long shallow edges across triangles tens of
+         metres wide, which is the worst case for landing on the pixel
+         grid. The difference is that the riser now follows an
+         iso-curve of the hill instead of a chain of triangle edges. */
       vec3 col = rampPickAA((tone + 0.5) / 6.0);
-      // the one hard shadow split (§4.4): aSun is 1 left of the spine
-      // and 0 right of it, so this draws a single line down the ridge.
-      // It is meant to be one line; it was a staircase.
-      float sh = 1.0 - aastep(0.5, vSun);
+      /* THE ONE HARD SHADOW SPLIT (§4.4), now exactly on the spine.
+         It was aastep(0.5, vSun) on an interpolated 1/0 attribute,
+         which puts the line midway between the x=0 column and the next
+         one — 2.97 m to the right of the spine it is meant to mark —
+         and kinks it at every row. From vXp it is the line xp = 0. */
+      float sh = 1.0 - aastep(0.0, -vXp);
       col = mix(col, uShadow, sh * 0.58);
-      col = mix(col, uShadowDeep, sh * (1.0 - vH) * 0.4);
-      col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vTone * 3.0 + vH * 5.0))) - 0.5) * 0.07;
+      col = mix(col, uShadowDeep, sh * (1.0 - h) * 0.4);
+      /* the grain's cells are anchored to the PROFILE now, so they
+         belong to the hill and cannot crawl along it as the tone
+         varying slides past them */
+      col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vXp * 0.21))) - 0.5) * 0.07;
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
@@ -1518,8 +1635,15 @@ const REACH_INVITE = invite();
    ------------------------------------------------------------------ */
 let t = 0;
 let started = false;
-let camY = ALT_LOW + 1.5;
-let camBack = 13;
+/* THE LENS, and the smoothed forgiveness. Both are state that has to
+   survive a protocol change, so they live out here with the rest of
+   it; both are reset in beginWith rather than carried across, because
+   easing from one protocol's pose into another's would be a claim of
+   continuity between two things that are not continuous. */
+const L = lens({ camBack: 13, kiteY: ALT_LOW });
+/* w = 6 rad/s: most of the way in about a third of a second, which is
+   comfortably inside the time between gates at SPEED. */
+const FORG = tracker(0, 3.5);
 let hit = 0;
 let RATE = rates(PROTOCOLS.box);
 
@@ -1632,8 +1756,37 @@ const loop = clock((dt, now, running) => {
      now — during a turnaround those differ by enough that the wrong gate
      opened by the wrong amount. --- */
   const { gate, ahead } = gateAt(COURSE, dist);
+  /* THE DECISION IS STILL QUANTISED; ITS ARRIVAL IS NOT.
+     ------------------------------------------------------------------
+     forgiveness() returns one of four levels, deliberately — §6.1
+     wants the world to make room in decided amounts rather than
+     breathing in and out with every wobble. But the level was being
+     written straight into uForgive, and uForgive MOVES VERTICES: the
+     vertex shader pushes every gate's lip away from its centre by
+     uForgive * FORGIVE_MAX * aLip. With FORGIVE_MAX at 4.6 m and four
+     levels, crossing one boundary moved every lip in the course by
+     1.53 m IN A SINGLE FRAME, and the glider — which is placed exactly
+     on the lip by KITE.skim — got carried 1.53 m with it.
+
+     tools/temporal.mjs measures the raw signal at a 193.2 m/s
+     single-frame velocity jump, the worst STEPPED field in the
+     chapter, and it fires whenever the reader's error hovers near a
+     boundary, which is most of the time.
+
+     So the staircase is the target and a critically-damped follower is
+     what reaches it: the opening still goes to four decided sizes, and
+     it takes about a third of a second to get there instead of
+     arriving between two frames. w = 6 settles inside the gap between
+     gates at this speed, so the room is there before the reader is.
+
+     THE ON-PACE GUARANTEE IS UNAFFECTED, and that is checked rather
+     than assumed: tools/regress.mjs clears every gate on the BASE gap
+     with forgiveness left completely unspent (see its note at line
+     514), so nothing that is guaranteed depends on how fast
+     forgiveness arrives. */
   const forg = forgiveness(kiteY, gate.centre);
-  uForgive.value = forg.extra / FORGIVE_MAX;
+  FORG.step(dt, forg.extra);
+  uForgive.value = FORG.value / FORGIVE_MAX;
 
   /* --- THE TWO FORCES, in order.
      First the glider steers away from a lip it is near, by itself,
@@ -1645,7 +1798,10 @@ const loop = clock((dt, now, running) => {
      what made contact a vibration: driving the old build with the
      buttons mashed gave a kite at 25.9 m/s, 10.8 m off its schedule,
      with all 130 grit slots live. --- */
-  const half = gate.half + forg.extra;
+  /* the SMOOTHED room, not the raw step: the collision test has to use
+     the opening the reader can see, or the glider would be skimmed
+     onto a lip that is not where it is drawn */
+  const half = gate.half + FORG.value;
   const KITE_HALF = 0.78;
   avoiding = 0; skimming = 0;
   if(Math.abs(ahead) < SLAB_Z + AVOID_MARGIN * 2){
@@ -1751,16 +1907,31 @@ const loop = clock((dt, now, running) => {
 
   /* --- the camera. Behind, and leaning the way the phase is going, so
      the gates you are about to meet are the ones in frame. --- */
-  let lookOff, wantBack, ease;
-  if(ph.cam === 'rise'){      lookOff =  2.6; wantBack = 13.5; ease = 2.6; }
-  else if(ph.cam === 'dive'){ lookOff = -2.2; wantBack = 12.5; ease = 3.0; }
-  else {                      lookOff =  0.2; wantBack = 11.5; ease = 3.2; }
-  camY += ((kiteY + 1.0) - camY) * Math.min(1, dt * 4.5);
-  camBack += (wantBack - camBack) * Math.min(1, dt * 2.0);
-  const back = camBack * (camera.aspect < 0.75 ? 1.0 : 1.3);
-  camera.position.set(kiteX * 0.3, camY, back);
+  /* THE POSE COMES FROM js/long-air-lens.js NOW, and the reason is a
+     measurement. The code this replaces read
+
+       if(ph.cam === 'rise'){ lookOff = 2.6; ... ease = 2.6; }   ...
+       camera.lookAt(x, kiteY + lookOff, -22);
+
+     with `ease` assigned in all three branches and NEVER READ. So the
+     aim offset was applied raw: at a rise->dive boundary the aim point
+     moved 4.8 m in one frame at about 22 m range — an instantaneous
+     12.3 degree rotation of the entire frame, four times every box
+     cycle. tools/temporal.mjs measures it as a 146.1 m/s single-frame
+     velocity jump, the largest discontinuity anywhere in this chapter,
+     and it is frame-rate independent, which is why it persisted at 58
+     fps and why it reads as "disorienting" rather than merely rough.
+
+     The dead `ease` variable says plainly that smoothing was intended
+     and never wired up. It is wired up now, and second-order, because
+     first-order smoothing of a target that STEPS leaves the velocity
+     discontinuous — 146.1 m/s became 7.5 m/s and still measured as a
+     velocity step. Second order took it to 0.49. */
+  L.step(dt, { kiteY, cam: ph.cam });
+  const back = L.camBack * (camera.aspect < 0.75 ? 1.0 : 1.3);
+  camera.position.set(kiteX * 0.3, L.camY, back);
   camera.up.set(0, 1, 0);
-  camera.lookAt(kiteX * 0.3, kiteY + lookOff, -22);
+  camera.lookAt(kiteX * 0.3, L.lookY, -22);
   /* The arrival displacement goes HERE: after the chapter has set the
      pose, and before anything below reads camera.position, so the
      uniforms see the camera that actually renders. */
@@ -1838,6 +2009,8 @@ function beginWith(which, remember){
   KITE = body({ corridor: CORRIDOR, rates: RATE, vMax: V_MAX });
   DRAG = drag({ maxLoss: DRAG_MAX_LOSS, gain: DRAG_GAIN, clear: DRAG_CLEAR });
   REACH_INVITE.reset();   // a new session is a new reader
+  /* the lens and the room, put where they belong with no motion */
+  L.reset(KITE.value); FORG.set(0);
   touches.clear(); readTouches(); forceHold = false;
   t = 0; dist = 0; hit = 0; histN = 0; subShown = '';
   skimming = 0; avoiding = 0;
@@ -1921,7 +2094,9 @@ window.__longAir = {
              skimming:!!skimming, avoiding:+avoiding.toFixed(2),
              behindNominal:+(SPEED*t - dist).toFixed(2),
              hit:+hit.toFixed(2), dist:+dist.toFixed(1),
-             camY:+camY.toFixed(2), liveGrit: grit.live(),
+             camY:+L.camY.toFixed(2), lookY:+L.lookY.toFixed(2),
+             camBack:+L.camBack.toFixed(2), forgive:+FORG.value.toFixed(3),
+             liveGrit: grit.live(),
              inDown, outDown, forceHold,
              reachAt: reachAt === null ? null : +reachAt.toFixed(3),
              targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3),

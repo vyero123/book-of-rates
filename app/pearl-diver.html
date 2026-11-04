@@ -212,6 +212,8 @@ import { ramp, AA_GLSL, FOG_AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CAUSTIC_GLSL,
 import { builder, bands, polyBillboard, triBillboard, particles,
          posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
+import { NU, NW, uAt, wAt, dovePoint, spherePoint,
+         doveNormal, sphereNormal, HALF_SPAN } from './js/dove-shape.js';
 import { arrival } from './js/arrival.js';
 import { wireExits } from './js/bookframe.js';
 
@@ -1309,23 +1311,110 @@ const PEARL_CHEST = new THREE.Vector3(0, 0.16, 0.30);
    sensible, and no resolution of the edge fixes a terminator that is
    genuinely made of ten straight pieces. 32x22, and the terminator
    resolved on top of that. */
-const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 22), posterMat(THREE, {
-  uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(R.at(MID))} },
-  prelude: PRE_AA,
+/* ==================================================================
+   THE PEARL IS THE DOVE — 3 November 2026
+   ==================================================================
+   At the top of the breath she raises the pearl and it opens into a
+   bird, which flies away before she goes back down. It replaces the
+   old ending, where the pearl simply travelled back to the seabed
+   during the inhale — she dropped it, which was never the intent. The
+   release is upward now: she gives it to the air at the top of the
+   breath instead of carrying it down.
+
+   ONE MESH, NOT TWO, AND THAT IS THE WHOLE TRICK. There is no
+   crossfade and no second sprite. The pearl and the dove are two
+   PARAMETERISATIONS OF THE SAME GRID: every vertex carries its place
+   on a sphere of the pearl's own radius and its place on the bird,
+   and `uMorph` moves between them. At morph 0 this is exactly the
+   sphere the chapter has been drawing since the first pass — same
+   radius, same two colours, same resolved terminator — so there is no
+   moment where one object is swapped for another. At morph 1 it is
+   the bird. In between, the sphere's two ends draw out into wings,
+   because the sphere's POLES are mapped to the WINGTIPS. The sphere
+   opens along its own axis.
+
+   Shape, resolution and the unfolding rule are in js/dove-shape.js,
+   which has no three.js in it so tools/continuity.mjs can sample the
+   wing's contour exactly as the terrain's is sampled. Measured there:
+   leading edge 6.77 deg at a knot (0.007 px of bulge at twelve
+   metres), trailing edge 5.94, cross-section ring 0.053 px, and the
+   morph proven not to fold the surface through itself at any value.
+
+   Original work: a generic bird built from smooth profile functions
+   (design doc 4.1).
+
+   DoubleSide because a wing is a blade and you see both faces of it;
+   gl_FrontFacing flips the normal so the shading is right on each.
+   ================================================================== */
+function doveGeometry(){
+  const b = builder(THREE, { aSphere:3, aSphereN:3, aDoveN:3, aW:1 });
+  for(let j = 0; j <= NW; j++){
+    const w = wAt(j);
+    for(let i = 0; i <= NU; i++){
+      const u = uAt(i);
+      const d = dovePoint(u, w), s = spherePoint(u, w);
+      b.vertex(d[0], d[1], d[2], {
+        aSphere: s, aSphereN: sphereNormal(u, w), aDoveN: doveNormal(u, w), aW: w
+      });
+    }
+  }
+  const row = NU + 1;
+  for(let j = 0; j < NW; j++){
+    for(let i = 0; i < NU; i++){
+      const a = j * row + i, c = (j + 1) * row + i;
+      b.tri(a, a + 1, c);
+      b.tri(a + 1, c + 1, c);
+    }
+  }
+  return b.geometry();
+}
+const doveMat = posterMat(THREE, {
+  uniforms:{ uWarm:{value:C(PAL.cream)}, uMid:{value:C(R.at(MID))},
+             uMorph:{value:0}, uFlap:{value:0} },
+  prelude: PRE_AA, side: THREE.DoubleSide,
   vertex:`
+    attribute vec3 aSphere; attribute vec3 aSphereN; attribute vec3 aDoveN;
+    attribute float aW;
+    uniform float uMorph, uFlap;
     varying vec3 vN;
-    void main(){ vN = normalize(normalMatrix * normal);
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+    void main(){
+      float a = abs(aW);
+      /* The body opens first and the tips last — but only the
+         CROSS-SECTION is delayed per station. The span uses the global
+         morph, because delaying that as well reverses the ordering of
+         neighbouring stations at the wingtip and folds the surface
+         through itself part-way through. Measured in dove-shape.js;
+         these two lines are its morphPoint(). */
+      float k = clamp((uMorph - a * 0.40) / 0.60, 0.0, 1.0);
+      k = k * k * k * (k * (k * 6.0 - 15.0) + 10.0);
+      vec3 p = vec3(mix(aSphere.x, position.x, uMorph),
+                    mix(aSphere.y, position.y, k),
+                    mix(aSphere.z, position.z, k));
+      vec3 n = normalize(mix(aSphereN, aDoveN, k));
+      // the beat: a rotation about the body axis whose angle grows
+      // along the span, so the wing BENDS rather than swinging rigidly
+      float ang = uFlap * smoothstep(0.08, 0.60, a) * uMorph
+                * (aW < 0.0 ? -1.0 : 1.0);
+      float ca = cos(ang), sa = sin(ang);
+      vec3 q = vec3(p.x * ca - p.y * sa, p.x * sa + p.y * ca, p.z);
+      vec3 nn = vec3(n.x * ca - n.y * sa, n.x * sa + n.y * ca, n.z);
+      vN = normalMatrix * nn;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(q, 1.0);
+    }
   `,
   fragment:`
     varying vec3 vN;
     uniform vec3 uWarm, uMid;
     void main(){
-      float l = dot(normalize(vN), normalize(vec3(-0.35, 0.8, 0.5)));
+      vec3 n = normalize(vN);
+      if(!gl_FrontFacing) n = -n;
+      float l = dot(n, normalize(vec3(-0.35, 0.8, 0.5)));
       gl_FragColor = vec4(mix(uMid, uWarm, aastep(0.12, l)), 1.0);
     }
   `
-}));
+});
+const pearl = new THREE.Mesh(doveGeometry(), doveMat);
+pearl.frustumCulled = false;      // the morph moves vertices past the box
 scene.add(pearl);
 
 /* ------------------------------------------------------------------
@@ -1438,6 +1527,8 @@ const vHR    = new THREE.Vector3();
 const vHands = new THREE.Vector3();
 const pL     = new THREE.Vector3();
 const pR     = new THREE.Vector3();
+const rL     = new THREE.Vector3();
+const rR     = new THREE.Vector3();
 /* the gathered hand positions, which are also where the pearl ends up.
    These are the values the old code reached at grip = 1, kept exactly. */
 const GATHER_L = new THREE.Vector3(-0.085,  0.18, 0.30);
@@ -1447,6 +1538,60 @@ const FREE_R   = new THREE.Vector3( 0.300, -0.02, 0.00);
 const ARM_SPAN = 0.78;
 let reachAmt = 0;
 const sstep = x => { const c = Math.min(1, Math.max(0, x)); return c*c*(3 - 2*c); };
+
+/* ==================================================================
+   THE RELEASE — raise, open, let go. 3 November 2026
+   ==================================================================
+   THE TIMING IS DERIVED, NOT TYPED. The one figure that is given in
+   seconds is when it starts: 0.30 s into the inhale, which is a beat
+   after she breaks the surface and is the same in any protocol. The
+   END is "before the descent", so the usable window is the phase's
+   own duration less that start and a tail margin, and every sub-beat
+   is a fraction of THAT window. A protocol with a longer inhale gets
+   a longer, slower gesture rather than the same gesture with dead air
+   after it.
+
+   WHAT IT COMES TO, for the two protocols that exist (both checked,
+   and both at the surface for the whole inhale so the gesture is
+   never cut short by §1.6a):
+
+                        box 4 s        no holds 5 s
+     window W           3.55 s         4.55 s
+     raise              0.30 - 1.37    0.30 - 1.66
+     opens              1.08 - 2.15    1.30 - 2.67
+     leaves the hands   1.90           2.35
+     out of frame by    3.85           4.85
+     inhale ends        4.00           5.00
+
+   Neither has to be compressed and neither snaps: the shortest beat
+   in the shorter protocol is the morph at 1.07 s, which is a third of
+   a second longer than the whole raise would need to read. If a
+   future protocol's inhale were under about 1.6 s the gesture would
+   not fit, and the right answer then is a shorter gesture decided
+   deliberately rather than this one squeezed — the arithmetic is here
+   so that is visible rather than discovered.
+
+   IT HAS TO BEAR REPETITION: ten to fourteen of these in a session.
+   The departure is seeded off a per-inhale counter, so the lateral
+   direction, the climb, the wander and the beat rate all differ from
+   one cycle to the next. The gesture on the figure is the same; the
+   flight is not.
+   ================================================================== */
+const DOVE_T0 = 0.30;        // seconds into the inhale before anything moves
+const DOVE_TAIL = 0.15;      // and gone this long before the phase ends
+const DOVE_FWD = new THREE.Vector3(0, 0, 1);   // the bird's own nose
+const dv = {
+  n: 0, seed: 0, flying: false, gone: false,
+  lift: 0, open: 0, morph: 0, flap: 0, bank: 0,
+  pos: new THREE.Vector3(), vel: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0)
+};
+const qDir = new THREE.Quaternion(), qBank = new THREE.Quaternion();
+let lastPhaseK = '';
+/* the raised, opened hand pose: up, forward and apart. It is a
+   continuation of the gather rather than a new pose — the blend runs
+   from wherever the gather left the hands, so the arms travel. */
+const RAISE_L = new THREE.Vector3(-0.150, 0.86, 0.26);
+const RAISE_R = new THREE.Vector3( 0.150, 0.86, 0.26);
 const cBodyUp = C(PAL.bodyUp), cBodyDown = C(PAL.bodyDown);
 const cBody = C(R.at(BODY)), cDeep = C(R.at(DEEP)), cInd = C(PAL.indigo);
 let subShown = '';
@@ -1561,6 +1706,41 @@ const loop = clock((dt, now, running) => {
   /* --- the diver --- */
   diver.position.set(Math.sin(t * 0.21) * 0.30, dyNow, Math.cos(t * 0.17) * 0.26);
 
+  /* --- THE RELEASE's own clock. One new bird per inhale. --- */
+  const inhale = ph.k === 'in';
+  if(inhale && lastPhaseK !== 'in'){
+    dv.n++; dv.seed = (dv.n * 2.399) % 6.283;
+    dv.flying = false; dv.gone = false;
+    dv.lift = dv.open = dv.morph = dv.flap = dv.bank = 0;
+  }
+  lastPhaseK = ph.k;
+  if(inhale && started){
+    const inT = st.pr * ph.d;
+    const W = Math.max(0.6, ph.d - DOVE_T0 - DOVE_TAIL);
+    const beat = (lo, hi) => sstep((inT - DOVE_T0 - lo * W) / ((hi - lo) * W));
+    const settle = beat(0.52, 0.90);          // arms come back down
+    dv.lift  = beat(0.00, 0.30) * (1 - settle);
+    dv.open  = beat(0.22, 0.40);              // the hands part: the release
+    dv.morph = beat(0.22, 0.52);
+    const depart = beat(0.45, 1.00);
+    // the launch itself happens in the pearl block below, where the
+    // hands' world position is fresh rather than a frame stale
+    dv.wantLaunch = !dv.flying && !dv.gone && inT >= DOVE_T0 + 0.45 * W;
+    if(dv.flying && !dv.gone){
+      dv.vel.y += dt * 0.7;                                   // keeps climbing
+      dv.vel.x += Math.sin(t * 1.3 + dv.seed) * dt * 1.6;     // and wanders
+      dv.pos.addScaledVector(dv.vel, dt);
+      dv.bank = Math.sin(t * 0.9 + dv.seed) * 0.38;
+      if(depart >= 1) dv.gone = true;
+    }
+    // the beat: a stretch while it is still in her hands, then flight
+    const rate = 8.4 + Math.sin(dv.seed * 2.3) * 1.6;
+    dv.flap = Math.sin(t * rate + dv.seed) * (dv.flying ? 0.95 : 0.22);
+  } else if(!inhale){
+    dv.flying = false; dv.gone = false;
+    dv.lift = dv.open = dv.morph = dv.flap = dv.bank = 0;
+  }
+
   /* THE REACH (see the gesture note above). It lives entirely inside
      the exhale, it is driven by that phase's own progress rather than
      by grip, and it is multiplied by (1 - grip) so it retracts exactly
@@ -1631,6 +1811,33 @@ const loop = clock((dt, now, running) => {
   pR.set(vPL.x + spread, vPL.y + 0.05, vPL.z);
   handL.position.copy(FREE_L).lerp(pL, reachAmt).lerp(GATHER_L, grip);
   handR.position.copy(FREE_R).lerp(pR, reachAmt).lerp(GATHER_R, grip);
+  /* THE RAISE, continuous with the gather rather than a new pose: the
+     same blend chain, one more link. `dv.open` parts the hands on top
+     of it, which is what lets the bird go — it is not released by a
+     timer, it is released by the hands opening. */
+  if(dv.lift > 0){
+    rL.copy(RAISE_L); rL.x -= dv.open * 0.16; rL.y += dv.open * 0.05;
+    rR.copy(RAISE_R); rR.x += dv.open * 0.16; rR.y += dv.open * 0.05;
+    handL.position.lerp(rL, dv.lift);
+    handR.position.lerp(rR, dv.lift);
+    /* The arms are BLENDED toward the raised pose by dv.lift, not
+       eased toward it at a rate scaled by dv.lift. The difference
+       matters: this frame's value already carries the gather, so a
+       straight blend travels from exactly where the gather left the
+       arm to exactly the raised angle, and dv.lift is itself smooth,
+       so nothing snaps at either end. A second easing on top of the
+       first would fight it and settle somewhere between the two. */
+    const upZ = -1.42 - dv.open * 0.30;
+    const mix1 = (a, b, k) => a + (b - a) * k;
+    armL.rotation.z = mix1(armL.rotation.z,  upZ,  dv.lift);
+    armR.rotation.z = mix1(armR.rotation.z, -upZ,  dv.lift);
+    armL.rotation.x = mix1(armL.rotation.x,  0.55, dv.lift);
+    armR.rotation.x = mix1(armR.rotation.x,  0.55, dv.lift);
+    armL.position.y = mix1(armL.position.y, 0.36, dv.lift);
+    armR.position.y = mix1(armR.position.y, 0.36, dv.lift);
+    // and she follows it up with her chest and chin
+    diver.rotation.x = mix1(diver.rotation.x, aim - 0.34, dv.lift);
+  }
 
   uDiver.value.copy(diver.position);
   diver.updateMatrixWorld(true);
@@ -1665,7 +1872,40 @@ const loop = clock((dt, now, running) => {
   handL.getWorldPosition(vHL);
   handR.getWorldPosition(vHR);
   vHands.addVectors(vHL, vHR).multiplyScalar(0.5);
-  pearl.position.lerpVectors(vBed, vHands, sstep((grip - 0.02) / 0.26));
+
+  if(dv.wantLaunch){
+    dv.wantLaunch = false; dv.flying = true;
+    dv.pos.copy(vHands);
+    /* Seeded per inhale, so ten to fourteen of these in a session are
+       not ten to fourteen replays of one arc. It leaves UP and AWAY
+       rather than toward the lens: a bird that grew as it came at the
+       camera would be a large shape sweeping the frame, which is the
+       exact thing tools/flash-check.md exists to catch. */
+    dv.vel.set(Math.sin(dv.seed) * 2.6,
+               5.2 + Math.sin(dv.seed * 1.7) * 1.1,
+               -(0.9 + ((dv.n * 7919) % 53) / 53 * 1.3));
+  }
+
+  if(dv.flying && !dv.gone){
+    pearl.position.copy(dv.pos);
+    dv.dir.copy(dv.vel).normalize();
+    qDir.setFromUnitVectors(DOVE_FWD, dv.dir);
+    qBank.setFromAxisAngle(DOVE_FWD, dv.bank);
+    pearl.quaternion.copy(qDir).multiply(qBank);
+  } else {
+    /* SHE NO LONGER DROPS IT. Through the whole inhale the pearl stays
+       with her hands — `take` is pinned at 1 — where it used to track
+       grip back down to zero and travel fifteen metres to the seabed.
+       Once the bird has gone the mesh is parked back at the seabed
+       position for the next descent, which happens while the lens is
+       above water and the seabed is not in frame. */
+    const take = inhale ? 1 : sstep((grip - 0.02) / 0.26);
+    pearl.position.lerpVectors(vBed, vHands, take);
+    pearl.quaternion.copy(diver.quaternion);
+  }
+  pearl.visible = !dv.gone;
+  doveMat.uniforms.uMorph.value = dv.morph;
+  doveMat.uniforms.uFlap.value  = dv.flap;
 
   /* --- bubbles on the exhale only; the hold is silent and still.
      `bubblesLive` is read by stepPuffs: the frame the flag drops, every
@@ -1835,6 +2075,9 @@ window.__pearlDiver = {
                for(const p of puffs.slots) if(p.live && p.kind === 0) n++; return n; })(),
              emitting: bubblesLive,
              reach:+reachAmt.toFixed(2),
+             dove:{ n:dv.n, lift:+dv.lift.toFixed(2), open:+dv.open.toFixed(2),
+                    morph:+dv.morph.toFixed(2), flying:dv.flying, gone:dv.gone,
+                    inT:+(s.p.k === 'in' ? s.pr * s.p.d : -1).toFixed(2) },
              scheduleY:+B.value(t).toFixed(2), shownY:+shownY.toFixed(2),
              released: freeY !== null, freeY: freeY === null ? null : +freeY.toFixed(2) }; },
   /** §1.6b: come up now, from a tool call. */

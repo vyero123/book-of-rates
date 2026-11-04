@@ -54,6 +54,8 @@
 import { periodOf, PROTOCOLS, ridgeAt, ceilAt, wanderAt, courseOf,
          CORR_LO, CORR_HI, RIDGE_TOP, GROUND } from '../app/js/long-air-breath.js';
 import { breath } from '../app/js/breath.js';
+import * as D from '../app/js/dove-shape.js';
+import { PROTOCOLS as DL } from '../app/js/deep-light-breath.js';
 import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset } from '../app/js/long-air-terrain.js';
 
@@ -415,6 +417,183 @@ say(`EVERY MESH, WORST KNOT — target ${TARGET_DEG} deg as seen`);
                  `worst ${worst.toFixed(2).padStart(6)} deg at ~${s.dist} m ` +
                  `= ${app.toFixed(2)} as seen`;
     if(app <= TARGET_DEG) ok(line); else bad(line);
+  }
+}
+
+/* ------------------------------------------------------------------
+   3d. PEARL DIVER — THE DOVE
+   ------------------------------------------------------------------
+   A wing's outline is a contour like any other, and a wing in motion
+   is the contour that shows a defect soonest: it sweeps across the
+   frame every cycle, ten to fourteen times a session. So it is held
+   to the same bar as the terrain, measured the same way, at the
+   mesh's own knots.
+
+   The leading and trailing edges are what the reader sees in
+   silhouette. The cross-section ring matters less — it is seen end-on
+   — but it is swept too, because a surface smooth in one direction
+   and coarse in the other still juts.
+   ------------------------------------------------------------------ */
+say('');
+say('PEARL DIVER — THE DOVE');
+{
+  /* How the dove is read, so every bar below is a number rather than a
+     feeling: a 0.68 m bird at about twelve metres on a 375x812 lens. */
+  const DOVE_DIST = 12.0;
+  const PX_PER_RAD = 812 / 1.082;
+  const DOVE_CAP_DEG = 15, DOVE_CAP_PX = 0.5;
+
+  // the contour functions, classified under refinement first
+  for(const [name, f] of [
+    ['chordHalf',  w => D.chordHalf(w)],
+    ['thickHalf',  w => D.thickHalf(w)],
+    ['sweepZ',     w => D.sweepZ(w)],
+    ['dihedralY',  w => D.dihedralY(w)],
+    ['centreZ',    w => D.centreZ(w)]
+  ]){
+    const r = classify(f, -1, 1, 0.02);
+    const line = `${('dove ' + name).padEnd(28)} ${r.kind.padEnd(11)} ` +
+                 `slope x${String(r.slopeGrowth).padStart(5)}  curv x${String(r.curvGrowth).padStart(6)}`;
+    if(r.kind === 'smooth') ok(line); else bad(line);
+  }
+
+  // the drawn silhouette, at the mesh's own span knots
+  const edge = (sgn) => {
+    let worst = 0, at = 0;
+    for(let j = 1; j < D.NW; j++){
+      const w0 = D.wAt(j - 1), w1 = D.wAt(j), w2 = D.wAt(j + 1);
+      const P = w => [D.spanX(w), D.centreZ(w) + sgn * D.chordHalf(w)];
+      const a = P(w0), b = P(w1), c = P(w2);
+      const t1 = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      const t2 = Math.atan2(c[1] - b[1], c[0] - b[0]);
+      let d = Math.abs(t2 - t1) * 180 / Math.PI;
+      if(d > 180) d = 360 - d;
+      if(d > worst){ worst = d; at = w1; }
+    }
+    return { deg:+worst.toFixed(2), at:+at.toFixed(3) };
+  };
+  /* THE BAR FOR A SMALL OBJECT IS NOT THE BAR FOR TERRAIN, and saying
+     so with a number rather than by waiving it. Four degrees was
+     derived for a hillside that fills the frame; the dove is a 0.68 m
+     bird read at about twelve metres. What a reader can see is the
+     SAGITTA — how far the polyline bulges off the true curve — which
+     for segment length h and knot angle θ is θh/8, and that converts
+     to device pixels at the viewing distance. A raw-angle cap rides
+     alongside it so the shape can never become a visible polygon
+     however small it is on screen. */
+  const span = 2 * D.HALF_SPAN / D.NW;      // segment length along x
+  for(const [name, sgn] of [['leading edge', 1], ['trailing edge', -1]]){
+    const k = edge(sgn);
+    const px = (k.deg * Math.PI / 180) * span / 8 / DOVE_DIST * PX_PER_RAD;
+    const line = `dove ${name}`.padEnd(28) + `${String(k.deg).padStart(6)} deg at w=${k.at}` +
+                 `  = ${px.toFixed(3)} px bulge at ${DOVE_DIST} m` +
+                 `   (caps ${DOVE_CAP_DEG} deg / ${DOVE_CAP_PX} px)`;
+    if(k.deg <= DOVE_CAP_DEG && px <= DOVE_CAP_PX) ok(line); else bad(line);
+  }
+
+  // the dihedral line, seen head-on
+  {
+    let worst = 0, at = 0;
+    for(let j = 1; j < D.NW; j++){
+      const P = w => [D.spanX(w), D.dihedralY(w)];
+      const a = P(D.wAt(j-1)), b = P(D.wAt(j)), c = P(D.wAt(j+1));
+      const d = Math.abs(Math.atan2(c[1]-b[1], c[0]-b[0]) -
+                         Math.atan2(b[1]-a[1], b[0]-a[0])) * 180 / Math.PI;
+      if(d > worst){ worst = d; at = D.wAt(j); }
+    }
+    const line = 'dove dihedral line'.padEnd(28) + `${String(+worst.toFixed(2)).padStart(6)} deg at w=${at.toFixed(3)}` +
+                 `   (budget ${TARGET_DEG})`;
+    if(worst <= TARGET_DEG) ok(line); else bad(line);
+  }
+
+  /* THE CROSS-SECTION RING, judged by what it puts on screen.
+     A ring of NU segments turns 360/NU per knot just by being a
+     circle, and an ellipse concentrates that turning at its two ends
+     — which on a wing are the leading and trailing edges and are
+     SUPPOSED to be sharp. A raw-angle bar would condemn a correctly
+     shaped blade. What can actually be seen is the sagitta: the
+     polyline's bulge off the true curve, which is the knot angle
+     times the local segment length over eight. The segments at an
+     ellipse's sharp ends are short, which is exactly why the large
+     angle there costs nothing. */
+  {
+    let worstPx = 0, worstDeg = 0, atW = 0;
+    for(let j = 0; j <= D.NW; j += 2){
+      const w = D.wAt(j);
+      for(let i = 0; i < D.NU; i++){
+        const P = k => { const p = D.dovePoint(D.uAt((k + D.NU) % D.NU), w); return [p[2], p[1]]; };
+        const a2 = P(i), b2 = P(i+1), c2 = P(i+2);
+        const h1 = Math.hypot(b2[0]-a2[0], b2[1]-a2[1]);
+        const h2 = Math.hypot(c2[0]-b2[0], c2[1]-b2[1]);
+        let d = Math.abs(Math.atan2(c2[1]-b2[1], c2[0]-b2[0]) -
+                         Math.atan2(b2[1]-a2[1], b2[0]-a2[0]));
+        if(d > Math.PI) d = 2 * Math.PI - d;
+        const px = d * ((h1 + h2) / 2) / 8 / DOVE_DIST * PX_PER_RAD;
+        if(px > worstPx){ worstPx = px; worstDeg = d * 180 / Math.PI; atW = w; }
+      }
+    }
+    const line = `dove cross-section ring`.padEnd(28) +
+                 `${worstDeg.toFixed(1)} deg = ${worstPx.toFixed(3)} px bulge at w=${atW.toFixed(2)}` +
+                 `   (cap ${DOVE_CAP_PX} px)`;
+    if(worstPx <= DOVE_CAP_PX) ok(line); else bad(line);
+  }
+
+  // the morph must not fold the surface through itself at any point
+  {
+    let minJ = Infinity, at = null;
+    for(let m = 0; m <= 1.0001; m += 0.05){
+      for(let j = 1; j <= D.NW; j++){
+        const w = D.wAt(j), wp = D.wAt(j - 1);
+        const x  = D.morphPoint(0.25, w,  m)[0];
+        const xp = D.morphPoint(0.25, wp, m)[0];
+        if(x - xp < minJ){ minJ = x - xp; at = { m:+m.toFixed(2), w:+w.toFixed(2) }; }
+      }
+    }
+    const line = `dove morph stays unfolded`.padEnd(28) +
+                 `min span step ${minJ.toFixed(5)} m at morph ${at.m}, w=${at.w}`;
+    if(minJ > -1e-9) ok(line); else bad(line + '  — the surface folds through itself');
+  }
+
+  /* THE GESTURE HAS TO FIT, IN BOTH PROTOCOLS.
+     The start is given in seconds (0.30 s into the inhale) and the end
+     is "before the descent", so the window is the phase's own duration
+     less the start and a tail margin, and every beat is a fraction of
+     that. A protocol with a longer inhale gets a longer gesture rather
+     than the same one with dead air after it. The check is that no
+     beat is short enough to snap: the morph is the tightest and is the
+     one that has to read as a transformation rather than a cut. */
+  {
+    const T0 = 0.30, TAIL = 0.15, MIN_MORPH = 0.60;
+    for(const id of Object.keys(DL)){
+      const inPh = DL[id].phases.find(p => p.k === 'in');
+      const W = inPh.d - T0 - TAIL;
+      const at = f => T0 + f * W;
+      const morphLen = (0.52 - 0.22) * W;
+      const line = `dove fits ${(DL[id].id + ' ' + inPh.d + 's').padEnd(12)}` +
+                   `W ${W.toFixed(2)}  raise ${at(0).toFixed(2)}-${at(0.30).toFixed(2)}` +
+                   `  opens ${at(0.22).toFixed(2)}-${at(0.52).toFixed(2)}` +
+                   `  released ${at(0.45).toFixed(2)}` +
+                   `  gone ${at(1).toFixed(2)} of ${inPh.d}`;
+      const fits = W > 0 && morphLen >= MIN_MORPH && at(1) <= inPh.d - TAIL + 1e-9;
+      if(fits) ok(line); else bad(line + `  — morph only ${morphLen.toFixed(2)}s`);
+      // and the inhale must be stationary at the surface, or the
+      // gesture would be cut short by the descent starting (§1.6a
+      // already requires this; it is asserted rather than assumed)
+      const flat = inPh.from === inPh.to && inPh.from > 0;
+      if(flat) ok(`     ${DL[id].id}: inhale is flat and above the surface`);
+      else bad(`     ${DL[id].id}: the inhale moves — the gesture would be cut short`);
+    }
+  }
+
+  // the blade stations are excluded from the ring check by MEASUREMENT:
+  // their cross-section is sub-pixel, so its knots cannot be seen
+  {
+    const PX = 812 / 1.082 / 12.0;
+    const t = D.thickHalf(0.6) * 2 * PX;
+    const line = `dove blade thickness at w=0.6`.padEnd(28) +
+                 `${(D.thickHalf(0.6)*2).toFixed(4)} m = ${t.toFixed(2)} px at 12 m`;
+    if(t < 1.0) ok(line + '  (sub-pixel: its ring is not a silhouette)');
+    else bad(line + '  — thick enough to show its cross-section knots');
   }
 }
 

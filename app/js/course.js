@@ -173,14 +173,48 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0, vMax 
     /** the same, driven by a phase kind instead of a pair of controls */
     follow(dt, kind){ return b.drive(dt, kind === 'in', kind === 'out'); },
 
+    /* SUBSTEPPED AT 60 Hz, and the reason is a measurement.
+       ---------------------------------------------------------------
+       This is semi-implicit Euler on a spring, which is stable here
+       (dt·sqrt(k) = 0.4 at the clock's 0.05 s cap, well inside the
+       limit) but not frame-rate independent: the trajectory it
+       produces depends on the step size it was integrated with.
+       tools/temporal.mjs measures the consequence by running the same
+       flight on a metronome 60 fps clock and on a jittered one that
+       sits at 58 and drops frames:
+
+         kiteY   lurch 0.055 steady -> 0.109 jittered   ratio 1.97
+         camY    lurch 0.030 steady -> 0.074 jittered   ratio 2.48
+
+       That is the glider's own altitude — and therefore the lens that
+       follows it — moving differently because a frame was late. The
+       reader reported exactly this, and reported that 58 fps is fine,
+       which is a statement about the integrator and not about
+       performance.
+
+       The fix is substepping rather than a closed form, deliberately.
+       An exact solution for the damped oscillator exists, but `lag()`
+       above is derived from THIS integrator and every chapter's
+       tracking tolerance in tools/regress.mjs is derived from `lag()`,
+       so replacing the integrator would move every one of those
+       numbers at once and nothing would be attributable. Substepping
+       changes nothing at 60 fps — n is 1, and the arithmetic is
+       identical bit for bit — and converges on the same trajectory
+       when frames are long. The clamps stay inside the loop, because a
+       body that reaches the corridor edge mid-step must stop there
+       rather than at the end of the frame. */
     settle(dt){
-      const want = C.atOf(b.fill);
-      b.v += ((want - b.value) * k - b.v * damp) * dt;
-      if(b.v >  vMax) b.v =  vMax;
-      if(b.v < -vMax) b.v = -vMax;
-      b.value += b.v * dt;
-      if(b.value < C.lo){ b.value = C.lo; b.v = Math.max(0, b.v); }
-      if(b.value > C.hi){ b.value = C.hi; b.v = Math.min(0, b.v); }
+      const n = Math.max(1, Math.ceil(dt * 60));
+      const h = dt / n;
+      for(let i = 0; i < n; i++){
+        const want = C.atOf(b.fill);
+        b.v += ((want - b.value) * k - b.v * damp) * h;
+        if(b.v >  vMax) b.v =  vMax;
+        if(b.v < -vMax) b.v = -vMax;
+        b.value += b.v * h;
+        if(b.value < C.lo){ b.value = C.lo; b.v = Math.max(0, b.v); }
+        if(b.value > C.hi){ b.value = C.hi; b.v = Math.min(0, b.v); }
+      }
       return b;
     },
 
