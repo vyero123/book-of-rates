@@ -52,12 +52,15 @@
  */
 
 import { periodOf, PROTOCOLS, ridgeAt, ceilAt, wanderAt, courseOf,
-         CORR_LO, CORR_HI, RIDGE_TOP, GROUND } from '../app/js/long-air-breath.js';
+         CORR_LO, CORR_HI, RIDGE_TOP, GROUND, ALT_LOW, BEHIND } from '../app/js/long-air-breath.js';
 import { breath } from '../app/js/breath.js';
 import * as D from '../app/js/dove-shape.js';
 import { PROTOCOLS as DL } from '../app/js/deep-light-breath.js';
 import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
-         highestDrawn, PROF, GX, lipOffset } from '../app/js/long-air-terrain.js';
+         highestDrawn, PROF, GX, lipOffset,
+         profileTone, profileH } from '../app/js/long-air-terrain.js';
+import { CAM_EASE } from '../app/js/long-air-lens.js';
+import { readFileSync } from 'node:fs';
 
 const VERBOSE = process.argv.includes('--verbose');
 
@@ -623,6 +626,235 @@ if(VERBOSE){
   say('');
   say('columns at z=0:');
   for(const c of columnsAt(0, period)) say(`   x ${c.x.toFixed(1).padStart(7)}  y ${c.y.toFixed(3)}`);
+}
+
+/* ==================================================================
+   THE ANGULAR BAR — what the knot subtends FROM THE LENS
+   ==================================================================
+   Everything above measures the surface in WORLD SPACE, and the brief
+   for this pass was right to question that. A four degree turn 20 m
+   from the lens is nothing; the same four degrees at 2 m is a corner.
+   The section above already knew this — it carried an "as seen" column
+   — but it computed it as `deg * min(1, 40/dist)`, which is a
+   heuristic with no optics in it. It is kept below for comparison and
+   it is not the measurement.
+
+   THE HONEST QUANTITY IS THE SAGITTA IN PIXELS: project the knot and
+   its two neighbours through the chapter's real lens, and measure how
+   far the knot's image sits off the straight line joining its
+   neighbours' images. That IS the question "does this read as a
+   polygon", in the only units that can answer it. Under a pixel and
+   the mesh is indistinguishable from a smooth curve at that distance,
+   whatever its world-space angle; over about two and the facets are
+   visible.
+
+   The lens is the chapter's own. Nothing here is a guessed camera:
+   fov, aspect, trailing distance and aim all come from the same
+   constants long-air.html builds the pose from, and the aspect is the
+   reader's phone — 375 x 812 CSS pixels, which is what §mobile-first
+   means and the screen this is for.
+   ================================================================== */
+say('');
+say('THE ANGULAR BAR — the knot projected through the chapter\'s own lens');
+
+const SCR_W = 375, SCR_H = 812;          // the reader's phone, CSS px
+const ASPECT = SCR_W / SCR_H;
+const FOV_DEG = ASPECT < 0.75 ? 66 : 55; // long-air.html's own fov(aspect)
+
+/* The nominal pose: the glider at the bottom of its corridor on a
+   level phase, which is where the ridge fills most of the frame and
+   therefore where its facets are most visible. CAM_EASE and the
+   aspect factor are the page's. */
+const POSE_KITE = ALT_LOW;
+const CAM_Y  = POSE_KITE + 1.0;
+const CAM_Z  = CAM_EASE.level.back * (ASPECT < 0.75 ? 1.0 : 1.3);
+const LOOK_Y = POSE_KITE + CAM_EASE.level.look;
+const LOOK_Z = -22;
+
+/* lookAt, by hand: the forward axis, then a right and an up from it.
+   No three.js in a Node tool. */
+function basis(){
+  const f = [0 - 0, LOOK_Y - CAM_Y, LOOK_Z - CAM_Z];
+  const fl = Math.hypot(...f); for(let i = 0; i < 3; i++) f[i] /= fl;
+  // right = normalize(cross(worldUp, -forward)) with worldUp = +y
+  const r = [ f[2] * 1 - 0, 0, -(f[0] * 1) ];
+  const rl = Math.hypot(...r) || 1; for(let i = 0; i < 3; i++) r[i] /= rl;
+  const u = [ r[1]*f[2] - r[2]*f[1], r[2]*f[0] - r[0]*f[2], r[0]*f[1] - r[1]*f[0] ];
+  return { f, r, u };
+}
+const BAS = basis();
+const FY = 1 / Math.tan(FOV_DEG / 2 * Math.PI / 180);
+
+/** World point to screen pixels, or null when it is behind the lens. */
+function project(x, y, z){
+  const d = [x - 0, y - CAM_Y, z - CAM_Z];
+  const vz = d[0]*BAS.f[0] + d[1]*BAS.f[1] + d[2]*BAS.f[2];   // +ve = ahead
+  if(vz <= 0.2) return null;
+  const vx = d[0]*BAS.r[0] + d[1]*BAS.r[1] + d[2]*BAS.r[2];
+  const vy = d[0]*BAS.u[0] + d[1]*BAS.u[1] + d[2]*BAS.u[2];
+  const nx = (FY / ASPECT) * vx / vz, ny = FY * vy / vz;
+  return [ (nx * 0.5 + 0.5) * SCR_W, (1 - (ny * 0.5 + 0.5)) * SCR_H, vz ];
+}
+
+/** True when an image is inside the frame the reader is looking at.
+ *  WITHOUT THIS THE MEASUREMENT IS MEANINGLESS, and the first run
+ *  proved it: it reported 80.15 px off the chord "at 1 m", which was a
+ *  row of the ridge passing directly beneath the lens — twelve metres
+ *  below it, one metre along the view axis, and nowhere near the
+ *  frame. A knot the reader cannot see cannot look polygonal. The
+ *  margin is generous rather than exact: a knot just outside the edge
+ *  still has triangles reaching into frame. */
+const onScreen = q => q && q[0] > -60 && q[0] < SCR_W + 60 &&
+                            q[1] > -60 && q[1] < SCR_H + 60;
+
+/** Pixels from B's image to the chord joining A's and C's images. */
+function sagittaPx(A, P, C){
+  const a = project(...A), p = project(...P), c = project(...C);
+  if(!a || !p || !c) return null;
+  if(!onScreen(a) || !onScreen(p) || !onScreen(c)) return null;
+  const ex = c[0] - a[0], ey = c[1] - a[1];
+  const L = Math.hypot(ex, ey);
+  if(L < 1e-6) return null;
+  const off = Math.abs((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / L;
+  return { px: off, dist: p[2] };
+}
+
+/* THE RIDGE, both ways, over the part of the strip that is in frame.
+   World z of a vertex with base z is period*BEHIND - mod(zb - dist,
+   period); at dist = 0 that is period*BEHIND - zb, so the rows in
+   front of the lens are the ones with small zb. The ridge is drawn
+   from the lens out to the fog, so sweep the near 120 m. */
+const BACK0 = period * BEHIND;
+const zWorldOf = zb => BACK0 - zb;
+
+let worstAcross = { px: 0 }, worstAlong = { px: 0 };
+for(let zb = 0; zb <= 130; zb += rowStep){
+  const cols = columnsAt(zb, period);
+  const zw = zWorldOf(zb);
+  /* ACROSS the ridge: the cross-section's own knots, which are the
+     columns, at the depth they are actually seen at. */
+  for(let i = 1; i < cols.length - 1; i++){
+    const r = sagittaPx([cols[i-1].x, cols[i-1].y, zw],
+                        [cols[i  ].x, cols[i  ].y, zw],
+                        [cols[i+1].x, cols[i+1].y, zw]);
+    if(r && r.px > worstAcross.px) worstAcross = { ...r, x: cols[i].x, zb };
+  }
+}
+/* ALONG the course: three rows of knots down the z axis at fixed x. */
+for(const x of [0, -13, 13, -34, 34, -58, 58]){
+  for(let zb = rowStep; zb <= 130; zb += rowStep){
+    const y0 = meshY(x, zb - rowStep, period), y1 = meshY(x, zb, period),
+          y2 = meshY(x, zb + rowStep, period);
+    const r = sagittaPx([x, y0, zWorldOf(zb - rowStep)],
+                        [x, y1, zWorldOf(zb)],
+                        [x, y2, zWorldOf(zb + rowStep)]);
+    if(r && r.px > worstAlong.px) worstAlong = { ...r, x, zb };
+  }
+}
+
+/* THE BAR. One pixel is the honest line: a vertex that sits less than
+   a pixel off its own chord cannot be seen to be a vertex. Two is
+   where faceting becomes legible on a 375 px screen, so that is the
+   bar, with the one-pixel figure reported alongside. */
+const PX_BAR = 2.0;
+for(const [name, w] of [['ridge across (columns)', worstAcross],
+                        ['ridge along (rows)',     worstAlong]]){
+  if(!w.dist){ bad(`${name}: nothing projected — the instrument saw no geometry`); continue; }
+  const line = `${name.padEnd(24)} worst ${w.px.toFixed(2).padStart(5)} px off the chord` +
+               ` at ${w.dist.toFixed(0)} m, x=${(w.x ?? 0).toFixed(0)}  (bar ${PX_BAR} px)`;
+  if(w.px <= PX_BAR) ok(line); else bad(line);
+}
+
+/* PROVE THE PROJECTOR. A tool that reports pixels has to be shown to
+   put a known thing in the right place, or the numbers above are
+   decoration — and a silently broken projector reports small
+   sagittas, which looks exactly like success. Two checks: the aim
+   point must land on the frame's centre line, and a metre stick at a
+   known distance must subtend the size the optics say it should. */
+{
+  const c = project(0, LOOK_Y, LOOK_Z);
+  const dx = Math.abs(c[0] - SCR_W / 2), dy = Math.abs(c[1] - SCR_H / 2);
+  if(dx < 0.6 && dy < 0.6) ok(`projector: the aim point lands at frame centre (off by ${dx.toFixed(2)}, ${dy.toFixed(2)} px)`);
+  else bad(`projector: the aim point is ${dx.toFixed(1)}, ${dy.toFixed(1)} px off centre — the camera basis is wrong`);
+
+  /* a 1 m vertical stick on the view axis, 40 m out, should subtend
+     H / (2 tan(fov/2) * 40) pixels */
+  const want = SCR_H / (2 * Math.tan(FOV_DEG / 2 * Math.PI / 180) * 40);
+  const pA = project(0, LOOK_Y, LOOK_Z), pB = project(0, LOOK_Y + 1, LOOK_Z);
+  const axis = Math.hypot(0, LOOK_Y - CAM_Y, LOOK_Z - CAM_Z);
+  const got = Math.abs(pB[1] - pA[1]) * axis / 40;     // rescale to 40 m
+  if(Math.abs(got - want) / want < 0.02)
+    ok(`projector: a 1 m stick at 40 m subtends ${(want).toFixed(1)} px as the optics require`);
+  else bad(`projector: 1 m at 40 m measured ${got.toFixed(2)} px, optics say ${want.toFixed(2)} — scale is wrong`);
+}
+
+/* ==================================================================
+   THE PAGE MUST NOT RE-IMPLEMENT THE TERRAIN
+   ==================================================================
+   This is the guard for the fault that made every number above
+   meaningless until 3 November. ridgeGeometry in long-air.html had its
+   own copy of the vertex arithmetic, and it had drifted from
+   columnsAt() in two places, so this file was measuring a 2.94 degree
+   cross-section while the page drew a 20.00 degree one.
+
+   A comment saying "use the module" would not have prevented it,
+   because a comment did say so. This reads the page as TEXT and fails
+   on the two expressions that drifted, and on the absence of the call
+   that replaced them. It is the same shape as the gate's credential
+   scan: cheap, textual, and aimed at one specific mistake that has
+   actually been made.
+   ================================================================== */
+say('');
+say('THE PAGE AGAINST THE MODULE — one definition, not two that can drift');
+{
+  const raw = readFileSync(new URL('../app/long-air.html', import.meta.url), 'utf8');
+  /* COMMENTS ARE STRIPPED BEFORE THE SCAN, and the first run of this
+     guard is why. It failed on both forbidden expressions — because
+     the note in ridgeGeometry explaining what they were QUOTES them
+     verbatim. That is precisely the mistake CLAUDE.md records about
+     the credential scan: writing the literal pattern into a tracked
+     file makes the scan match that file for ever and quietly useless.
+     Here it was loud rather than quiet, which is luck. The scan now
+     looks at code. */
+  const page = raw.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, ' ');
+  const forbidden = [
+    [/Math\.abs\(\s*q\.x\s*\)\s*>\s*100/,
+     'the hard wander step that wanderScale() replaced'],
+    [/q\.h\s*\?\s*gradeAt/,
+     'the boolean grade test where the module multiplies by q.h'],
+  ];
+  let clean = true;
+  for(const [re, why] of forbidden){
+    if(re.test(page)){ bad(`long-air.html still contains ${why}`); clean = false; }
+  }
+  if(clean) ok('long-air.html contains neither of the two expressions that drifted');
+  if(/columnsAt\s*\(/.test(page)) ok('long-air.html builds its ridge from columnsAt()');
+  else bad('long-air.html does not call columnsAt() — it is computing vertices again');
+
+  /* AND THE GLSL CONSTANTS. The rock shader evaluates profileTone and
+     profileH per fragment, in GLSL, from numbers written out by hand.
+     That is a second copy of a decision, so it is checked against the
+     module rather than trusted: the band edges and the taper span are
+     read back out of the shader source and compared. */
+  const want = { edges: [40, 72, 132], hLo: 86, hSpan: 54 };
+  const got = {
+    edges: [...page.matchAll(/aastep\((\d+)\.0,\s*a\)/g)].map(m => +m[1]),
+    hLo:   +(page.match(/clamp\(\(a - (\d+)\.0\) \/ (\d+)\.0, 0\.0, 1\.0\)/) || [])[1],
+    hSpan: +(page.match(/clamp\(\(a - (\d+)\.0\) \/ (\d+)\.0, 0\.0, 1\.0\)/) || [])[2]
+  };
+  const same = JSON.stringify(got.edges) === JSON.stringify(want.edges) &&
+               got.hLo === want.hLo && got.hSpan === want.hSpan;
+  /* and the module's own functions must agree with those numbers */
+  const modOk = profileTone(39) === 0 && profileTone(41) === 2 &&
+                profileTone(71) === 2 && profileTone(73) === 1 &&
+                profileTone(131) === 1 && profileTone(133) === 3 &&
+                Math.abs(profileH(86) - 1) < 1e-9 && profileH(140) === 0;
+  if(same && modOk)
+    ok(`the shader's band edges ${got.edges.join('/')} m and taper ${got.hLo}..${got.hLo+got.hSpan} m match profileTone/profileH`);
+  else if(!same)
+    bad(`the shader's band edges ${JSON.stringify(got)} do NOT match the module's ${JSON.stringify(want)}`);
+  else
+    bad('profileTone/profileH no longer have the band edges the shader was written against');
 }
 
 say('');

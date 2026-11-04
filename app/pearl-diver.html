@@ -1587,6 +1587,21 @@ const dv = {
 };
 const qDir = new THREE.Quaternion(), qBank = new THREE.Quaternion();
 let lastPhaseK = '';
+/* A NEW BIRD IS ARMED BY THE PHASE CHANGING INTO 'in', which is right
+   in continuous play and wrong at every entry point that jumps the
+   clock. beginWith() sets t = 0, and t = 0 of both protocols that
+   start with an inhale IS an inhale — so if the previous session left
+   lastPhaseK as 'in' the change never fires, and the chapter opens
+   with the last cycle's dove still flying across the frame on stale
+   velocity. Caught by tracing the gesture rather than by watching it:
+   the trace showed flying true at t = 0.02 with morph still 0.
+   Resume, "choose a different breath" and seek() all land here. */
+function resetDove(){
+  dv.flying = false; dv.gone = false; dv.wantLaunch = false;
+  dv.lift = dv.open = dv.morph = dv.flap = dv.bank = 0;
+  dv.vel.set(0, 0, 0);
+  lastPhaseK = '';
+}
 /* the raised, opened hand pose: up, forward and apart. It is a
    continuation of the gather rather than a new pose — the blend runs
    from wherever the gather left the hands, so the arms travel. */
@@ -2017,6 +2032,7 @@ function beginWith(which, remember){
   elGate.classList.remove('on');
   started = true;
   freeY = null; releasing = false;
+  resetDove();
   t = 0; prevY = B.value(0); subShown = '';
   ARRIVE.start();
   loop.resync();
@@ -2064,7 +2080,7 @@ window.__pearlDiver = {
   ack: () => picked.read(),
   scene, camera, THREE,   // so a stray shape can be identified by toggling
   only(hide){ scene.traverse(o => { if(o.isMesh && hide.indexOf(o.name) >= 0) o.visible = false; }); },
-  seek(v){ t = v; prevY = B.value(v); },
+  seek(v){ t = v; prevY = B.value(v); resetDove(); },
   now(){ const s = B.at(t);
     return { protocol:B.proto.id, cycle:B.cycle, session:B.session,
              t, phase:s.p.k, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),

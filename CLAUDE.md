@@ -145,8 +145,28 @@ Practical consequences, learned doing the Deep Light remap:
 
 ## Other standing constraints for this project
 
+- **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**
+  On 3 November two sessions worked the folder at once. The other one pushed its own
+  chapter and, because the assembly step mirrors the whole working copy into the clone,
+  commit `6df1556` ("Pearl Diver: the pearl opens into a dove…") also carried a *mid-flight*
+  snapshot of this session's Long Air work: `follow.js`, `long-air-lens.js`,
+  `tools/temporal.mjs`, 255 lines of `long-air.html` and the `course.js` change. It passed
+  the gate at that instant and deployed, so unverified half-work shipped under a commit
+  message that does not mention it — and the next gate run failed on four checks belonging
+  to a session that had not asked for a push. The reverse also happened: a correct
+  `resetDove()` fix sat unpushable for an hour because the gate was blocked on the other
+  session's files.
+  There is no per-file staging to retreat to; the mirror is deliberate and load-bearing
+  (it is what makes a push verifiable). So the rule is at the session level:
+  **never have two sessions writing this folder.** If a second one is needed, give it its
+  own clone outside the mount. And after any concurrent episode, do not assume the remote
+  reflects only what you intended — diff the mount against a fresh clone before continuing,
+  and re-verify anything that shipped without you.
 - **Never run git inside the mounted folder.** Clone to `/tmp`, assemble there, push with an
   askpass helper. Writes to the mounted folder are fine; git operations are not.
+  Note that `tools/check.sh` is a git operation in part — its credential scan reads the
+  index — so run it in the clone, never in the mount. `push.sh` already does this; running
+  the gate by hand in the mount is the slip to avoid.
 - **`token.txt` is a live PAT at the repo root.** It is in `.gitignore`. Never echo it, never
   put it on a command line, never commit it. Before every push, scan the index for the
   fine-grained-PAT prefix — build the pattern at runtime rather than writing it literally in

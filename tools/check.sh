@@ -119,6 +119,33 @@ else
   say "  ok    scenery continuous: every field smooth under refinement"
 fi
 
+# --- 4c. and the scenery must be continuous IN TIME ---
+# continuity.mjs measures SHAPE, and it had brought every mesh in Long
+# Air under its bar while the reader was still reporting the chapter as
+# disorienting and jerky. It could not have found the reason: nothing
+# in it samples time, so a value that drives geometry and changes
+# discontinuously FROM ONE FRAME TO THE NEXT was outside its reach by
+# construction.
+#
+# tools/temporal.mjs is the counterpart. It drives the chapter's real
+# modules frame by frame over two clocks — a metronome 60 fps and a
+# jittered one that sits at 58 and drops frames, which is the reader's
+# own situation — differences every animated scalar twice in TIME, and
+# names what it finds: a position step, a velocity step (a smooth
+# follower chasing a target that steps, which a position-only measure
+# passes), or a frame-rate dependence.
+#
+# It proves itself on seven controls first, asserts that its on-pace
+# reader touches no surface before claiming to measure free flight, and
+# keeps the pre-fix lens as a negative control.
+if ! node "$ROOT/tools/temporal.mjs" > /dev/null 2>&1; then
+  say "  FAIL  something animated moves in steps"
+  node "$ROOT/tools/temporal.mjs" 2>&1 | grep -E "FAIL" | head -10
+  FAIL=1
+else
+  say "  ok    motion continuous: no animated scalar steps on either clock"
+fi
+
 # --- 5. no credential may ever reach the index ---
 PAT="github""_pat_"
 if [ -d "$ROOT/.git" ]; then

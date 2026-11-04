@@ -1775,9 +1775,13 @@ const loop = clock((dt, now, running) => {
 
      So the staircase is the target and a critically-damped follower is
      what reaches it: the opening still goes to four decided sizes, and
-     it takes about a third of a second to get there instead of
-     arriving between two frames. w = 6 settles inside the gap between
-     gates at this speed, so the room is there before the reader is.
+     it arrives over a few tenths of a second instead of between two
+     frames. w was chosen by sweeping it against the measurement
+     rather than by feel — 8/6/5/4/3.5/3 measure 2.19/1.46/1.08/0.71/
+     0.54/0.39 m/s of worst velocity jump on pace — and 3.5 is the
+     fastest that also clears the bar on the OFF-pace run, where the
+     steps come thick and fast. It settles well inside the 1.45 s
+     between gates, so the room is still there before the reader is.
 
      THE ON-PACE GUARANTEE IS UNAFFECTED, and that is checked rather
      than assumed: tools/regress.mjs clears every gate on the BASE gap

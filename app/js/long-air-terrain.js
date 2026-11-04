@@ -101,16 +101,59 @@ export function wanderScale(x){
   return 1 - 0.6 * (t * t * t * (t * (t * 6 - 15) + 10));
 }
 
-/* HOW FINE. Both numbers are set by the continuity instrument rather
-   than by eye: the worst knot angle in the chapter is the target, and
-   these are the spacings that bring the ridge under it.
-     columns  5.9 m  ->  cross-section knots 2.8 deg worst
-     rows     2.6 m  ->  along-course knots 3.7 deg worst
-   Both were walked down until the instrument passed at four degrees,
-   not chosen and then justified: 3.0 m rows measured 4.23 and failed.
-   Triangles scale as the product of the two, so both were raised
-   together only as far as the measurement demanded. */
-export const COLS = 65;
+/* HOW FINE — AND THE BAR IS ANGULAR NOW, NOT WORLD-SPACE.
+   ------------------------------------------------------------------
+   These used to be set by a four degree worst-knot bar measured in
+   WORLD space, and that bar was the wrong quantity. Four degrees of
+   turn 120 m away is invisible; the same four degrees at 24 m is a
+   facet. The old report knew it mattered — it carried an "as seen"
+   column — but computed it as `deg * min(1, 40/dist)`, a heuristic
+   with no optics in it.
+
+   tools/continuity.mjs now projects each knot and its two neighbours
+   through the chapter's REAL lens (its own fov(aspect), its own
+   trailing distance and aim, on a 375 x 812 phone) and measures how
+   far the knot's image sits off the chord joining its neighbours'.
+   That is the question "does this read as a polygon" asked in the only
+   units that can answer it. The projector is checked against two known
+   cases — the aim point must land at frame centre, a 1 m stick at 40 m
+   must subtend the 15.6 px the optics require — before any of its
+   numbers are believed.
+
+   Measured on the near cross-section, which is where the reader
+   actually looks (24 m out, just off the spine):
+
+     COLS  spacing   sagitta      world-space knot
+      65    5.94 m    3.77 px      2.56 deg   <- passed the old 4 deg bar
+      85    4.52 m    2.26 px      2.00 deg
+     105    3.65 m    1.50 px      1.63 deg
+     129    2.97 m    1.00 px      1.36 deg   <- here
+     161    2.37 m    0.65 px      1.11 deg
+
+   So the old build was comfortably inside its four degree bar and
+   nearly four pixels off its own chord at the distance it is read at.
+   That is the brief's suspicion confirmed: the bar was too loose
+   exactly where it mattered.
+
+   129, NOT 105. The bar is 2 px — where faceting becomes legible on a
+   375 px screen — and 105 would clear it at 1.50. But a vertex less
+   than a pixel off its own chord cannot be SEEN to be a vertex at
+   all, and 129 is where that happens. Picking the first value that
+   scrapes under the line is the thing this project has a note about;
+   this is picked for the property, with the bar left as the backstop.
+
+   ROWS ARE UNCHANGED at 2.6 m, because the same instrument measures
+   the along-course knots at 0.58 px — already more than three times
+   inside the bar. Refining them would have cost triangles and bought
+   nothing, which is the whole reason for measuring the two axes
+   separately rather than raising both together.
+
+   Sagitta goes as the SQUARE of the spacing, and the table confirms
+   it: doubling the columns quartered it. That is also the proof that
+   the field's curvature is bounded and therefore that subdivision is
+   the right lever here at all — the same test that said it was the
+   wrong lever while the profile was quantised. */
+export const COLS = 129;
 export const ROW_SPACING = 2.6;
 
 /** The column table the geometry is built from, generated rather than
