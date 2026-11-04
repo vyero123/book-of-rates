@@ -260,6 +260,16 @@ import { body, drag } from './js/course.js';
    only be measured in Node, and tools/temporal.mjs has to drive the
    real thing rather than a replica of it. */
 import { lens } from './js/long-air-lens.js';
+/* ONE WIND OVER THE WHOLE PLATEAU — 3 November 2026.
+   The detail pass adds several soft layers at once, and they are all
+   driven by the single field in js/long-air-wind.js rather than by one
+   noise function each. Pearl Diver's strongest move was that one light
+   field lights the Snell window, the shafts and the seabed, so the
+   reader sees one phenomenon in three places instead of three effects;
+   this is the same argument applied to air. It is also the safe
+   construction: independent per-element noise is unbounded curvature,
+   which is exactly what had to be taken out of the gate lip. */
+import { WIND_GLSL } from './js/long-air-wind.js';
 import { tracker } from './js/follow.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
@@ -293,13 +303,39 @@ const R = ramp([0xF4ECC2, 0xD9C98E, 0xB79A66, 0x7E6B4E, 0x3C4A48, 0x173A44]);
    is a HUE SHIFT into teal, not a darkening — §4.2 rule 2. */
 const ROCK = {
   shadow:0x1E4C52, shadowDeep:0x14323C,
-  accent:0xE4572E, grit:0xE8DCAE
+  accent:0xE4572E, grit:0xE8DCAE,
+  /* THE TWO NAMED COLOURS THE GRASS NEEDS, and they are deliberately
+     NOT the accent. #E4572E carries one meaning in this chapter — the
+     gate lip you aim at, the warm edge when the course is making room,
+     the one grain of a graze — and painting a hillside of flowers in it
+     would spend that meaning on scenery. §4.2 allows named colours
+     outside the ramp for exactly this.
+       sheen  the pale flash along the top of a comb of grass as the
+              wind lays it over. Warm, close to the sky's own high
+              band, so it reads as the same noon light.
+       bloom  wildflower colour, scattered low and sparse. A dusty
+              apricot: warm enough to be seen against the hill's
+              greens and browns, far enough from the accent's
+              saturation that the two can never be confused. */
+  sheen:0xF0E7B4, bloom:0xDFA389
 };
 const AIR = {
   skyHigh:0xF2E6A0, skyLow:0xBFE3B4,
-  sun:0xFFFDF0, halo:0xFFF6C8,
+  sun:0xFFF4CC, halo:0xFFE6A2, halo2:0xF4C98A,
   cloud:0xBFD3AE, cloudLo:0x8FAE92, cloudDeep:0x6E8C7A,
-  haze:0xCFE0AE, bird:0x3C4A48, flare:0xFFF3C4
+  cloudLit:0xE2EBC6,
+  haze:0xCFE0AE,
+  /* THE SECOND HAZE, and it is what makes the perspective aerial
+     rather than merely foggy. Real haze is a LAYER: it pools in the
+     low ground and thins with height, so a far crest stands clear of
+     the bank its own skirt is sinking into. One fog colour cannot do
+     that, because it tints everything at a distance equally and the
+     whole far field goes flat — which is the thing the ceiling on
+     fogAmount already exists to limit. Warmer and denser than the
+     high haze, because the air down there is carrying dust off the
+     plateau. */
+  hazeLow:0xD8CE9A,
+  bird:0x3C4A48, flare:0xFFF3C4
 };
 
 /* ---------- DOM ---------- */
@@ -349,6 +385,17 @@ const uFog     = { value: C(AIR.haze) };
 const uRamp    = { value: ramp6 };
 const uPeriod  = { value: 1 };
 const uHorizon = { value: 0.5 };
+/* THE KITE'S WAKE ON THE GRASS, in the ridge's own BASE coordinates.
+   x = the kite's lateral position, y = the base z of the point on the
+   hill its shadow is falling on, z = the shadow's radius.
+
+   Why base z and not world z: the ridge is one strip wrapped by a
+   modulo in the vertex shader, so the only coordinate a fragment can
+   compare against without undoing that is the one the geometry was
+   baked in. The shadow's placement already inverts the scroll to find
+   it (see the shadow block in the loop) — this is the same number,
+   taken from the same line, rather than a second derivation of it. */
+const uWake    = { value: new THREE.Vector3(0, 0, 2.2) };
 
 /* THE §4.2a PRELUDES — 2 November 2026, carried over from Pearl Diver.
    A hard edge is not a jagged edge: the step stays where it was and the
@@ -386,18 +433,20 @@ const SCROLL_WHOLE_GLSL = scrollWholeGlsl(BEHIND);
    §4.2 rule 4: choose the sky first and let it be the loudest thing.
    ------------------------------------------------------------------ */
 const skyU = {
-  uTime, uAspect:{value:1}, uHorizon, uRamp, uHit,
+  uTime, uAspect:{value:1}, uHorizon, uRamp, uHit, uFill,
   uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
-  uSun:{value:C(AIR.sun)}, uHalo:{value:C(AIR.halo)},
-  uCloud:{value:C(AIR.cloud)}, uHaze:{value:C(AIR.haze)}
+  uSun:{value:C(AIR.sun)}, uHalo:{value:C(AIR.halo)}, uHalo2:{value:C(AIR.halo2)},
+  uCloud:{value:C(AIR.cloud)}, uCloudLit:{value:C(AIR.cloudLit)},
+  uCloudLo:{value:C(AIR.cloudLo)}, uHaze:{value:C(AIR.haze)}
 };
 onFit(() => { skyU.uAspect.value = camera.aspect; });
 scene.add(screenQuad(THREE, {
-  uniforms: skyU, prelude: PRE_SKY,
+  uniforms: skyU, prelude: PRE_SKY + WIND_GLSL,
   fragment:`
     varying vec2 vUv;
-    uniform float uTime, uAspect, uHorizon, uHit;
-    uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo, uCloud, uHaze;
+    uniform float uTime, uAspect, uHorizon, uHit, uFill;
+    uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo, uHalo2;
+    uniform vec3 uCloud, uCloudLit, uCloudLo, uHaze;
     /* a disc with its edge resolved. The sun and every cloud lobe here
        is a step() on a radius drawn inside a two-triangle screen quad,
        so MSAA has nothing to work with and these were the most visibly
@@ -407,21 +456,90 @@ scene.add(screenQuad(THREE, {
       float h = vUv.y - uHorizon;
       vec3 col = mix(uSkyLow, uSkyHigh, posteriseAA(h / 0.95, 5.0));
 
-      vec2 sp = vec2(0.38, uHorizon + 0.70);
+      /* ==============================================================
+         THE SUN IS LOW, AND ITS HEIGHT IS DERIVED
+         ==============================================================
+         It was painted at uHorizon + 0.70 — about 46 degrees up a 66
+         degree frame — which on the reader's phone puts it ABOVE THE
+         TOP OF THE SCREEN. Inspected on the deployed build at 375x812:
+         the chapter has a sun and nobody has ever seen it.
+
+         Where it belongs is not a taste question, because the chapter
+         has already committed to a sun elevation elsewhere and has
+         been contradicting it. The glider's shadow is thrown forward
+         by fwd = alt * 2.4 metres (see the shadow block in the
+         loop), and a shadow 2.4 times as long as the object is high is
+         a light at atan(1/2.4) = 22.6 degrees. On a 66 degree vertical
+         field that is 22.6/66 = 0.343 of the frame height above the
+         horizon. So the sun goes there: not tuned until it looked
+         right, but placed where the shadow the reader is already
+         reading says it must be.
+
+         It is warmer for the same reason rather than for the mood. A
+         sun at 22 degrees is seen through several times the air a
+         noon sun is, so it loses its blue end — hence #FFF4CC with an
+         amber inner halo and a dusty apricot outer one, three resolved
+         discs where there were two.
+
+         WHAT IS STILL INCONSISTENT, said plainly rather than quietly
+         fixed: the AZIMUTH. The shadow falls FORWARD, down the course,
+         which puts the light behind the reader — and this disc is
+         painted in the sky ahead of them. Only one of those can be
+         true. Reconciling it means either giving up the visible sun or
+         throwing the shadow back towards the lens where it cannot be
+         seen, and that is a composition decision rather than a
+         correctness one. The elevation is now right; the azimuth is
+         left for the reader to choose.
+         ============================================================== */
+      vec2 sp = vec2(0.30, uHorizon + 0.343);
       vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
       float sd = length(q);
-      col = mix(col, uHalo, disc(sd, 0.050));
-      col = mix(col, uSun,  disc(sd, 0.025));
+      col = mix(col, uHalo2, disc(sd, 0.105));
+      col = mix(col, uHalo,  disc(sd, 0.055));
+      col = mix(col, uSun,   disc(sd, 0.026));
 
-      float cl = 0.0;
+      /* ==============================================================
+         THE CLOUDS ARE LOBED AND THEY HAVE AN UNDERSIDE
+         ==============================================================
+         Three circles is three circles. A cloud's silhouette is the
+         most recognisable soft shape there is and it is made of
+         bulges, so the radius is modulated by two components of the
+         angle at different frequencies — the second one is what stops
+         it reading as a three-lobed clover, which is what one
+         component gives.
+
+         And a cloud is not a flat shape: the light comes from above,
+         so the top of each lobe is nearly white and the underside is
+         the shaded value. Two hard steps across the lobe's own height,
+         which is the §4.2 treatment of a round form and the same thing
+         the terminator does for the wool on the gate banks.
+
+         THEY DRIFT WITH THE READER'S BREATH. The rate rises with the
+         gust, so the whole sky eases forward on an inhale. The base
+         rate is unchanged, and the range is small — the point is that
+         the sky is not indifferent, not that anything happens.
+         ============================================================== */
+      float drift = uTime * 0.0035 * (0.55 + 0.85 * windGust(uFill));
+      float cl = 0.0, clTop = 0.0, clLo = 0.0;
       for(int i = 0; i < 3; i++){
         float fi = float(i);
-        float cx = fract(0.2 + fi * 0.34 + uTime * 0.0035) * 1.8 - 0.4;
-        vec2 cc = vec2(cx, uHorizon + 0.34 + fi * 0.10);
+        float cx = fract(0.2 + fi * 0.34 + drift) * 1.8 - 0.4;
+        vec2 cc = vec2(cx, uHorizon + 0.30 + fi * 0.09);
         vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.24, vUv.y - cc.y);
-        cl = max(cl, disc(length(d2), 0.026));
+        float ang = atan(d2.y, d2.x);
+        float rr = 0.026 * (1.0 + 0.34 * sin(ang * 3.0 + fi * 2.1)
+                                + 0.17 * sin(ang * 7.0 - fi * 1.3));
+        float inLobe = disc(length(d2), rr);
+        /* 0 at the bottom of this lobe, 1 at the top of it */
+        float up = clamp(d2.y / max(rr, 1e-4) * 0.5 + 0.5, 0.0, 1.0);
+        cl    = max(cl,    inLobe);
+        clTop = max(clTop, inLobe * aastep(0.62, up));
+        clLo  = max(clLo,  inLobe * (1.0 - aastep(0.30, up)));
       }
-      col = mix(col, uCloud, cl * aastep(0.05, h));
+      float skyCl = aastep(0.05, h);
+      col = mix(col, uCloud,    cl    * skyCl);
+      col = mix(col, uCloudLit, clTop * skyCl * 0.75);
+      col = mix(col, uCloudLo,  clLo  * skyCl * 0.55);
       col = mix(col, uHaze, (1.0 - aastep(0.0, h)) * 0.6);
       // a soft contact warms the whole sky for a moment. Warm, not red:
       // it is information, not a penalty.
@@ -570,9 +688,11 @@ function ridgeGeometry(proto){
 }
 
 const rockMat = posterMat(THREE, {
-  uniforms:{ uDist, uPeriod, uRamp, uFog,
-             uShadow:{value:C(ROCK.shadow)}, uShadowDeep:{value:C(ROCK.shadowDeep)} },
-  side: THREE.DoubleSide, prelude: PRE,
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uTime, uFill, uWake,
+             uShadow:{value:C(ROCK.shadow)}, uShadowDeep:{value:C(ROCK.shadowDeep)},
+             uSheen:{value:C(ROCK.sheen)}, uBloom:{value:C(ROCK.bloom)},
+             uFogLow:{value:C(AIR.hazeLow)} },
+  side: THREE.DoubleSide, prelude: PRE + WIND_GLSL,
   /* ------------------------------------------------------------------
      THE CONTOURS ARE COMPUTED PER FRAGMENT — 3 November 2026
      ------------------------------------------------------------------
@@ -623,8 +743,27 @@ const rockMat = posterMat(THREE, {
      ------------------------------------------------------------------ */
   vertex: SCROLL_GLSL + `
     attribute float aXp; attribute float aH; attribute float aSun;
-    varying float vXp; varying float vDist; varying float vY;
+    varying float vXp; varying float vDist; varying float vY; varying float vZb;
+    varying float vWx;
     void main(){
+      /* vWx is the vertex's WORLD x — the profile x plus whatever the
+         course's lateral wander has added at this row. The grass FIELD
+         is anchored in profile coordinates so it belongs to the hill;
+         the KITE's wake has to be compared in world coordinates,
+         because that is where the kite is. Two coordinates, each used
+         for the one thing it is right for. */
+      vWx = position.x;
+      /* vZb IS THE BASE z, TAKEN BEFORE THE SCROLL. It is the
+         coordinate the hill was baked in, so anything anchored to it
+         belongs to the hill and travels with it — the same argument
+         that anchored the chip grain to the profile rather than to an
+         interpolated tone, where it had been crawling along the
+         surface. It is genuinely linear down a column, so it is safe
+         as a varying; the grass FIELD is then evaluated from it per
+         fragment rather than being interpolated, which is the whole
+         §4.2a lesson and the reason the value bands moved into the
+         fragment stage in the first place. */
+      vZb = position.z;
       vec3 p = scrolled(position);
       vXp = aXp; vY = p.y;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
@@ -633,8 +772,11 @@ const rockMat = posterMat(THREE, {
     }
   `,
   fragment:`
-    varying float vXp; varying float vDist; varying float vY;
-    uniform vec3 uShadow, uShadowDeep;
+    varying float vXp; varying float vDist; varying float vY; varying float vZb;
+    varying float vWx;
+    uniform vec3 uShadow, uShadowDeep, uSheen, uBloom, uFogLow;
+    uniform float uTime, uFill, uPeriod;
+    uniform vec3 uWake;
     /* profileTone(), in GLSL. Hand-assigned bands of |x| (§4.2: value
        indices are decisions, never a function of distance). Hard steps
        on purpose — but resolved steps, at the exact metre they are
@@ -651,16 +793,117 @@ const rockMat = posterMat(THREE, {
       float t = clamp((a - 86.0) / 54.0, 0.0, 1.0);
       return 1.0 - t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
     }
+    /* ==================================================================
+       THE GRASS — 3 November 2026
+       ==================================================================
+       The plateau was a large smooth surface carrying four value bands
+       and a chip grain, and at 375 px the lower two thirds of the frame
+       was one flat brown field for the whole session. Everything in
+       this block is in the FRAGMENT stage and costs no triangles,
+       which is deliberate rather than merely thrifty: new geometry is
+       new knots, and every knot has to hold the chapter's 1 px angular
+       bar through its own lens. A field evaluated per fragment from
+       world position has no knots at all, so the detail arrives
+       without anything to measure — which is the same reason the value
+       bands moved down here on 3 November.
+
+       THE COMB IS THE WIND, NOT A TEXTURE. js/long-air-wind.js defines
+       one field for the whole chapter; the grass samples it at a point
+       DISPLACED along the wind, so the blades lie over rather than
+       merely lightening and darkening in place. The displacement grows
+       with fill -- the reader's own breath — so the field is combed
+       harder on an inhale and settles on an exhale.
+
+       AND THE KITE PARTS IT. uWake carries the base-z of the point the
+       glider's shadow is falling on and the shadow's own radius, read
+       straight off the shadow placement in the loop rather than
+       derived a second time. Within a couple of radii the sample point
+       is pushed radially OUTWARD, so the grass lies away from the kite
+       and springs back behind it. It is a displacement of a smooth
+       field by a smooth envelope, so it cannot introduce a step; and
+       it says nothing about whether the reader is doing well, because
+       the only thing it responds to is where the glider is.
+       ================================================================== */
     void main(){
       float a = abs(vXp);
       float h = hAt(a);
       float tone = toneAt(a) + (1.0 - h) * 1.6;
+
+      /* the hill's own coordinates: the profile across and the BAKED z
+         along. Anchored to the hill, so nothing can crawl over it. */
+      vec2 gw = vec2(vXp, vZb);
+      /* the wake, compared in the coordinates each term belongs in:
+         the kite's lateral position against the vertex's WORLD x
+         (which is the profile x plus the course's wander), and the
+         shadow's anchor against the baked z, wrapped by the strip's
+         own period because that is the only way two points on an
+         endless strip can be compared at all. */
+      float sdx = vWx - uWake.x;
+      float sdz = mod(vZb - uWake.y + uPeriod * 0.5, uPeriod) - uPeriod * 0.5;
+      float rw  = sqrt(sdx * sdx + sdz * sdz);
+      /* the step() guard is not clutter: uWake.z is zero on the frames
+         the shadow is not drawn, and smoothstep with its two edges
+         equal is undefined. It degrades to "no wake", which is exactly
+         what no shadow should mean. */
+      float wake = step(0.01, uWake.z) *
+                   (1.0 - smoothstep(uWake.z * 0.5, uWake.z * 2.8 + 0.001, rw));
+      vec2 away = rw > 0.001 ? vec2(sdx, sdz) / rw : vec2(0.0, 1.0);
+
+      float gust = windGust(uFill);
+      vec2 gc = gw + windLay(gw, uTime, gust) * 2.9 + away * wake * 2.6;
+      float comb = windWave(gc, uTime);
+
+      /* WHERE THERE IS GRASS. h already tapers from the lit crown to
+         the outer skirt, which is where the hill stops being pasture
+         and starts being scree — so it is the right envelope and not a
+         second decision about the same boundary. The far dissolve is
+         generous: the short component is 24 m between ripples, which
+         is still twenty-odd pixels across at the far edge of the fog,
+         so this never approaches the sampling rate. (Pearl Diver's
+         glitter path needed a cutoff at 22 m because its cell DID go
+         under a pixel. Nothing here does. The dissolve is housekeeping,
+         not a fix.) */
+      float grass = h * (1.0 - smoothstep(260.0, 420.0, vDist));
+      /* the comb as THREE HARD STEPS, like every other value in this
+         chapter — a lit face, a body and a shaded trough on each swell
+         of grass — with the risers resolved to a pixel rather than
+         landing on the grid (§4.2a). It is a shift WITHIN the hill's
+         own ramp index, so the grass can never be a different hue
+         family from the hill it is growing on. */
+      tone -= (posteriseAA(comb * 0.5 + 0.5, 3.0) - 0.5) * 0.95 * grass;
       /* rampPickAA still, and still for the original reason: the risers
          that remain are long shallow edges across triangles tens of
          metres wide, which is the worst case for landing on the pixel
          grid. The difference is that the riser now follows an
          iso-curve of the hill instead of a chain of triangle edges. */
       vec3 col = rampPickAA((tone + 0.5) / 6.0);
+
+      /* THE SHEEN ALONG A COMB'S CREST, which is the thing that makes a
+         field of barley read as barley: the seed heads catch the light
+         all down one side of each swell as it passes. Present in
+         proportion to the GUST, so the hillside brightens as the
+         reader breathes in and settles as they breathe out — the
+         chapter's largest surface answering the breath, continuously
+         and without saying anything about it. */
+      col = mix(col, uSheen, aastep(0.62, comb) * grass * (0.10 + 0.30 * gust));
+
+      /* WILDFLOWER COLOUR, scattered low. A hard cell hash decides
+         which 1.6 m patches have any and a resolved disc inside the
+         cell is the clump, so a flower is a SHAPE like everything else
+         here rather than a soft dot. Low on the hill only — the lane
+         and the shoulders, not the skirt — and gone by 180 m, well
+         before a clump could fall under a pixel and become the kind of
+         crawling noise that is detail at one distance and a defect at
+         the next. */
+      vec2 cell = gw * 0.62;
+      vec2 inCell = fract(cell) - 0.5;
+      col = mix(col, uBloom,
+        step(0.88, chipAt(floor(cell)))
+        * (1.0 - aastep(0.21, length(inCell)))
+        * (1.0 - smoothstep(34.0, 78.0, a))
+        * (1.0 - smoothstep(90.0, 180.0, vDist))
+        * grass * 0.50);
+
       /* THE ONE HARD SHADOW SPLIT (§4.4), now exactly on the spine.
          It was aastep(0.5, vSun) on an interpolated 1/0 attribute,
          which puts the line midway between the x=0 column and the next
@@ -673,7 +916,41 @@ const rockMat = posterMat(THREE, {
          belong to the hill and cannot crawl along it as the tone
          varying slides past them */
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vXp * 0.21))) - 0.5) * 0.07;
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+
+      /* ==============================================================
+         TRUE AERIAL PERSPECTIVE — the haze is a LAYER, not a tint
+         ==============================================================
+         One fog colour applied by distance alone tints everything far
+         away equally, which is why the ceiling on fogAmount exists at
+         all: without it the whole far field converges on one value and
+         the parallax the background was built for stops being visible.
+         The ceiling limits the damage; it does not fix the cause.
+
+         Real haze pools. It is dust and moisture sitting in the low
+         ground, so there is MORE of it down the skirt and LESS over
+         the crest, and the consequence is the thing that reads as
+         distance in a landscape: a far ridge line standing clear above
+         the bank its own flanks are sinking into. This chapter is a
+         plateau with a gorge in it and had none of that.
+
+         So the fog here has two colours and a height. vY is the
+         fragment's world height and the ridge runs from about -15 at
+         the bottom of the skirt to +3.4 at the crest, which is the
+         span the layer is written across. The low haze is warmer and
+         denser — dust off the plateau rather than moisture — and it
+         thickens the fog as well as recolouring it, up to a cap that
+         still leaves the furthest band readable as itself.
+
+         DESCENDING DEEPENS IT, and that is free rather than added: the
+         chapter already lerps uFog towards the mid value as the kite
+         comes down (see the loop), and this multiplies that by the
+         fragment's own height, so dropping into the low ground puts
+         the reader INTO the layer instead of merely near it.
+         ============================================================== */
+      float lowAir = 1.0 - smoothstep(-7.0, 2.5, vY);
+      vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
+      gl_FragColor = vec4(
+        mix(col, haze, min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir))), 1.0);
     }
   `
 });
@@ -796,15 +1073,16 @@ function gateGeometry(course, which){
 }
 
 const gateMatFor = kind => posterMat(THREE, {
-  uniforms:{ uDist, uPeriod, uRamp, uFog, uForgive, uKite, uNearFade,
+  uniforms:{ uDist, uPeriod, uRamp, uFog, uForgive, uKite, uNearFade, uTime, uFill,
              uShadow:{value:C(kind === 'rock' ? ROCK.shadow : AIR.cloudLo)},
              uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
              uAccent:{value:C(ROCK.accent)},
+             uLit:{value:C(AIR.cloudLit)},
              uIsCloud:{value: kind === 'cloud' ? 1 : 0} },
   /* FrontSide, not DoubleSide: with the winding fixed above, the
      interior of a slab is never drawn, and the interior being drawn as
      a lit surface was the chapter's reported flash. */
-  side: THREE.FrontSide, prelude: PRE + NEAR_FADE,
+  side: THREE.FrontSide, prelude: PRE + NEAR_FADE + WIND_GLSL,
   /* SCROLL_WHOLE_GLSL, not SCROLL_GLSL: the gates are separate objects in
      one merged mesh, and a per-vertex mod() smears any triangle that
      straddles the wrap. Measured cause of the 135.4 frame. */
@@ -832,8 +1110,51 @@ const gateMatFor = kind => posterMat(THREE, {
     varying float vTone; varying float vSun; varying float vLip; varying float vLedge;
     varying float vDist; varying float vSide; varying float vSeed;
     varying float vY; varying float vX;
-    uniform vec3 uShadow, uDeep, uAccent;
-    uniform float uIsCloud, uNearFade;
+    uniform vec3 uShadow, uDeep, uAccent, uLit;
+    uniform float uIsCloud, uNearFade, uTime, uFill;
+    /* ==================================================================
+       WOOL — giving the cloud bank a body
+       ==================================================================
+       The cloud gate is a thirty-metre slab hanging across the frame
+       twice a second and it was painted with two flat values and a
+       chip hash. Flat lobes are the §4.2 rule-5 idiom done to a thing
+       that has no business being flat: a cloud is the one object in
+       this chapter that is made of volume, and the reader is flying
+       under it.
+
+       THREE OCTAVES, FOLDED, NOT ADDED. Same construction as the kit's
+       caustic field and for the same reason: sin(x)+sin(y) is legible
+       as two sines within a second and reads as corrugated iron. Each
+       octave rotates the coordinate by an irrational-ish angle and
+       folds it through the previous one, so no direction and no period
+       is readable and the lobes close into the rounded cells wool
+       actually has.
+
+       AND IT IS SHADED, NOT JUST PATTERNED. The field is read as a
+       HEIGHT and differenced along the light direction, which gives a
+       real terminator on each lobe — the part that turns a pattern
+       into a surface with a near side and a far side. One extra
+       evaluation of the field, no normals, no lighting rig, and the
+       split is resolved to a pixel like every other hard edge here.
+
+       THE WIND CARRIES IT. The sample point is advected along the
+       chapter's one wind direction at a rate that rises with the
+       reader's own gust, so the wool crawls across the bank when they
+       breathe in and nearly stops when they breathe out. Slowly: 9 cm
+       a second at full gust, which over the second and a half a gate
+       is in frame is a tenth of a lobe. It should be felt rather than
+       watched.
+       ================================================================== */
+    float wool(vec2 p){
+      float s = 0.0, amp = 1.0, tot = 0.0;
+      for(int i = 0; i < 3; i++){
+        p = mat2(0.8018, -0.5976, 0.5976, 0.8018) * p * 1.87;
+        s   += amp * sin(p.x + sin(p.y * 1.27));
+        tot += amp;
+        amp *= 0.55;
+      }
+      return clamp(s / tot * 0.5 + 0.5, 0.0, 1.0);
+    }
     void main(){
       /* THE GATE THE READER HAS ALREADY FLOWN STOPS BEING DRAWN.
          Without this a slab fills the frame as it reaches the lens --
@@ -876,6 +1197,27 @@ const gateMatFor = kind => posterMat(THREE, {
          line on a dark slab, moving across the frame. Resolved, it is
          the same line in the same place and it stops fizzing. */
       col = mix(col, uAccent, aastep(0.96, vLip) * (1.0 - aastep(0.22, vLedge)) * 0.30);
+
+      /* THE WOOL, on the cloud bank only. Branching on a uniform is
+         uniform control flow, so both gates stay one program each and
+         the rock slab pays nothing for this. */
+      if(uIsCloud > 0.5){
+        vec2 wp = vec2(vX, vY) * 0.21
+                + windDir() * (uTime * 0.09 * windGust(uFill))
+                + vec2(vSeed * 13.0, vSeed * 7.0);
+        float lobe = wool(wp);
+        /* the terminator: the field read as a height and differenced
+           along the light, which is what makes a lobe round */
+        float side = aastep(0.0, wool(wp + vec2(0.17, 0.12)) - lobe);
+        float band = posteriseAA(lobe, 3.0);
+        col = mix(col, uDeep, (1.0 - band) * 0.34);
+        col = mix(col, uLit,  band * side * 0.34);
+        /* and the lip of the bank is the brightest part of it: the
+           light gets under the edge of a cloud. It is the edge the
+           reader aims at, so it is also the one place extra value is
+           worth spending. */
+        col = mix(col, uLit, aastep(0.96, vLip) * (1.0 - aastep(0.22, vLedge)) * 0.26);
+      }
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5) * 0.08;
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
@@ -962,14 +1304,26 @@ function sailGeometry(){
 }
 const sail = new THREE.Mesh(sailGeometry(), posterMat(THREE, {
   uniforms:{ uFill, uRamp, uTime, uAccent:{value:C(ROCK.accent)},
-             uShadow:{value:C(ROCK.shadow)} },
+             uShadow:{value:C(ROCK.shadow)},
+             uSheen:{value:C(ROCK.sheen)} },
   side: THREE.DoubleSide, prelude: PRE_RAMP,
   vertex:`
     attribute float aR; attribute float aRing; attribute float aSector;
     uniform float uFill, uTime;
     varying float vRing; varying float vSector; varying float vR;
+    varying vec2 vCloth;
     void main(){
       vec3 p = position;
+      /* THE CLOTH COORDINATE IS THE UNDEFORMED DIAMOND, and that is the
+         whole of why the weave works. p.xy after the growth and
+         spread below is the sail's SHAPE, which changes every frame as
+         it inflates; taking the weave from that would scale the warp
+         and weft with the breath, so the cloth would appear to stretch
+         like rubber. A woven cloth does not. Its threads are fixed in
+         the material, the material only moves — so the weave is taken
+         from position, which is the sail's own body coordinate and
+         is constant per vertex for the life of the mesh. */
+      vCloth = position.xy;
       // the sail grows, and the OUTER ribs grow more than the inner ones
       float grow   = 0.74 + 0.44 * uFill;
       float spread = 1.0 + aRing * 0.14 * uFill;
@@ -984,7 +1338,8 @@ const sail = new THREE.Mesh(sailGeometry(), posterMat(THREE, {
   `,
   fragment:`
     varying float vRing; varying float vSector; varying float vR;
-    uniform vec3 uAccent, uShadow;
+    varying vec2 vCloth;
+    uniform vec3 uAccent, uShadow, uSheen;
     uniform float uFill;
     void main(){
       // one hand-assigned value per rib: pale core out to mid edge.
@@ -1000,6 +1355,43 @@ const sail = new THREE.Mesh(sailGeometry(), posterMat(THREE, {
       // ring 2 to ring 3 — so it was a hard jagged line across the
       // brightest, most-looked-at edge in the chapter.
       col = mix(col, uAccent, aastep(2.5, vRing) * (0.25 + 0.35 * uFill));
+
+      /* ==============================================================
+         THE SAIL IS WOVEN
+         ==============================================================
+         This is the one object the reader looks at for ten minutes and
+         it was four flat values. Making it cloth is the cheapest
+         detail in the chapter and the one with the longest dwell.
+
+         WARP AND WEFT, ALONG THE SPARS. The two thread directions run
+         with the cross-spar and the spine rather than at some angle to
+         them, because that is how a kite is actually cut — the sail is
+         sewn to its frame. Both are resolved to a pixel (§4.2a): a
+         weave is a high-frequency pattern on a small moving object,
+         which is the exact recipe for a crawling edge, and the sail
+         banks and pitches every breath.
+
+         THE PITCH IS 2.4 cm OF THREAD, measured rather than picked. The
+         sail is about 1.7 m across and sits twelve metres from the
+         lens, so a metre is roughly 62 px on the reader's phone: the
+         threads land about one and a half pixels apart, which is as
+         fine as a weave can be and still be a weave rather than moire.
+         Finer than this and posteriseAA's own fallback would dissolve
+         it, which is the correct behaviour and also a waste.
+
+         IT TAUTENS, IT DOES NOT STRETCH. The weave coordinate is the
+         undeformed cloth (see the vertex stage), so the threads never
+         scale. What fill changes is the CONTRAST: a slack sail is
+         soft and a filled one is drum-tight and catches the light
+         along every thread. So the texture reads the breath without
+         the cloth behaving like rubber.
+         ============================================================== */
+      vec2 th = vCloth / 0.024;
+      float warp = aastep(0.46, fract(th.x));
+      float weft = aastep(0.46, fract(th.y));
+      float tight = 0.06 + 0.13 * uFill;
+      col = mix(col, uSheen, warp * weft * tight);
+      col = mix(col, uShadow, (1.0 - warp) * (1.0 - weft) * tight * 0.8);
       gl_FragColor = vec4(col, 1.0);
     }
   `
@@ -1890,11 +2282,21 @@ const loop = clock((dt, now, running) => {
   const far = clamp01(alt / 30);
   const fwd = clamp(alt * 2.4, 20, 72);
   kiteShadow.visible = alt < 40;
+  /* THE WAKE ON THE GRASS IS THE SHADOW'S OWN PLACEMENT, not a second
+     derivation of it. `-fwd` is the world z the shadow falls at and the
+     line below inverts the scroll exactly as the vertex loop does, so
+     the hill's fragments and the shadow's vertices cannot disagree
+     about where the kite is over the ground. The radius goes to zero
+     when the shadow is not drawn, so the grass is parted by something
+     the reader can see and never by something they cannot. */
+  const shRad = 2.2 + far * 1.6;
+  uWake.value.set(kiteX, dist + period * BEHIND + fwd,
+                  kiteShadow.visible ? shRad : 0.0);
   if(kiteShadow.visible){
     /* ON THE SURFACE THAT IS DRAWN, not the one the function describes
        — meshY, in js/long-air-terrain.js, is the mesh's own
        interpolation and therefore the triangles the GPU renders. */
-    const rad = 2.2 + far * 1.6;
+    const rad = shRad;
     const rows = rowsOf(period);
     for(let i = 0; i < shN; i++){
       const wx = kiteX + shUnit[i*3] * rad;
