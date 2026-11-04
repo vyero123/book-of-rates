@@ -155,8 +155,8 @@ one of them resolved by DELETION rather than by decision:
   turned towards it and drift through it, and a three-step warm wash carries the glow. With
   nothing in frame asserting a direction there is nothing left to contradict, so the
   forward shadow stands unopposed. A resolved question does not stay on the list.
-- **The brief's triangle figure (41,696) is stale.** Measured: 74,720 before this pass,
-  76,264 after.
+- **The brief's triangle figure (41,696) is stale.** Measured on the deployed build at
+  375x812: 74,720 triangles / 12 draw calls before this pass, 75,852 / 15 after.
 - **Standing principle this pass is built on:** detail goes in the FRAGMENT stage by
   default, because new geometry is new knots and every knot has to hold the chapter's 1 px
   angular bar through its own lens. The three things that did add geometry were chosen so
