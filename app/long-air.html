@@ -323,7 +323,7 @@ const AIR = {
   skyHigh:0xF2E6A0, skyLow:0xBFE3B4,
   sun:0xFFF4CC, halo:0xFFE6A2, halo2:0xF4C98A,
   cloud:0xBFD3AE, cloudLo:0x8FAE92, cloudDeep:0x6E8C7A,
-  cloudLit:0xE2EBC6,
+  cloudLit:0xF1F4DC,
   haze:0xCFE0AE,
   /* THE SECOND HAZE, and it is what makes the perspective aerial
      rather than merely foggy. Real haze is a LAYER: it pools in the
@@ -494,9 +494,21 @@ scene.add(screenQuad(THREE, {
       vec2 sp = vec2(0.30, uHorizon + 0.343);
       vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
       float sd = length(q);
-      col = mix(col, uHalo2, disc(sd, 0.105));
-      col = mix(col, uHalo,  disc(sd, 0.055));
-      col = mix(col, uSun,   disc(sd, 0.026));
+      /* THE RADII, AND WHY THE FIRST SET WERE WRONG. They were
+         0.105/0.055/0.026 at full strength, which deployed as a
+         saturated apricot disc a quarter of the sky across: a sunset
+         poster rather than a sun. Two things were wrong. The outer
+         ring has to be a WASH rather than a replacement, because a
+         halo is the sky seen through more light and not a second
+         object; and 0.105 of frame height through a 66 degree field is
+         a seven degree disc, which is fourteen times the half degree a
+         sun actually subtends. These are still generous — a literal
+         half degree would be three pixels and this chapter does not
+         draw anything three pixels across — but the ratio between the
+         three is now a sun with glare around it rather than a target. */
+      col = mix(col, uHalo2, disc(sd, 0.070) * 0.55);
+      col = mix(col, uHalo,  disc(sd, 0.036) * 0.80);
+      col = mix(col, uSun,   disc(sd, 0.017));
 
       /* ==============================================================
          THE CLOUDS ARE LOBED AND THEY HAVE AN UNDERSIDE
@@ -863,20 +875,52 @@ const rockMat = posterMat(THREE, {
          glitter path needed a cutoff at 22 m because its cell DID go
          under a pixel. Nothing here does. The dissolve is housekeeping,
          not a fix.) */
-      float grass = h * (1.0 - smoothstep(260.0, 420.0, vDist));
-      /* the comb as THREE HARD STEPS, like every other value in this
-         chapter — a lit face, a body and a shaded trough on each swell
-         of grass — with the risers resolved to a pixel rather than
-         landing on the grid (§4.2a). It is a shift WITHIN the hill's
-         own ramp index, so the grass can never be a different hue
-         family from the hill it is growing on. */
-      tone -= (posteriseAA(comb * 0.5 + 0.5, 3.0) - 0.5) * 0.95 * grass;
+      /* THE SKIRT GETS IT TOO, AT LOWER CONTRAST. h tapers to zero
+         across x = 86..140, and gating the grass on h alone left the
+         near two thirds of the frame — the outer skirt, which is what
+         fills the bottom of the screen at every altitude — as one
+         undifferentiated dark field, which is the deficit this whole
+         pass is for. The hill does not stop being ground out there, it
+         stops being pasture: so the same comb runs across it at about
+         half the amplitude, and the sheen and the flowers stay gated
+         on h because heather does not flash and does not bloom in that
+         colour. */
+      float grass = (0.45 + 0.55 * h) * (1.0 - smoothstep(260.0, 420.0, vDist));
       /* rampPickAA still, and still for the original reason: the risers
          that remain are long shallow edges across triangles tens of
          metres wide, which is the worst case for landing on the pixel
          grid. The difference is that the riser now follows an
          iso-curve of the hill instead of a chain of triangle edges. */
       vec3 col = rampPickAA((tone + 0.5) / 6.0);
+
+      /* ==============================================================
+         THE COMB IS A WHOLE RAMP STEP, AND THE FIRST VERSION WAS NOT
+         ==============================================================
+         It was written as a shift of the tone INDEX by up to 0.45
+         before the ramp lookup, which is arithmetically reasonable and
+         drew nothing at all. The ramp's cells are one tone unit wide
+         and the base sits at tone + 0.5 — dead centre of a cell — so a
+         plus or minus 0.45 excursion stays inside that cell for every
+         value it can take and comes out the same colour. Deployed and
+         looked at: a flat brown hill, with a field being evaluated
+         correctly and discarded by the lookup.
+
+         So the three faces of each swell of grass are three ADJACENT
+         ramp steps, picked explicitly: the hill's own value for the
+         body, one step paler for the face the light is on, one deeper
+         for the trough behind it. That is §4.2 rule 2 — two to four
+         values and every one of them a decision — rather than a
+         gradient hoping to land on a boundary.
+
+         The two edges are resolved on comb itself, which is a real
+         per-fragment field with a real screen-space derivative, so
+         each riser is one pixel wide and sits on the iso-curve of the
+         wind rather than on the pixel grid (§4.2a).
+         ============================================================== */
+      vec3 gLit  = rampPickAA((tone - 0.5) / 6.0);
+      vec3 gDeep = rampPickAA((tone + 1.5) / 6.0);
+      col = mix(col, gLit,  grass * aastep(0.34, comb) * 0.88);
+      col = mix(col, gDeep, grass * (1.0 - aastep(-0.34, comb)) * 0.88);
 
       /* THE SHEEN ALONG A COMB'S CREST, which is the thing that makes a
          field of barley read as barley: the seed heads catch the light
@@ -885,7 +929,7 @@ const rockMat = posterMat(THREE, {
          reader breathes in and settles as they breathe out — the
          chapter's largest surface answering the breath, continuously
          and without saying anything about it. */
-      col = mix(col, uSheen, aastep(0.62, comb) * grass * (0.10 + 0.30 * gust));
+      col = mix(col, uSheen, aastep(0.62, comb) * h * (0.06 + 0.22 * gust));
 
       /* WILDFLOWER COLOUR, scattered low. A hard cell hash decides
          which 1.6 m patches have any and a resolved disc inside the
@@ -902,7 +946,7 @@ const rockMat = posterMat(THREE, {
         * (1.0 - aastep(0.21, length(inCell)))
         * (1.0 - smoothstep(34.0, 78.0, a))
         * (1.0 - smoothstep(90.0, 180.0, vDist))
-        * grass * 0.50);
+        * h * 0.50);
 
       /* THE ONE HARD SHADOW SPLIT (§4.4), now exactly on the spine.
          It was aastep(0.5, vSun) on an interpolated 1/0 attribute,
@@ -1210,8 +1254,15 @@ const gateMatFor = kind => posterMat(THREE, {
            along the light, which is what makes a lobe round */
         float side = aastep(0.0, wool(wp + vec2(0.17, 0.12)) - lobe);
         float band = posteriseAA(lobe, 3.0);
-        col = mix(col, uDeep, (1.0 - band) * 0.34);
-        col = mix(col, uLit,  band * side * 0.34);
+        /* LIT HARDER THAN IT IS DEEPENED, and the first version had it
+           the other way round. The bank's base is already the ramp
+           washed 55% towards uShadow, so deepening the troughs as much
+           as the crests were lit took the whole slab olive — a cloud
+           that was darker than the hill under it. A cloud is the
+           brightest thing in a daylit frame after the sun. */
+        col = mix(col, uDeep, (1.0 - band) * 0.20);
+        col = mix(col, uLit,  band * side * 0.62);
+        col = mix(col, uLit,  band * 0.18);
         /* and the lip of the bank is the brightest part of it: the
            light gets under the edge of a cloud. It is the edge the
            reader aims at, so it is also the one place extra value is

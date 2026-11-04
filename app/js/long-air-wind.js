@@ -83,18 +83,34 @@
    phase is displaced by sin of the long component's phase. The two
    never line up into a plaid and no single period is readable.
 
-   The direction is a decision, like every other decision in this
-   project: the wind crosses the course from the left-rear, so the
-   combs run diagonally away from the reader rather than straight down
-   the course (which would read as the course) or straight across it
-   (which would read as a ladder). CROSS_ROT rotates the short
-   component off the long one by about 24 degrees, which is enough to
-   keep them from beating and little enough that they are plainly the
-   same wind.
+   THE WIND BLOWS ACROSS THE COURSE, AND THAT IS NOT A TASTE SETTING.
+   The first version had it running mostly DOWN the course (0.37, 0.93)
+   on the reasoning that combs travelling away from the reader would
+   read as depth. Deployed and looked at, the grass was invisible, and
+   the reason is the geometry of the view rather than anything about
+   the field: the lens sits about fifteen metres above a surface that
+   runs six hundred metres into the fog, so the hill is seen almost
+   edge-on. Eighty metres of DEPTH is compressed into a narrow band
+   near the horizon, while the whole near two thirds of the frame —
+   which is what the reader actually looks at — spans only a few
+   metres of z and better than two hundred metres of x. A field that
+   varies along z is therefore constant over almost the entire visible
+   hill. It was being drawn, correctly, and it was one colour.
+
+   So the long comb runs across the course (0.93, 0.37) and the short
+   one is rotated 24 degrees off it, which puts both of them in the
+   axis that has screen extent where it matters: about two and a half
+   long swells and seven ripples across the near field. The combs now
+   travel sideways across the frame, which is also the better read —
+   wind crossing a field of barley is a thing that moves past you, not
+   a thing that recedes.
+
+   CROSS_ROT keeps the two from beating into a plaid and is small
+   enough that they are plainly the same wind.
    ------------------------------------------------------------------ */
 export const WIND = {
-  DIR_X: 0.3714,          // normalised: the long comb's travel direction
-  DIR_Z: 0.9285,
+  DIR_X: 0.9285,          // normalised: the long comb's travel direction
+  DIR_Z: 0.3714,
   CROSS_ROT: 0.42,        // radians the short component is rotated by
   K1: 0.075,              // 1/m — the long comb
   K2: 0.260,              // 1/m — the short ripple
