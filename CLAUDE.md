@@ -394,3 +394,74 @@ So, before building anything: *what does the breath move, and what is it moving 
 TO?* Then put a number on it, and remember the Shepherd's correction — angular rate is the
 right test for a lens pointed ALONG the motion; across it, the number is the fraction of
 the frame travelled.
+
+## The Murmuration — 7 November 2026
+
+Built into Lantern Current's slot. The breath drives the flock's SHAPE: gather and lift on
+the inhale, open and settle on the exhale. Nothing travels, which is the one spatial
+relationship this book did not have and the opposite of the one that failed.
+
+**I QUOTED A NUMBER BEFORE BUILDING IT AND THE NUMBER WAS WRONG.** "19 degrees a second of
+silhouette motion" was a flock's angular radius going from 38 to 19 degrees — an EXTENT,
+quoted as a RATE. Over a four-second inhale it is 4.5. Nor can staging fix it: the angular
+radius of a ball at range D changes at about (dR/dt)/D, so 19 deg/s needs tens of metres a
+second of radius change and a breath does not contain that. Check the units of a proposal's
+headline number before committing to the proposal.
+
+**MEASURED ON THE DEPLOYED BUILD at 375x812, flown on the cue:**
+
+    flock drawn width      237% of frame spread -> 77% gathered
+    contraction rate       30.8% of frame width a second
+    a bird on screen       222 px/s peak = 27.4% of frame height a second
+    the drawn lower edge   98 px/s = 12.1% a second
+    churn                  41.2 -> 102.4 deg/s  (constant airspeed, x2.5)
+    density                x15.3 birds per cubic metre
+    cost                   1,122 triangles / 2 draw calls, 63 fps
+
+For comparison the Shepherd ships at 18% of frame width a second and Lantern managed
+2.4 deg/s. **Quote both kinds of number or neither** — the angular figures are in the
+module beside the frame fractions.
+
+**THE FLOCK IS A BROAD SHALLOW SHEET, AND IT TOOK TWO WRONG SHAPES TO GET THERE.** A
+squashed ball at 28 m subtends 70 degrees; the phone is PORTRAIT, so the frame is 62 tall
+and only 31 across, and it ran off both sides and read as birds everywhere. A tall column
+was worse and the reason is the one to keep: **the lens points up at 72 degrees, so the
+camera's screen-up is nearly world -x and the column's long axis runs down the view
+direction.** A column seen end-on is a blob. The paper calculation measured the angle an
+axis subtends IN SPACE, and at this elevation that lands in DEPTH. What a steeply upward
+lens sees face-on is a horizontal sheet.
+
+**PUSHING THE LENS BACK WAS THE TEMPTING FIX AND IT IS A TRAP.** Fitting a 20 m ball into
+31 degrees needs 80 m of range; the near edge goes to 60 m, a bird crosses at 10 deg/s
+instead of 52. That hands back everything the staging was for in order to satisfy a
+condition about the staging. Change the shape, not the distance — and `regress.mjs` now
+refuses a near edge over 16 m so a quiet drift cannot happen without a gate failing.
+
+**SIX INSTRUMENT FAULTS IN ONE CHAPTER, none of them in the chapter.** Projecting two AXES
+instead of the surface (cannot see foreshortening — this is the one that cost a whole
+shape); dividing by `size.H`, which is 0 when the page is measured with its pane hidden, and
+returning a confident zero; converting NDC y to degrees by multiplying by the field of view
+(NDC is linear in the TANGENT of the angle); measuring before the loop had placed the
+camera, so `project()` returned NaN, which `toFixed` turns into "NaN" and JSON into null;
+tracking a point on the flock's underside, which at this elevation moves almost entirely in
+depth; and flying an unsteered reader at SELF_WALK and calling it cue-perfect. The drawn
+figures are in PIXELS and PERCENT OF FRAME now, which need no conversion, and the box
+sampler is proved against a 5 m sphere versus the optics (212 px against 232) before any of
+its numbers are believed.
+
+**AND THERE IS NO CONTROL LOOP IN THE FLOCK.** Five hundred birds converging on a target is
+five hundred things proportional to a remaining error — the shape that cost the Shepherd its
+mapping twice. Every bird's position is a FUNCTION of `gather`, evaluated in the vertex
+shader from a bird index and four shared uniforms. One integrator in the chapter (the kit's
+body spring) and one accumulator (the orbit angle, which must be integrated rather than
+recomputed, because omega depends on the radius and a shared phase that jumped when the
+flock changed shape would tear the pattern apart once a breath).
+
+**A SKY BEHIND NOTHING IS THE CASE §4.2 BREAKS ON.** Six posterised steps are six SLABS
+across 812 px, their edges read as horizons, and they cut through the flock; the three giant
+arcs that looked like sand dunes were the warm wash's own contours at three steps. Sixteen
+and eight now. The idiom is about edges that mean something — a sky's do not.
+
+**Derive tolerances, don't widen them.** The mashing-reader check failed at 1e-9 because two
+sprung integrations differ by their rounding. The bar is one DRAWN PIXEL: the whole band is
+worth 482 px of flock width at 375x812, so one pixel is 1/482 of it.
