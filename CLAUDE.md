@@ -324,3 +324,53 @@ the lens. Measure the two axes separately — that is why they are different num
   discipline; the music and art layers are design decisions and are not apologised for.
 - **No existing recordings, compositions, characters or frames.** Original work in an idiom
   only. See design doc §3.7 and §4.1.
+
+## The Shepherd makes progress — 7 November 2026
+
+The chapter oscillated on a fixed path; the reader asked for progress, over the hill and
+on to the next. It is a better chapter now, and the rebuild taught four things.
+
+**A mapping can be right and the picture still empty, and only looking tells you.** Two
+faults survived every harness in this repo:
+
+1. The lens was 22 m behind him and the hills are 18 m long, so there was a CREST between
+   the camera and the shepherd. He was not in frame at all. Sightline clearance over the
+   ground is measured now, at twelve points around a hill.
+2. A side view of a line of figures needs the line to FIT. A portrait phone gives 31
+   degrees across; the first lens put the shepherd past the left edge and the last sheep
+   seventeen hundred pixels past that. The FLOCK was re-derived against the frame — 4.5 s
+   of memory instead of 10 — rather than the frame being bent around the flock.
+
+**Angular rate is the right test for a lens pointed ALONG the motion. Across it, the
+number is the fraction of the frame travelled.** The Shepherd's lens is abeam, so its
+5.9 deg/s abeam figure means nothing on its own; what the reader reads is that he crosses
+the whole picture in 5.4 seconds, 18% of the width a second. Quote both or neither.
+
+**One-sided lags only.** The gait lags accelerations and not decelerations. Lagged both
+ways it OVERSHOOTS the place it is walking to, and this chapter cannot walk back, so the
+overshoot lands past the crest, the "next occurrence" target moves a whole hill on, and he
+chases it for ever: 2.94 hills a breath instead of one. Any controller whose target is a
+"next occurrence" has this shape. Keep v <= the rate rule at every instant, by
+construction rather than by a clamp.
+
+**A rate proportional to the distance remaining crawls the last stretch — and the last
+stretch of a climb is the flat bit at the top.** He was at 70% of the hill when the inhale
+ended and spent half the hold still walking. A dead zone just moves the fault to a figure
+stopping dead from walking pace. Saturating (v = vmax * e^2/(e^2+E0^2)) is zero at zero
+error WITH ZERO SLOPE and near the cap everywhere else.
+
+**An unlit surface hides its own facets, and the sagitta sweep should say so.** The hill is
+flat-shaded from fields of (d, o) with no normal in it, so an interior knot has nothing to
+reveal it; what shows a row boundary is the edge where the ground meets the SKY. That edge
+is FOUND per column, not assumed — with a low lens it is four metres away for some columns
+and a hundred for others. The interior sweeps are still gated: a mesh that passes without
+needing the argument is worth more than the argument.
+
+**Cost: 81,920 triangles / 5 draw calls**, DOWN from 125,440 at the start of the staging
+pass, because moving the lens out bought more across than it cost along. The two axes are
+nothing like each other here — 0.338 m rows against 1.688 m columns — and the table of what
+each setting buys is beside them in `shepherd.html`.
+
+**The lens constants are on the inspection hook** (`__shepherd.cam({...})`). Staging cannot
+be measured, only looked at, and a push per guess is how an afternoon goes into a camera.
+The module's constants are the source of truth and seed it.
