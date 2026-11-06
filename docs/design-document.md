@@ -203,6 +203,41 @@ What this principle does **not** license:
   point towards air; nothing is scored. Disclosure is the part the app is actually
   responsible for, so it is the part that must be good.
 
+#### 1.6c Disclosure happens once, at the scroll — amendment, 6 November 2026
+
+*Added by the author. It amends the last bullet of §1.6 above — "Dropping the disclosure" —
+and nothing else in §1.6 or §1.6a is touched. The original reasoning is left standing, as
+this document's method requires, because it is still the reasoning; what changes is where
+it is discharged.*
+
+> **Disclosure is a channel, not a quantity. It happens once, in the warning scroll, and
+> the chapters are kept clear of it.**
+
+The scroll (`app/js/scroll.js`) sits between the cover and the book. Every reader passes it,
+it cannot be skipped past by accident, and it carries all of it: the circumstances the
+practice asks for, on land and seated; the water rule, stated without exception as §1.6
+requires; stopping, light-headedness and when to get help; and the not-medical-advice line.
+
+Until now each chapter *also* carried a footer repeating a thinned version of that, and each
+gate sheet carried a disclaimer and a caution paragraph doing the same. That was a second and
+third copy of a disclosure that had already happened — inside the experience it was
+disclosing about, over the picture, every session, for ever. Repetition inside the thing is
+not more disclosure. It is a worse read of the thing, and it quietly suggests the scroll was
+not trusted to do its job.
+
+So the chapter screens carry **no safety text at all**. The last bullet of §1.6 still holds
+and is unchanged in substance: holds stay short and equal to the other phases, countdowns
+still point towards air, nothing is scored, and the stop control is still on screen the whole
+way through. Those are the disclosures that are *structural* rather than written, and they
+are where the app's actual responsibility lives.
+
+**What this does not license.** The scroll is now the only written disclosure in the product,
+so it carries everything, and anything the scroll does not say is not said anywhere. A
+chapter-specific caution — the obvious live one is Bamboo Rain's lightning, which lit the
+whole screen and had its own line on that chapter's gate sheet — has no home under this
+amendment unless it is added to the scroll. That is a decision for the author and is recorded
+here as open rather than resolved.
+
 ### 1.6a The depiction rule — no inhale underwater, ever
 
 *Added 23 October 2026, by the author. A standing protocol rule, not a note on any one
