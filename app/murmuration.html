@@ -665,28 +665,57 @@ window.__murmuration = {
     if(!size.H || !size.W)
       return { error: 'the canvas has no layout (W=' + size.W + ', H=' + size.H +
                       ') — measure this with the page visible' };
-    const px = v => { const q = v.clone().project(camera);
-      return [(q.x * 0.5 + 0.5) * size.W, (-q.y * 0.5 + 0.5) * size.H]; };
-    const out = { frame: { w: size.W, h: size.H, fovDeg: camera.fov,
-                           fovHDeg: +(2 * Math.atan(Math.tan(camera.fov / 2 * Math.PI / 180)
-                                      * camera.aspect) * 180 / Math.PI).toFixed(1) } };
+    /* THE SCREEN BOUNDING BOX OF THE FLOCK'S OWN SURFACE, sampled.
+       NOT two axes projected — that is the measurement that hid the
+       foreshortening and cost a whole shape. At 72 degrees of
+       elevation the camera's screen-up is nearly world -x, so the
+       angle an axis subtends IN SPACE can land almost entirely in
+       DEPTH; a sample of the surface cannot be fooled that way
+       because it only ever reports where pixels are. */
+    const tmp = new THREE.Vector3();
+    const box = (rh, rv, alt) => {
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for(let a = 0; a < 24; a++){
+        for(let b2 = 0; b2 <= 12; b2++){
+          const th = a / 24 * Math.PI * 2, ph = b2 / 12 * Math.PI - Math.PI / 2;
+          tmp.set(X_C + rh * Math.cos(ph) * Math.cos(th),
+                  alt  + rv * Math.sin(ph),
+                  0    + rh * Math.cos(ph) * Math.sin(th)).project(camera);
+          const sx = (tmp.x * 0.5 + 0.5) * size.W, sy = (-tmp.y * 0.5 + 0.5) * size.H;
+          if(tmp.z > 1) continue;                 // behind the lens
+          x0 = Math.min(x0, sx); x1 = Math.max(x1, sx);
+          y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+        }
+      }
+      return { w: x1 - x0, h: y1 - y0 };
+    };
     for(const [name, g] of [['spread', 0], ['gathered', 1]]){
       const geo = geometry(g), r = radiiAt(g), alt = altitudeAt(g);
-      const c = new THREE.Vector3(X_C, alt, 0);
-      const L = px(c.clone().setX(X_C - r.h)), Rr = px(c.clone().setX(X_C + r.h));
-      const T = px(c.clone().setY(alt + r.v)), Bm = px(c.clone().setY(alt - r.v));
-      const wPx = Math.abs(Rr[0] - L[0]), hPx = Math.abs(T[1] - Bm[1]);
+      const bb = box(r.h, r.v, alt);
       out[name] = {
-        /* drawn */
-        widthPx: +wPx.toFixed(0), heightPx: +hPx.toFixed(0),
-        widthPctFrame: +(wPx / size.W * 100).toFixed(0),
-        heightPctFrame: +(hPx / size.H * 100).toFixed(0),
-        /* exact, from the module */
-        subtendHDeg: +geo.subtendH.toFixed(1), subtendVDeg: +geo.subtendV.toFixed(1),
-        bottomRangeM: +geo.bottomRange.toFixed(1),
-        birdAtBottomDegPerSec: +geo.birdNear.toFixed(1),
-        churnDegPerSec: +geo.churn.toFixed(1)
+        /* DRAWN, in pixels and as a fraction of the frame */
+        widthPx: +bb.w.toFixed(0), heightPx: +bb.h.toFixed(0),
+        widthPctFrame: +(bb.w / size.W * 100).toFixed(0),
+        heightPctFrame: +(bb.h / size.H * 100).toFixed(0),
+        /* EXACT, from the module */
+        subtendDeg: +geo.subtendH.toFixed(1),
+        nearRangeM: +geo.nearEdge.toFixed(1),
+        birdAtNearDegPerSec: +geo.birdNear.toFixed(1),
+        churnDegPerSec: +geo.churn.toFixed(1),
+        birdsPerCubicMetre: +(FLOCK_N / (4 / 3 * Math.PI * r.h * r.h * r.v)).toFixed(3)
       };
+    }
+    /* PROVE THE INSTRUMENT: a sphere the size of the spread flock,
+       placed at the aim point, must come out near the field of view
+       the optics say it should. A bounding box that silently returns
+       nothing looks exactly like a flock that is not there. */
+    {
+      const probe = box(5, 5, altitudeAt(0));
+      const D = Math.hypot(X_C - CAM_AT[0], altitudeAt(0) - CAM_AT[1]);
+      const wantPx = 2 * Math.atan(5 / D) / (camera.fov * Math.PI / 180) * size.H;
+      out.instrument = { sphere5mPx: +probe.w.toFixed(0),
+                         opticsSayPx: +wantPx.toFixed(0),
+                         agrees: Math.abs(probe.w - wantPx) / wantPx < 0.15 };
     }
     out.sweep = sweep(B.proto.phases.find(p => p.k === 'in').d);
     return out;
@@ -722,10 +751,22 @@ window.__murmuration = {
     const bottom = () => { const p = new THREE.Vector3(
       X_C, uCentre.value.y - uRV.value, 0).project(camera);
       return [(p.x*0.5+0.5)*size.W, (-p.y*0.5+0.5)*size.H]; };
-    const span = () => { const r = uRH.value, y = uCentre.value.y;
-      const a = new THREE.Vector3(X_C - r, y, 0).project(camera);
-      const b2 = new THREE.Vector3(X_C + r, y, 0).project(camera);
-      return Math.abs(b2.x - a.x) * 0.5 * size.W; };
+    /* the drawn width, from the same surface sample rates() uses —
+       the world-x pair this used before is seen nearly end-on at this
+       elevation and reported zero */
+    const span = () => {
+      const rh = uRH.value, rv = uRV.value, y = uCentre.value.y;
+      let x0 = 1e9, x1 = -1e9; const t = new THREE.Vector3();
+      for(let a = 0; a < 24; a++) for(let b2 = 0; b2 <= 12; b2++){
+        const th = a / 24 * Math.PI * 2, ph = b2 / 12 * Math.PI - Math.PI / 2;
+        t.set(X_C + rh * Math.cos(ph) * Math.cos(th), y + rv * Math.sin(ph),
+              rh * Math.cos(ph) * Math.sin(th)).project(camera);
+        if(t.z > 1) continue;
+        const sx = (t.x * 0.5 + 0.5) * size.W;
+        x0 = Math.min(x0, sx); x1 = Math.max(x1, sx);
+      }
+      return x1 - x0;
+    };
 
     /* start from the bottom of a breath, flown exactly on the cue */
     beginWith('holds', false);

@@ -121,22 +121,35 @@ export const AIRSPEED = 11.0;
    handing back everything the staging was for in order to satisfy a
    condition about the staging. The lens stays where it is.
 
-   SO THE FLOCK CHANGES SHAPE INSTEAD. It is TALL — a roosting column
-   rather than a ball — which is a real form a murmuration takes and
-   is also the form a portrait frame can hold: narrow across, where
-   there are only 31 degrees, and tall, where there are 62.
+   SO THE FLOCK CHANGES SHAPE INSTEAD — AND THE FIRST ATTEMPT AT THAT
+   WAS ALSO WRONG, for a reason worth keeping. A tall roosting column
+   looked right on paper: narrow where the frame has 31 degrees, tall
+   where it has 62. But THE LENS POINTS UP AT 72 DEGREES, so the
+   camera's screen-up vector is nearly world -x and its screen-right
+   is world z — the column's long axis runs almost straight down the
+   view direction. A column seen end-on is a blob. The paper
+   calculation measured the angle the vertical axis subtends IN
+   SPACE, which at this elevation lands in DEPTH rather than on the
+   screen, and no amount of making it taller would have shown up in
+   the frame.
+
+   What a steeply upward lens sees face-on is a HORIZONTAL SHEET, so
+   that is what the flock is: broad and shallow, which is also what a
+   murmuration mostly is. Both screen axes then scale with the same
+   radius and the arithmetic is honest again.
 
    AND THE CONDITION ITSELF HAD TO BE RE-DERIVED, because "the flock
    subtends 30 to 40 degrees" assumed a ball seen whole. What actually
    has to be true is:
 
-     GATHERED   a readable shape with margin on the narrow axis —
-                15.1 degrees across (49% of the frame's width) and
-                27.0 tall (44% of its height)
-     SPREAD     plainly bigger, and allowed to OVERFLOW: 44.2 across
-                and 73.7 tall, or 143% and 119% of the frame. A sky
-                you cannot see the edges of is not a failure, it is
-                the other half of the mechanic.
+     GATHERED   a readable shape with margin on the narrow axis
+     SPREAD     plainly bigger, and allowed to OVERFLOW. A sky you
+                cannot see the edges of is not a failure, it is the
+                other half of the mechanic.
+
+   Both are MEASURED on the running build by projecting the flock's
+   own surface and taking the screen bounding box — not by projecting
+   two axes, which is what hid the foreshortening above.
 
    The number that is being held is the RATIO, which is what the
    reader sees: the flock goes from more than filling the frame to
@@ -145,18 +158,20 @@ export const AIRSPEED = 11.0;
 
 /** Horizontal and vertical radius, spread and gathered. Four numbers
  *  rather than one, because the shape changes as well as the size:
- *  spread it is 1.85 times taller than wide, gathered 1.8 — it does
- *  not simply scale, it compacts. */
-export const R_H_SPREAD = 13.0, R_V_SPREAD = 24.0;
-export const R_H_GATHER =  5.0, R_V_GATHER =  9.0;
+ *  spread it is a broad shallow sheet, 20 m across and 9 deep;
+ *  gathered it is 8 by 3.6, so it does not simply scale — it
+ *  compacts, and the number of birds in a cubic metre goes up by
+ *  fifteen and a half times. */
+export const R_H_SPREAD = 20.0, R_V_SPREAD = 9.0;
+export const R_H_GATHER =  8.0, R_V_GATHER = 3.6;
 
 /** Where the column sits. It LIFTS as it gathers, which reinforces
  *  the shape change rather than competing with it: gathering makes it
  *  smaller AND further away, so the angular size falls faster than
- *  the radius does. Spread, the bottom of the column is 8 m off the
- *  ground and 11.9 m from the lens — that is the "close and
- *  underneath" the numbers depend on, and it is the bottom of the
- *  column rather than the centre that delivers it. */
+ *  the radius does. Spread, the nearest part of the sheet is about
+ *  12 m from the lens — that is the "close and underneath" every
+ *  number depends on, and it is the near EDGE rather than the centre
+ *  that delivers it. */
 export const X_C = 10.0;          // metres along the ground from the lens
 export const ALT_SPREAD = 32.0;
 export const ALT_GATHER = 38.0;
@@ -330,7 +345,9 @@ export function geometry(gather){
   const deg = a => a * 180 / Math.PI;
   /* the BOTTOM of the column is the nearest part of it, and it is
      what the "close and underneath" figures are measured from */
-  const bottom = Math.hypot(dx, dy - r.v);
+  /* the nearest part of the sheet, which for a broad shallow form
+     seen from below is its near edge rather than its underside */
+  const bottom = Math.max(1.0, D - r.h);
   return {
     radius: R, rh: r.h, rv: r.v,
     centreRange: D,
