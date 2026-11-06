@@ -146,6 +146,44 @@ else
   say "  ok    motion continuous: no animated scalar steps on either clock"
 fi
 
+# --- 4d. the back button must stay sensible ---
+# The reader hit a real bug here on 6 November: every exit assigned
+# location.href, which PUSHES a history entry, so Back from the
+# contents went forward into the chapter the reader had just left and
+# restarted it. The fix is that returning uses the browser's own back
+# (js/bookframe.js, returnToBook) and that opening the book pushes a
+# `#contents` entry for it to land on.
+#
+# Neither of those can be proved in Node — history is a browser
+# object. What CAN be checked, cheaply and textually, is that nothing
+# has quietly gone back to the construction that caused it: a chapter
+# assigning location.href to the contents directly, bypassing the
+# shared helper, or index.html losing the pushState the helper lands
+# on. Same shape as the credential scan: aimed at one specific
+# mistake that has actually been made.
+BACK=0
+for f in "$ROOT"/app/*.html; do
+  [ -e "$f" ] || continue
+  case "$(basename "$f")" in index.html|deep-light.html) continue ;; esac
+  if grep -qE "location\.href *= *['\"]\./#contents" "$f"; then
+    say "  FAIL  $(basename "$f") assigns location.href to the contents — use returnToBook()"
+    BACK=1
+  fi
+done
+if ! grep -q "pushState({ bor:'contents' }" "$ROOT/app/index.html"; then
+  say "  FAIL  index.html no longer pushes a #contents entry for Back to land on"
+  BACK=1
+fi
+if ! grep -q "export function returnToBook" "$ROOT/app/js/bookframe.js"; then
+  say "  FAIL  bookframe.js has lost returnToBook()"
+  BACK=1
+fi
+if [ "$BACK" -eq 0 ]; then
+  say "  ok    the back button's two halves are both still wired"
+else
+  FAIL=1
+fi
+
 # --- 5. no credential may ever reach the index ---
 PAT="github""_pat_"
 if [ -d "$ROOT/.git" ]; then

@@ -49,9 +49,6 @@
     text-shadow:0 2px 16px rgba(20,10,14,.9)}
   #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
     opacity:.7;text-transform:uppercase;text-shadow:0 2px 12px rgba(20,10,14,.9)}
-  #bar{position:fixed;left:0;right:0;bottom:max(36px,calc(env(safe-area-inset-bottom) + 28px));
-    z-index:20;height:2px;margin:0 36px;background:rgba(242,227,200,.18);pointer-events:none}
-  #barfill{height:100%;width:0;background:rgba(242,227,200,.75)}
   #note{position:fixed;left:0;right:0;bottom:max(14px,calc(env(safe-area-inset-bottom) + 6px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(242,227,200,.5);letter-spacing:.06em;padding:0 20px;pointer-events:none;
@@ -104,7 +101,6 @@
 
 <div id="upnote">touch to come up</div>
 <div id="cue"><div id="phase">breathe in</div><div id="sub">above the water</div></div>
-<div id="bar"><div id="barfill"></div></div>
 <!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
      Disclosure happens once, in the warning scroll (js/scroll.js),
      which sits between the cover and the book and which every reader
@@ -268,7 +264,7 @@ const AIR = {
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
 const elUpNote = $('upnote');
-const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
+const elPhase = $('phase'), elSub = $('sub');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -276,7 +272,7 @@ function fallback(why){
   if(why) $('fbwhy').textContent = why;
   elGate.classList.remove('on');
   elFall.classList.add('on');
-  $('cue').style.display = $('bar').style.display = 'none';
+  $('cue').style.display = 'none';
   elFps.classList.add('off');
 }
 
@@ -2100,7 +2096,6 @@ const loop = clock((dt, now, running) => {
      one line here and nothing else. */
   const showSub = B.at(t).p.count ? cue.sub : '';
   if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
-  elBar.style.width = (100 * B.progress(t)).toFixed(2) + '%';
 
   renderer.render(scene, camera);
   fpsTick(now, false);

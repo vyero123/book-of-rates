@@ -437,9 +437,42 @@ mountPageFrame($('contents'));
 
 const returning = location.hash === '#contents';
 let opened = false;
+/* ==================================================================
+   THE COVER AND THE CONTENTS ARE TWO HISTORY ENTRIES
+   ==================================================================
+   6 November 2026. They were one: opening the book changed classes on
+   the same URL, so the only entry a chapter could go Back to was the
+   CLOSED COVER. A reader who left a chapter with the browser's back
+   button landed on a shut book and was asked to open it again.
+
+   Opening pushes `#contents` now, so the stack reads cover, contents,
+   chapter, and Back from a chapter lands on the contents — which is
+   also the entry js/bookframe.js's returnToBook() goes to, so the
+   button and the gesture agree rather than building two different
+   stacks. Back from the contents is the cover, and Back from the
+   cover leaves, which is what a front door should do.
+
+   showCover/showContents exist because a popstate is not a page load:
+   the classes have to be put back by hand. */
+function showContents(){
+  opened = true;
+  coverWrap.classList.add('gone');
+  $('contents').classList.add('on');
+}
+function showCover(){
+  opened = false;
+  $('board').style.transition = 'none';
+  coverWrap.classList.remove('gone', 'bor-open');
+  $('contents').classList.remove('on');
+}
+addEventListener('popstate', () => {
+  if (location.hash === '#contents') showContents(); else showCover();
+});
+
 function openBook(){
   if (opened) return;
   opened = true;
+  try { history.pushState({ bor:'contents' }, '', '#contents'); } catch(e){}
   // fast on return visits: a beautiful animation you cannot bypass becomes
   // an obstacle by the fifth session
   const ms = PREF.coverSeen ? 420 : 1500;
@@ -472,7 +505,12 @@ if (returning){
   // and requireScroll() is a no-op once it has been read (design doc
   // §1.6: disclosure, not a consent gate).
   requireScroll(() => {});
-  try { history.replaceState(null, '', location.pathname + location.search); } catch(e){}
+  /* THE replaceState THAT USED TO BE HERE IS GONE. It tidied the hash
+     out of the address bar, and in doing so destroyed the only record
+     that this entry was the contents — which is exactly the entry the
+     back button needs to find. The hash is a screen marker now and is
+     allowed to show; a reload of this URL lands on the contents,
+     which is where the reader was. */
 }
 
 /* ================= contents ================= */

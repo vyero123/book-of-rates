@@ -70,9 +70,6 @@
   #hint{margin-top:14px;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
     text-transform:uppercase;color:rgba(255,242,168,.0);transition:color .5s ease}
   #hint.on{color:rgba(255,242,168,.78)}
-  #bar{position:fixed;left:0;right:0;bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));
-    z-index:20;height:2px;margin:0 36px;background:rgba(242,244,250,.24);pointer-events:none}
-  #barfill{height:100%;width:0;background:rgba(255,242,168,.85)}
   #note{position:fixed;left:0;right:0;bottom:max(22px,calc(env(safe-area-inset-bottom) + 14px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(242,244,250,.6);letter-spacing:.06em;padding:0 20px;pointer-events:none;
@@ -126,7 +123,6 @@
   <div id="phase">breathe in</div>
   <div id="sub">through the nose</div>
 </div>
-<div id="bar"><div id="barfill"></div></div>
 <!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
      Disclosure happens once, in the warning scroll (js/scroll.js),
      which sits between the cover and the book and which every reader
@@ -269,7 +265,7 @@ const AIR = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
+const elPhase = $('phase'), elSub = $('sub');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -1086,7 +1082,6 @@ const loop = clock((dt, now, running) => {
   // pressed once. It is an instruction, not a prompt to perform.
   const wantHint = started && !hintShown && blowing === 1;
   if(pressing) hintShown = true;
-  elBar.style.width = (100 * prog).toFixed(2) + '%';
 
   renderer.render(scene, camera);
   fpsTick(now, false);

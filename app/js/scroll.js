@@ -175,10 +175,20 @@ export function openScroll(onDone){
   let done = false;
   const EVENTS = ['pointerdown','touchstart','touchmove','wheel','keydown','click'];
 
+  /* BACK DISMISSES IT TOO — 6 November 2026. The scroll takes any
+     input at all to close (design doc §1.6: disclosure, not a consent
+     gate), and the browser's back button is an input the reader
+     plainly means as "not this". Without it, Back over the scroll
+     navigated the page underneath while the sheet stayed on top of
+     whatever arrived. Closing is closing: it marks seen exactly as
+     every other dismissal does. */
+  function onPop(){ close(); }
+
   function close(){
     if (done) return;
     done = true;
     for (const e of EVENTS) window.removeEventListener(e, close, true);
+    window.removeEventListener('popstate', onPop);
     el.removeEventListener('scroll', close, true);
     el.style.transition = 'opacity .26s ease, transform .26s ease';
     el.style.opacity = '0';
@@ -193,6 +203,7 @@ export function openScroll(onDone){
   setTimeout(() => {
     if (done) return;
     for (const e of EVENTS) window.addEventListener(e, close, true);
+    window.addEventListener('popstate', onPop);
     el.addEventListener('scroll', close, true);
   }, 150);
 }

@@ -191,6 +191,49 @@ export function closeBook({ then = () => {}, ms = 760, face = '' } = {}){
  *  wired, so a chapter can assert it found them — four silently unlinked
  *  shaders have shipped in this project and a silently unwired link is
  *  the same failure in a different medium. */
+/* ==================================================================
+   RETURNING IS GOING BACK — 6 November 2026
+   ==================================================================
+   The reader hit this: the browser's own back button broke the app.
+   It is worth writing down exactly, because the mechanism is not the
+   one it looks like.
+
+   Every exit assigned `location.href = './#contents'`, which PUSHES a
+   new history entry. So a reader who opened the book, opened a
+   chapter and came back had:
+
+       1  /app/            the cover
+       2  /app/long-air    the chapter
+       3  /app/#contents   the contents, as a NEW entry
+
+   and index.html then called replaceState on entry 3 to tidy the hash
+   out of the address bar, which also destroyed the only record that
+   it was a return. Pressing Back from the contents therefore went to
+   entry 2 — BACK INTO THE CHAPTER THE READER HAD JUST LEFT, as a
+   fresh page load, which restarts the session. Back moved forward.
+   Pressing it again landed on the closed cover and asked them to open
+   the book they were already in.
+
+   The fix is to stop pretending a return is a new destination. It is
+   the browser's own back, so it uses the browser's own back, and no
+   entry is created at all. The contents entry that already exists is
+   the one the reader lands on.
+
+   THE FALLBACK IS NOT DECORATION. A reader who deep-linked to a
+   chapter, or refreshed inside one, has nothing behind them — the
+   referrer is empty and history.back() would leave the site. Those
+   get the assignment, which is right for them: they are arriving at
+   the contents, not returning to it. */
+export function returnToBook(href = './#contents'){
+  let cameFromHere = false;
+  try {
+    cameFromHere = !!document.referrer &&
+                   new URL(document.referrer).origin === location.origin;
+  } catch(e){ cameFromHere = false; }
+  if(cameFromHere && history.length > 1) history.back();
+  else location.href = href;
+}
+
 export function wireExits(selector = 'a[href*="#contents"]', opts = {}){
   // Load the sheet NOW, at boot, not at the moment of leaving: a <link>
   // appended to the head loads asynchronously, and a board whose CSS has
@@ -202,7 +245,7 @@ export function wireExits(selector = 'a[href*="#contents"]', opts = {}){
       if(e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;  // let the reader open a new tab
       e.preventDefault();
       const href = a.getAttribute('href');
-      closeBook({ ...opts, then: () => { location.href = href; } });
+      closeBook({ ...opts, then: () => returnToBook(href) });
     });
   }
   return links.length;

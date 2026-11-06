@@ -172,7 +172,7 @@ import { PageTurn } from './js/pageturn.js';
 import { requireScroll } from './js/scroll.js';
 import { sizeCanvas, offscreen, release, releaseAll, diag, onResizeDebounced } from './js/surface.js';
 import { note, clearNote, install as installBlackbox } from './js/blackbox.js';
-import { closeBook, wireExits } from './js/bookframe.js';
+import { closeBook, wireExits, returnToBook } from './js/bookframe.js';
 installBlackbox();
 
 /* ---------- preferences: remembered, never scored ---------- */
@@ -326,7 +326,7 @@ d('stop').onclick  = () => finish(false);
 // better land there rather than on a closed cover
 /* The flat chapters leave the same way the three-dimensional ones do:
    the cover's board, closing. One mechanism for the whole book. */
-d('again').onclick = () => closeBook({ then: () => { location.href = './#contents'; } });
+d('again').onclick = () => closeBook({ then: () => returnToBook() });
 wireExits();
 
 function applyEyesClosed(on){

@@ -42,9 +42,6 @@
   #hint{margin-top:14px;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
     text-transform:uppercase;color:rgba(201,168,106,0);transition:color .8s ease}
   #hint.on{color:rgba(201,168,106,.72)}
-  #bar{position:fixed;left:0;right:0;bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));
-    z-index:20;height:2px;margin:0 36px;background:rgba(239,228,204,.18);pointer-events:none}
-  #barfill{height:100%;width:0;background:rgba(201,168,106,.85)}
   #note{position:fixed;left:0;right:0;bottom:max(22px,calc(env(safe-area-inset-bottom) + 14px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(239,228,204,.5);letter-spacing:.06em;padding:0 20px;pointer-events:none;
@@ -98,7 +95,6 @@
   <div id="phase">breathe in</div>
   <div id="sub">the boat lifts</div>
 </div>
-<div id="bar"><div id="barfill"></div></div>
 <!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
      Disclosure happens once, in the warning scroll (js/scroll.js),
      which sits between the cover and the book and which every reader
@@ -221,7 +217,7 @@ const NIGHT = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
+const elPhase = $('phase'), elSub = $('sub');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -1303,7 +1299,6 @@ const loop = clock((dt, now, running) => {
      one line here and nothing else. */
   const showSub = B.at(t).p.count ? cue.sub : '';
   if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
-  elBar.style.width = (100 * prog).toFixed(2) + '%';
 
   renderer.render(scene, camera);
   fpsTick(now, false);
