@@ -143,9 +143,10 @@ import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice, SESSION_CAP,
          CORRIDOR, RANGE, normOf, atOf, rates,
-         FLOCK_N, AIRSPEED, R_SPREAD, R_GATHER, FLATTEN, SHELL_IN,
+         FLOCK_N, AIRSPEED, SHELL_IN,
+         R_H_SPREAD, R_V_SPREAD, R_H_GATHER, R_V_GATHER,
          X_C, ALT_SPREAD, ALT_GATHER,
-         radiusAt, altitudeAt, omegaAt, geometry, sweep,
+         radiusAt, radiiAt, altitudeAt, omegaAt, geometry, sweep,
          CAM_AT, CAM_AIM } from './js/murmuration-breath.js';
 import { body } from './js/course.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL }
@@ -165,7 +166,7 @@ const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
    palest first, and every surface picks an index BY HAND. */
 const R = ramp([0xF6E7BC, 0xE6D39A, 0xBFC3A4, 0x8C9CA8, 0x4E5F70, 0x232B36]);
 const AIR = {
-  low:0xF6E7BC, mid:0xBFC3A4, high:0x4E5F70,
+  low:0xF7EAC4, mid:0xDCDCB2, high:0xA9B6B4, zenith:0x6E8292,
   cirrus:0xFFF4D4, warm:0xEFC89A
 };
 const BIRD = { body:0x232B36, lit:0x4E5F70, far:0x8C9CA8 };
@@ -201,8 +202,12 @@ const uTime   = { value: 0 };
 const uFill   = { value: 0 };
 const uRamp   = { value: ramp6 };
 const uHaze   = { value: C(AIR.mid) };
-/* the two numbers the whole flock is drawn from */
-const uR      = { value: R_SPREAD };
+/* the three numbers the whole flock is drawn from. TWO RADII, not
+   one: the flock is a tall column rather than a ball, because the
+   phone is in portrait and a 31 degree frame cannot hold a sphere
+   that fills a 62 degree one. See js/murmuration-breath.js. */
+const uRH     = { value: R_H_SPREAD };
+const uRV     = { value: R_V_SPREAD };
 const uCentre = { value: new THREE.Vector3(X_C, ALT_SPREAD, 0) };
 /* the orbit ANGLE, accumulated: it is the integral of omega dt and
    omega changes with the radius, so it cannot be recomputed from
@@ -233,6 +238,7 @@ const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
 const skyU = {
   uTime, uAspect:{ value: 1 }, uRamp, uFill,
   uLow:{ value:C(AIR.low) }, uMid:{ value:C(AIR.mid) }, uHigh:{ value:C(AIR.high) },
+  uZen:{ value:C(AIR.zenith) },
   uCirrus:{ value:C(AIR.cirrus) }, uWarm:{ value:C(AIR.warm) }
 };
 onFit(() => { skyU.uAspect.value = camera.aspect; });
@@ -241,13 +247,19 @@ scene.add(screenQuad(THREE, {
   fragment:`
     varying vec2 vUv;
     uniform float uTime, uAspect, uFill;
-    uniform vec3 uLow, uMid, uHigh, uCirrus, uWarm;
+    uniform vec3 uLow, uMid, uHigh, uZen, uCirrus, uWarm;
     void main(){
       /* vUv.y is up the frame, which here IS elevation: the lens does
          not move, so there is no horizon term to subtract. */
-      float h = vUv.y;
-      vec3 col = mix(uLow, uMid, posteriseAA(h / 0.62, 3.0));
-      col = mix(col, uHigh, posteriseAA(clamp((h - 0.40) / 0.60, 0.0, 1.0), 4.0));
+      /* EIGHT STEPS, NOT FOUR, AND BUNCHED LOW. The first version put
+         three or four slabs across the whole frame and it read as a
+         flag rather than a sky: with no horizon to compress the
+         gradient into the bottom of the picture, equal steps are
+         equal bands. pow() bunches them where the light is. */
+      float h = pow(clamp(vUv.y, 0.0, 1.0), 0.85);
+      vec3 col = mix(uLow, uMid, posteriseAA(clamp(h / 0.45, 0.0, 1.0), 3.0));
+      col = mix(col, uHigh, posteriseAA(clamp((h - 0.34) / 0.42, 0.0, 1.0), 3.0));
+      col = mix(col, uZen,  posteriseAA(clamp((h - 0.74) / 0.26, 0.0, 1.0), 2.0));
 
       /* a warm wash low and off to one side, so the light has a place
          it comes from without a disc anywhere — the reader called a
@@ -255,11 +267,13 @@ scene.add(screenQuad(THREE, {
       vec2 q = vec2((vUv.x - 0.26) * uAspect, vUv.y - 0.02);
       col = mix(col, uWarm, posteriseAA(1.0 - clamp(length(q) / 0.78, 0.0, 1.0), 3.0) * 0.30);
 
-      /* high cirrus, in bands rather than lobes: at this elevation
-         cloud is seen nearly edge-on and edge-on cloud is stripes */
-      float band = sin(vUv.y * 26.0 + sin(vUv.x * 3.1 + 1.7) * 1.6 + uTime * 0.011);
-      float lane = (1.0 - smoothstep(0.10, 0.52, vUv.y)) * (1.0 - smoothstep(0.52, 0.86, vUv.y));
-      col = mix(col, uCirrus, aastep(0.62, band) * lane * 0.30);
+      /* THIN CIRRUS, LOW, AND MUCH LESS OF IT. The first version was
+         broad slow curves and read as sand dunes — a horizon the
+         chapter does not have, drawn by accident in the one place the
+         reader looks for one. */
+      float band = sin(vUv.y * 74.0 + sin(vUv.x * 2.3 + 1.7) * 0.9 + uTime * 0.008);
+      float lane = smoothstep(0.02, 0.14, vUv.y) * (1.0 - smoothstep(0.16, 0.34, vUv.y));
+      col = mix(col, uCirrus, aastep(0.80, band) * lane * 0.22);
 
       col += (grainAt(vUv * 540.0) - 0.5) * 0.022;
       gl_FragColor = vec4(col, 1.0);
@@ -315,15 +329,15 @@ function flockGeometry(){
 
 const flockMat = posterMat(THREE, {
   uniforms:{
-    uRamp, uTime, uR, uCentre, uOrbit, uHaze,
+    uRamp, uTime, uRH, uRV, uCentre, uOrbit, uHaze,
     uBody:{ value:C(BIRD.body) }, uLit:{ value:C(BIRD.lit) },
     uFar:{ value:C(BIRD.far) },
-    uFlatten:{ value: FLATTEN }, uShellIn:{ value: SHELL_IN }
+    uShellIn:{ value: SHELL_IN }
   },
   side: THREE.DoubleSide, prelude: PRE,
   vertex:`
     attribute float aBird;
-    uniform float uTime, uR, uOrbit, uFlatten, uShellIn;
+    uniform float uTime, uRH, uRV, uOrbit, uShellIn;
     uniform vec3 uCentre;
     varying float vDist; varying float vEdge; varying float vFace;
 
@@ -354,17 +368,21 @@ const flockMat = posterMat(THREE, {
       float ang = h5 * 6.28318 + uOrbit * sp;
 
       /* the shell has thickness, or the flock is a soap bubble */
-      float rr = uR * mix(uShellIn, 1.0, h1 * h4);
+      float rr = mix(uShellIn, 1.0, h1 * h4);
       vec3 radial = cos(ang) * e1 + sin(ang) * e2;
-      vec3 squash = vec3(1.0, uFlatten, 1.0);
+      /* THE TWO RADII GO IN HERE, as an anisotropic scale of a unit
+         shell: wide is uRH and tall is uRV, so the flock is a column.
+         Everything downstream — the heading, the wings — has to be
+         scaled the same way or the birds fly across their own flock. */
+      vec3 squash = vec3(uRH, uRV, uRH);
       vec3 off = rr * radial * squash;
 
       /* a slow shared deformation, so the silhouette is a flock and
          not an ellipsoid. It does NOT follow the breath — it is the
          flock's own weather, and keeping it off the breath is what
          stops it reading as something the reader did. */
-      float w = sin(uTime * 0.21 + off.x * 0.06) * 0.14
-              + sin(uTime * 0.13 - off.z * 0.05) * 0.10;
+      float w = sin(uTime * 0.21 + off.x * 0.06) * 0.12
+              + sin(uTime * 0.13 - off.y * 0.04) * 0.09;
       off *= 1.0 + w;
 
       vec3 at = uCentre + off;
@@ -509,7 +527,8 @@ const loop = clock((dt, now, running) => {
   /* --- AND THE FLOCK IS A FUNCTION OF IT. Radius, altitude and the
      churn, all clamped at the point of use because the spring
      overshoots the band on purpose. --- */
-  uR.value = radiusAt(gather);
+  const rr = radiiAt(gather);
+  uRH.value = rr.h; uRV.value = rr.v;
   uCentre.value.set(X_C, altitudeAt(gather), 0);
   /* the orbit angle is INTEGRATED, because omega depends on the
      radius and the radius is moving: a shared angle recomputed from
@@ -618,36 +637,119 @@ window.__murmuration = {
              fill:+SHAPE.fill.toFixed(3), gather:+SHAPE.value.toFixed(3),
              v:+SHAPE.v.toFixed(3),
              error:+(SHAPE.value - B.value(t)).toFixed(3),
-             radius:+uR.value.toFixed(2), alt:+uCentre.value.y.toFixed(2),
+             rh:+uRH.value.toFixed(2), rv:+uRV.value.toFixed(2),
+             radius:+radiusAt(SHAPE.value).toFixed(2),
+             alt:+uCentre.value.y.toFixed(2),
              orbit:+uOrbit.value.toFixed(2),
              reachAt: reachAt === null ? null : +reachAt.toFixed(3),
              touches: touches.size, inviteLearned: REACH_INVITE.learned };
   },
-  /** THE CLAIM, MEASURED ON WHAT IS DRAWN rather than predicted: the
-   *  flock's extent in degrees and in pixels, and how fast its near
-   *  edge and its birds cross the frame, taken from the live camera
-   *  and the live radius. */
+  /** THE CLAIM, MEASURED ON WHAT IS DRAWN rather than predicted.
+   *
+   *  THE FIRST VERSION OF THIS WAS WRONG IN TWO WAYS and reported a
+   *  confident zero, which is the fourth time on this project that a
+   *  reported fault has been the instrument. It divided by `size.H`,
+   *  which is 0 whenever the page is measured with its pane hidden —
+   *  so it is checked here and refused rather than returned. And it
+   *  converted NDC y to degrees by multiplying by the field of view,
+   *  which is only true for a pinhole at the centre of the frame: NDC
+   *  is linear in the TANGENT of the angle, not in the angle.
+   *
+   *  So the drawn numbers are in PIXELS and as a FRACTION OF THE
+   *  FRAME, which need no conversion and are what the reader actually
+   *  sees; the angular figures are computed in 3-D from the module,
+   *  where they are exact. Both are reported, because the project's
+   *  own note says to quote both or neither.
+   */
   rates(){
-    const degPerPx = (camera.fov) / size.H;
-    const out = {};
+    if(!size.H || !size.W)
+      return { error: 'the canvas has no layout (W=' + size.W + ', H=' + size.H +
+                      ') — measure this with the page visible' };
+    const px = v => { const q = v.clone().project(camera);
+      return [(q.x * 0.5 + 0.5) * size.W, (-q.y * 0.5 + 0.5) * size.H]; };
+    const out = { frame: { w: size.W, h: size.H, fovDeg: camera.fov,
+                           fovHDeg: +(2 * Math.atan(Math.tan(camera.fov / 2 * Math.PI / 180)
+                                      * camera.aspect) * 180 / Math.PI).toFixed(1) } };
     for(const [name, g] of [['spread', 0], ['gathered', 1]]){
-      const geo = geometry(g);
-      const c = new THREE.Vector3(X_C, altitudeAt(g), 0);
-      const top = c.clone(); top.y += geo.radius * FLATTEN;
-      const bot = c.clone(); bot.y -= geo.radius * FLATTEN;
-      const pt = top.project(camera), pb = bot.project(camera);
+      const geo = geometry(g), r = radiiAt(g), alt = altitudeAt(g);
+      const c = new THREE.Vector3(X_C, alt, 0);
+      const L = px(c.clone().setX(X_C - r.h)), Rr = px(c.clone().setX(X_C + r.h));
+      const T = px(c.clone().setY(alt + r.v)), Bm = px(c.clone().setY(alt - r.v));
+      const wPx = Math.abs(Rr[0] - L[0]), hPx = Math.abs(T[1] - Bm[1]);
       out[name] = {
-        subtendDeg: +geo.subtend.toFixed(1),
-        drawnPx: +(Math.abs(pt.y - pb.y) * 0.5 * size.H).toFixed(0),
-        drawnDeg: +(Math.abs(pt.y - pb.y) * 0.5 * size.H * degPerPx).toFixed(1),
-        nearEdgeM: +geo.nearEdge.toFixed(1),
-        birdNearDegPerSec: +geo.birdNear.toFixed(1),
+        /* drawn */
+        widthPx: +wPx.toFixed(0), heightPx: +hPx.toFixed(0),
+        widthPctFrame: +(wPx / size.W * 100).toFixed(0),
+        heightPctFrame: +(hPx / size.H * 100).toFixed(0),
+        /* exact, from the module */
+        subtendHDeg: +geo.subtendH.toFixed(1), subtendVDeg: +geo.subtendV.toFixed(1),
+        bottomRangeM: +geo.bottomRange.toFixed(1),
+        birdAtBottomDegPerSec: +geo.birdNear.toFixed(1),
         churnDegPerSec: +geo.churn.toFixed(1)
       };
     }
     out.sweep = sweep(B.proto.phases.find(p => p.k === 'in').d);
-    out.frameDeg = +(camera.fov).toFixed(1);
     return out;
+  },
+  /** AND THE SAME THING FLOWN rather than evaluated: pump one inhale
+   *  and report how far a tagged bird and the flock's own outline
+   *  actually moved on screen, in pixels a second and in percent of
+   *  the frame a second. Predicted numbers are a hypothesis; this is
+   *  the measurement. */
+  flown(){
+    if(!size.H) return { error: 'the canvas has no layout' };
+    const inhale = B.proto.phases.find(p => p.k === 'in').d;
+    const bird = () => {
+      /* one bird, reconstructed with the shader's own arithmetic, so
+         what is reported is what is drawn rather than a second model
+         of it. Bird 0, at the outside of the shell. */
+      const h11 = n => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
+      const i = 0;
+      const h1 = h11(i + 0.17), h2 = h11(i + 3.71), h3 = h11(i + 9.23),
+            h4 = h11(i + 15.4), h5 = h11(i + 21.9);
+      const n = new THREE.Vector3(h1*2-1, (h2*2-1)*0.55, h3*2-1).normalize();
+      const e1 = new THREE.Vector3().crossVectors(n, new THREE.Vector3(0,1,0.17)).normalize();
+      const e2 = new THREE.Vector3().crossVectors(n, e1);
+      const ang = h5 * 6.28318 + uOrbit.value * (0.74 + 0.52 * h4);
+      const rr = SHELL_IN + (1 - SHELL_IN) * (h1 * h4);
+      const off = e1.clone().multiplyScalar(Math.cos(ang))
+                   .add(e2.clone().multiplyScalar(Math.sin(ang)))
+                   .multiplyScalar(rr)
+                   .multiply(new THREE.Vector3(uRH.value, uRV.value, uRH.value));
+      const p = uCentre.value.clone().add(off).project(camera);
+      return [(p.x*0.5+0.5)*size.W, (-p.y*0.5+0.5)*size.H];
+    };
+    const bottom = () => { const p = new THREE.Vector3(
+      X_C, uCentre.value.y - uRV.value, 0).project(camera);
+      return [(p.x*0.5+0.5)*size.W, (-p.y*0.5+0.5)*size.H]; };
+    const span = () => { const r = uRH.value, y = uCentre.value.y;
+      const a = new THREE.Vector3(X_C - r, y, 0).project(camera);
+      const b2 = new THREE.Vector3(X_C + r, y, 0).project(camera);
+      return Math.abs(b2.x - a.x) * 0.5 * size.W; };
+
+    /* start from the bottom of a breath, flown exactly on the cue */
+    beginWith('holds', false);
+    loop.pump(1 / 60, Math.round(60 * (B.proto.phases.reduce((a,p)=>a+p.d,0) - 0.01)));
+    let b0 = bird(), e0 = bottom(), s0 = span(), birdMax = 0, edgeMax = 0, prevB = b0, prevE = e0;
+    const steps = Math.round(60 * inhale);
+    for(let k = 0; k < steps; k++){
+      loop.pump(1 / 60, 1);
+      const b = bird(), e = bottom();
+      birdMax = Math.max(birdMax, Math.hypot(b[0]-prevB[0], b[1]-prevB[1]) * 60);
+      edgeMax = Math.max(edgeMax, Math.hypot(e[0]-prevE[0], e[1]-prevE[1]) * 60);
+      prevB = b; prevE = e;
+    }
+    const s1 = span();
+    return {
+      inhaleSecs: inhale,
+      birdPeakPxPerSec: +birdMax.toFixed(0),
+      birdPeakPctFramePerSec: +(birdMax / size.H * 100).toFixed(1),
+      edgePeakPxPerSec: +edgeMax.toFixed(0),
+      edgePeakPctFramePerSec: +(edgeMax / size.H * 100).toFixed(1),
+      spanPx: [+s0.toFixed(0), +s1.toFixed(0)],
+      spanPctFrameWidth: [+(s0/size.W*100).toFixed(0), +(s1/size.W*100).toFixed(0)],
+      shrinkPctFrameWidthPerSec: +(((s0 - s1) / size.W * 100) / inhale).toFixed(1)
+    };
   },
   links(){ return linkReport(renderer, scene, camera); },
   solo(){ return soloReport(); },
@@ -665,7 +767,7 @@ window.__murmuration = {
 };
 
 const exits = wireExits();
-void exits; void SESSION_CAP; void AIRSPEED; void R_SPREAD; void R_GATHER;
+void exits; void SESSION_CAP; void AIRSPEED;
 void ALT_SPREAD; void ALT_GATHER; void atOf; void clamp; void resize;
 }
 </script>

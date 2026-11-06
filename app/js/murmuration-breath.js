@@ -104,23 +104,62 @@ export const FLOCK_N = 560;
  *  Everything angular in this chapter is derived from it. */
 export const AIRSPEED = 11.0;
 
-/** The flock's radius, spread and gathered. The ratio is what the
- *  churn is: omega = AIRSPEED / R, so 20 -> 11 is 0.55 -> 1.00 rad/s,
- *  a flock that boils nearly twice as fast at the top of a breath. */
-export const R_SPREAD = 20.0;
-export const R_GATHER = 11.0;
+/* ==================================================================
+   THE FLOCK IS TALL, AND THAT IS THE FRAME'S DOING — 7 November 2026
+   ==================================================================
+   THE FIRST BUILD WAS A SQUASHED BALL AND IT WAS UNREADABLE. Twenty
+   metres of radius at 28 m subtends 70 degrees; the phone is in
+   PORTRAIT, so the frame is 62 degrees tall and only 31 across. The
+   flock ran off both sides and read as "birds everywhere" rather than
+   as a shape, which is fatal in a chapter whose whole mechanic is the
+   shape.
 
-/** Murmurations are broader than they are tall. A sphere of birds
- *  reads as a planet; this is the squash that makes it a flock. */
-export const FLATTEN = 0.62;
+   THE OBVIOUS FIX IS THE WRONG ONE. Pushing the lens back until a
+   20 m ball fits the narrow axis means 80 m of range, and at 80 m the
+   near edge is 60 m away, a bird crosses the field at 10 deg/s
+   instead of 76, and the near edge sweeps 4 instead of 28. That is
+   handing back everything the staging was for in order to satisfy a
+   condition about the staging. The lens stays where it is.
 
-/** Where the ball sits. It LIFTS as it gathers, which reinforces the
- *  shape change rather than competing with it: gathering makes it
- *  smaller AND further away, so the angular radius falls faster than
- *  the radius does. */
+   SO THE FLOCK CHANGES SHAPE INSTEAD. It is TALL — a roosting column
+   rather than a ball — which is a real form a murmuration takes and
+   is also the form a portrait frame can hold: narrow across, where
+   there are only 31 degrees, and tall, where there are 62.
+
+   AND THE CONDITION ITSELF HAD TO BE RE-DERIVED, because "the flock
+   subtends 30 to 40 degrees" assumed a ball seen whole. What actually
+   has to be true is:
+
+     GATHERED   a readable shape with margin on the narrow axis —
+                15.1 degrees across (49% of the frame's width) and
+                27.0 tall (44% of its height)
+     SPREAD     plainly bigger, and allowed to OVERFLOW: 44.2 across
+                and 73.7 tall, or 143% and 119% of the frame. A sky
+                you cannot see the edges of is not a failure, it is
+                the other half of the mechanic.
+
+   The number that is being held is the RATIO, which is what the
+   reader sees: the flock goes from more than filling the frame to
+   under half of it, twice a breath.
+   ================================================================== */
+
+/** Horizontal and vertical radius, spread and gathered. Four numbers
+ *  rather than one, because the shape changes as well as the size:
+ *  spread it is 1.85 times taller than wide, gathered 1.8 — it does
+ *  not simply scale, it compacts. */
+export const R_H_SPREAD = 13.0, R_V_SPREAD = 24.0;
+export const R_H_GATHER =  5.0, R_V_GATHER =  9.0;
+
+/** Where the column sits. It LIFTS as it gathers, which reinforces
+ *  the shape change rather than competing with it: gathering makes it
+ *  smaller AND further away, so the angular size falls faster than
+ *  the radius does. Spread, the bottom of the column is 8 m off the
+ *  ground and 11.9 m from the lens — that is the "close and
+ *  underneath" the numbers depend on, and it is the bottom of the
+ *  column rather than the centre that delivers it. */
 export const X_C = 10.0;          // metres along the ground from the lens
-export const ALT_SPREAD = 28.0;
-export const ALT_GATHER = 36.0;
+export const ALT_SPREAD = 32.0;
+export const ALT_GATHER = 38.0;
 
 /** The shell has thickness, or every bird sits on one surface and the
  *  flock reads as a soap bubble. 0.42 means the innermost birds are
@@ -177,7 +216,16 @@ export function shapeOf(gather){
   return u * u * u * (u * (u * 6 - 15) + 10);
 }
 export function radiusAt(gather){
-  return R_SPREAD + (R_GATHER - R_SPREAD) * shapeOf(gather);
+  /* THE EFFECTIVE RADIUS, which is the one the churn is computed
+     from: the cube root of the ellipsoid's own volume measure, so a
+     column and a ball of the same volume boil at the same rate. */
+  const r = radiiAt(gather);
+  return Math.cbrt(r.h * r.h * r.v);
+}
+export function radiiAt(gather){
+  const g = shapeOf(gather);
+  return { h: R_H_SPREAD + (R_H_GATHER - R_H_SPREAD) * g,
+           v: R_V_SPREAD + (R_V_GATHER - R_V_SPREAD) * g };
 }
 export function altitudeAt(gather){
   return ALT_SPREAD + (ALT_GATHER - ALT_SPREAD) * shapeOf(gather);
@@ -275,21 +323,28 @@ export const rates = ratesOf;
  *  Angles in degrees, ranges in metres. */
 export function geometry(gather){
   const R = radiusAt(gather);
+  const r = radiiAt(gather);
   const dx = X_C - CAM_AT[0];
   const dy = altitudeAt(gather) - CAM_AT[1];
   const D = Math.hypot(dx, dy);
-  const deg = r => r * 180 / Math.PI;
+  const deg = a => a * 180 / Math.PI;
+  /* the BOTTOM of the column is the nearest part of it, and it is
+     what the "close and underneath" figures are measured from */
+  const bottom = Math.hypot(dx, dy - r.v);
   return {
-    radius: R,
+    radius: R, rh: r.h, rv: r.v,
     centreRange: D,
-    nearEdge: D - R,
-    angRadius: deg(Math.atan(R / D)),       // half the flock's extent
+    bottomRange: bottom,
+    nearEdge: bottom,
+    subtendH: deg(2 * Math.atan(r.h / D)),
+    subtendV: deg(2 * Math.atan(r.v / D)),
+    angRadius: deg(Math.atan(R / D)),
     subtend:   deg(2 * Math.atan(R / D)),
     /** how fast one bird crosses the field of view, at the near edge
      *  and at the far side. Constant in metres a second; it is only
      *  the range that changes. */
-    birdNear:  deg(AIRSPEED / Math.max(1e-6, D - R)),
-    birdFar:   deg(AIRSPEED / (D + R)),
+    birdNear:  deg(AIRSPEED / Math.max(1e-6, bottom)),
+    birdFar:   deg(AIRSPEED / (D + r.v)),
     /** and how fast the pattern recirculates */
     churn:     deg(omegaAt(gather))
   };
@@ -301,6 +356,8 @@ export function sweep(secs = 4){
   const a = geometry(0), b = geometry(1);
   return {
     secs,
+    subtendH: [+a.subtendH.toFixed(1), +b.subtendH.toFixed(1)],
+    subtendV: [+a.subtendV.toFixed(1), +b.subtendV.toFixed(1)],
     subtend: [+a.subtend.toFixed(1), +b.subtend.toFixed(1)],
     /** THE SMALL ONE, and it is in the report on purpose */
     angRadiusRate: +((a.angRadius - b.angRadius) / secs).toFixed(2),
