@@ -245,6 +245,47 @@ at the start of this pass. Still not measured on the reader's phone. The knobs, 
 first: `COLS`/`ROW_SPACING` (the ridge, ~89k of it), `CLOUD_COLS` (101), `BUTT_COLS` (85),
 `CLOUD_N` (16, the only one that changes how much sky is covered).
 
+## The Shepherd, and what Lantern Current's failure taught — 6 November 2026
+
+**Lantern Current is a failed concept, not a rough one, and the number says so.** The
+reader's verdict was "I don't get its motion", which is literally accurate: its breath
+drives a 0.68 m hull lift over 4 s, and against the nearest thing that moves with it that
+is **2.4 degrees a second** of angular rate. Long Air is 88. Nothing survives that gap —
+it is three orders of nothing. The deeper fault is that its camera RIDES the thing the
+breath moves, so the motion cancels out; and its spatial relationship, travel along a
+path, is Long Air's with a different skin. My recommendation is that it is replaced rather
+than rebuilt, and that its slot goes to a new idea. **Not deleted in this pass** — removing
+a chapter is a content decision.
+
+**The Shepherd exists because of that diagnosis.** Its lens is PARKED at the foot of the
+path, so the figure recedes and returns: the breath's motion is displacement across the
+frame and a change of size, neither of which a following camera can show. Build anything
+new against this question first — *what does the breath move, and what is it moving
+RELATIVE TO* — because a chapter can pass every gate in this repo and still be the one
+nobody understands.
+
+**Three faults in the new chapter that the harnesses found, not me:**
+
+- **A binary control cannot express a hold.** Hold-to-climb, release-to-descend has two
+  states; box breathing has three. `regress.mjs` measured 20.89 m of error on a 22 m band
+  — very nearly the whole hill, on the protocol the chapter offers first. It is Long Air's
+  pursuit now: a finger sets a place and a hold is leaving it there. **Any chapter offering
+  a protocol with holds needs a three-state control**, and the cheapest check for it is to
+  fly the cue perfectly in the harness and look at the error.
+- **A classifier that cannot reach the defect reports a clean surface.** `groundAt` used
+  `Math.abs(o)`, a slope kink straight down the path — the one line the camera always
+  points at. The sweep ran 0 upward and never crossed zero. Sweep THROUGH the symmetry
+  axis, always.
+- **58 draw calls.** Every limb of every animal was its own Mesh. `js/mesh.js` opens by
+  saying why that is wrong and this was the first chapter with a flock in it. One merged
+  mesh with per-animal uniform arrays: 5 calls. Bake normals with the INVERSE scale when
+  primitives are stretched non-uniformly, or the lit side is silently wrong.
+
+**Cost:** 70,718 triangles / 5 draw calls at 375x812. Hill resolution measured at three
+settings (161/193/225 columns → 2.14/1.51/1.10 px) and 193 shipped; rows left at 132
+because the same instrument reads 0.14 px along the path, where the hill runs away from
+the lens. Measure the two axes separately — that is why they are different numbers.
+
 ## Other standing constraints for this project
 
 - **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**
