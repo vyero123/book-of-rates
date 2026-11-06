@@ -63,7 +63,7 @@ import { breath } from '../app/js/breath.js';
 import { body, drag } from '../app/js/course.js';
 import { lens, CAM_EASE } from '../app/js/long-air-lens.js';
 import { tracker } from '../app/js/follow.js';
-import { cloudBaseOffset } from '../app/js/long-air-terrain.js';
+import * as cloudfield from '../app/js/long-air-clouds.js';
 import { MAG, MAG_V } from '../app/js/long-air-breath.js';
 
 let FAIL = false;
@@ -488,6 +488,7 @@ const period = periodOf(proto);
 const RATE = rates(proto);
 const probe = breath(proto);
 const course = courseOf(proto, t => probe.value(t));
+const clouds = cloudfield.cloudsFor(course);
 
 /* ------------------------------------------------------------------
    THE PRE-FIX LENS — the negative control
@@ -620,14 +621,12 @@ function sampleChapter(clk, { makeLens = lens, offPace = false, climb = false } 
        look worse than 60, and a boundary that bit discontinuously
        would show here as a velocity step however smooth it looked.
        Driven through the real module, not a replica. */
-    const { ahead } = gateAt(course, dist);
-    const reach = 2.6 + CLOUD_REACH;
-    const qq = Math.min(1, Math.abs(ahead) / reach);
-    const env = 1 - qq * qq * qq * (qq * (qq * 6 - 15) + 10);
-    const into = env > 0
-      ? K.buoy({ base: gate.centre + half + cloudBaseOffset(gate.i),
-                 bodyHalf: 0.78, dt, lift: CLOUD_LIFT, env })
-      : 0;
+    const kiteZb = dist + period * BEHIND;
+    let into = 0;
+    for(const n of cloudfield.cloudsAt(clouds, period, kiteZb, 0)){
+      const d = K.buoy({ base: n.base, bodyHalf: 0.78, dt, lift: CLOUD_LIFT, env: n.env });
+      if(d > into) into = d;
+    }
 
     L.step(dt, { kiteY: K.value, cam: ph.cam });
 
@@ -692,8 +691,15 @@ const jitterRun = sampleChapter(JITTER(FRAMES));
 const beforeRun = sampleChapter(JITTER(FRAMES), { makeLens: lensBefore });
 const offSteady = sampleChapter(STEADY(FRAMES), { offPace: true });
 const offJitter = sampleChapter(JITTER(FRAMES), { offPace: true });
-const upSteady  = sampleChapter(STEADY(FRAMES), { climb: true });
-const upJitter  = sampleChapter(JITTER(FRAMES), { climb: true });
+/* TWICE AS LONG AS THE OTHERS, because the clouds are sparse now.
+   Sixteen of them over a 48 s lap, most off the lane, so a 30 s run
+   can miss every one — and it did: the check fired with "the
+   climbing reader never enters a cloud", correctly, since every cloud
+   number here would otherwise have been measuring nothing. The run is
+   lengthened rather than the assertion softened. */
+const UP_FRAMES = FRAMES * 4;
+const upSteady  = sampleChapter(STEADY(UP_FRAMES), { climb: true });
+const upJitter  = sampleChapter(JITTER(UP_FRAMES), { climb: true });
 
 /* THE PRECONDITION, ASSERTED RATHER THAN ASSUMED. */
 say('');

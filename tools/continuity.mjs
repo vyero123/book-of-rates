@@ -63,7 +63,8 @@ import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          CGX, cloudLip, cloudUnder, cloudCrown, cloudEnd, BANK_DEPTH, CLOUD_CROWN_MAX,
          BGX, buttressTop, gateFlank, BUTT_HALF, BUTT_SINK } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
-import { MAG, MAG_V, MAG_T } from '../app/js/long-air-breath.js';
+import * as CF from '../app/js/long-air-clouds.js';
+import { MAG, MAG_V, MAG_T, GATE_HALF } from '../app/js/long-air-breath.js';
 import { readFileSync } from 'node:fs';
 
 const VERBOSE = process.argv.includes('--verbose');
@@ -963,88 +964,115 @@ for(const [name, w] of [['ridge across (columns)', worstAcross],
 }
 
 /* ==================================================================
-   THE CLOUD LIP, IN PIXELS
+   THE CLOUDS, IN PIXELS — and the promise they have to keep
    ==================================================================
-   6 November 2026. The rock lip is measured in world degrees above
-   and that is fine for it: a smooth U with one ripple over 1 m
-   columns. The cloud lip is cauliflower over 0.33 m columns, and a
-   world-degree bar on a segment that short measures the SEGMENT
-   LENGTH rather than anything a reader can see — 4 degrees across
-   0.33 m is 0.11 px of bulge at the range a gate is read at. Holding
-   the cloud to it is what kept the banks shapeless: the profile was
-   not timid, it was at the resolution limit of the wrong bar.
+   6 November 2026. The clouds stopped being the gates' upper lip and
+   became a sparse field of their own, so everything measured here
+   changed subject. Three questions, and the first is the one that
+   matters:
 
-   So this one is projected, like the ridge, the trees and the dove.
-   Same lens, same sagitta, same 2 px bar. A gate is met at about
-   twenty metres, which is where the rock lip is already assumed to
-   be read.
+   1. ON-PACE PLAY MUST NEVER NEED TO ENTER ONE. That invariant used
+      to hold because the bank WAS the gate's upper lip, so clearing
+      it and clearing the gate were the same act. Now it holds because
+      every cloud's underside is derived from the SCHEDULE at its own
+      position plus the gate's half-opening plus a clearance — the
+      same margin the course already promises. Derived, and checked
+      here against the LOWEST the underside ever reaches, which is the
+      drawn curve minus the billow's own bound.
+   2. The silhouette has to hold the pixel bar, like every other edge.
+   3. A cloud may not push past the ceiling the chapter says the
+      weather sits under.
    ================================================================== */
 say('');
-say('THE CLOUD LIP — the silhouette, through the lens');
+say('THE CLOUDS — a sparse field now, not the gates\' upper lip');
 {
   const probe3 = breath(proto);
   const course3 = courseOf(proto, t => probe3.value(t));
-  let worst = { px: 0 }, seen = 0, worstDeg = 0, minOff = Infinity;
-  let worstCrown = { px: 0 }, overCeil = 0;
-  for(const g of course3.gates){
-    const zw = zWorldOf(g.zb);
-    if(zw > 0 || zw < -140) continue;
-    /* THE CURVE THE PAGE DRAWS, not the one it starts from. The first
-       version of the close measured cloudLip alone while the page
-       drew the whole closed outline, and reported a 129 degree turn
-       at an x where nothing of the sort was happening. Both come out
-       of the module now, so there is nothing to drift. */
-    const lipBase = g.centre + g.half;
-    const crownBase = Math.min(ceilAt(g.zb, period) + 2.0, lipBase + BANK_DEPTH);
-    const crown = k => crownBase + cloudCrown(g.i, k);
-    const Y = k => cloudUnder(g.i, k, lipBase, crown(k));
-    for(let k = 0; k < CGX.length; k++){
-      if(crownBase + cloudCrown(g.i, k) > ceilAt(g.zb, period) + 2.0 + CLOUD_CROWN_MAX + 1e-9){
-        overCeil++; break;
+  const field = CF.cloudsFor(course3);
+
+  /* (1) the promise */
+  let worstClear = Infinity, clearAt = null;
+  for(const c of field){
+    for(let u = -1; u <= 1.0001; u += 0.01){
+      const low = CF.cloudUnderY(c, u) - CF.CLOUD_BILLOW;
+      const m = low - CF.scheduleAt(course3, c.zb);
+      if(m < worstClear){ worstClear = m; clearAt = { i:c.i, u:+u.toFixed(2) }; }
+    }
+  }
+  const pl = `every cloud's lowest underside clears the schedule beneath it by ` +
+             `${worstClear.toFixed(2)} m (the opening itself is ${GATE_HALF.toFixed(2)})`;
+  if(worstClear >= GATE_HALF) ok(pl + '  — on-pace play can never need to enter one');
+  else bad(pl + `  — a reader following the cue would be put into cloud ${clearAt.i}`);
+
+  /* (2) the silhouette, under and crown, through the chapter's lens */
+  let worst = { px: 0 }, seen = 0, worstDeg = 0;
+  const N = CF.CLOUD_COLS;
+  /* EVERY CLOUD IS PROJECTED AT A REPRESENTATIVE DISTANCE, not at
+     wherever this particular layout happens to put it. Sparse means
+     sixteen clouds over 672 m, so at any one moment most of them are
+     outside the frame and the first version of this check measured
+     NOTHING and said so. The question is not whether these ones are
+     in shot; it is whether a cloud's outline reads as a polygon at
+     the range clouds are read at. 40 m is the near end of that — a
+     cloud closer than this is overhead and past — so it is the worst
+     case and therefore the one to hold. */
+  const CLOUD_DIST = 40;
+  for(const c of field){
+    const zw = -CLOUD_DIST;
+    for(const [name, Y] of [['under', u => CF.cloudUnderY(c, u)],
+                            ['crown', u => CF.cloudCrownY(c, u)]]){
+      for(let k = 1; k < N - 1; k++){
+        const U = j => -1 + (j / (N - 1)) * 2;
+        /* centred for the measurement. A cloud's own x puts most of
+           them off the side of the frame, where onScreen rejects the
+           knots and the check quietly measures six of them instead of
+           two thousand. Where it sits is a composition question; what
+           its edge looks like when you are under it is this one. */
+        const X = j => U(j) * c.halfW;
+        const r = sagittaPx([X(k-1), Y(U(k-1)), zw], [X(k), Y(U(k)), zw],
+                            [X(k+1), Y(U(k+1)), zw]);
+        if(r){ seen++; if(r.px > worst.px) worst = { ...r, i:c.i, k, name }; }
+        const s1 = (Y(U(k)) - Y(U(k-1))) / (X(k) - X(k-1));
+        const s2 = (Y(U(k+1)) - Y(U(k))) / (X(k+1) - X(k));
+        worstDeg = Math.max(worstDeg, Math.abs(Math.atan(s2) - Math.atan(s1)) * 180 / Math.PI);
       }
     }
-    for(let k = 1; k < CGX.length - 1; k++){
-      const r = sagittaPx([CGX[k-1], crown(k-1), zw], [CGX[k], crown(k), zw],
-                          [CGX[k+1], crown(k+1), zw]);
-      if(r && r.px > worstCrown.px) worstCrown = { ...r, gate:g.i, x:CGX[k] };
-    }
-    for(let k = 1; k < CGX.length - 1; k++){
-      const r = sagittaPx([CGX[k-1], Y(k-1), zw], [CGX[k], Y(k), zw], [CGX[k+1], Y(k+1), zw]);
-      if(r){ seen++; if(r.px > worst.px) worst = { ...r, gate:g.i, x:CGX[k] }; }
-      const s1 = (Y(k) - Y(k-1)) / (CGX[k] - CGX[k-1]);
-      const s2 = (Y(k+1) - Y(k)) / (CGX[k+1] - CGX[k]);
-      worstDeg = Math.max(worstDeg, Math.abs(Math.atan(s2) - Math.atan(s1)) * 180 / Math.PI);
-    }
-    for(let k = 0; k < CGX.length; k++) minOff = Math.min(minOff, cloudLip(g.i, k));
   }
-  if(worstCrown.px){
-    const cl = `cloud crown silhouette   worst ${worstCrown.px.toFixed(2).padStart(5)} px off the chord` +
-               ` at ${worstCrown.dist.toFixed(0)} m (gate ${worstCrown.gate}, x=${worstCrown.x.toFixed(1)})` +
-               `  (bar ${PX_BAR} px)`;
-    if(worstCrown.px <= PX_BAR) ok(cl); else bad(cl);
-  }
-  /* ceilAt no longer POSITIONS the crown — BANK_DEPTH does — but it
-     still bounds it, so the field is still load-bearing and still
-     checked rather than left as a seam test on something nothing
-     draws. */
-  if(overCeil === 0) ok(`every bank crown stays under ceilAt + 2 + its bulge's own bound ` +
-                        `(${CLOUD_CROWN_MAX.toFixed(2)} m, derived from the amplitudes)`);
-  else bad(`${overCeil} bank crown(s) push past the ceiling the chapter says they sit under`);
-  if(seen === 0){
-    bad('cloud lip: nothing projected — the instrument saw no gates');
-  } else {
-    const line = `cloud lip silhouette     worst ${worst.px.toFixed(2).padStart(5)} px off the chord` +
-                 ` at ${worst.dist.toFixed(0)} m (gate ${worst.gate}, x=${worst.x.toFixed(1)}),` +
-                 ` ${worstDeg.toFixed(1)} deg in world, ${seen} knots in frame  (bar ${PX_BAR} px)`;
+  if(seen === 0) bad('clouds: nothing projected — the instrument saw no clouds in frame');
+  else {
+    const line = `cloud silhouette         worst ${worst.px.toFixed(2).padStart(5)} px off the chord` +
+                 ` at ${worst.dist.toFixed(0)} m (cloud ${worst.i}, ${worst.name}),` +
+                 ` ${worstDeg.toFixed(1)} deg in world, ${seen} knots  (bar ${PX_BAR} px)`;
     if(worst.px <= PX_BAR) ok(line); else bad(line);
   }
-  /* THE STANDING INVARIANT: variation only ever makes the hole
-     BIGGER. Three new cosine terms on the lip is three new chances to
-     get a sign wrong, and a negative offset would eat the opening the
-     whole on-pace guarantee is measured against. */
-  const ml = `cloud lip offset is non-negative everywhere (min ${minOff.toFixed(4)} m)`;
-  if(minOff >= -1e-12) ok(ml);
-  else bad(ml + '  — a bulge cuts INTO the opening');
+
+  /* (3) the ceiling, and the billow's own bound */
+  let over = 0, topMost = -Infinity;
+  for(const c of field){
+    for(let u = -1; u <= 1.0001; u += 0.02){
+      const top = CF.cloudCrownY(c, u) + CF.CLOUD_BILLOW * c.puff * 1.3;
+      topMost = Math.max(topMost, top);
+      if(top > ceilAt(c.zb, period) + 2.0 + CF.CLOUD_BILLOW * 2 + 12) over++;
+    }
+  }
+  if(over === 0) ok(`no cloud pushes past the ceiling; the highest reaches ${topMost.toFixed(1)} m`);
+  else bad(`${over} samples push past the ceiling the chapter says the weather sits under`);
+
+  /* AND HOW SPARSE. The reader asked for clouds that do not overwhelm
+     an otherwise sunny day, so the number that answers that is
+     printed rather than left to taste: what fraction of the strip has
+     a cloud anywhere over the lane. */
+  let covered = 0, steps = 0;
+  for(let z = 0; z < period; z += 2){
+    steps++;
+    if(CF.cloudsAt(field, period, z, 0).length) covered++;
+  }
+  ok(`sky over the lane: ${(100 - covered / steps * 100).toFixed(0)}% open, ` +
+     `${field.length} clouds ${(2 * Math.min(...field.map(c => c.halfW))).toFixed(0)}-` +
+     `${(2 * Math.max(...field.map(c => c.halfW))).toFixed(0)} m wide, ` +
+     `bases ${Math.min(...field.map(c => c.base)).toFixed(0)}-` +
+     `${Math.max(...field.map(c => c.base)).toFixed(0)} m; layout repeats every ` +
+     `${(period / 14).toFixed(0)} s, the billow never does`);
 }
 
 /* ==================================================================

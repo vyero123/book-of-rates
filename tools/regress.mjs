@@ -40,6 +40,7 @@ import * as bamboo from '../app/js/bamboo-rain-breath.js';
 import * as lantern from '../app/js/lantern-breath.js';
 import { body, ratesOf, corridor as cor, drag } from '../app/js/course.js';
 import * as terrain from '../app/js/long-air-terrain.js';
+import * as cloudfield from '../app/js/long-air-clouds.js';
 
 const STEP = 0.05;          // 20 samples a second
 const EPS  = 1e-12;
@@ -555,6 +556,7 @@ const KITE_HALF = 0.78;
 function fly(proto, press){
   const b = breath(proto);
   const course = longAir.courseOf(proto, t => b.value(t));
+  const clouds = cloudfield.cloudsFor(course);
   const kite = kiteBody(proto);
   const fric = drag({ maxLoss: longAir.DRAG_MAX_LOSS, gain: longAir.DRAG_GAIN,
                       clear: longAir.DRAG_CLEAR });
@@ -599,20 +601,19 @@ function fly(proto, press){
       const margin = gate.half - Math.abs(kite.value - gate.centre) - KITE_HALF;
       if(margin < worstMargin){ worstMargin = margin; worstAt = +t.toFixed(2); }
     }
-    /* THE CLOUD BANK. Same field, same envelope and the same module
-       the page drives — not a replica of it, which is the standing
-       rule in this project and the reason the terrain sampler was
-       once measuring a surface nobody drew. */
+    /* THE CLOUDS, which stopped being the gates' upper lip on
+       6 November. Same field and the same module the page drives —
+       not a replica, which is the standing rule here and the reason
+       the terrain sampler once measured a surface nobody drew. */
     {
-      const reach = 2.6 + longAir.CLOUD_REACH;
-      const q = Math.min(1, Math.abs(ahead) / reach);
-      const env = 1 - q * q * q * (q * (q * 6 - 15) + 10);
-      if(env > 0){
-        const into = kite.buoy({ base: gate.centre + half + terrain.cloudBaseOffset(gate.i),
-                                 bodyHalf: KITE_HALF,
-                                 dt, lift: longAir.CLOUD_LIFT, env });
-        if(into > 0){ cloudFrames++; maxCloud = Math.max(maxCloud, into); }
+      const kiteZb = dist + course.period * longAir.BEHIND;
+      let deepest = 0;
+      for(const n of cloudfield.cloudsAt(clouds, course.period, kiteZb, 0)){
+        const into = kite.buoy({ base: n.base, bodyHalf: KITE_HALF,
+                                 dt, lift: longAir.CLOUD_LIFT, env: n.env });
+        if(into > deepest) deepest = into;
       }
+      if(deepest > 0){ cloudFrames++; maxCloud = Math.max(maxCloud, deepest); }
     }
     maxY = Math.max(maxY, kite.value);
     minRidge = Math.min(minRidge, kite.value - longAir.ridgeAt(dist, course.period));
