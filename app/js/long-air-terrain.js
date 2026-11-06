@@ -167,8 +167,8 @@ export function wanderScale(x){
    from 66,048 triangles to 87,840, which is the single largest line
    in this chapter's budget and is bought on the reader's "not too
    stingy". */
-export const COLS = 169;
-export const ROW_SPACING = 2.0;
+export const COLS = 145;
+export const ROW_SPACING = 2.5;
 
 /** The column table the geometry is built from, generated rather than
  *  written out, so the count is a knob and not an edit. */
