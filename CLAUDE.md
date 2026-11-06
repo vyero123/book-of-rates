@@ -217,11 +217,33 @@ and nothing has been measured on the reader's own phone. `CLOUD_N` (16) is the o
 that changes how much sky is covered; `CLOUD_COLS` and `BUTT_COLS` are the two that cost
 the most and buy only smoothness.
 
-**Still not done: the ground's TEXTURE.** Continuity was bought where it needed it and the
-popping ridges were a real fault, now fixed — but the hill is still value bands plus grass
-plus grain, and it does not read as a material the way the sail's weave or the cloud's wool
-does. It wants a second, finer octave of relief, which needs more rows, which is now
-affordable. It was not started.
+**The ground's texture is done, in TWO layers, and the split is the lesson.** The note
+that asked for "a finer octave of relief" was half an answer: the sail's weave and the
+cloud's wool — the two things the reader named as reading like materials — are SHADING,
+not geometry. So the mesh got the mid scale (`reliefAt`, 10–30 m, folded so no direction
+is legible, paid for with rows) and the fragment stage got the fine scale (2 m and 0.7 m,
+dissolving out past 90 m). Geometry buys the silhouette and the way light falls across a
+slope; it does not buy grain. The mesh samples ~2.3 m, so anything under about 9 m of
+wavelength aliases and belongs in the shader by arithmetic rather than by preference.
+
+**Two instruments were wrong and the new octave exposed both.** The seam check used
+one-sided differences and was measuring its own truncation error — it failed a field that
+is exactly periodic by construction; centred differences read 6e-15. And the world-degree
+proxy assumes a FIXED column spacing, so when ROW_SPACING went 2.6 → 2.3 it condemned a
+surface the projected measurement passes at 0.89 px. Sweeps that have a projected
+counterpart now report and do not gate; the cloud ceiling and the far mesas have none and
+keep theirs.
+
+**Measure three settings before spending on subdivision.** 169/2.0 is 112,896 ridge
+triangles at 0.70 px; 153/2.3 is 88,768 at 0.89; 145/2.5 is 77,472 at 0.99. The middle one
+ships: it holds the 1 px line (below which a vertex cannot be seen to BE a vertex) on both
+axes, and the 24,000 triangles the finest setting buys go into a difference nobody can
+see. "Not too stingy" is not a licence to waste.
+
+**Cost: 140,526 triangles / 16 draw calls** on the deployed build at 375x812, from 117,806
+at the start of this pass. Still not measured on the reader's phone. The knobs, largest
+first: `COLS`/`ROW_SPACING` (the ridge, ~89k of it), `CLOUD_COLS` (101), `BUTT_COLS` (85),
+`CLOUD_N` (16, the only one that changes how much sky is covered).
 
 ## Other standing constraints for this project
 
