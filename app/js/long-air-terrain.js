@@ -159,16 +159,27 @@ export function wanderScale(x){
    the field's curvature is bounded and therefore that subdivision is
    the right lever here at all — the same test that said it was the
    wrong lever while the profile was quantised. */
-/* 145 AND 2.2, UP FROM 129 AND 2.6. The fine octave is the reason
-   and the pixel bar is what sets them: its shortest term is 8.5 m
-   down the course and 14 m across, which needs about four samples a
-   cycle to be drawn rather than aliased. Measured afterwards, not
-   assumed — tools/continuity.mjs projects both axes. The ridge goes
-   from 66,048 triangles to 87,840, which is the single largest line
-   in this chapter's budget and is bought on the reader's "not too
-   stingy". */
-export const COLS = 145;
-export const ROW_SPACING = 2.5;
+/* 153 AND 2.3, UP FROM 129 AND 2.6. The fine octave is the reason:
+   its shortest term is 10.7 m down the course, which needs about
+   four samples a cycle to be drawn rather than aliased.
+
+   MEASURED AT THREE SETTINGS RATHER THAN PICKED, because the ridge
+   is the single largest line in this chapter's triangle budget and
+   "not too stingy" is not a licence to waste:
+
+       169 / 2.0   112,896 tri   0.70 px across, 0.77 along
+       153 / 2.3    88,768       0.89            1.01
+       145 / 2.5    77,472       0.99            1.11
+
+   153 and 2.3 is shipped. It holds the ONE pixel line — the point
+   below which a vertex cannot be seen to be a vertex at all, which
+   is stricter than the 2 px bar the chapter gates on — on both axes.
+   The 24,000 extra triangles the finer setting buys go entirely into
+   the difference between 0.70 px and 0.89 px, which nobody can see.
+   The coarsest setting breaks the 1 px line along the course, so it
+   is not free either. */
+export const COLS = 153;
+export const ROW_SPACING = 2.3;
 
 /** The column table the geometry is built from, generated rather than
  *  written out, so the count is a knob and not an edit. */
