@@ -38,6 +38,7 @@ import * as deepLight from '../app/js/deep-light-breath.js';
 import * as longAir from '../app/js/long-air-breath.js';
 import * as bamboo from '../app/js/bamboo-rain-breath.js';
 import * as shep from '../app/js/shepherd-breath.js';
+import * as murm from '../app/js/murmuration-breath.js';
 import { tracker } from '../app/js/follow.js';
 import { body, ratesOf, corridor as cor, drag } from '../app/js/course.js';
 import * as terrain from '../app/js/long-air-terrain.js';
@@ -1014,6 +1015,7 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
    ------------------------------------------------------------------ */
 const CHAPTERS = [
   { name:'the shepherd',    mod: shep,      corridor: shep.CORRIDOR },
+  { name:'the murmuration', mod: murm,      corridor: murm.CORRIDOR },
   { name:'long air',        mod: longAir,   corridor: longAir.CORRIDOR },
   { name:'bamboo rain',     mod: bamboo,    corridor: bamboo.CORRIDOR  },
   /* Deep Light predates the corridor helper and anchors its heights
@@ -1349,6 +1351,141 @@ for(const [id, proto] of Object.entries(bamboo.PROTOCOLS)){
                 `${rms.toFixed(2)} m rms inside a predicted ${allow.toFixed(2)} m of lag ` +
                 `(worst ${worst.toFixed(2)}), nearest ${nearest.toFixed(1)} m, ` +
                 `clearing monotone to ${bamboo.CLEAR_SHIFT} m, ${strokes} lightning samples, all on exhales`);
+}
+
+/* ==================================================================
+   5c. THE MURMURATION — the shape is the claim
+   ==================================================================
+   This chapter has no path, no collision and no chain of followers.
+   What it has instead is a SHAPE that the breath writes, and three
+   things have to be true about it that nothing else in the repo
+   would catch.
+
+   The arithmetic is in js/murmuration-breath.js and is re-run here
+   rather than quoted, because the header comment in that file has
+   already been wrong once: the "19 degrees a second of silhouette
+   motion" this chapter was proposed on was an EXTENT quoted as a
+   RATE, and over a four-second inhale it is a quarter of that.
+   ================================================================== */
+{
+  const FRAME_H_DEG = 31.0;    // a 375x812 frame at fov 62 is 31 across
+  const deg = a => a * 180 / Math.PI;
+
+  /* (a) THE SHAPE PARAMETER IS SMOOTH AND FLAT AT BOTH ENDS. The
+         corridor clamps the body's value at GATHER_LO/HI, and the
+         whole point of the smootherstep is that the clamp lands
+         where the derivative is already zero — otherwise the flock
+         hits a wall at the top of every inhale, in the one moment
+         the reader is most likely to be watching. */
+  {
+    const d = g => (murm.shapeOf(g + 1e-4) - murm.shapeOf(g - 1e-4)) / 2e-4;
+    const endSlope = Math.max(Math.abs(d(murm.GATHER_LO)), Math.abs(d(murm.GATHER_HI)));
+    if(endSlope > 1e-3)
+      fail(`murmuration: shapeOf has slope ${endSlope.toExponential(2)} at the corridor's ` +
+           `own clamp — the flock stops dead rather than easing`);
+    let prev = -1, mono = true;
+    for(let g = murm.GATHER_LO; g <= murm.GATHER_HI + 1e-9; g += 0.01){
+      const v = murm.shapeOf(g);
+      if(v < prev - 1e-12) mono = false;
+      prev = v;
+      if(v < -1e-9 || v > 1 + 1e-9) fail(`murmuration: shapeOf(${g.toFixed(2)}) = ${v}`);
+    }
+    if(!mono) fail('murmuration: shapeOf is not monotonic — gathering harder would spread it');
+  }
+
+  /* (b) THE FLOCK FITS THE FRAME WHEN GATHERED AND OVERFLOWS IT WHEN
+         SPREAD. This is the condition the staging was re-derived
+         against after a squashed ball ran off both sides of a
+         portrait frame and read as birds everywhere. It is the
+         chapter's legibility, stated as a number. */
+  const a = murm.geometry(0), b = murm.geometry(1);
+  if(!(b.subtendH < FRAME_H_DEG * 0.9))
+    fail(`murmuration: gathered, the flock subtends ${b.subtendH.toFixed(1)} deg across a ` +
+         `${FRAME_H_DEG} deg frame — there is no shape to read`);
+  if(!(a.subtendH > FRAME_H_DEG * 1.3))
+    fail(`murmuration: spread, the flock subtends only ${a.subtendH.toFixed(1)} deg — the two ` +
+         `states are not far enough apart to be a mechanic`);
+
+  /* (c) AND THE CHURN IS THE MECHANIC. Constant airspeed means a ball
+         that halves in radius doubles its angular rate; if that ratio
+         ever falls to nothing, the breath has stopped TURNING the
+         birds and the chapter is a flock that gets smaller. */
+  const churnRatio = b.churn / a.churn;
+  if(churnRatio < 2.0)
+    fail(`murmuration: the churn only goes ${a.churn.toFixed(1)} -> ${b.churn.toFixed(1)} deg/s ` +
+         `(x${churnRatio.toFixed(2)}) — the breath is not turning the birds`);
+  /* the near edge has to stay CLOSE, because every angular figure in
+     the module is measured from it and a lens that drifts back gives
+     the chapter away without changing a line of the mapping */
+  if(a.nearEdge > 16)
+    fail(`murmuration: the near edge is ${a.nearEdge.toFixed(1)} m away when spread — the ` +
+         `staging has moved and a bird now crosses at ${a.birdNear.toFixed(1)} deg/s`);
+
+  /* (d) A CUE-PERFECT READER REACHES BOTH ENDS OF THE SHAPE, and a
+         mashing one buys nothing extra. Same rate-cap question every
+         chapter answers, asked of a shape instead of a position. */
+  for(const [id, proto] of Object.entries(murm.PROTOCOLS)){
+    const r = ratesOf(proto);
+    const cue   = body({ corridor: murm.CORRIDOR, rates: r,
+                         vMax: murm.RANGE * r.fillPerSec * 2.2 });
+    const mash  = body({ corridor: murm.CORRIDOR, rates: r,
+                         vMax: murm.RANGE * r.fillPerSec * 2.2 });
+    const bm = breath(proto);
+    cue.reset(murm.normOf(bm.value(0))); mash.reset(murm.normOf(bm.value(0)));
+    const dt = 1 / 120;
+    let worst = 0, cueHi = -Infinity, cueLo = Infinity, mashHi = -Infinity;
+    for(let t = 0; t < proto.session; t += dt){
+      for(const [bd, target] of [[cue, murm.normOf(bm.value(t))],
+                                 [mash, (Math.sin(t * 9) > 0 ? 1 : 0)]]){
+        const gap = target - bd.fill;
+        const cap = (gap > 0.012 ? r.fillPerSec : gap < -0.012 ? r.emptyPerSec : 0) * dt;
+        if(cap > 0){
+          let mv = gap * 14 * dt;
+          if(mv >  cap) mv =  cap;
+          if(mv < -cap) mv = -cap;
+          bd.fill = Math.min(1, Math.max(0, bd.fill + mv));
+        }
+        bd.settle(dt);
+      }
+      if(t > proto.cycle){
+        worst = Math.max(worst, Math.abs(cue.value - bm.value(t)));
+        cueHi = Math.max(cueHi, cue.value); cueLo = Math.min(cueLo, cue.value);
+        mashHi = Math.max(mashHi, mash.value);
+      }
+    }
+    const allowLag = trailBound(cue, proto.phases);
+    if(worst > allowLag)
+      fail(`murmuration/${id}: the shape trails its schedule by ${worst.toFixed(3)}, more than ` +
+           `the ${allowLag.toFixed(3)} the spring explains`);
+    if(cueHi < 0.90 || cueLo > 0.10)
+      fail(`murmuration/${id}: flying the cue reaches only ${cueLo.toFixed(2)}..${cueHi.toFixed(2)} ` +
+           `of the band — the reader cannot get the shape the chapter offers`);
+    /* ONE DRAWN PIXEL, DERIVED RATHER THAN PICKED. Comparing two
+       sprung integrations at 1e-9 is comparing their rounding: the
+       no-holds protocol came out 0.001 of the band apart, which is
+       the spring's own slop and not a reader buying anything. The
+       question the check is actually asking is whether breathing
+       faster buys shape A READER COULD SEE, so the tolerance is one
+       pixel of drawn flock on the reader's own phone:
+
+         the whole band is worth (63.9 - 24.0)/31 * 375 = 482 px
+         of drawn width at 375x812, so 1 px is 1/482 of it. */
+    const PX = 1 / ((a.subtendH - b.subtendH) / FRAME_H_DEG * 375);
+    if(mashHi > cueHi + PX)
+      fail(`murmuration/${id}: a mashing reader gathers to ${mashHi.toFixed(4)} against the ` +
+           `cue's ${cueHi.toFixed(4)} — ${((mashHi-cueHi)/PX).toFixed(1)} drawn pixels of ` +
+           `extra shape, so breathing faster is buying something`);
+
+    if(failures === 0)
+      console.log(`    ok    murmuration/${id}: ${a.subtendH.toFixed(0)} deg of flock spread ` +
+        `(${(a.subtendH / FRAME_H_DEG * 100).toFixed(0)}% of a portrait frame) down to ` +
+        `${b.subtendH.toFixed(0)} (${(b.subtendH / FRAME_H_DEG * 100).toFixed(0)}%), near edge ` +
+        `${a.nearEdge.toFixed(1)} m, a bird there ${a.birdNear.toFixed(0)} deg/s, churn ` +
+        `${a.churn.toFixed(0)} -> ${b.churn.toFixed(0)} deg/s (x${churnRatio.toFixed(1)}), ` +
+        `density x${((a.rh*a.rh*a.rv)/(b.rh*b.rh*b.rv)).toFixed(1)}; cue reaches ` +
+        `${cueLo.toFixed(2)}..${cueHi.toFixed(2)}, tracks to ${worst.toFixed(3)}, mashing buys nothing`);
+  }
+  void deg;
 }
 
 /* ------------------------------------------------------------------
