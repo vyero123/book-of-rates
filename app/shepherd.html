@@ -397,7 +397,7 @@ const hillMat = posterMat(THREE, {
       /* and it darkens going down the flank, which IS a decision
          about the ground and not about distance: that is where the
          bracken is */
-      float low = 1.0 - smoothstep(-6.0, 2.0, vY - ${'${'}0${'}'});
+      float low = 1.0 - smoothstep(-6.0, 2.0, vY);
       vec3 col = rampPickAA((tone + 0.5) / 6.0);
 
       /* THE GRASS, from the kit's one wind field. Same construction
@@ -689,18 +689,19 @@ const loop = clock((dt, now, running) => {
      own capped rate. The two are separate on purpose: the flock
      records the reader's walk, not the schedule's. --- */
   if(started && !forceHold){
-    const want = clamp01(normOf(sched));
-    const gap = want - WALKER.fill;
-    const up = holding, down = !holding;
-    const pace = holding || Math.abs(gap) > 0.02 ? 1 : SELF_WALK;
-    const cap = (up ? RATE.fillPerSec : RATE.emptyPerSec) * pace * dt;
-    if(cap > 0){
-      let move = (up ? 1 : -1) * cap;
-      /* nobody steering: he follows the cue at SELF_WALK rather than
-         sliding to the foot of the hill and staying there */
-      if(!holding && !started) move = 0;
-      WALKER.fill = clamp01(WALKER.fill + move);
-    }
+    /* THE HOLD IS THE WHOLE CONTROL. Holding sends him up at the
+       protocol's own fill rate; letting go lets him come down at its
+       empty rate. The touch writes a DIRECTION and the kit integrates
+       it, so breathing twice as fast buys half the walk — the same
+       cap, for the same reason, as every other chapter.
+
+       NOBODY STEERING IS NOT A FAILURE STATE. A reader who never
+       touches the glass gets a shepherd who drifts back down to the
+       foot of the hill at SELF_WALK and stands there with his flock
+       around him, which is a thing a shepherd does. Declining costs
+       nothing and is not corrected (§1.6b). */
+    const rate = holding ? RATE.fillPerSec : RATE.emptyPerSec * SELF_WALK;
+    WALKER.fill = clamp01(WALKER.fill + (holding ? 1 : -1) * rate * dt);
     WALKER.settle(dt);
   } else {
     WALKER.drive(dt, holding, !holding);
