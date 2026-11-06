@@ -191,6 +191,38 @@ nothing useful about it. If the chapter has gone soft, the first places to look 
 CLOUD_LIP_COLS (121) and BUTT_COLS (61), both of which are knobs with the arithmetic for
 what they buy written next to them in `long-air-terrain.js`.
 
+## Long Air — 6 November 2026, the triangle budget opened
+
+The reader reported 60 fps strong and said not to be stingy with triangles. Three things
+to carry forward.
+
+**Subdivision is still the wrong answer for the gates, and now for a STRUCTURAL reason
+rather than a cost one.** The cost argument (half-metre rows, ~400,000 triangles) is no
+longer the point. The real reason is that the gate lip must be a HARD EDGE: it is the
+thing the reader aims at, §4.2 says a hard edge is legitimate, and a C2 terrain surface
+cannot have one by construction. Folding the gate into the ground would either lose the
+aimable edge or keep it as a crease that fails the continuity bar by design. The collision
+model is also 1-D — a horizontal lip at `centre - half` — and a terrain-blended gate would
+have a lip varying with x that the 1-D model cannot represent. Do not reopen this on cost.
+
+**Where the triangles DID go:** `BUTT_COLS` 67 → 85 and `CLOUD_COLS` 45 → 101, both bought
+to hold the 2 px bar after a shape change, both with the arithmetic beside them. The
+pattern worth keeping: change the shape for the look, measure, then buy the bar back with
+columns rather than compromising the shape.
+
+**Cost, measured on the deployed build at 375x812:** 92,486 triangles / 16 draw calls at
+the start of this pass, **117,806 / 16** now. That is where I would start being nervous —
+not because of this number, but because the next structural change will want another 20%
+and nothing has been measured on the reader's own phone. `CLOUD_N` (16) is the one knob
+that changes how much sky is covered; `CLOUD_COLS` and `BUTT_COLS` are the two that cost
+the most and buy only smoothness.
+
+**Still not done: the ground's TEXTURE.** Continuity was bought where it needed it and the
+popping ridges were a real fault, now fixed — but the hill is still value bands plus grass
+plus grain, and it does not read as a material the way the sail's weave or the cloud's wool
+does. It wants a second, finer octave of relief, which needs more rows, which is now
+affordable. It was not started.
+
 ## Other standing constraints for this project
 
 - **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**
