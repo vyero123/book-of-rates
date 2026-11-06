@@ -479,78 +479,199 @@ scene.add(hill);
    two-value split is resolved across one pixel rather than landing on
    the grid.
    ------------------------------------------------------------------ */
+/* ==================================================================
+   ONE MESH FOR ALL SIX FIGURES
+   ==================================================================
+   The first build gave every limb of every animal its own Mesh and
+   its own material: 58 draw calls for a scene with four layers in
+   it. js/mesh.js opens by saying exactly why that is wrong — the
+   natural way to write "five sheep" is five objects, and on a phone
+   that is forty-five draw calls for a few hundred triangles — and
+   this chapter is the one place in the book with a FLOCK, which is
+   the case the rule was written for.
+
+   So every figure is baked once into one builder, in its own local
+   space, and carries three attributes: which animal it belongs to,
+   which value it is painted with, and which limb it is. The animals'
+   positions, headings, leans and strides are uniform arrays, so the
+   whole flock and its shepherd are ONE draw call and the per-frame
+   work is six vec3 writes rather than fifty-four matrix updates.
+
+   THE NORMALS ARE BAKED WITH THE INVERSE SCALE, which is the part
+   that is easy to get wrong and silent when it is: these primitives
+   are stretched non-uniformly, and a normal carried through a
+   non-uniform scale unchanged points somewhere the surface does not.
+   The fleece's terminator is computed from it, so a wrong normal
+   would show up as a sheep lit from the wrong side — visible, but
+   only if you know what you are looking at.
+   ================================================================== */
+const FIG_N = FLOCK_N + 1;               // the shepherd is index 0
+const K_FLEECE = 0, K_DARK = 1, K_CLOAK = 2, K_CLOAK_LIT = 3, K_SKIN = 4, K_CROOK = 5;
+const L_NONE = 0, L_FRONT = 1, L_BACK = 2;
+
+/** Bake one stretched primitive into the builder, in the figure's own
+ *  local space. `hip` is the height a limb rotates about. */
+function bake(b, geo, { who, kind, limb = L_NONE, hip = 0,
+                        s = [1,1,1], at = [0,0,0], rz = 0 }){
+  const pos = geo.getAttribute('position'), nor = geo.getAttribute('normal');
+  const idx = geo.getIndex();
+  const base = b.count;
+  const cr = Math.cos(rz), sr = Math.sin(rz);
+  for(let i = 0; i < pos.count; i++){
+    let x = pos.getX(i) * s[0], y = pos.getY(i) * s[1], z = pos.getZ(i) * s[2];
+    /* the normal takes the INVERSE scale, then is normalised: that is
+       what a non-uniform scale does to a surface normal, and skipping
+       it is the silent half of this. */
+    let nx = nor.getX(i) / s[0], ny = nor.getY(i) / s[1], nz = nor.getZ(i) / s[2];
+    if(rz){
+      const x2 = x * cr - y * sr, y2 = x * sr + y * cr; x = x2; y = y2;
+      const n2 = nx * cr - ny * sr, m2 = nx * sr + ny * cr; nx = n2; ny = m2;
+    }
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    b.vertex(x + at[0], y + at[1], z + at[2],
+      { aWho: who, aKind: kind, aLimb: limb, aHip: hip,
+        aN: [nx / nl, ny / nl, nz / nl] });
+  }
+  for(let i = 0; i < idx.count; i += 3){
+    b.tri(base + idx.getX(i), base + idx.getX(i + 1), base + idx.getX(i + 2));
+  }
+}
+
 const SPH    = new THREE.SphereGeometry(1, 16, 12);
 const SPH_HI = new THREE.SphereGeometry(1, 28, 18);
 const BOX    = new THREE.BoxGeometry(1, 1, 1);
-const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => part(THREE, geo, mat, sx, sy, sz, px, py, pz, rz);
 
-const flatMat = hex => new THREE.MeshBasicMaterial({ color: hex });
-const matCloak = flatMat(COAT.cloak), matCloakLit = flatMat(COAT.cloakLit);
-const matSkin = flatMat(COAT.skin),  matCrook = flatMat(COAT.crook);
-const matFace = flatMat(WOOL.face);
+function figuresGeometry(){
+  const b = builder(THREE, { aWho:1, aKind:1, aLimb:1, aHip:1, aN:3 });
 
-/* the fleece: two values with a RESOLVED terminator, so a sheep is a
-   round thing and not a faceted one */
-const fleeceMat = posterMat(THREE, {
-  uniforms:{ uLit:{value:C(WOOL.lit)}, uBody:{value:C(WOOL.body)},
-             uShade:{value:C(WOOL.shade)} },
-  prelude: PRE_AA,
+  /* ---- the shepherd, index 0 ---- */
+  const W = 0;
+  bake(b, SPH_HI, { who:W, kind:K_CLOAK,     s:[0.30,0.52,0.26], at:[0,0.52,0] });
+  bake(b, SPH_HI, { who:W, kind:K_CLOAK_LIT, s:[0.22,0.30,0.20], at:[0.10,0.70,0.06] });
+  bake(b, SPH_HI, { who:W, kind:K_SKIN,      s:[0.15,0.17,0.15], at:[0,1.12,0] });
+  bake(b, SPH,    { who:W, kind:K_CLOAK,     s:[0.17,0.10,0.17], at:[0,1.22,0] });
+  bake(b, SPH,    { who:W, kind:K_SKIN,  s:[0.055,0.30,0.055], at:[-0.27,0.52,0], rz: 0.18 });
+  bake(b, SPH,    { who:W, kind:K_SKIN,  s:[0.055,0.30,0.055], at:[ 0.27,0.52,0], rz:-0.18 });
+  bake(b, SPH,    { who:W, kind:K_CLOAK, s:[0.075,0.34,0.075], at:[-0.11,0.30,0],
+                    limb:L_FRONT, hip:0.34 });
+  bake(b, SPH,    { who:W, kind:K_CLOAK, s:[0.075,0.34,0.075], at:[ 0.11,0.30,0],
+                    limb:L_BACK,  hip:0.34 });
+  bake(b, BOX,    { who:W, kind:K_CROOK, s:[0.025,1.45,0.025], at:[0.30,0.66,0.02], rz:0.05 });
+
+  /* ---- five sheep, 1..5 ---- */
+  for(let i = 1; i <= FLOCK_N; i++){
+    bake(b, SPH_HI, { who:i, kind:K_FLEECE, s:[0.34,0.26,0.46], at:[0,0.40,0] });
+    bake(b, SPH_HI, { who:i, kind:K_FLEECE, s:[0.17,0.16,0.17], at:[0,0.50,-0.42] });
+    bake(b, SPH,    { who:i, kind:K_DARK,   s:[0.105,0.12,0.14], at:[0,0.44,-0.55] });
+    bake(b, SPH,    { who:i, kind:K_DARK,   s:[0.045,0.06,0.045], at:[-0.09,0.56,-0.50] });
+    bake(b, SPH,    { who:i, kind:K_DARK,   s:[0.045,0.06,0.045], at:[ 0.09,0.56,-0.50] });
+    for(const [lx, lz, lb] of [[-0.15,-0.26,L_FRONT],[0.15,-0.26,L_BACK],
+                               [-0.15,0.24,L_BACK],  [0.15,0.24,L_FRONT]]){
+      bake(b, BOX, { who:i, kind:K_DARK, s:[0.045,0.30,0.045], at:[lx,0.16,lz],
+                     limb:lb, hip:0.31 });
+    }
+  }
+  return b.geometry();
+}
+
+const figMat = posterMat(THREE, {
+  uniforms:{
+    uPos:{ value: Array.from({length:FIG_N}, () => new THREE.Vector3()) },
+    uYaw:{ value: new Float32Array(FIG_N) },
+    uLean:{ value: new Float32Array(FIG_N) },
+    uStride:{ value: new Float32Array(FIG_N) },
+    uFleeceLit:{value:C(WOOL.lit)},  uFleeceBody:{value:C(WOOL.body)},
+    uFleeceShade:{value:C(WOOL.shade)}, uDark:{value:C(WOOL.face)},
+    uCloak:{value:C(COAT.cloak)}, uCloakLit:{value:C(COAT.cloakLit)},
+    uSkin:{value:C(COAT.skin)},   uCrook:{value:C(COAT.crook)},
+    uFog
+  },
+  prelude: PRE_AA + FOG,
   vertex:`
-    varying vec3 vN;
-    void main(){ vN = normalMatrix * normal;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+    attribute float aWho; attribute float aKind; attribute float aLimb;
+    attribute float aHip; attribute vec3 aN;
+    uniform vec3 uPos[${'$'}{FIG_N}];
+    uniform float uYaw[${'$'}{FIG_N}];
+    uniform float uLean[${'$'}{FIG_N}];
+    uniform float uStride[${'$'}{FIG_N}];
+    varying vec3 vN; varying float vKind; varying float vDist;
+    void main(){
+      int w = int(aWho + 0.5);
+      vec3 at = uPos[0]; float yaw = uYaw[0], lean = uLean[0], stride = uStride[0];
+      for(int k = 0; k < ${'$'}{FIG_N}; k++){
+        if(k == w){ at = uPos[k]; yaw = uYaw[k]; lean = uLean[k]; stride = uStride[k]; }
+      }
+      vec3 p = position; vec3 n = aN;
+      /* the limb swings about its own hip, so a leg pivots rather
+         than sliding — and the two pairs swing opposite */
+      if(aLimb > 0.5){
+        float sgn = aLimb < 1.5 ? 1.0 : -1.0;
+        float a = stride * sgn;
+        float ca = cos(a), sa = sin(a);
+        float y = p.y - aHip, z = p.z;
+        p.y = aHip + y * ca - z * sa;
+        p.z =        y * sa + z * ca;
+        float ny = n.y, nz = n.z;
+        n.y = ny * ca - nz * sa;
+        n.z = ny * sa + nz * ca;
+      }
+      /* lean into the slope, then turn to face along the path */
+      float cl = cos(lean), sl = sin(lean);
+      float py = p.y * cl - p.z * sl, pz = p.y * sl + p.z * cl;
+      p.y = py; p.z = pz;
+      float nyl = n.y * cl - n.z * sl, nzl = n.y * sl + n.z * cl;
+      n.y = nyl; n.z = nzl;
+      float cy = cos(yaw), sy = sin(yaw);
+      float px = p.x * cy + p.z * sy; pz = -p.x * sy + p.z * cy;
+      p.x = px; p.z = pz;
+      float nxy = n.x * cy + n.z * sy, nzy = -n.x * sy + n.z * cy;
+      n.x = nxy; n.z = nzy;
+
+      vKind = aKind;
+      vN = normalMatrix * n;
+      vec4 mv = modelViewMatrix * vec4(p + at, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
   `,
   fragment:`
-    varying vec3 vN;
-    uniform vec3 uLit, uBody, uShade;
+    varying vec3 vN; varying float vKind; varying float vDist;
+    uniform vec3 uFleeceLit, uFleeceBody, uFleeceShade, uDark;
+    uniform vec3 uCloak, uCloakLit, uSkin, uCrook;
     void main(){
+      /* THE FLEECE IS THE ONLY LIT THING IN THE CHAPTER, and it is lit
+         because a sheep is a round white object and nothing else makes
+         one read as round. Two values with the terminator RESOLVED
+         across a pixel: the step is correct, and §4.2a is what keeps
+         it from being a staircase on a curved surface — Pearl Diver's
+         pearl had exactly this fault before it was fixed. Everything
+         else here is flat (§4.2 rule 1). */
       vec3 n = normalize(vN);
       float l = dot(n, normalize(vec3(0.62, 0.70, 0.35)));
-      vec3 col = mix(uShade, uBody, aastep(-0.05, l));
-      col = mix(col, uLit, aastep(0.52, l));
-      gl_FragColor = vec4(col, 1.0);
+      vec3 fleece = mix(uFleeceShade, uFleeceBody, aastep(-0.05, l));
+      fleece = mix(fleece, uFleeceLit, aastep(0.52, l));
+
+      vec3 col = fleece;
+      col = mix(col, uDark,     step(0.5, vKind) * (1.0 - step(1.5, vKind)));
+      col = mix(col, uCloak,    step(1.5, vKind) * (1.0 - step(2.5, vKind)));
+      col = mix(col, uCloakLit, step(2.5, vKind) * (1.0 - step(3.5, vKind)));
+      col = mix(col, uSkin,     step(3.5, vKind) * (1.0 - step(4.5, vKind)));
+      col = mix(col, uCrook,    step(4.5, vKind));
+      /* vKind is a per-primitive identity, not a field, so a resolved
+         step would be resolving a boundary that exists inside no
+         triangle — plain step() is correct here and cheaper. */
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
     }
   `
 });
+const figures = new THREE.Mesh(figuresGeometry(), figMat);
+figures.frustumCulled = false;
+scene.add(figures);
 
-function makeShepherd(){
-  const g = new THREE.Group();
-  g.add(mk(SPH_HI, matCloak, 0.30, 0.52, 0.26,  0,  0.52, 0));      // the cloak
-  g.add(mk(SPH_HI, matCloakLit, 0.22, 0.30, 0.20, 0.10, 0.70, 0.06));
-  g.add(mk(SPH_HI, matSkin, 0.15, 0.17, 0.15,  0,  1.12, 0));       // head
-  g.add(mk(SPH,    matCloak, 0.17, 0.10, 0.17,  0,  1.22, 0));      // hat
-  g.add(mk(SPH, matSkin, 0.055, 0.30, 0.055, -0.27, 0.52, 0, 0.18));
-  g.add(mk(SPH, matSkin, 0.055, 0.30, 0.055,  0.27, 0.52, 0, -0.18));
-  const legL = mk(SPH, matCloak, 0.075, 0.34, 0.075, -0.11, 0.00, 0);
-  const legR = mk(SPH, matCloak, 0.075, 0.34, 0.075,  0.11, 0.00, 0);
-  g.add(legL); g.add(legR);
-  g.add(mk(BOX, matCrook, 0.025, 1.45, 0.025, 0.30, 0.66, 0.02, 0.05));
-  return { group: g, legL, legR };
-}
-
-function makeSheep(){
-  const g = new THREE.Group();
-  const bodyM = mk(SPH_HI, fleeceMat, 0.34, 0.26, 0.46, 0, 0.40, 0);
-  g.add(bodyM);
-  g.add(mk(SPH_HI, fleeceMat, 0.17, 0.16, 0.17, 0, 0.50, -0.42));   // the neck's wool
-  g.add(mk(SPH, matFace, 0.105, 0.12, 0.14, 0, 0.44, -0.55));       // face
-  g.add(mk(SPH, matFace, 0.045, 0.06, 0.045, -0.09, 0.56, -0.50));  // ears
-  g.add(mk(SPH, matFace, 0.045, 0.06, 0.045,  0.09, 0.56, -0.50));
-  const legs = [];
-  for(const [lx, lz] of [[-0.15,-0.26],[0.15,-0.26],[-0.15,0.24],[0.15,0.24]]){
-    const l = mk(BOX, matFace, 0.045, 0.30, 0.045, lx, 0.16, lz);
-    legs.push(l); g.add(l);
-  }
-  return { group: g, legs };
-}
-
-const shepherd = makeShepherd();
-scene.add(shepherd.group);
+/* the flock's own state: each follows the one ahead of it */
 const flock = [];
 for(let i = 0; i < FLOCK_N; i++){
-  const sh = makeSheep();
-  scene.add(sh.group);
-  flock.push({ ...sh, follow: tracker(WALK_LO, FLOCK_W), s: WALK_LO });
+  flock.push({ follow: tracker(WALK_LO, FLOCK_W), s: WALK_LO, off: Math.sin(i * 2.399) * 0.9 });
 }
 
 /* ------------------------------------------------------------------
@@ -637,11 +758,21 @@ const touches = new Set();
   window.addEventListener('blur', () => { touches.clear(); holding = false; });
 })();
 
-/* HOW FAST HE WALKS WHEN NOBODY IS STEERING. Not zero — that is a
-   punishment for declining, which §1.6b rules out — and not one,
-   which would make the chapter play itself. At 0.42 he drifts up the
-   lower slope and back, always a beat behind, visibly unled. */
-const SELF_WALK = 0.42;
+/* THERE IS NO SELF-WALK CONSTANT, AND REMOVING IT WAS A FIX.
+   -------------------------------------------------------------------
+   It was 0.42, on the reasoning that a reader who is not steering
+   should still see the shepherd move. That conflated two different
+   things and broke the exhale: LETTING GO IS THE EXHALE. Measured on
+   the deployed build, a released descent ran at 0.42 of the empty
+   rate and took nine seconds to do what the four second phase asks,
+   so the cue said "breathe out" while the hill disagreed.
+
+   Released is now the full empty rate, which lands the descent
+   exactly on the phase. A reader who never touches the glass gets a
+   shepherd standing at the foot of the hill with his flock around
+   him — which is a thing a shepherd does, costs nothing, and is not
+   corrected. §1.6b is satisfied by the scene being pleasant to
+   decline rather than by a constant that keeps him walking. */
 
 let t = 0, started = false;
 let RATE = rates(PROTOCOLS.box);
@@ -659,21 +790,26 @@ function pathPoint(s, out){
   return out.set(pathX(s), hillAt(s), -s);
 }
 
-/** Place a figure on the path at s, facing the way it is going. */
-function placeOnPath(group, s, dir){
-  pathPoint(s, vTmp);
-  group.position.copy(vTmp);
-  /* the heading is the path's own tangent, taken from the module
-     rather than from a stored velocity, so it is right by
-     construction at every s */
-  const h = 0.4;
-  const ax = pathX(s + h) - pathX(s - h);
-  const az = -(h * 2);
-  group.rotation.y = Math.atan2(ax * dir, az * dir);
-  /* and it leans into the slope: a figure walking a hillside is not
-     vertical, and the lean is the slope's own gradient */
-  const grad = (hillAt(s + h) - hillAt(s - h)) / (h * 2);
-  group.rotation.x = -Math.atan(grad) * 0.55 * dir;
+/** Write one figure's pose into the merged mesh's uniform arrays.
+ *  `i` is 0 for the shepherd and 1..N for the flock.
+ *
+ *  THE HEADING AND THE LEAN BOTH COME FROM THE PATH ITSELF rather
+ *  than from anything stored: the tangent and the gradient are
+ *  differences of pathX and hillAt, which are the same two functions
+ *  the hill mesh is built from. A figure cannot drift off the
+ *  surface it is standing on, because its feet are defined by the
+ *  surface. That is the rule this project arrived at the hard way —
+ *  a geometry builder carrying its own copy of the terrain measured
+ *  one surface while the GPU drew another. */
+const H = 0.4;
+function poseAt(i, s, lateral, stride){
+  const U = figMat.uniforms;
+  U.uPos.value[i].set(pathX(s) + lateral, hillAt(s), -s);
+  const ax = pathX(s + H) - pathX(s - H);
+  U.uYaw.value[i] = Math.atan2(ax, -(H * 2));
+  const grad = (hillAt(s + H) - hillAt(s - H)) / (H * 2);
+  U.uLean.value[i] = -Math.atan(grad) * 0.55;
+  U.uStride.value[i] = stride;
 }
 
 const loop = clock((dt, now, running) => {
@@ -700,7 +836,7 @@ const loop = clock((dt, now, running) => {
        foot of the hill at SELF_WALK and stands there with his flock
        around him, which is a thing a shepherd does. Declining costs
        nothing and is not corrected (§1.6b). */
-    const rate = holding ? RATE.fillPerSec : RATE.emptyPerSec * SELF_WALK;
+    const rate = holding ? RATE.fillPerSec : RATE.emptyPerSec;
     WALKER.fill = clamp01(WALKER.fill + (holding ? 1 : -1) * rate * dt);
     WALKER.settle(dt);
   } else {
@@ -720,34 +856,26 @@ const loop = clock((dt, now, running) => {
     prev = sh.s;
   }
 
-  /* --- placing them, and the walk cycle. The legs swing with the
-     figure's own SPEED, so standing still is standing still — a
-     walk cycle on a timer is the thing that makes a figure read as
-     a puppet. --- */
-  const dirS = WALKER.v >= 0 ? 1 : -1;
-  placeOnPath(shepherd.group, s, 1);
+  /* --- placing them, and the walk cycle.
+     THE LEGS SWING WITH THE FIGURE'S OWN SPEED, so standing still is
+     standing still. A walk cycle on a wall clock is the single thing
+     that makes a figure read as a puppet, and on a hold — where this
+     chapter's whole point is that he STOPS — it would be the loudest
+     possible lie about what the breath is doing. --- */
   const stride = Math.sin(t * 7.0) * clamp(Math.abs(WALKER.v) * 0.09, 0, 0.5);
-  shepherd.legL.rotation.x =  stride;
-  shepherd.legR.rotation.x = -stride;
+  poseAt(0, s, 0, stride);
 
   const at = shadowMat.uniforms.uAt.value, rad = shadowMat.uniforms.uRad.value;
-  pathPoint(s, vTmp); at[0].set(vTmp.x, vTmp.y + 0.03, vTmp.z); rad[0] = 0.62;
+  at[0].set(pathX(s), hillAt(s) + 0.03, -s); rad[0] = 0.62;
   for(let i = 0; i < flock.length; i++){
     const sh = flock[i];
-    placeOnPath(sh.group, sh.s, 1);
-    /* they fan slightly off the path, so five sheep are a flock and
-       not a queue. Deterministic per sheep, never random. */
-    sh.group.position.x += Math.sin(i * 2.399) * 0.9;
     const sv = Math.abs(sh.follow.v);
-    const sstr = Math.sin(t * 8.0 + i * 1.7) * clamp(sv * 0.08, 0, 0.45);
-    sh.legs[0].rotation.x =  sstr; sh.legs[3].rotation.x =  sstr;
-    sh.legs[1].rotation.x = -sstr; sh.legs[2].rotation.x = -sstr;
-    at[i + 1].set(sh.group.position.x, hillAt(sh.s) + 0.03, -sh.s);
+    poseAt(i + 1, sh.s, sh.off,
+           Math.sin(t * 8.0 + i * 1.7) * clamp(sv * 0.08, 0, 0.45));
+    at[i + 1].set(pathX(sh.s) + sh.off, hillAt(sh.s) + 0.03, -sh.s);
     rad[i + 1] = 0.44;
   }
-  shadowMat.uniforms.uAt.needsUpdate = true;
-  shadowMat.uniforms.uRad.needsUpdate = true;
-  uWalker.value.set(shepherd.group.position.x, shepherd.group.position.y, -s);
+  uWalker.value.set(pathX(s), hillAt(s), -s);
 
   /* --- THE LENS. Parked near the foot, aiming at him with a slow
      follower so he cannot leave the frame and the tracking is not
@@ -768,7 +896,7 @@ const loop = clock((dt, now, running) => {
   /* --- the invitation, projected from where he actually is --- */
   const reachWanted = started && ph.k !== 'hold';
   const rInv = REACH_INVITE.step(dt, { wanted: reachWanted, taken: holding });
-  vTmp.set(shepherd.group.position.x, shepherd.group.position.y + 1.2, -s).project(camera);
+  vTmp.copy(figMat.uniforms.uPos.value[0]); vTmp.y += 1.2; vTmp.project(camera);
   const sy = (-vTmp.y * 0.5 + 0.5) * size.H;
   const spread = Math.max(60, size.H * 0.16);
   elMUp.style.top = (sy - spread).toFixed(1) + 'px';
@@ -875,10 +1003,11 @@ window.__shepherd = {
              triangles: renderer.info.render.triangles };
   },
   where(){
-    const put = o => { const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+    const proj = v3 => { const v = v3.clone().project(camera);
       return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
                inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 }; };
-    return { shepherd:put(shepherd.group), last:put(flock[flock.length-1].group),
+    const U = figMat.uniforms.uPos.value;
+    return { shepherd:proj(U[0]), last:proj(U[FIG_N - 1]),
              horizonUv:+uHorizon.value.toFixed(3) };
   }
 };
