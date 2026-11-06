@@ -60,7 +60,8 @@ import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset,
          profileTone, profileH,
          TREES, TREE_SEG, treeWidth, treeLean,
-         CGX, cloudLip, BGX, buttressTop, gateFlank } from '../app/js/long-air-terrain.js';
+         CGX, cloudLip, cloudUnder, cloudCrown, cloudEnd, BANK_DEPTH,
+         BGX, buttressTop, gateFlank } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
 import { readFileSync } from 'node:fs';
 
@@ -951,10 +952,25 @@ say('THE CLOUD LIP — the silhouette, through the lens');
   const probe3 = breath(proto);
   const course3 = courseOf(proto, t => probe3.value(t));
   let worst = { px: 0 }, seen = 0, worstDeg = 0, minOff = Infinity;
+  let worstCrown = { px: 0 }, overCeil = 0;
   for(const g of course3.gates){
     const zw = zWorldOf(g.zb);
     if(zw > 0 || zw < -140) continue;
-    const Y = k => g.centre + g.half + cloudLip(g.i, k);
+    /* THE CURVE THE PAGE DRAWS, not the one it starts from. The first
+       version of the close measured cloudLip alone while the page
+       drew the whole closed outline, and reported a 129 degree turn
+       at an x where nothing of the sort was happening. Both come out
+       of the module now, so there is nothing to drift. */
+    const lipBase = g.centre + g.half;
+    const crownBase = Math.min(ceilAt(g.zb, period) + 2.0, lipBase + BANK_DEPTH);
+    const crown = k => crownBase + cloudCrown(g.i, k);
+    const Y = k => cloudUnder(g.i, k, lipBase, crown(k));
+    if(crownBase + cloudCrown(g.i, 0) > ceilAt(g.zb, period) + 2.0 + 6.0) overCeil++;
+    for(let k = 1; k < CGX.length - 1; k++){
+      const r = sagittaPx([CGX[k-1], crown(k-1), zw], [CGX[k], crown(k), zw],
+                          [CGX[k+1], crown(k+1), zw]);
+      if(r && r.px > worstCrown.px) worstCrown = { ...r, gate:g.i, x:CGX[k] };
+    }
     for(let k = 1; k < CGX.length - 1; k++){
       const r = sagittaPx([CGX[k-1], Y(k-1), zw], [CGX[k], Y(k), zw], [CGX[k+1], Y(k+1), zw]);
       if(r){ seen++; if(r.px > worst.px) worst = { ...r, gate:g.i, x:CGX[k] }; }
@@ -964,6 +980,18 @@ say('THE CLOUD LIP — the silhouette, through the lens');
     }
     for(let k = 0; k < CGX.length; k++) minOff = Math.min(minOff, cloudLip(g.i, k));
   }
+  if(worstCrown.px){
+    const cl = `cloud crown silhouette   worst ${worstCrown.px.toFixed(2).padStart(5)} px off the chord` +
+               ` at ${worstCrown.dist.toFixed(0)} m (gate ${worstCrown.gate}, x=${worstCrown.x.toFixed(1)})` +
+               `  (bar ${PX_BAR} px)`;
+    if(worstCrown.px <= PX_BAR) ok(cl); else bad(cl);
+  }
+  /* ceilAt no longer POSITIONS the crown — BANK_DEPTH does — but it
+     still bounds it, so the field is still load-bearing and still
+     checked rather than left as a seam test on something nothing
+     draws. */
+  if(overCeil === 0) ok('every bank crown stays under ceilAt + 2 (+ its own bulge)');
+  else bad(`${overCeil} bank crown(s) push past the ceiling the chapter says they sit under`);
   if(seen === 0){
     bad('cloud lip: nothing projected — the instrument saw no gates');
   } else {

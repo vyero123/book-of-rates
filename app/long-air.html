@@ -257,7 +257,8 @@ import { PROTOCOLS, CHOICE, validChoice,
 import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset,
          columnsAt, TREES, TREE_SEG, treeWidth, treeLean,
          CGX, cloudLip, cloudBaseOffset,
-         BGX, buttressTop, gateFlank } from './js/long-air-terrain.js';
+         BGX, buttressTop, gateFlank,
+         cloudCrown, cloudEnd, cloudUnder, BANK_DEPTH } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
 /* The lens is a module for the same reason the terrain is: a jerk can
    only be measured in Node, and tools/temporal.mjs has to drive the
@@ -1133,9 +1134,17 @@ function gateGeometry(course, which, period){
        meshY is the surface the GPU renders, so the two coincide by
        construction. The small sink is for depth precision only — a
        coincident surface z-fights. */
+    /* THE CROWN IS LUMPY TOO, and the bank CLOSES at its ends. The
+       crown stays anchored to ceilAt, so that field still sets how
+       high the weather sits; what is new is that it is no longer a
+       straight line, and that past the opening the lip climbs to
+       meet it so each end is a rounded shoulder instead of a
+       vertical cut. */
+    const crownBase = Math.min(ceilAt(g.zb, course.period) + 2.0, lip + BANK_DEPTH);
+    const crownAt = k => crownBase + cloudCrown(g.i, k);
     const farAt = k => which < 0
       ? meshY(XS[k], g.zb, period, rows) - 0.25
-      : ceilAt(g.zb, course.period) + 2.0;
+      : crownAt(k);
     const seed = ((g.i * 7919) % 97) / 97;
     /* the lip is level in the kite's own lane and steps away from it to
        the sides, so the centre lane is visibly the route and the sides
@@ -1144,9 +1153,10 @@ function gateGeometry(course, which, period){
        sampler: it used to turn 36 degrees at the knot directly in
        front of the reader, which was the sharpest jut in the chapter
        and on the one edge you actually aim at. */
-    const lipAt = k => isCloud
-      ? lip + cloudLip(g.i, k)
-      : buttressTop(XS[k], g.i, lip, meshY(XS[k], g.zb, period, rows));
+    const lipAt = k => {
+      if(!isCloud) return buttressTop(XS[k], g.i, lip, meshY(XS[k], g.zb, period, rows));
+      return cloudUnder(g.i, k, lip, crownAt(k));
+    };
     const base = b.count;
     for(let k = 0; k < XS.length; k++){
       b.vertex(XS[k], lipAt(k), g.zb,

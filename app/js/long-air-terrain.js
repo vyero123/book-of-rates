@@ -493,9 +493,81 @@ export const TREES = Array.from({ length: TREE_N }, (_, i) => {
    and the cauliflower is where the cloud is deep. That is what a
    cumulus does and it is also what keeps the opening honest.
    ================================================================== */
-export const CLOUD_LIP_COLS = 91;
+/* THE WHOLE OUTLINE, NOT JUST THE BOTTOM EDGE — second pass,
+   6 November 2026, after looking at the first one on the deployed
+   build. The cauliflower went on the LIP and the lip alone, and the
+   bank still read as a white block: its top was a flat line at the
+   ceiling and its sides were vertical cuts at x = +-15. Most of a
+   cloud's silhouette is its top and its ends. Putting bumps on the
+   one edge that was already the least of the problem is the kind of
+   fix that measures well and changes nothing.
+
+   So the columns run to +-26 and the bank CLOSES: past the opening
+   the lip rises to meet the crown, so each end is a rounded shoulder
+   rather than a cut. The crown gets its own three scales, with
+   different phases from the lip's, so the top is as lumpy as the
+   bottom and the two do not rhyme. The bank is a closed blob now and
+   there is clear sky past its ends, which there should be. */
+export const CLOUD_LIP_COLS = 121;
+export const CLOUD_HALF = 22;
 export const CGX = Array.from({ length: CLOUD_LIP_COLS },
-  (_, i) => -15 + (i / (CLOUD_LIP_COLS - 1)) * 30);
+  (_, i) => -CLOUD_HALF + (i / (CLOUD_LIP_COLS - 1)) * CLOUD_HALF * 2);
+
+/** 0 across the opening, 1 where the bank has closed. Quintic, so
+ *  the shoulder is C2 at both ends. */
+export function cloudEnd(x){
+  const t = Math.min(1, Math.max(0, (Math.abs(x) - 15) / (CLOUD_HALF - 15)));
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/** The crown's own cauliflower, upward. Same construction as the
+ *  lip's and deliberately different phases: a cloud whose top echoed
+ *  its bottom would read as an extruded shape, which is what this
+ *  whole pass is for. Non-negative, so it only ever adds height. */
+export function cloudCrown(gateI, k){
+  const x = CGX[k];
+  const ph = n => ((gateI * 1.733 * n + 2.1) % 6.283);
+  const lobe = (amp, wave, n) => amp * 0.5 * (1 - Math.cos(x * (2 * Math.PI / wave) + ph(n)));
+  return lobe(3.20, 17.0, 1) + lobe(1.00, 8.0, 2) + lobe(0.30, 4.0, 3);
+}
+
+/* HOW DEEP A BANK IS, and why it is not the ceiling any more.
+   ------------------------------------------------------------------
+   The crown used to sit at ceilAt + 2, which for a low gate is a
+   twenty-five metre white tower thirty metres wide. That is a wall,
+   which is what it was when it had to be one; a bank that closes at
+   its ends has to have proportions a cloud has. Twelve metres against
+   sixty-four wide is a cumulus.
+
+   THE SHOULDER IS WHAT THIS NUMBER IS REALLY FOR. Closing the ends
+   means the lip climbs the whole depth of the bank over CLOUD_HALF -
+   15 metres, and that shoulder is the sharpest turn in the profile.
+   For a rise R over span S at column spacing h the knot angle is
+   about 5.77 R h / S^2 and the sagitta is that times h/8, so holding
+   1.5 px at the twelve metres a gate is nearest needs
+
+       R <= 0.0333 S^2 / h^2
+
+   At S = 17 and h = 0.71 that is 19.0 m, against a worst case here of
+   twelve plus the crown's own 4.9 m of bulge. Measured rather than
+   trusted: tools/continuity.mjs projects the DRAWN outline.
+
+   ceilAt still bounds it -- the crown may not exceed ceilAt + 2 --
+   so the field still means something and is still checked, but it no
+   longer POSITIONS the crown. */
+export const BANK_DEPTH = 12;
+
+/** The drawn underside of a bank at one column: the cauliflower where
+ *  the opening is, rising to meet the crown where the bank closes.
+ *  THIS is the curve the page draws, so this is the curve the sampler
+ *  measures — the first version of the close had the page drawing
+ *  this and the sampler still measuring cloudLip alone, and the check
+ *  fired on a 129 degree turn that was not where it said it was. */
+export function cloudUnder(gateI, k, lipBase, crownY){
+  const under = lipBase + cloudLip(gateI, k);
+  const e = cloudEnd(CGX[k]);
+  return under + (crownY - under) * e;
+}
 
 /** The cloud bank's lower outline, in metres away from the opening.
  *  Shares the per-gate size decision with lipOffset so a wide gate is
@@ -504,14 +576,22 @@ export function cloudLip(gateI, k){
   const x = CGX[k];
   // the same decided per-gate opening the rock lip uses
   const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8) / 0.6) * 0.6;
-  const t = Math.abs(x) / 15;
+  /* THE CLAMP IS LOAD-BEARING AND WAS MISSING. A quintic smootherstep
+     is only a smootherstep on [0,1]; past it, t^3(6t^2-15t+10) grows
+     without any bound at all. While CGX stopped at +-15 that could
+     not happen. Widening it to close the bank's ends sent t to 2.5
+     and this returned FOUR HUNDRED METRES at the outermost column,
+     which is what the sampler was reporting as a 129 degree turn. It
+     was right and the first reading of it was not: the curve really
+     was turning, and not where the first explanation put it. */
+  const t = Math.min(1, Math.abs(x) / 15);
   const u = t * t * t * (t * (t * 6 - 15) + 10);   // C2, flat at x = 0
   // the cauliflower, three scales, each non-negative by construction
   const ph = n => ((gateI * 2.399 * n) % 6.283);
   const lobe = (amp, wave, n) => amp * 0.5 * (1 - Math.cos(x * (2 * Math.PI / wave) + ph(n)));
   // flattish under the middle of the opening, full at the sides
   const win = 0.28 + 0.72 * u;
-  return vmax * u + (lobe(1.80, 11.0, 1) + lobe(0.70, 5.0, 2) + lobe(0.22, 2.2, 3)) * win;
+  return vmax * u + (lobe(1.80, 11.0, 1) + lobe(0.55, 5.5, 2) + lobe(0.15, 3.5, 3)) * win;
 }
 
 /** THE DRAWN UNDERSIDE OF A BANK IN THE KITE'S OWN LANE.
