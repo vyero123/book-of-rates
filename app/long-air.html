@@ -34,9 +34,6 @@
     text-shadow:0 2px 16px rgba(23,42,48,.85)}
   #sub{margin-top:8px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
     opacity:.82;text-transform:uppercase;text-shadow:0 2px 12px rgba(23,42,48,.85)}
-  #bar{position:fixed;left:0;right:0;bottom:max(130px,calc(env(safe-area-inset-bottom) + 122px));
-    z-index:20;height:2px;margin:0 36px;background:rgba(255,246,220,.26);pointer-events:none}
-  #barfill{height:100%;width:0;background:rgba(255,246,220,.85)}
   #note{position:fixed;left:0;right:0;bottom:max(100px,calc(env(safe-area-inset-bottom) + 92px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(255,246,220,.72);letter-spacing:.06em;padding:0 20px;pointer-events:none;
@@ -124,7 +121,6 @@
 <div id="fps" role="status" title="Tap to hide">—</div>
 
 <div id="cue"><div id="phase">breathe in</div><div id="sub">let it climb</div></div>
-<div id="bar"><div id="barfill"></div></div>
 <div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
 <div id="reach" aria-label="Touch above or below the glider to move it there"></div>
@@ -364,7 +360,7 @@ const AIR = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
+const elPhase = $('phase'), elSub = $('sub');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 const elReach = $('reach'), elMUp = $('mUp'), elMDn = $('mDn');
@@ -373,7 +369,7 @@ function fallback(why){
   if(why) $('fbwhy').textContent = why;
   elGate.classList.remove('on');
   elFall.classList.add('on');
-  $('cue').style.display = $('bar').style.display = 'none';
+  $('cue').style.display = 'none';
   elReach.style.display = elMUp.style.display = elMDn.style.display = 'none';
   elFps.classList.add('off');
 }
@@ -3294,10 +3290,34 @@ const loop = clock((dt, now, running) => {
 
   /* --- cue text. The countdown points at the next breath, never at
      elapsed time (§2.4). Nothing here is a score. --- */
+  /* ==================================================================
+     ONLY THE CUE IS LEFT OVER THE PICTURE — 6 November 2026
+     ==================================================================
+     The reader asked for the text in the middle of the frame to go,
+     keeping the phase word and the countdown phrasing. What was there
+     besides those: a session progress bar, and the phase's own
+     flavour line — "let it climb", "fly it level", "at the surface".
+
+     THE COUNTDOWN STAYS AND THE FLAVOUR GOES, and they were the same
+     element. breath.js's cue() puts a countdown in `sub` when the
+     phase has a `count` and the flavour line there when it does not,
+     so the phase's own table is what decides: `ph.count` is present
+     exactly on the phases that point AT THE NEXT BREATH, which is
+     §2.4 — a countdown here always says what is coming, never how
+     long you have been going. Read off the phase rather than by
+     matching the string, and the kit is untouched, so the other
+     three chapters keep their flavour lines.
+
+     THE SESSION BAR IS GONE. It was the one thing on screen that
+     described the whole session rather than this breath, which is
+     close to a progress score in a chapter whose gate sheet promises
+     nothing is counted. `B.progress` still exists and nothing else
+     reads it.
+     ================================================================== */
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
-  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
-  elBar.style.width = (100 * B.progress(t)).toFixed(2) + '%';
+  const showSub = !!ph.count ? cue.sub : '';
+  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
 
   renderer.render(scene, camera);
   fpsTick(now, false);
