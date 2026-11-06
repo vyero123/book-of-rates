@@ -171,7 +171,7 @@ const LAND = {
   hazeLow:0xDCD6A2
 };
 const AIR = {
-  skyHigh:0xBFD8E2, skyLow:0xEFE3B2,
+  skyHigh:0xD6DCC0, skyLow:0xEFE3B2,
   sun:0xFFF6D8, halo:0xFFE9AE, halo2:0xF2C78C,
   cloud:0xFFFFFF, cloudCool:0xC9D4E2, cloudBase:0xA8B6C8,
   haze:0xD8E2BE
@@ -331,8 +331,26 @@ scene.add(mesas);
    the longest silhouette in the chapter and is where a polygon would
    show first, so it is the edge the numbers are chosen for.
    ------------------------------------------------------------------ */
+/* MEASURED AT THREE SETTINGS, not picked. The hill is this chapter's
+   whole triangle budget and the near ground is eight metres from a
+   parked lens, where a metre is ninety-four pixels — so the columns
+   are set by what the nearest knot subtends, not by what the hill
+   looks like from where the shepherd is.
+
+       161   42,240 tri   2.14 px across the path
+       193   50,688       1.51
+       225   59,136       1.10
+
+   193 ships: it is the first that clears the 2 px bar with room, and
+   the 8,400 triangles the next step buys go into the difference
+   between 1.51 px and 1.10 px, which nobody can see. The rows are
+   left at 132 because the same instrument reads 0.14 px ALONG the
+   path — the hill runs away from the lens there, so the same spacing
+   subtends a twentieth as much, and spending on it would be spending
+   on nothing. Measuring the two axes separately is the whole reason
+   they are different numbers. */
 const HILL_ROWS = 132;        // along the path, 0..PATH_HI
-const HILL_COLS = 97;         // across it, -HILL_HALF..+HILL_HALF
+const HILL_COLS = 193;        // across it, -HILL_HALF..+HILL_HALF
 const HILL_HALF = 54;
 function hillGeometry(){
   const b = builder(THREE, { aS:1, aO:1 });
@@ -427,13 +445,23 @@ const hillMat = posterMat(THREE, {
 
       /* wildflower colour, sparse, near the path only and gone
          before a clump could fall under a pixel */
-      vec2 cell = gw * 0.62;
+      /* WILDFLOWERS, AND THE NEAR FADE IS THE POINT OF THIS BLOCK.
+         At 1.6 m cells with a 0.21 disc they were a metre across, and
+         the ground nearest the lens is six metres away — they drew as
+         stains on the grass rather than as flowers. A clump is small
+         and there are more of them: 0.55 m cells, a 0.13 disc. They
+         also fade IN with distance as well as out, because at arm's
+         length a posterised disc is a shape and not a flower, and the
+         foreground here is always close. Gone by 90 m at the other
+         end, before a clump could fall under a pixel. */
+      vec2 cell = gw * 1.8;
       vec2 inCell = fract(cell) - 0.5;
       col = mix(col, uBloom,
-        step(0.90, chipAt(floor(cell)))
-        * (1.0 - aastep(0.21, length(inCell)))
-        * (1.0 - smoothstep(6.0, 26.0, ao))
-        * (1.0 - smoothstep(40.0, 90.0, vDist)) * 0.45);
+        step(0.93, chipAt(floor(cell)))
+        * (1.0 - aastep(0.13, length(inCell)))
+        * (1.0 - smoothstep(8.0, 28.0, ao))
+        * smoothstep(7.0, 16.0, vDist)
+        * (1.0 - smoothstep(45.0, 90.0, vDist)) * 0.40);
 
       /* WHAT THE GROUND IS MADE OF — the fine scale, in the fragment
          stage where it belongs. Two folded components at 2 m and
@@ -736,46 +764,82 @@ shadows.frustumCulled = false;
 shadows.renderOrder = 1;
 scene.add(shadows);
 
-/* ------------------------------------------------------------------
-   5. THE CONTROL — hold to send him up, let go and he comes down
-   ------------------------------------------------------------------
-   One pair of booleans, exactly as every other chapter: the touch
-   does not write the position, it writes a DIRECTION, and the
-   direction goes through the kit's capped integration. So breathing
-   twice as fast buys half the walk, and reaching is worth precisely
-   what a button was worth and no more.
-   ------------------------------------------------------------------ */
-let holding = false;
-const touches = new Set();
+/* ==================================================================
+   5. THE CONTROL — he walks to where your finger is
+   ==================================================================
+   THE FIRST VERSION WAS BINARY AND THE HARNESS KILLED IT. Hold to
+   climb, release to descend: two states, and the box protocol has
+   THREE things a reader can be doing — filling, emptying, and
+   holding. There was no way to express a hold, so a reader flying
+   the box cue correctly was forced to walk during the two phases
+   where the whole point is that they stand still. tools/regress.mjs
+   measured it at 20.89 m of error against a 22 m band: very nearly
+   the entire hill, on the protocol this chapter offers first.
+
+   So it is the pursuit, which this project has already proved in
+   Long Air and which has a hold built into its shape rather than
+   bolted on: ONE touch sets a place on the path and the shepherd
+   walks to it. Above him he climbs, below him he comes down, and to
+   HOLD you simply leave your finger where it is. Nothing new has to
+   be learned and nothing has to be taught.
+
+   AND THE RATE CAP IS UNTOUCHED, which is the part that matters. The
+   pursuit does not write the position: it computes a direction and
+   feeds it through the same capped integration a button fed, so
+   reaching to the top of the glass is worth exactly one inhale's
+   walk and no more. Breathing twice as fast still buys half the
+   hill. The step is PROPORTIONAL to the gap and saturates at the
+   cap, which is what makes a fast-waving finger low-pass rather than
+   rectify — the fault Long Air's section 4c found when its first
+   pursuit charged at the target bang-bang.
+   ================================================================== */
+const touches = new Map();
+/** 0..1 down the screen, or null when the reader is not steering. */
+let reachAt = null;
+function readTouches(){
+  reachAt = touches.size === 1 ? [...touches.values()][0] : null;
+}
 (function(){
   const el = elReach;
-  const put = e => { e.preventDefault(); touches.add(e.pointerId); holding = touches.size > 0; };
-  const drop = e => { touches.delete(e.pointerId); holding = touches.size > 0; };
+  const put = e => {
+    e.preventDefault();
+    touches.set(e.pointerId, e.clientY / Math.max(1, window.innerHeight));
+    readTouches();
+  };
+  const drop = e => { touches.delete(e.pointerId); readTouches(); };
   el.addEventListener('pointerdown', put);
+  el.addEventListener('pointermove', e => { if(touches.has(e.pointerId)) put(e); });
   el.addEventListener('pointerup', drop);
   el.addEventListener('pointercancel', drop);
   el.addEventListener('pointerleave', drop);
-  window.addEventListener('blur', () => { touches.clear(); holding = false; });
+  window.addEventListener('blur', () => { touches.clear(); readTouches(); });
 })();
 
-/* THERE IS NO SELF-WALK CONSTANT, AND REMOVING IT WAS A FIX.
-   -------------------------------------------------------------------
-   It was 0.42, on the reasoning that a reader who is not steering
-   should still see the shepherd move. That conflated two different
-   things and broke the exhale: LETTING GO IS THE EXHALE. Measured on
-   the deployed build, a released descent ran at 0.42 of the empty
-   rate and took nine seconds to do what the four second phase asks,
-   so the cue said "breathe out" while the hill disagreed.
+/* The middle 76% of the glass is the whole path, so both ends are
+   reachable without pressing the very edge, where a thumb cannot go
+   and the browser's own gestures live. */
+const REACH_TOP = 0.12, REACH_BOT = 0.88;
+const reachFill = y => clamp01((REACH_BOT - y) / (REACH_BOT - REACH_TOP));
 
-   Released is now the full empty rate, which lands the descent
-   exactly on the phase. A reader who never touches the glass gets a
-   shepherd standing at the foot of the hill with his flock around
-   him — which is a thing a shepherd does, costs nothing, and is not
-   corrected. §1.6b is satisfied by the scene being pleasant to
-   decline rather than by a constant that keeps him walking. */
+/* HOW HARD HE LEANS TOWARDS YOUR FINGER, per second. A proportional
+   follower tracking a ramp of slope v settles at an error of v/K, and
+   the error that matters here is how far behind the cue he is
+   allowed to be. K = 14 leaves about a hundredth of the band on a
+   cue-perfect walk, which is a feel rather than a handicap. */
+const PURSUE_K = 14;
+
+/* HOW FAST HE WALKS WHEN NOBODY IS STEERING, as a fraction of the
+   protocol's own rate. Not zero — that is a punishment for
+   declining, which §1.6b rules out — and not one, which would make
+   the chapter walk itself. At 0.42 he follows the cue a beat behind,
+   visibly unled, and a reader who never touches the glass gets a
+   shepherd ambling the lower slope with his flock, which is a thing
+   a shepherd does. */
+const SELF_WALK = 0.42;
 
 let t = 0, started = false;
 let RATE = rates(PROTOCOLS.box);
+let forceUp = false, forceDown = false;
 let WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: PATH_V_MAX * 2.2 });
 const AIM = tracker(CAM_EASE.level.look, CAM_EASE.level.ease);
 const CAMS = tracker(WALK_LO, 1.5);
@@ -836,11 +900,21 @@ const loop = clock((dt, now, running) => {
        foot of the hill at SELF_WALK and stands there with his flock
        around him, which is a thing a shepherd does. Declining costs
        nothing and is not corrected (§1.6b). */
-    const rate = holding ? RATE.fillPerSec : RATE.emptyPerSec;
-    WALKER.fill = clamp01(WALKER.fill + (holding ? 1 : -1) * rate * dt);
+    const schedFill = clamp01(normOf(sched));
+    const target = reachAt !== null ? reachFill(reachAt) : schedFill;
+    const gap = target - WALKER.fill;
+    const up = gap > 0.012, down = gap < -0.012;
+    const pace = reachAt !== null ? 1 : SELF_WALK;
+    const cap = (up ? RATE.fillPerSec : down ? RATE.emptyPerSec : 0) * pace * dt;
+    if(cap > 0){
+      let move = gap * PURSUE_K * dt;
+      if(move >  cap) move =  cap;
+      if(move < -cap) move = -cap;
+      WALKER.fill = clamp01(WALKER.fill + move);
+    }
     WALKER.settle(dt);
   } else {
-    WALKER.drive(dt, holding, !holding);
+    WALKER.drive(dt, forceUp, forceDown);
   }
   const s = WALKER.value;
   uFill.value = WALKER.fill;
@@ -895,7 +969,7 @@ const loop = clock((dt, now, running) => {
 
   /* --- the invitation, projected from where he actually is --- */
   const reachWanted = started && ph.k !== 'hold';
-  const rInv = REACH_INVITE.step(dt, { wanted: reachWanted, taken: holding });
+  const rInv = REACH_INVITE.step(dt, { wanted: reachWanted, taken: reachAt !== null });
   vTmp.copy(figMat.uniforms.uPos.value[0]); vTmp.y += 1.2; vTmp.project(camera);
   const sy = (-vTmp.y * 0.5 + 0.5) * size.H;
   const spread = Math.max(60, size.H * 0.16);
@@ -936,7 +1010,7 @@ function beginWith(which, remember){
   for(const sh of flock){ sh.follow.set(WALKER.value); sh.s = WALKER.value; }
   AIM.set(CAM_EASE.level.look); CAMS.set(WALKER.value);
   REACH_INVITE.reset();
-  touches.clear(); holding = false; forceHold = false;
+  touches.clear(); readTouches(); forceHold = false; forceUp = forceDown = false;
   t = 0;
   ARRIVE.start();
   loop.resync();
@@ -972,7 +1046,15 @@ window.__shepherd = {
   ack: () => picked.read(),
   scene, camera, THREE,
   pump(dt, n){ return loop.pump(dt, n); },
-  hold(on){ holding = !!on; forceHold = false; return holding; },
+  /** Put a finger on the glass at 0..1 down the screen, or null to
+   *  lift it. null is also what two fingers mean. */
+  reach(y){ if(y === null || y === undefined){ touches.clear(); }
+            else { touches.clear(); touches.set(-1, y); }
+            readTouches(); forceHold = false;
+            return { reachAt, targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3) }; },
+  /** Drive the two directions the old way, for a tool call. */
+  hold(which, down){ if(which === 'up') forceUp = !!down; else forceDown = !!down;
+                     forceHold = forceUp || forceDown; return { forceUp, forceDown }; },
   seek(v){ t = v; },
   now(){
     const st = B.at(t);
@@ -987,7 +1069,9 @@ window.__shepherd = {
              error:+(WALKER.value - B.value(t)).toFixed(2),
              flock: flock.map(f => +f.s.toFixed(2)),
              gaps, trail:+(WALKER.value - flock[flock.length-1].s).toFixed(2),
-             holding, inviteLearned: REACH_INVITE.learned };
+             reachAt: reachAt === null ? null : +reachAt.toFixed(3),
+             targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3),
+             touches: touches.size, inviteLearned: REACH_INVITE.learned };
   },
   links(){ return linkReport(renderer, scene, camera); },
   solo(){ return soloReport(); },

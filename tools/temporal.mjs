@@ -65,6 +65,7 @@ import { lens, CAM_EASE } from '../app/js/long-air-lens.js';
 import { tracker } from '../app/js/follow.js';
 import * as cloudfield from '../app/js/long-air-clouds.js';
 import { MAG, MAG_V } from '../app/js/long-air-breath.js';
+import * as SHEP from '../app/js/shepherd-breath.js';
 
 let FAIL = false;
 const say = s => console.log(s);
@@ -916,6 +917,89 @@ say('A READER HOLDING THE INHALE — the run that goes into the cloud');
     else if(r.fails)       bad(line);
     else                   ok(line);
   }
+}
+
+/* ==================================================================
+   THE SHEPHERD — a CHAIN of followers, which is new
+   ==================================================================
+   Every other chapter has followers; none of them has followers
+   feeding followers. A chain is where a step gets AMPLIFIED rather
+   than absorbed: each link multiplies its input's velocity jump by
+   about w, so a jolt at the head arrives at the tail five times
+   magnified, and the tail is a sheep the reader is looking at.
+
+   That is the thing this harness exists to catch, so it is driven
+   here with the chapter's real modules — the same tracker and the
+   same body the page runs — on both clocks. The head is judged as a
+   first-class field and so is the LAST sheep, because if anything is
+   going to lurch it is the end of the chain.
+   ================================================================== */
+function sampleShepherd(clk){
+  const proto = SHEP.PROTOCOLS.box;
+  const b = breath(proto);
+  const R = rates(proto);
+  const W = body({ corridor: SHEP.CORRIDOR, rates: R, vMax: SHEP.PATH_V_MAX * 2.2 });
+  const flock = Array.from({ length: SHEP.FLOCK_N },
+                           () => tracker(SHEP.WALK_LO, SHEP.FLOCK_W));
+  const aim = tracker(SHEP.CAM_EASE.level.look, SHEP.CAM_EASE.level.ease);
+  const cams = tracker(SHEP.WALK_LO, 1.5);
+  W.reset(SHEP.normOf(b.value(0)));
+  for(const f of flock) f.set(W.value);
+  let t = 0, wall = 0;
+  const S = { walk:[], sheep1:[], sheepLast:[], trail:[], camAim:[], camAt:[] };
+  for(const dt of clk){
+    t += dt; wall += dt;
+    const ph = b.at(t).p;
+    /* a cue-perfect reader: the finger sits where the schedule is,
+       which is what makes a hold a hold */
+    const want = SHEP.normOf(b.value(t));
+    const gap = want - W.fill;
+    const up = gap > 0.012, down = gap < -0.012;
+    const cap = (up ? R.fillPerSec : down ? R.emptyPerSec : 0) * dt;
+    if(cap > 0){
+      let mv = gap * 14 * dt;
+      if(mv >  cap) mv =  cap;
+      if(mv < -cap) mv = -cap;
+      W.fill = Math.min(1, Math.max(0, W.fill + mv));
+    }
+    W.settle(dt);
+    let prev = W.value;
+    for(const f of flock){ f.step(dt, prev); prev = f.value; }
+    const E = SHEP.CAM_EASE[ph.cam] || SHEP.CAM_EASE.level;
+    aim.w = E.ease; aim.step(dt, E.look); cams.step(dt, W.value);
+    S.walk.push     ({ t: wall, v: W.value });
+    S.sheep1.push   ({ t: wall, v: flock[0].value });
+    S.sheepLast.push({ t: wall, v: flock[flock.length-1].value });
+    S.trail.push    ({ t: wall, v: W.value - flock[flock.length-1].value });
+    S.camAim.push   ({ t: wall, v: aim.value });
+    S.camAt.push    ({ t: wall, v: cams.value });
+  }
+  return S;
+}
+
+say('');
+say('THE SHEPHERD — the walk, the chain, and the lens');
+{
+  const a = sampleShepherd(STEADY(FRAMES));
+  const b2 = sampleShepherd(JITTER(FRAMES));
+  for(const k of Object.keys(a)){
+    const ra = analyse(a[k]), rb = analyse(b2[k]);
+    const r = verdict(ra, rb);
+    const line = `${k.padEnd(16)} ` +
+      `${(rb.stepRatio === Infinity ? 'inf' : rb.stepRatio.toFixed(1)).padStart(9)}  ` +
+      `${(rb.dvRatio === Infinity ? 'inf' : rb.dvRatio.toFixed(1)).padStart(9)}  ` +
+      `${rb.maxDV.toFixed(3).padStart(9)}   ${r.kind}   fr x${r.frRatio === Infinity ? 'inf' : r.frRatio.toFixed(2)}`;
+    if(r.fails) bad(line); else ok(line);
+  }
+  /* AND THE CHAIN MUST NOT AMPLIFY. The whole hazard of followers
+     feeding followers is that the tail is worse than the head; if it
+     is, the sheep at the back is the thing that lurches. */
+  const head = analyse(sampleShepherd(JITTER(FRAMES)).walk);
+  const tail = analyse(sampleShepherd(JITTER(FRAMES)).sheepLast);
+  const amp = head.maxDV > 1e-9 ? tail.maxDV / head.maxDV : 0;
+  const al = `the chain damps rather than amplifies: head ${head.maxDV.toFixed(3)} -> ` +
+             `tail ${tail.maxDV.toFixed(3)} u/s, x${amp.toFixed(2)} over ${SHEP.FLOCK_N} links`;
+  if(amp <= 1.0) ok(al); else bad(al + '  — the sheep at the back lurches harder than the shepherd');
 }
 
 say('');

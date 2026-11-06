@@ -66,6 +66,7 @@ import { CAM_EASE } from '../app/js/long-air-lens.js';
 import * as CF from '../app/js/long-air-clouds.js';
 import { MAG, MAG_V, MAG_T, GATE_HALF } from '../app/js/long-air-breath.js';
 import { readFileSync } from 'node:fs';
+import * as SH from '../app/js/shepherd-breath.js';
 
 const VERBOSE = process.argv.includes('--verbose');
 
@@ -1243,6 +1244,147 @@ say('THE PAGE AGAINST THE MODULE — one definition, not two that can drift');
     bad(`the shader's band edges ${JSON.stringify(got)} do NOT match the module's ${JSON.stringify(want)}`);
   else
     bad('profileTone/profileH no longer have the band edges the shader was written against');
+}
+
+/* ==================================================================
+   THE SHEPHERD
+   ==================================================================
+   A new chapter, 6 November 2026, and it comes in at the bar rather
+   than being brought to it. Two things to measure and they are the
+   two this project always measures: are the fields smooth under
+   refinement, and does the mesh built from them read as a polygon at
+   the distance it is looked at.
+
+   THE LENS IS THIS CHAPTER'S OWN. It is parked — that is the whole
+   spatial idea — so unlike Long Air's there is one pose rather than
+   a trailing one, and the hill is read from the foot of the path
+   looking up it. The projector is proved against two known cases
+   before any of its numbers are believed, exactly as the other one
+   is: a silently broken projector reports SMALL sagittas, which
+   looks like success.
+   ================================================================== */
+say('');
+say('THE SHEPHERD — the hill, through its own lens');
+{
+  /* the fields first: smooth under refinement, or the mesh cannot be
+     fixed by subdividing it however many rows are thrown at it */
+  for(const [name, f] of [
+    ['hillAt   (the path)',   x => SH.hillAt(x)],
+    ['pathX    (the drift)',  x => SH.pathX(x)],
+    ['groundAt (o = 0)',      x => SH.groundAt(x, 0)],
+    ['groundAt (o = 18)',     x => SH.groundAt(x, 18)],
+    ['groundAt across, s=20', o => SH.groundAt(20, o)],
+    ['groundAt across, s=36', o => SH.groundAt(36, o)]
+  ]){
+    /* THE ACROSS SWEEPS RUN THROUGH ZERO. They used to run 0 upward,
+       which is the half of the hillside with no path down the middle
+       of it — and the kink the first build had was exactly at o = 0.
+       A classifier that cannot reach the defect reports smooth. */
+    const across = name.includes('across');
+    const r = across ? classify(f, -40, 40, 0.3)
+                     : classify(f, 0, SH.PATH_HI, 0.35);
+    const line = `${name.padEnd(26)} ${r.kind.padEnd(11)} ` +
+                 `slope x${String(r.slopeGrowth).padStart(5)}  curv x${String(r.curvGrowth).padStart(6)}`;
+    if(r.kind === 'smooth') ok(line); else bad(line);
+  }
+
+  /* the lens: parked at the foot, aiming up the path */
+  const ASPECT_S = 375 / 812;
+  const FOV_S = ASPECT_S < 0.75 ? 62 : 52;
+  const CAM = [SH.pathX(SH.CAM_AT) + SH.CAM_SIDE,
+               SH.hillAt(SH.CAM_AT) + SH.CAM_UP,
+               -SH.CAM_AT];
+  /* it aims at the middle of the walk, which is where it spends most
+     of a session and where the hill fills most of the frame */
+  const AIMS = (SH.WALK_LO + SH.WALK_HI) / 2;
+  const LOOK = [SH.pathX(AIMS), SH.hillAt(AIMS) + 1.0, -AIMS];
+  const f = [LOOK[0]-CAM[0], LOOK[1]-CAM[1], LOOK[2]-CAM[2]];
+  const fl = Math.hypot(...f); for(let i = 0; i < 3; i++) f[i] /= fl;
+  const rr = [f[2], 0, -f[0]];
+  const rl = Math.hypot(...rr) || 1; for(let i = 0; i < 3; i++) rr[i] /= rl;
+  const uu = [rr[1]*f[2]-rr[2]*f[1], rr[2]*f[0]-rr[0]*f[2], rr[0]*f[1]-rr[1]*f[0]];
+  const FY_S = 1 / Math.tan(FOV_S / 2 * Math.PI / 180);
+  const projS = (x, y, z) => {
+    const d = [x-CAM[0], y-CAM[1], z-CAM[2]];
+    const vz = d[0]*f[0] + d[1]*f[1] + d[2]*f[2];
+    if(vz <= 0.2) return null;
+    const vx = d[0]*rr[0] + d[1]*rr[1] + d[2]*rr[2];
+    const vy = d[0]*uu[0] + d[1]*uu[1] + d[2]*uu[2];
+    return [((FY_S/ASPECT_S)*vx/vz * 0.5 + 0.5) * 375,
+            (1 - (FY_S*vy/vz * 0.5 + 0.5)) * 812, vz];
+  };
+  const onS = q => q && q[0] > -60 && q[0] < 435 && q[1] > -60 && q[1] < 872;
+  const sagS = (A, P, Cc) => {
+    const a2 = projS(...A), p2 = projS(...P), c2 = projS(...Cc);
+    if(!a2 || !p2 || !c2 || !onS(a2) || !onS(p2) || !onS(c2)) return null;
+    const ex = c2[0]-a2[0], ey = c2[1]-a2[1];
+    const L = Math.hypot(ex, ey); if(L < 1e-6) return null;
+    return { px: Math.abs((p2[0]-a2[0])*ey - (p2[1]-a2[1])*ex) / L, dist: p2[2] };
+  };
+
+  /* PROVE IT FIRST */
+  {
+    const c = projS(...LOOK);
+    const dx = Math.abs(c[0] - 375/2), dy = Math.abs(c[1] - 812/2);
+    if(dx < 0.6 && dy < 0.6) ok(`shepherd projector: the aim lands at frame centre (off by ${dx.toFixed(2)}, ${dy.toFixed(2)} px)`);
+    else bad(`shepherd projector: aim is ${dx.toFixed(1)}, ${dy.toFixed(1)} px off centre`);
+    const want = 812 / (2 * Math.tan(FOV_S/2*Math.PI/180) * 40);
+    const pA = projS(...LOOK), pB = projS(LOOK[0], LOOK[1]+1, LOOK[2]);
+    const axis = Math.hypot(LOOK[0]-CAM[0], LOOK[1]-CAM[1], LOOK[2]-CAM[2]);
+    const got = Math.abs(pB[1]-pA[1]) * axis / 40;
+    if(Math.abs(got-want)/want < 0.02)
+      ok(`shepherd projector: a 1 m stick at 40 m subtends ${want.toFixed(1)} px as the optics require`);
+    else bad(`shepherd projector: 1 m at 40 m measured ${got.toFixed(2)} px, optics say ${want.toFixed(2)}`);
+  }
+
+  /* the mesh's own knots, both axes. The row and column counts are
+     the page's, read from it rather than retyped — a second copy of
+     a resolution is a second thing to drift. */
+  const page = readFileSync(new URL('../app/shepherd.html', import.meta.url), 'utf8');
+  const ROWS = +(page.match(/const HILL_ROWS = (\d+)/) || [])[1];
+  const COLS = +(page.match(/const HILL_COLS = (\d+)/) || [])[1];
+  const HALF = +(page.match(/const HILL_HALF = (\d+)/) || [])[1];
+  if(!ROWS || !COLS || !HALF) bad('shepherd: could not read the hill mesh resolution out of the page');
+  const sAt = i => (i / ROWS) * SH.PATH_HI;
+  const oAt = k => -HALF + (k / (COLS - 1)) * HALF * 2;
+  const V = (i, k) => [SH.pathX(sAt(i)) + oAt(k), SH.groundAt(sAt(i), oAt(k)), -sAt(i)];
+
+  let along = { px: 0 }, across = { px: 0 }, seen = 0;
+  for(let k = 0; k < COLS; k += 2){
+    for(let i = 1; i < ROWS; i++){
+      const r = sagS(V(i-1, k), V(i, k), V(i+1, k));
+      if(r){ seen++; if(r.px > along.px) along = { ...r, s:+sAt(i).toFixed(1), o:+oAt(k).toFixed(1) }; }
+    }
+  }
+  for(let i = 0; i <= ROWS; i += 2){
+    for(let k = 1; k < COLS - 1; k++){
+      const r = sagS(V(i, k-1), V(i, k), V(i, k+1));
+      if(r){ seen++; if(r.px > across.px) across = { ...r, s:+sAt(i).toFixed(1), o:+oAt(k).toFixed(1) }; }
+    }
+  }
+  if(seen === 0) bad('shepherd: nothing projected — the instrument saw no hill');
+  else {
+    for(const [name, w] of [['hill along the path', along], ['hill across it', across]]){
+      const line = `${name.padEnd(24)} worst ${w.px.toFixed(2).padStart(5)} px off the chord at ` +
+                   `${w.dist.toFixed(0)} m (s=${w.s}, o=${w.o}), ${seen} knots  (bar ${PX_BAR} px)`;
+      if(w.px <= PX_BAR) ok(line); else bad(line);
+    }
+  }
+
+  /* AND THE FIGURES STAND ON THE SURFACE THAT IS DRAWN. They are
+     placed by hillAt and the hill is built from groundAt, and
+     groundAt(s, 0) is hillAt(s) only if the cross-slope terms vanish
+     on the path. If they ever stop doing that the whole flock floats
+     or sinks, silently, because nothing else would notice. */
+  let worstFoot = 0, footAt = 0;
+  for(let x = 0; x <= SH.PATH_HI; x += 0.25){
+    const d = Math.abs(SH.groundAt(x, 0) - SH.hillAt(x));
+    if(d > worstFoot){ worstFoot = d; footAt = x; }
+  }
+  const fl2 = `the path is the hill: worst |groundAt(s,0) - hillAt(s)| = ` +
+              `${worstFoot.toExponential(1)} m at s=${footAt.toFixed(1)}`;
+  if(worstFoot < 1e-9) ok(fl2 + '  (the figures stand on what is drawn)');
+  else bad(fl2 + '  — the flock is walking above or below the hillside');
 }
 
 say('');

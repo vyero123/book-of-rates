@@ -129,10 +129,23 @@ export function pathX(s){
  *  so the path sits in a shallow draw and the horizon is the brow
  *  rather than the edge of a plane. */
 export function groundAt(s, o){
-  const a = Math.abs(o);
-  const fall = 0.055 * a * a / (1 + a * 0.045);
-  const cross = Math.sin(s * 0.063 + a * 0.08 + 1.7) * 0.9
-              * (1 - Math.exp(-a * 0.08));
+  /* EVEN IN o, AND SMOOTH ACROSS ZERO. The first version took
+     a = Math.abs(o) and built both terms on it, which puts a SLOPE
+     KINK down the middle of the hillside — along the path, which is
+     the one line the camera is always pointed at. tools/continuity.mjs
+     measured the crease at 5.11 px against a 2 px bar once it was
+     asked to sweep THROUGH zero; its first sweep ran 0 upward and
+     never crossed the fault, which is the older lesson restated: a
+     check that cannot reach the defect reports a clean surface.
+
+     o*o is even and smooth at the origin and needs no abs() at all.
+     The fall's denominator uses it too, so the whole term is a
+     rational function of o^2 — C-infinity everywhere, bounded
+     curvature, and it refines. */
+  const q = o * o;
+  const fall = 0.055 * q / (1 + 0.0015 * q);
+  const cross = Math.sin(s * 0.063 + o * 0.08 + 1.7) * 0.9
+              * (1 - Math.exp(-0.0032 * q));
   return hillAt(s) - fall + cross;
 }
 

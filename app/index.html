@@ -585,6 +585,37 @@ const lockedWhy = `<p class="aside"><b>The Breath Held is not in this edition.</
       content decision and is left to the reader; it would be one edit,
       in FIRST_EDITION below and the four `.ch` lines in this file.
    ================================================================== */
+/* THE SHEPHERD — the first theme this book ever had, in three
+   dimensions. A figure walking up and down a hill, with a flock that
+   is the last several seconds of your own pace strung out behind him.
+   It has no flat twin to take over from: the 2-D original was the
+   sketch the whole book came out of rather than a chapter in it.
+
+   The plate is the hill seen from the foot of the path, which is
+   where the lens actually sits. */
+const shepherdHTML = `<a class="plate" href="shepherd.html">
+    <div class="pic">
+      <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
+        <rect width="96" height="66" fill="#EFE3B2"/>
+        <rect y="0" width="96" height="16" fill="#D6DCC0"/>
+        <circle cx="68" cy="17" r="13" fill="#FFE9AE" opacity=".55"/>
+        <ellipse cx="22" cy="13" rx="13" ry="4" fill="#FFFFFF"/>
+        <ellipse cx="58" cy="9" rx="10" ry="3.2" fill="#FFFFFF"/>
+        <path d="M0,30 C22,20 40,17 52,17 C66,17 80,21 96,31 L96,66 L0,66 Z" fill="#7B9A5E"/>
+        <path d="M0,40 C24,30 40,26 52,26 C66,26 80,31 96,42 L96,66 L0,66 Z" fill="#A9C07C"/>
+        <path d="M44,20 C44,34 36,50 24,66 L44,66 C50,50 52,34 52,20 Z" fill="#D7DC9A"/>
+        <rect x="46" y="13" width="2" height="7" fill="#7C5438"/>
+        <circle cx="47" cy="12" r="2.2" fill="#7C5438"/>
+        <rect x="49" y="10" width="1" height="9" fill="#6B5134"/>
+        <ellipse cx="44" cy="25" rx="2.4" ry="1.8" fill="#FFFFFF"/>
+        <ellipse cx="40" cy="33" rx="2.9" ry="2.1" fill="#FFFFFF"/>
+        <ellipse cx="35" cy="43" rx="3.4" ry="2.5" fill="#FFFFFF"/>
+        <ellipse cx="30" cy="55" rx="4.1" ry="3" fill="#FFFFFF"/>
+      </svg>
+    </div>
+    <div class="cap">The Shepherd</div>
+  </a>`;
+
 const pearlDiverHTML = `<a class="plate" href="pearl-diver.html">
     <div class="pic">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
@@ -785,7 +816,11 @@ if(leadIdx > 0) taken.unshift(taken.splice(leadIdx, 1)[0]);
 /* Bamboo Rain and Lantern Current have no flat twin to take over from —
    they are new chapters rather than second readings — so they simply
    join the 3-D block at the end of it, in chapter order. */
-const three = taken.concat([bambooHTML, lanternHTML]);
+/* The Shepherd joins the end of the 3-D block with the other two
+   that have no flat twin. The link-wiring guard below derives its
+   expectation from the page's own content, so a new plate is covered
+   by it automatically rather than needing a number bumped. */
+const three = taken.concat([bambooHTML, lanternHTML, shepherdHTML]);
 
 const head  = label => `<div class="ct"><span>${label}</span><i></i></div>`;
 const grid  = plates => `<div class="plates">${plates.join('')}</div>`;

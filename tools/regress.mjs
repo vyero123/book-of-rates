@@ -38,6 +38,8 @@ import * as deepLight from '../app/js/deep-light-breath.js';
 import * as longAir from '../app/js/long-air-breath.js';
 import * as bamboo from '../app/js/bamboo-rain-breath.js';
 import * as lantern from '../app/js/lantern-breath.js';
+import * as shep from '../app/js/shepherd-breath.js';
+import { tracker } from '../app/js/follow.js';
 import { body, ratesOf, corridor as cor, drag } from '../app/js/course.js';
 import * as terrain from '../app/js/long-air-terrain.js';
 import * as cloudfield from '../app/js/long-air-clouds.js';
@@ -1029,6 +1031,7 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
      (c) The session cap, and protocol() not eating the chapter's `id`.
    ------------------------------------------------------------------ */
 const CHAPTERS = [
+  { name:'the shepherd',    mod: shep,      corridor: shep.CORRIDOR },
   { name:'long air',        mod: longAir,   corridor: longAir.CORRIDOR },
   { name:'bamboo rain',     mod: bamboo,    corridor: bamboo.CORRIDOR  },
   { name:'lantern current', mod: lantern,   corridor: lantern.CORRIDOR },
@@ -1068,6 +1071,111 @@ for(const ch of CHAPTERS){
   }
   if(failures === 0)
     console.log(`    ok    ${ch.name}: schedule closes at every seam, inside the corridor, under the cap`);
+}
+
+/* ==================================================================
+   5z. THE SHEPHERD — the flock is the claim
+   ==================================================================
+   This chapter's one real promise is that the line of sheep behind
+   the shepherd IS the last several seconds of the reader's own pace.
+   Everything else — the walk tracking the cue, the figures staying on
+   the hill — follows from the kit and is checked with it. What needs
+   its own harness is the flock, because it is the only thing in the
+   book built out of a CHAIN of followers and the only place where a
+   derivation (2Nv/w) is standing in for a thing the reader looks at.
+
+   So this flies the chapter's real modules — js/follow.js's tracker
+   and js/course.js's body, the same objects the page drives — and
+   measures the trail on the DRAWN positions. The algebra assumes the
+   target is a ramp; the schedule turns around twice a breath, which
+   is exactly where an assumption like that stops holding, so the
+   number is measured rather than trusted.
+   ================================================================== */
+for(const [id, proto] of Object.entries(shep.PROTOCOLS)){
+  const b = breath(proto);
+  const walker = body({ corridor: shep.CORRIDOR, rates: ratesOf(proto),
+                        vMax: shep.PATH_V_MAX * 2.2 });
+  const flock = Array.from({ length: shep.FLOCK_N },
+                           () => tracker(shep.WALK_LO, shep.FLOCK_W));
+  walker.reset(shep.normOf(b.value(0)));
+  for(const f of flock) f.set(walker.value);
+
+  const dt = 1 / 120;
+  let maxTrail = 0, minS = Infinity, maxS = -Infinity;
+  let lastMin = Infinity, lastMax = -Infinity, worstErr = 0;
+  for(let t = 0; t < proto.session; t += dt){
+    /* A CUE-PERFECT READER, AND THE FIRST VERSION OF THIS WAS THE
+       BUG RATHER THAN THE TEST. It drove a BINARY reader — holding
+       through the inhale, released otherwise — and measured 20.89 m
+       of error on the box protocol. That was not the harness being
+       strict: the chapter's control was binary too, so a hold phase
+       was unflyable by construction and the harness had found it.
+       The control is a pursuit now and a hold is a finger left where
+       it is, so the cue-perfect reader is one whose finger sits on
+       the schedule's own place on the path. */
+    const r = ratesOf(proto);
+    const want = shep.normOf(b.value(t));
+    const gap = want - walker.fill;
+    const up = gap > 0.012, down = gap < -0.012;
+    const cap = (up ? r.fillPerSec : down ? r.emptyPerSec : 0) * dt;
+    if(cap > 0){
+      let mv = gap * 14 * dt;
+      if(mv >  cap) mv =  cap;
+      if(mv < -cap) mv = -cap;
+      walker.fill = Math.min(1, Math.max(0, walker.fill + mv));
+    }
+    walker.settle(dt);
+    let prev = walker.value;
+    for(const f of flock){ f.step(dt, prev); prev = f.value; }
+
+    const last = flock[flock.length - 1].value;
+    maxTrail = Math.max(maxTrail, walker.value - last);
+    minS = Math.min(minS, walker.value); maxS = Math.max(maxS, walker.value);
+    lastMin = Math.min(lastMin, last);  lastMax = Math.max(lastMax, last);
+    worstErr = Math.max(worstErr, Math.abs(walker.value - b.value(t)));
+  }
+
+  /* (a) THE WALK STAYS ON THE HILL. The body is clamped into the
+         corridor, so this is really asking whether the clamp ever has
+         to do anything — a figure held against a wall is a figure
+         being corrected, which this chapter does not do. */
+  if(minS < shep.PATH_LO - 1e-9 || maxS > shep.PATH_HI + 1e-9)
+    fail(`the shepherd/${id}: the walk leaves the path (${minS.toFixed(2)}..${maxS.toFixed(2)})`);
+  if(minS < shep.WALK_LO - 2.0 || maxS > shep.WALK_HI + 2.0)
+    fail(`the shepherd/${id}: an on-cue walk overshoots its own band by more than 2 m ` +
+         `(${minS.toFixed(2)}..${maxS.toFixed(2)} against ${shep.WALK_LO}..${shep.WALK_HI})`);
+
+  /* (b) AND SO DOES THE LAST SHEEP. The flock is the record, and a
+         record kept off the end of the hill is not being kept where
+         the reader can read it. */
+  if(lastMin < shep.PATH_LO - 1e-9 || lastMax > shep.PATH_HI + 1e-9)
+    fail(`the shepherd/${id}: the last sheep leaves the path ` +
+         `(${lastMin.toFixed(2)}..${lastMax.toFixed(2)})`);
+
+  /* (c) THE TRAIL IS WHAT THE DERIVATION SAYS. FLOCK_W was inverted
+         out of FLOCK_TRAIL on the assumption of a ramp; this is the
+         measurement that assumption has to survive. A fifth either
+         way: the schedule turns around, so the steady-state figure is
+         an upper bound the flock spends most of its time near rather
+         than a value it sits at. */
+  const want = shep.FLOCK_TRAIL;
+  if(Math.abs(maxTrail - want) > want * 0.2)
+    fail(`the shepherd/${id}: the flock trails ${maxTrail.toFixed(2)} m against a derived ` +
+         `${want.toFixed(2)} — FLOCK_W and FLOCK_TRAIL have come apart`);
+
+  /* (d) AND IT IS A FLOCK, NOT A SMEAR. At an even pace the gaps are
+         the trail over N; if that fell under the legibility bound the
+         chapter would be drawing one long sheep. */
+  const evenGap = maxTrail / shep.FLOCK_N;
+  if(evenGap < shep.FLOCK_MIN_GAP)
+    fail(`the shepherd/${id}: ${evenGap.toFixed(2)} m between sheep at an even pace, under ` +
+         `the ${shep.FLOCK_MIN_GAP.toFixed(2)} m at which they stop being separate animals`);
+
+  if(failures === 0)
+    console.log(`    ok    the shepherd/${id}: an on-cue walk stays on the hill ` +
+      `(${minS.toFixed(1)}..${maxS.toFixed(1)} of ${shep.PATH_LO}..${shep.PATH_HI}), tracks the cue ` +
+      `to ${worstErr.toFixed(2)} m, and the flock trails ${maxTrail.toFixed(2)} m against a derived ` +
+      `${want.toFixed(2)} with ${evenGap.toFixed(2)} m between sheep`);
 }
 
 /* ------------------------------------------------------------------
