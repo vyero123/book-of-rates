@@ -590,15 +590,15 @@ const figMat = posterMat(THREE, {
   vertex:`
     attribute float aWho; attribute float aKind; attribute float aLimb;
     attribute float aHip; attribute vec3 aN;
-    uniform vec3 uPos[${'$'}{FIG_N}];
-    uniform float uYaw[${'$'}{FIG_N}];
-    uniform float uLean[${'$'}{FIG_N}];
-    uniform float uStride[${'$'}{FIG_N}];
+    uniform vec3 uPos[${FIG_N}];
+    uniform float uYaw[${FIG_N}];
+    uniform float uLean[${FIG_N}];
+    uniform float uStride[${FIG_N}];
     varying vec3 vN; varying float vKind; varying float vDist;
     void main(){
       int w = int(aWho + 0.5);
       vec3 at = uPos[0]; float yaw = uYaw[0], lean = uLean[0], stride = uStride[0];
-      for(int k = 0; k < ${'$'}{FIG_N}; k++){
+      for(int k = 0; k < ${FIG_N}; k++){
         if(k == w){ at = uPos[k]; yaw = uYaw[k]; lean = uLean[k]; stride = uStride[k]; }
       }
       vec3 p = position; vec3 n = aN;
