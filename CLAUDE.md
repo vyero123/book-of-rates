@@ -374,3 +374,23 @@ each setting buys is beside them in `shepherd.html`.
 **The lens constants are on the inspection hook** (`__shepherd.cam({...})`). Staging cannot
 be measured, only looked at, and a push per guess is how an afternoon goes into a camera.
 The module's constants are the source of truth and seed it.
+
+## Lantern Current was withdrawn — 7 November 2026
+
+Removed from the book, on the reader's instruction and my recommendation. Not deleted
+quietly: `app/lantern-current.html` is a forwarding stub to the contents, `archive.html`
+carries it as a withdrawn chapter with the reason on its card, and `js/lantern-breath.js`
+is a tombstone (`rm` is refused on this mount). Out of `index.html`'s contents, out of
+`sw.js`'s shell list — cache bumped to `bor-v19` — and out of `regress.mjs` entirely,
+including its `WATER` entry, its arch-cadence check and the whole of section 5b.
+
+**THE DIAGNOSIS IS KEPT, because it is the test every new chapter now takes first.** Its
+breath drove a 0.68 m hull lift over four seconds; against the nearest thing that moved
+with it, that is **2.4 degrees a second**. Long Air is 88. The deeper faults were that its
+camera RODE the thing the breath moved, so the motion cancelled out, and that its spatial
+relationship — travel along a path — was Long Air's with a different skin.
+
+So, before building anything: *what does the breath move, and what is it moving RELATIVE
+TO?* Then put a number on it, and remember the Shepherd's correction — angular rate is the
+right test for a lens pointed ALONG the motion; across it, the number is the fraction of
+the frame travelled.

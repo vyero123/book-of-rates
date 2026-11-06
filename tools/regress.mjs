@@ -37,7 +37,6 @@ import { breath } from '../app/js/breath.js';
 import * as deepLight from '../app/js/deep-light-breath.js';
 import * as longAir from '../app/js/long-air-breath.js';
 import * as bamboo from '../app/js/bamboo-rain-breath.js';
-import * as lantern from '../app/js/lantern-breath.js';
 import * as shep from '../app/js/shepherd-breath.js';
 import { tracker } from '../app/js/follow.js';
 import { body, ratesOf, corridor as cor, drag } from '../app/js/course.js';
@@ -182,13 +181,11 @@ for(const [id, p] of Object.entries(longAir.PROTOCOLS)){
  *  adding it here is the obvious way to lose the guarantee. */
 const WATER = [
   { chapter:'deep light', surface: deepLight.SURFACE, protocols: deepLight.PROTOCOLS },
-  /* Lantern Current, added 24 Oct with the chapter itself. §6 row 4 is on
-     the design doc's own list of water themes, so the rule binds it: the
-     travelled scalar is the hull's height above the waterline and every
-     anchor of every phase is above SURFACE, so the inhale is never under
-     it by the SHAPE of the mapping. That is the claim; this is where it
-     stops being a claim. */
-  { chapter:'lantern current', surface: lantern.SURFACE, protocols: lantern.PROTOCOLS }
+  /* LANTERN CURRENT WAS THE SECOND ENTRY and was withdrawn on
+     7 November 2026. The rule's own note still applies to whatever
+     water chapter comes next: a water theme that is not in this list
+     is not covered, so adding one without adding it here is the
+     obvious way to lose the guarantee. */
 ];
 
 /** Sample one protocol across a cycle at a fine step and return every
@@ -454,21 +451,6 @@ for(const id of Object.keys(longAir.PROTOCOLS)){
   if(failures === 0)
     console.log(`    ok    long air/${id}: a gate crosses the lens ${rate.toFixed(2)} times a ` +
                 `second, every ${course.dz.toFixed(1)} m`);
-}
-
-/* The same question of the other travelling chapter. Lantern Current
-   passes under an arch, which is a cable and some lamps rather than a
-   wall, but it is still something crossing the view on a fixed cadence
-   and it is still worth knowing the number. */
-for(const id of Object.keys(lantern.PROTOCOLS)){
-  const period = lantern.periodOf(lantern.PROTOCOLS[id]);
-  const spacing = period / lantern.archCount(period);
-  const rate = lantern.SPEED / spacing;
-  if(rate > SWEEPS_PER_SECOND_MAX)
-    fail(`lantern/${id}: an arch crosses the lens ${rate.toFixed(2)} times a second`);
-  if(failures === 0)
-    console.log(`    ok    lantern/${id}: an arch crosses the lens ${rate.toFixed(2)} times a ` +
-                `second, every ${spacing.toFixed(1)} m`);
 }
 
 /* ------------------------------------------------------------------
@@ -1034,7 +1016,6 @@ const CHAPTERS = [
   { name:'the shepherd',    mod: shep,      corridor: shep.CORRIDOR },
   { name:'long air',        mod: longAir,   corridor: longAir.CORRIDOR },
   { name:'bamboo rain',     mod: bamboo,    corridor: bamboo.CORRIDOR  },
-  { name:'lantern current', mod: lantern,   corridor: lantern.CORRIDOR },
   /* Deep Light predates the corridor helper and anchors its heights
      directly, so it joins (a) and (c) and not (b). */
   { name:'deep light',      mod: deepLight, corridor: null }
@@ -1368,298 +1349,6 @@ for(const [id, proto] of Object.entries(bamboo.PROTOCOLS)){
                 `${rms.toFixed(2)} m rms inside a predicted ${allow.toFixed(2)} m of lag ` +
                 `(worst ${worst.toFixed(2)}), nearest ${nearest.toFixed(1)} m, ` +
                 `clearing monotone to ${bamboo.CLEAR_SHIFT} m, ${strokes} lightning samples, all on exhales`);
-}
-
-/* ------------------------------------------------------------------
-   5b. LANTERN CURRENT — §1.6a BY CONSTRUCTION, and the river's seams
-   ------------------------------------------------------------------
-   The §1.6a sampling is done in section 3 above with the other water
-   chapters. What is checked here is the STRUCTURAL claim the chapter
-   makes about why it passes: not that the samples happen to come out
-   above the line, but that both walls the controller clamps to are above
-   it, so no clamp, overshoot or contact can put the hull under water at
-   all. That is the difference between satisfying the rule and being
-   unable to break it — §1.6a's own wording: satisfy it with the shape of
-   the mapping, not with a number tuned until it just clears.
-   ------------------------------------------------------------------ */
-if(!(lantern.WALL_LOW > lantern.SURFACE))
-  fail(`lantern current: the lower corridor wall is at ${lantern.WALL_LOW}, not above ` +
-       `the waterline — the hull could be clamped under water`);
-
-for(const [id, proto] of Object.entries(lantern.PROTOCOLS)){
-  const b = breath(proto);
-  const period = lantern.periodOf(proto);
-
-  /* the river's seams, same discipline as Long Air's strip */
-  const seams = {
-    bankL: [lantern.bankAt(0, period, -1), lantern.bankAt(period, period, -1)],
-    bankR: [lantern.bankAt(0, period,  1), lantern.bankAt(period, period,  1)],
-    treeL: [lantern.treeAt(0, period, -1), lantern.treeAt(period, period, -1)],
-    treeR: [lantern.treeAt(0, period,  1), lantern.treeAt(period, period,  1)]
-  };
-  for(const [what, [x, y]] of Object.entries(seams)){
-    if(Math.abs(x - y) > 1e-9)
-      fail(`lantern/${id}: the ${what} does not close at the seam (${Math.abs(x-y).toExponential(2)})`);
-  }
-
-  /* every lantern is off the boat's own lane and inside the bank, both
-     sides. There is no collision in this chapter, and this is the reason
-     there does not need to be one. */
-  let inLane = 0, pastBank = 0;
-  for(let i = 0; i < lantern.LANTERNS; i++){
-    const L = lantern.lanternAt(i, period);
-    if(Math.abs(L.x) < 1.0) inLane++;
-    if(Math.abs(L.x) > Math.abs(lantern.bankAt(L.z, period, Math.sign(L.x))) - 0.5) pastBank++;
-  }
-  if(inLane)   fail(`lantern/${id}: ${inLane} lantern(s) sit in the boat's own lane`);
-  if(pastBank) fail(`lantern/${id}: ${pastBank} lantern(s) sit in or past the bank`);
-
-  /* the boat follows the schedule with mass — the kit's controller with
-     the SCHEDULE holding the control instead of a reader — and must
-     still never go under. Driven, not asserted. */
-  const hull = body({ corridor: lantern.CORRIDOR, rates: ratesOf(proto) });
-  const dt = 1 / 120;
-  let lowest = Infinity, worst = 0;
-  for(let t = 0; t < proto.session; t += dt){
-    hull.follow(dt, b.at(t).p.k);
-    lowest = Math.min(lowest, hull.value);
-    if(t > proto.cycle) worst = Math.max(worst, Math.abs(hull.value - b.value(t)));
-  }
-  if(lowest <= lantern.SURFACE)
-    fail(`lantern/${id}: the hull reached ${lowest.toFixed(3)} m, at or below the waterline`);
-  /* and the lag must be the spring's own and nothing else — derived
-     from the controller's constants, never a number picked to pass */
-  const allowLag = trailBound(hull, proto.phases);
-  if(worst > allowLag)
-    fail(`lantern/${id}: the hull trails its schedule by ${worst.toFixed(3)} m, more than the ` +
-         `${allowLag.toFixed(3)} m the spring explains — the anchors are not what a ` +
-         `constant rate reaches`);
-
-  /* ---------------------------------------------------------------
-     THE ATTENTION ARC. The chapter's claim is: focus one, then focus
-     two HIGHER AND MORE, then all the way down to nothing gathered.
-     Each clause is checkable and none of them is visible in a
-     screenshot, so none of them is left to one.
-     --------------------------------------------------------------- */
-  const ins = proto.phases.filter(q => q.k === 'in');
-  if(ins.length !== 2)
-    fail(`lantern/${id}: a double breath needs two inhale phases, found ${ins.length}`);
-  else {
-    if(!(ins[1].d < ins[0].d))
-      fail(`lantern/${id}: the second inhale (${ins[1].d}s) is not shorter than the first`);
-    if(ins[0].focus !== lantern.FOCUS.NEAR || ins[1].focus !== lantern.FOCUS.FAR)
-      fail(`lantern/${id}: the two inhales do not name two different objects of focus ` +
-           `(${ins[0].focus} then ${ins[1].focus})`);
-    // the increase: the second object is HIGHER and the attention on it
-    // is TIGHTER, and the front gets there FASTER. "More", not "another
-    // one of the same".
-    if(!(ins[1].to > ins[0].to))
-      fail(`lantern/${id}: the second inhale does not rise above the first ` +
-           `(${ins[0].to} then ${ins[1].to}) — there is no increase`);
-    if(!(ins[1].tight(1) > ins[0].tight(1)))
-      fail(`lantern/${id}: attention is not tighter on the second object ` +
-           `(${ins[0].tight(1)} vs ${ins[1].tight(1)})`);
-    /* THE FRONT'S ANCHORS, like the hull's, MUST BE WHAT A CONSTANT
-       RATE REACHES. Both were written for a "the second sip is faster"
-       effect and both were wrong in the same way: the control
-       integrates at one rate across the whole inhale, so an anchor it
-       cannot reach is not a target, it is a permanent error. The front
-       version trailed by 0.15 of the arch, which on screen is the light
-       running up the wire visibly behind the cue asking for it.
-
-       So the increase is NOT A SPEED anywhere in this chapter. It is
-       what gets lit (the second sip finishes the span and the keystone,
-       the part that is overhead), how tightly it is held, and where the
-       lens goes. Those are the three checks below. */
-    const totalInR = ins.reduce((a, q) => a + q.d, 0);
-    const wantReach = ins[0].d / totalInR;
-    if(Math.abs(ins[0].reach[1] - wantReach) > 1e-9)
-      fail(`lantern/${id}: the first sip ends with the front at ${ins[0].reach[1]} but a ` +
-           `constant-rate hold reaches ${wantReach.toFixed(3)} there`);
-
-    /* and the second sip must light the TOP of the arch: everything it
-       adds has to be higher than everything the first sip reached */
-    const archA = lantern.archLights();
-    const firstTop  = Math.max(...archA.filter(L => L.s <= ins[0].reach[1] + 1e-9).map(L => L.y));
-    const secondTop = Math.max(...archA.map(L => L.y));
-    const secondSet = archA.filter(L => L.s > ins[0].reach[1] + 1e-9);
-    if(!secondSet.length)
-      fail(`lantern/${id}: the second sip lights nothing the first did not`);
-    else if(!(Math.min(...secondSet.map(L => L.y)) >= firstTop - 1e-9))
-      fail(`lantern/${id}: the second sip lights something LOWER than the first reached ` +
-           `— "up through them" has to be up`);
-    if(!(secondTop > firstTop))
-      fail(`lantern/${id}: the second sip does not reach higher than the first`);
-
-    /* THE HULL'S OWN ANCHORS MUST BE WHAT A CONSTANT RATE REACHES.
-       The hull is the kit's body with the schedule holding the control,
-       and that integrates at one rate across the whole inhale, so the
-       only height it can be at when the first sip ends is the one that
-       rate gets to. A prettier number here does not move the boat; it
-       makes the boat lag its own schedule for the rest of the breath,
-       and the lag then looks like a badly tuned spring. */
-    const totalIn = ins.reduce((a, q) => a + q.d, 0);
-    const want = lantern.HULL_LOW +
-                 (lantern.HULL_HIGH - lantern.HULL_LOW) * (ins[0].d / totalIn);
-    if(Math.abs(ins[0].to - want) > 1e-9)
-      fail(`lantern/${id}: the first sip ends at ${ins[0].to.toFixed(3)} m but a constant-rate ` +
-           `inhale reaches ${want.toFixed(3)} m there`);
-  }
-
-  /* The exhale must reach NO FOCUS AT ALL, and must get there before it
-     ends rather than at the last instant: "all the way down to an
-     unfocused, general, relaxed state" is a place to arrive and rest in,
-     not a line to cross on the way to the next breath. */
-  const outs = proto.phases.filter(q => q.k === 'out');
-  for(const q of outs){
-    if(q.focus !== lantern.FOCUS.NONE)
-      fail(`lantern/${id}: the exhale still names a focus (${q.focus})`);
-    if(q.tight(1) > 1e-9)
-      fail(`lantern/${id}: attention is still ${q.tight(1).toFixed(3)} at the end of the exhale`);
-    let arrived = null;
-    for(let p = 0; p <= 1.0001; p += 0.005){
-      if(q.tight(p) <= 1e-9){ arrived = p; break; }
-    }
-    if(arrived === null || arrived > 0.9)
-      fail(`lantern/${id}: the exhale only lets go at ${(arrived === null ? 1 : arrived).toFixed(2)} ` +
-           `of the way through — there is no released state to rest in`);
-  }
-
-  /* REACH is continuous across the whole cycle and ends where it began,
-     or the illumination front teleports once a breath — which, against
-     an arch lighting from the feet up, would look like the arch
-     flickering rather than like a jump. */
-  let prevReach = null, reachHi = 0, reachLo = 1;
-  for(let t = 0; t <= proto.cycle + 1e-9; t += 0.01){
-    const a = lantern.attention(b, +t.toFixed(4));
-    reachHi = Math.max(reachHi, a.reach); reachLo = Math.min(reachLo, a.reach);
-    if(prevReach !== null && Math.abs(a.reach - prevReach) > 0.08)
-      fail(`lantern/${id}: the illumination front jumps ${Math.abs(a.reach-prevReach).toFixed(3)} ` +
-           `at t=${t.toFixed(2)}`);
-    prevReach = a.reach;
-  }
-  if(Math.abs(reachHi - lantern.REACH_FULL) > 1e-9)
-    fail(`lantern/${id}: the front only reaches ${reachHi.toFixed(3)}, never the apex`);
-  if(reachLo > 1e-9)
-    fail(`lantern/${id}: the front never comes back down to the feet (lowest ${reachLo.toFixed(3)})`);
-
-  /* ---------------------------------------------------------------
-     THE ARCH ITSELF. Its distance ordering is baked from a canonical
-     eye, and the two things that must be true of it are that the feet
-     really are nearest and the apex really is furthest — otherwise
-     "lights up from the sides and rushes upward" is just a claim.
-     --------------------------------------------------------------- */
-  const arch = lantern.archLights();
-  if(arch.length !== lantern.ARCH_LIGHTS * 2)
-    fail(`lantern: an arch has ${arch.length} lights, not ${lantern.ARCH_LIGHTS * 2}`);
-  if(Math.abs(arch[0].s) > 1e-9 || Math.abs(arch[arch.length-1].s - 1) > 1e-9)
-    fail('lantern: the arch ordering is not normalised to 0..1');
-  // nearest is a foot (a near 0), furthest is an apex (a near 1)
-  if(arch[0].a > 0.2)
-    fail(`lantern: the nearest light on the arch is at a=${arch[0].a.toFixed(2)}, not a foot`);
-  if(arch[arch.length-1].a < 0.8)
-    fail(`lantern: the furthest light is at a=${arch[arch.length-1].a.toFixed(2)}, not the apex`);
-  // both feet must light before anything above them: "the lights on
-  // either side closest to the person light up first"
-  const firstTwo = arch.slice(0, 2).map(L => L.side).sort();
-  if(firstTwo[0] !== -1 || firstTwo[1] !== 1)
-    fail('lantern: the first two lights of an arch are not one on each side');
-  // height must increase with the ordering, or "upward" is not what
-  // the front actually does
-  for(let i = 1; i < arch.length; i++){
-    if(arch[i].y < arch[i-1].y - 1e-9 && arch[i].side === arch[i-1].side)
-      fail(`lantern: the arch ordering goes DOWN at index ${i} ` +
-           `(${arch[i-1].y.toFixed(2)} -> ${arch[i].y.toFixed(2)})`);
-  }
-  // nothing in the boat's lane, at any height
-  const inLaneArch = arch.filter(L => Math.abs(L.x) < 1.0).length;
-  if(inLaneArch) fail(`lantern: ${inLaneArch} arch light(s) sit in the boat's own lane`);
-  // the arches must fit the strip a whole number of times
-  const nArch = lantern.archCount(period);
-  if(Math.abs(lantern.archZ(nArch, period) - period) > 1e-9)
-    fail('lantern: the arches do not close at the strip seam');
-
-  /* ---------------------------------------------------------------
-     THE FRONT, FLOWN. The reader holds through both inhales and lets
-     go through the exhale, driven by the same controller the page
-     drives, and three things must come out of it:
-
-       - the front reaches the apex, so the whole arch can light;
-       - it comes back to the feet before the next breath, so the fade
-         is a thing that completes rather than a thing that is
-         interrupted;
-       - HOLDING THROUGH THE EXHALE TOO CANNOT PUSH IT PAST THE APEX.
-         That is the rate cap, and it is what stops "hold more" being a
-         strategy. The arch has a top.
-     --------------------------------------------------------------- */
-  const FRONT_CORRIDOR = cor({ lo:-0.20, hi:1.14, low:-0.12, high:1.06 });
-  const flyFront = (holdAlways) => {
-    const f = body({ corridor: FRONT_CORRIDOR, rates: ratesOf(proto), k: 140, zeta: 0.55 });
-    let hi = -Infinity, lo = Infinity, endOfExhale = null, worstE = 0;
-    const dt = 1 / 120;
-    for(let tt = 0; tt < proto.session; tt += dt){
-      const kind = b.at(tt).p.k;
-      const hold = holdAlways ? true : (kind === 'in');
-      f.drive(dt, hold, !hold);
-      if(tt > proto.cycle){
-        hi = Math.max(hi, f.value); lo = Math.min(lo, f.value);
-        if(!holdAlways) worstE = Math.max(worstE, Math.abs(f.fill - lantern.attention(b, tt).reach));
-      }
-      // the instant before the cycle wraps, on the second cycle onward
-      const u = tt % proto.cycle;
-      if(!holdAlways && tt > proto.cycle && u > proto.cycle - dt * 1.5) endOfExhale = f.value;
-    }
-    return { hi:+hi.toFixed(4), lo:+lo.toFixed(4), endOfExhale, worstE:+worstE.toFixed(4) };
-  };
-  const onCue = flyFront(false);
-  const greedy = flyFront(true);
-  /* THE APEX MUST ACTUALLY LIGHT. Not "the front gets close to 1" —
-     the keystone lamp's own litAmount must reach full, which is the
-     thing the reader can see and the thing two separate bugs stopped
-     happening (a lip running the wrong way, and a spring target of
-     exactly 1 that a sprung value approaches and never arrives at). */
-  const apex = Math.max(...lantern.archLights().map(L => L.s));
-  if(lantern.litAmount(apex, onCue.hi) < 1 - 1e-9)
-    fail(`lantern/${id}: holding exactly on the cue leaves the keystone at ` +
-         `${lantern.litAmount(apex, onCue.hi).toFixed(3)} — the arch never closes`);
-  if(onCue.endOfExhale === null || lantern.litAmount(0, onCue.endOfExhale) > 1e-9)
-    fail(`lantern/${id}: the feet are still lit at ${onCue.endOfExhale} when the next breath ` +
-         `begins — the fade never completes`);
-  /* AND HOLDING THROUGH THE EXHALE GAINS NOTHING. The arch has a top;
-     this is the rate cap, and it is what stops "hold more" being a
-     strategy in a chapter where nothing is counted. */
-  if(lantern.litAmount(apex, greedy.hi) > lantern.litAmount(apex, onCue.hi) + 1e-9)
-    fail(`lantern/${id}: holding through the exhale lights more of the arch than holding on ` +
-         `the cue does — the arch is supposed to have a top`);
-  const frontCtrl = body({ corridor: FRONT_CORRIDOR, rates: ratesOf(proto), k: 140, zeta: 0.55 });
-  /* fill is integrated, not sprung, so the only error it can have
-     against the schedule is a real mismatch between the anchors and the
-     rate — which is exactly what this is looking for. The tolerance is
-     a hundredth of the arch, not a derived lag, because there is no
-     spring in this comparison at all. */
-  const frontAllow = 0.01;
-  void frontCtrl;
-  if(onCue.worstE > frontAllow)
-    fail(`lantern/${id}: the front trails the schedule by ${onCue.worstE} of the arch, more ` +
-         `than the ${frontAllow.toFixed(4)} its own spring explains`);
-
-  /* litAmount is the only thing that decides what is on, so it had
-     better be monotonic in the front and bounded. */
-  let prevLit = -1;
-  for(let f = 0; f <= 1.0001; f += 0.01){
-    const v = lantern.litAmount(0.5, f);
-    if(v < prevLit - 1e-12) fail('lantern: litAmount() is not monotonic in the front');
-    if(v < 0 || v > 1) fail(`lantern: litAmount() returned ${v}`);
-    prevLit = v;
-  }
-
-  if(failures === 0)
-    console.log(`    ok    lantern/${id}: hull stays ${lowest.toFixed(2)} m clear of the waterline ` +
-                `(walls ${lantern.WALL_LOW}/${lantern.WALL_HIGH}), lag ${worst.toFixed(2)} m, ` +
-                `banks and treeline close at the seam, no lantern in the lane; ` +
-                `arch: ${arch.length} lights, feet first, keystone lights at front ` +
-                `${onCue.hi.toFixed(3)} and the feet go out before the next breath, ` +
-                `front tracks the hold to ${onCue.worstE} of the arch`);
 }
 
 /* ------------------------------------------------------------------
