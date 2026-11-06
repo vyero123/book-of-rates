@@ -39,6 +39,7 @@ import * as longAir from '../app/js/long-air-breath.js';
 import * as bamboo from '../app/js/bamboo-rain-breath.js';
 import * as lantern from '../app/js/lantern-breath.js';
 import { body, ratesOf, corridor as cor, drag } from '../app/js/course.js';
+import * as terrain from '../app/js/long-air-terrain.js';
 
 const STEP = 0.05;          // 20 samples a second
 const EPS  = 1e-12;
@@ -607,7 +608,8 @@ function fly(proto, press){
       const q = Math.min(1, Math.abs(ahead) / reach);
       const env = 1 - q * q * q * (q * (q * 6 - 15) + 10);
       if(env > 0){
-        const into = kite.buoy({ base: gate.centre + half, bodyHalf: KITE_HALF,
+        const into = kite.buoy({ base: gate.centre + half + terrain.cloudBaseOffset(gate.i),
+                                 bodyHalf: KITE_HALF,
                                  dt, lift: longAir.CLOUD_LIFT, env });
         if(into > 0){ cloudFrames++; maxCloud = Math.max(maxCloud, into); }
       }

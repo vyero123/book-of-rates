@@ -63,6 +63,7 @@ import { breath } from '../app/js/breath.js';
 import { body, drag } from '../app/js/course.js';
 import { lens, CAM_EASE } from '../app/js/long-air-lens.js';
 import { tracker } from '../app/js/follow.js';
+import { cloudBaseOffset } from '../app/js/long-air-terrain.js';
 
 let FAIL = false;
 const say = s => console.log(s);
@@ -615,7 +616,8 @@ function sampleChapter(clk, { makeLens = lens, offPace = false, climb = false } 
     const qq = Math.min(1, Math.abs(ahead) / reach);
     const env = 1 - qq * qq * qq * (qq * (qq * 6 - 15) + 10);
     const into = env > 0
-      ? K.buoy({ base: gate.centre + half, bodyHalf: 0.78, dt, lift: CLOUD_LIFT, env })
+      ? K.buoy({ base: gate.centre + half + cloudBaseOffset(gate.i),
+                 bodyHalf: 0.78, dt, lift: CLOUD_LIFT, env })
       : 0;
 
     L.step(dt, { kiteY: K.value, cam: ph.cam });

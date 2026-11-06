@@ -433,3 +433,91 @@ export const TREES = Array.from({ length: TREE_N }, (_, i) => {
     seed: (i * 1.91) % 6.283
   };
 });
+
+/* ==================================================================
+   THE CLOUD LIP — a silhouette, not a slab with detail on it
+   ==================================================================
+   6 November 2026. The reader: the clouds look nothing like clouds,
+   in shape or colour. The shape half is the one that matters first,
+   and the diagnosis is exact — the banks were a smooth U with a
+   single ripple on it, shaded with a wool field. That is a SLAB WITH
+   SURFACE DETAIL. What makes a cloud read as a cloud is its OUTLINE:
+   rounded bulges at several scales, cauliflower rather than lobed,
+   sitting on a flattish base. No amount of shading rescues a wrong
+   silhouette, and shading that does not follow the bulges actively
+   fights it.
+
+   WHY THE OLD PROFILE COULD NOT HAVE BULGES, and what changed.
+   The turn angle at a knot is about f'' times the column spacing, and
+   for a component of amplitude A and wavenumber k that is A k^2 h.
+   The shared lip had 31 columns across 30 m, so h = 1 m, and the
+   chapter's 4 degree world-space bar allows A k^2 <= 0.07. For bulges
+   eight metres across that is an amplitude of eleven centimetres:
+   invisible. The profile was not timid, it was at its resolution
+   limit.
+
+   BOTH HALVES OF THAT ARE FIXED. The columns go to 91 over the same
+   30 m, h = 0.33 m; and the bar becomes the PIXEL sagitta through the
+   chapter's own lens, which is the honest quantity and the one the
+   ridge, the trees and the dove are already held to. A 4 degree
+   world bar on a 0.33 m segment is 0.11 px of bulge at the distance a
+   gate is read at — it was never measuring what a reader can see, it
+   was measuring the segment length. tools/continuity.mjs now projects
+   this profile.
+
+   THREE SCALES, each a plain cosine of x with a per-gate phase, so
+   the curvature is bounded and the whole thing refines — the lesson
+   of the per-column jitter that had to be taken out of lipOffset.
+   Amplitudes are chosen against the budget above and then MEASURED
+   rather than trusted:
+
+       1.8 m at 11 m across   A k^2 = 0.59
+       0.7 m at  5 m          = 1.10
+       0.22 m at 2.2 m        = 1.79
+                        total  3.48   against about 3.9 at a 2 px bar
+
+   NON-NEGATIVE IN THE GATE'S OWN DIRECTION at every x, which keeps
+   the standing invariant that variation only ever makes the hole
+   BIGGER. Each component is written as (1 - cos)/2 times its
+   amplitude, which is zero at its own minima and never negative, so
+   the sum cannot dip below the base lip however the phases land.
+
+   AND A FLATTISH BASE. The bulges are weighted by a smooth window
+   that is small in the middle of the opening and full at the sides,
+   so the part of the bank the reader flies under is close to level
+   and the cauliflower is where the cloud is deep. That is what a
+   cumulus does and it is also what keeps the opening honest.
+   ================================================================== */
+export const CLOUD_LIP_COLS = 91;
+export const CGX = Array.from({ length: CLOUD_LIP_COLS },
+  (_, i) => -15 + (i / (CLOUD_LIP_COLS - 1)) * 30);
+
+/** The cloud bank's lower outline, in metres away from the opening.
+ *  Shares the per-gate size decision with lipOffset so a wide gate is
+ *  wide for both halves, and adds the bulges on top. */
+export function cloudLip(gateI, k){
+  const x = CGX[k];
+  // the same decided per-gate opening the rock lip uses
+  const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8) / 0.6) * 0.6;
+  const t = Math.abs(x) / 15;
+  const u = t * t * t * (t * (t * 6 - 15) + 10);   // C2, flat at x = 0
+  // the cauliflower, three scales, each non-negative by construction
+  const ph = n => ((gateI * 2.399 * n) % 6.283);
+  const lobe = (amp, wave, n) => amp * 0.5 * (1 - Math.cos(x * (2 * Math.PI / wave) + ph(n)));
+  // flattish under the middle of the opening, full at the sides
+  const win = 0.28 + 0.72 * u;
+  return vmax * u + (lobe(1.80, 11.0, 1) + lobe(0.70, 5.0, 2) + lobe(0.22, 2.2, 3)) * win;
+}
+
+/** THE DRAWN UNDERSIDE OF A BANK IN THE KITE'S OWN LANE.
+ *
+ *  The buoyancy boundary has to be where the cloud IS, not where the
+ *  opening's arithmetic puts it. Those were the same number until the
+ *  cauliflower went on: cloudLip raises the drawn lip above the base
+ *  lip everywhere, so a reader would have felt the push while still
+ *  looking at clear air under the bank. The glider flies within about
+ *  twenty centimetres of x = 0, so the column at x = 0 is the honest
+ *  place to ask, and CGX has one exactly there by construction (91 is
+ *  odd). Shared rather than re-derived at the three call sites. */
+export const CLOUD_MID = (CLOUD_LIP_COLS - 1) / 2;
+export function cloudBaseOffset(gateI){ return cloudLip(gateI, CLOUD_MID); }

@@ -255,7 +255,8 @@ import { PROTOCOLS, CHOICE, validChoice,
    places, so continuity.mjs was measuring a 2.94 degree surface while
    the page drew a 20.00 degree one. See the note in ridgeGeometry. */
 import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset,
-         columnsAt, TREES, TREE_SEG, treeWidth, treeLean } from './js/long-air-terrain.js';
+         columnsAt, TREES, TREE_SEG, treeWidth, treeLean,
+         CGX, cloudLip, cloudBaseOffset } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
 /* The lens is a module for the same reason the terrain is: a jerk can
    only be measured in Node, and tools/temporal.mjs has to drive the
@@ -325,6 +326,21 @@ const AIR = {
   sun:0xFFF4CC, halo:0xFFE6A2, halo2:0xF4C98A,
   cloud:0xBFD3AE, cloudLo:0x8FAE92, cloudDeep:0x6E8C7A,
   cloudLit:0xF1F4DC,
+  /* THE BANKS ARE WHITE NOW, AND THAT IS A DEPARTURE FROM THE RAMP
+     ON PURPOSE. They were painted out of the chapter's six-step rock
+     family washed towards a teal shadow, which is why they came out
+     olive -- a cloud the colour of the hill under it. §4.2 keeps one
+     hue family for the SCENE and palette.js's family() exists for the
+     named colours that sit outside the ramp; this is that. Three
+     steps of white plus a cool base is how a flat illustrator draws
+     cloud, and it is the smallest set that still has a lit side, a
+     body and an underside.
+       bankWarm  the face turned towards the light, warmed by it
+       bankBody  the mass: white, and the brightest value in the frame
+       bankCool  the shadowed underside, a HUE SHIFT into blue rather
+                 than a darkening (§4.2 rule 2)
+       bankBase  the flat bottom, deepest and coolest */
+  bankWarm:0xFFF4DE, bankBody:0xFFFFFF, bankCool:0xC9D4E2, bankBase:0xA8B6C8,
   haze:0xCFE0AE,
   /* THE SECOND HAZE, and it is what makes the perspective aerial
      rather than merely foggy. Real haze is a LAYER: it pools in the
@@ -1074,7 +1090,16 @@ function gateGeometry(course, which){
      necessary — per-vertex wrapping smears any triangle that straddles
      the boundary across the whole 672 m period for one frame, and that
      was Long Air's worst single event. */
-  const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1, aBaseZ:1 });
+  /* THE TWO HALVES NO LONGER SHARE A PROFILE. The rock lip is a
+     smooth U with a ripple and 31 columns is plenty for it; the cloud
+     lip is cauliflower and needs 91 to carry bulges that can be seen.
+     Both come from js/long-air-terrain.js, so neither is a second
+     copy of anything. */
+  const isCloud = which > 0;
+  const XS  = isCloud ? CGX : GX;
+  const LIP = isCloud ? cloudLip : lipOffset;
+  const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1,
+                             aBaseZ:1, aLipY:1 });
   for(const g of course.gates){
     const lip = g.centre + which * g.half;
     /* REVERTED, AND THE MEASUREMENT IS WHY.
@@ -1103,24 +1128,24 @@ function gateGeometry(course, which){
        sampler: it used to turn 36 degrees at the knot directly in
        front of the reader, which was the sharpest jut in the chapter
        and on the one edge you actually aim at. */
-    const lipAt = k => lip + which * lipOffset(g.i, k);
+    const lipAt = k => lip + which * LIP(g.i, k);
     const base = b.count;
-    for(let k = 0; k < GX.length; k++){
-      b.vertex(GX[k], lipAt(k), g.zb,
-               { aLip:1, aLedge:0, aTone: which < 0 ? MID : LIGHT, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb });
+    for(let k = 0; k < XS.length; k++){
+      b.vertex(XS[k], lipAt(k), g.zb,
+               { aLip:1, aLedge:0, aTone: which < 0 ? MID : LIGHT, aSun: XS[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb, aLipY: lipAt(k) });
     }
-    for(let k = 0; k < GX.length; k++){
-      b.vertex(GX[k], far, g.zb,
-               { aLip:0, aLedge:0, aTone: which < 0 ? BODY : MID, aSun: GX[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb });
+    for(let k = 0; k < XS.length; k++){
+      b.vertex(XS[k], far, g.zb,
+               { aLip:0, aLedge:0, aTone: which < 0 ? BODY : MID, aSun: XS[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb, aLipY: lipAt(k) });
     }
     // the back face, offset in z, so a slab reads as solid as it passes
-    for(let k = 0; k < GX.length; k++){
+    for(let k = 0; k < XS.length; k++){
       // the back of the lip: same height, SLAB_Z further down the course.
       // aLedge marks it, because the triangles between this row and the
       // front lip row form a HORIZONTAL SHELF thirty metres wide, and a
       // shelf is not an edge however much it shares an attribute with one.
-      b.vertex(GX[k], lipAt(k), g.zb - SLAB_Z,
-               { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed, aBaseZ: g.zb });
+      b.vertex(XS[k], lipAt(k), g.zb - SLAB_Z,
+               { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed, aBaseZ: g.zb, aLipY: lipAt(k) });
     }
     /* WINDING, and it is why this mesh could not be front-face culled.
        ------------------------------------------------------------
@@ -1139,7 +1164,7 @@ function gateGeometry(course, which){
 
        `cw` flips the order for the rock gate. The cloud gate keeps the
        original order, which was the one that happened to be right. */
-    const N = GX.length;
+    const N = XS.length;
     const cw = which < 0;
     const tri = (a, b2, c) => cw ? b.tri(a, c, b2) : b.tri(a, b2, c);
     for(let k = 0; k < N - 1; k++){
@@ -1160,21 +1185,39 @@ const gateMatFor = kind => posterMat(THREE, {
              uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
              uAccent:{value:C(ROCK.accent)},
              uLit:{value:C(AIR.cloudLit)},
+             uWarm:{value:C(AIR.bankWarm)}, uBody:{value:C(AIR.bankBody)},
+             uCool:{value:C(AIR.bankCool)}, uBase:{value:C(AIR.bankBase)},
+             uInCloud,
              uIsCloud:{value: kind === 'cloud' ? 1 : 0} },
   /* FrontSide, not DoubleSide: with the winding fixed above, the
      interior of a slab is never drawn, and the interior being drawn as
      a lit surface was the chapter's reported flash. */
-  side: THREE.FrontSide, prelude: PRE + NEAR_FADE + WIND_GLSL,
+  side: THREE.FrontSide,
+  /* THE CLOUD BLENDS; THE ROCK DOES NOT.
+     Both dissolves on this material were stochastic per-cell
+     discards, which is a dither pattern by construction -- the note
+     in CLAUDE.md says so and says tuning the cell cannot fix it. For
+     an opaque slab passing the lens that is the right trade; for a
+     cloud the reader is INSIDE it is a frame full of static. So the
+     cloud half is transparent and both of its dissolves become alpha.
+     depthWrite stays TRUE: a nearer bank must still occlude a farther
+     one, and the cost is that two banks overlapping in depth blend in
+     index order rather than in depth order. They are twenty metres
+     apart and each is a shell, so the error is small; it is a real
+     limitation of one merged mesh and is written down rather than
+     hidden. */
+  transparent: kind === 'cloud',
+  prelude: PRE + NEAR_FADE + WIND_GLSL,
   /* SCROLL_WHOLE_GLSL, not SCROLL_GLSL: the gates are separate objects in
      one merged mesh, and a per-vertex mod() smears any triangle that
      straddles the wrap. Measured cause of the 135.4 frame. */
   vertex: SCROLL_WHOLE_GLSL + `
     attribute float aLip; attribute float aLedge; attribute float aTone; attribute float aSun;
-    attribute float aSide; attribute float aSeed;
+    attribute float aSide; attribute float aSeed; attribute float aLipY;
     uniform float uForgive;
     varying float vTone; varying float vSun; varying float vLip; varying float vLedge;
     varying float vDist; varying float vSide; varying float vSeed;
-    varying float vY; varying float vX;
+    varying float vY; varying float vX; varying float vBelow;
     void main(){
       vec3 p = position;
       // §6.1: the gap widens when the player drifts off pace rather than
@@ -1183,6 +1226,14 @@ const gateMatFor = kind => posterMat(THREE, {
       p = scrolledWhole(p);
       vTone = aTone; vSun = aSun; vLip = aLip; vLedge = aLedge; vSide = aSide; vSeed = aSeed;
       vY = p.y; vX = position.x;
+      /* HOW FAR INSIDE THE BANK'S OWN OUTLINE THIS FRAGMENT IS.
+         aLipY is the lip height AT THIS COLUMN, so this is measured
+         from the cauliflower rather than from the slab -- which is
+         the whole point. Shading that steps on a constant height
+         would run straight bands across a bumpy silhouette and the
+         form would fight the outline. The value steps follow the
+         bulges because they are steps in THIS. */
+      vBelow = aSide * (aLipY - position.y);
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
       gl_Position = projectionMatrix * mv;
@@ -1191,8 +1242,9 @@ const gateMatFor = kind => posterMat(THREE, {
   fragment:`
     varying float vTone; varying float vSun; varying float vLip; varying float vLedge;
     varying float vDist; varying float vSide; varying float vSeed;
-    varying float vY; varying float vX;
+    varying float vY; varying float vX; varying float vBelow;
     uniform vec3 uShadow, uDeep, uAccent, uLit;
+    uniform vec3 uWarm, uBody, uCool, uBase;
     uniform float uIsCloud, uNearFade, uTime, uFill, uInCloud;
     /* ==================================================================
        WOOL — giving the cloud bank a body
@@ -1246,9 +1298,19 @@ const gateMatFor = kind => posterMat(THREE, {
          this chapter was reported for. The terraces are hashed on
          height and seed so they belong to the slab rather than crawling
          across the screen. */
-      if(uNearFade > 0.5 && nearGone(vDist, vec2(vX, vY + vSeed * 17.0))) discard;
+      /* THE ROCK STILL DISSOLVES IN CELLS; THE CLOUD FADES.
+         A hard terraced discard is right for an opaque slab sweeping
+         the lens and wrong for a cloud the reader is inside. */
+      float alpha = 1.0;
+      if(uIsCloud < 0.5){
+        if(uNearFade > 0.5 && nearGone(vDist, vec2(vX, vY + vSeed * 17.0))) discard;
+      } else {
+        if(uNearFade > 0.5) alpha *= nearKeep(vDist);
+        alpha *= 1.0 - uInCloud * 0.92;
+        if(alpha < 0.012) discard;
+      }
       /* ==========================================================
-         THE BANK COMES APART AS YOU ENTER IT
+         (the cell dissolve this replaced, kept for the record)
          ==========================================================
          Found by flying into one on the deployed build. Removing the
          ceiling let the glider inside the cloud SLAB, and a slab is
@@ -1270,26 +1332,21 @@ const gateMatFor = kind => posterMat(THREE, {
          you may go in, and in there it is cloud rather than a wall
          seen from the inside. uInCloud is second-order smoothed, so
          this cannot flick on. */
-      if(uIsCloud > 0.5 && uInCloud > 0.01){
-        /* 0.17 m CELLS, not the near fade's 1.4 m ones. Looked at on
-           the deployed build: at the near fade's cell size this
-           dissolve reads as torn card — the slab is thirty metres
-           across and eleven from the lens, so a 1.4 m cell is a
-           rectangle tens of pixels wide, and a frame full of them is
-           broken glass rather than mist. The near fade gets away with
-           that size because it happens for a moment at close range on
-           a thing already leaving; this one is sustained and fills
-           the frame. A chip at this distance is about eleven pixels,
-           which reads as texture. */
-        vec2 cc = floor(vec2(vX, vY + vSeed * 23.0) * 6.0);
-        if(fract(sin(dot(cc, vec2(41.3, 289.1))) * 43758.5453) < uInCloud * 0.94) discard;
-      }
+      /* At 1.4 m cells it read as torn card and at 0.17 m as
+         speckled static: a stochastic per-cell discard on an opaque
+         surface IS a dither, and no cell size resolves that. It is an
+         alpha now, which is what the note in CLAUDE.md said the
+         honest fix was. */
       float tone = vTone + (1.0 - vLip) * 1.3;
       // the slab faces are thirty metres across and the tone is a
       // varying, so each value riser runs the width of the frame
       vec3 col = rampPickAA((tone + 0.5) / 6.0);
-      col = mix(col, uShadow, uIsCloud * 0.55);
-      float sh = 1.0 - aastep(0.5, vSun);
+      /* the rock half keeps the ramp and its hard sun split; the
+         cloud half is repainted from scratch below, so none of this
+         is allowed to reach it -- the old code washed the ramp
+         towards a teal shadow for the cloud and that wash WAS the
+         olive. */
+      float sh = (1.0 - aastep(0.5, vSun)) * (1.0 - uIsCloud);
       col = mix(col, uDeep, sh * 0.45);
       /* THE ACCENT IS AN EDGE, NOT A SHELF. It used to be painted
          wherever vLip was high, and the back-of-lip row shares that
@@ -1308,44 +1365,67 @@ const gateMatFor = kind => posterMat(THREE, {
          So: accent only in the first slice of the shelf's depth, which
          is the edge itself, and the rest of the shelf is shaded as the
          cut face it actually is. */
-      col = mix(col, uDeep, vLedge * 0.55);
+      col = mix(col, uDeep, vLedge * 0.55 * (1.0 - uIsCloud));
       /* The accent line is the thing you aim at, it is one or two
          pixels wide at the distance you read it, and it was drawn with
          two step()s on interpolated varyings — which is the single
          most aliasing-prone construction in the chapter: a thin bright
          line on a dark slab, moving across the frame. Resolved, it is
          the same line in the same place and it stops fizzing. */
-      col = mix(col, uAccent, aastep(0.96, vLip) * (1.0 - aastep(0.22, vLedge)) * 0.30);
+      col = mix(col, uAccent, aastep(0.96, vLip) * (1.0 - aastep(0.22, vLedge)) * 0.30
+                              * (1.0 - uIsCloud));
 
       /* THE WOOL, on the cloud bank only. Branching on a uniform is
          uniform control flow, so both gates stay one program each and
          the rock slab pays nothing for this. */
       if(uIsCloud > 0.5){
+        /* ==========================================================
+           A WHITE BODY IN THREE STEPS, PLUS A COOL BASE
+           ==========================================================
+           Not a value out of the chapter's rock ramp washed towards
+           teal, which is what made these olive -- a cloud darker than
+           the hill beneath it. White is the brightest thing in a
+           daylit frame after the light itself, and the shadowed part
+           of a cloud shifts HUE into blue rather than darkening
+           (§4.2 rule 2).
+
+           THE STEPS ARE IN vBelow, WHICH IS DEPTH UNDER THE BANK'S
+           OWN OUTLINE. That is the half of this the old version got
+           wrong even where the colours were defensible: it stepped on
+           a wool field in slab coordinates, so the value bands ran
+           across the silhouette instead of following it, and the form
+           fought the outline. Stepping in vBelow means the rim band
+           hugs every bulge by construction -- the bands ARE the
+           cauliflower, seen in value.
+
+           The wool stays, at low amplitude, to break the bands up so
+           they do not read as contour lines. It is texture on top of
+           form now rather than standing in for it. */
         vec2 wp = vec2(vX, vY) * 0.21
                 + windDir() * (uTime * 0.09 * windGust(uFill))
                 + vec2(vSeed * 13.0, vSeed * 7.0);
         float lobe = wool(wp);
-        /* the terminator: the field read as a height and differenced
-           along the light, which is what makes a lobe round */
-        float side = aastep(0.0, wool(wp + vec2(0.17, 0.12)) - lobe);
-        float band = posteriseAA(lobe, 3.0);
-        /* LIT HARDER THAN IT IS DEEPENED, and the first version had it
-           the other way round. The bank's base is already the ramp
-           washed 55% towards uShadow, so deepening the troughs as much
-           as the crests were lit took the whole slab olive — a cloud
-           that was darker than the hill under it. A cloud is the
-           brightest thing in a daylit frame after the sun. */
-        col = mix(col, uDeep, (1.0 - band) * 0.20);
-        col = mix(col, uLit,  band * side * 0.62);
-        col = mix(col, uLit,  band * 0.18);
-        /* and the lip of the bank is the brightest part of it: the
-           light gets under the edge of a cloud. It is the edge the
-           reader aims at, so it is also the one place extra value is
-           worth spending. */
-        col = mix(col, uLit, aastep(0.96, vLip) * (1.0 - aastep(0.22, vLedge)) * 0.26);
+        float round_ = aastep(0.0, wool(wp + vec2(0.17, 0.12)) - lobe);
+        /* depth under the outline, softened by the wool so the bands
+           are ragged at their edges like a cloud and not like a
+           contour map */
+        float dep = max(0.0, vBelow) + (lobe - 0.5) * 1.1;
+        col = uBody;
+        /* the light is on the -x side, which is where the hill's own
+           spine split and the sky's warm wash both put it */
+        col = mix(col, uWarm, clamp(0.5 - vX * 0.055, 0.0, 1.0) * 0.75 * round_);
+        /* three hard steps down into the mass, resolved to a pixel */
+        col = mix(col, uCool, aastep(2.2, dep) * 0.55);
+        col = mix(col, uBase, aastep(6.0, dep) * 0.70);
+        /* the rim: the light gets under the edge of a cloud, and the
+           edge is the thing the reader aims at */
+        col = mix(col, uBody, (1.0 - aastep(0.55, dep)) * 0.85);
       }
-      col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5) * 0.08;
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
+      col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5)
+                   * 0.08 * (1.0 - uIsCloud);
+      /* a cloud is water in air and takes far less of the haze than
+         rock at the same distance does: it IS the haze, locally. */
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * (1.0 - uIsCloud * 0.55)), alpha);
     }
   `
 });
@@ -2741,8 +2821,11 @@ const loop = clock((dt, now, running) => {
     const q = clamp01(Math.abs(ahead) / reach);
     const env = 1 - q * q * q * (q * (q * 6 - 15) + 10);
     if(env > 0){
-      inCloudDepth = KITE.buoy({ base: gate.centre + half, bodyHalf: KITE_HALF,
-                                 dt, lift: CLOUD_LIFT, env });
+      /* the base is the DRAWN underside in the kite's own lane, not
+         the opening's arithmetic: the cauliflower raises the lip and
+         the force has to agree with the picture. */
+      inCloudDepth = KITE.buoy({ base: gate.centre + half + cloudBaseOffset(gate.i),
+                                 bodyHalf: KITE_HALF, dt, lift: CLOUD_LIFT, env });
       kiteY = KITE.value;
     }
   }

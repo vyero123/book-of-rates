@@ -59,7 +59,8 @@ import { PROTOCOLS as DL } from '../app/js/deep-light-breath.js';
 import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset,
          profileTone, profileH,
-         TREES, TREE_SEG, treeWidth, treeLean } from '../app/js/long-air-terrain.js';
+         TREES, TREE_SEG, treeWidth, treeLean,
+         CGX, cloudLip } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
 import { readFileSync } from 'node:fs';
 
@@ -883,6 +884,59 @@ for(const [name, w] of [['ridge across (columns)', worstAcross],
   const tl = `tallest treetop ${top.toFixed(2)} m against the corridor floor ${CORR_LO} ` +
              `(tree ${atT}); clears by ${(CORR_LO - top).toFixed(2)} m`;
   if(top < CORR_LO) ok(tl); else bad(tl + '  — a tree is in the flight band');
+}
+
+/* ==================================================================
+   THE CLOUD LIP, IN PIXELS
+   ==================================================================
+   6 November 2026. The rock lip is measured in world degrees above
+   and that is fine for it: a smooth U with one ripple over 1 m
+   columns. The cloud lip is cauliflower over 0.33 m columns, and a
+   world-degree bar on a segment that short measures the SEGMENT
+   LENGTH rather than anything a reader can see — 4 degrees across
+   0.33 m is 0.11 px of bulge at the range a gate is read at. Holding
+   the cloud to it is what kept the banks shapeless: the profile was
+   not timid, it was at the resolution limit of the wrong bar.
+
+   So this one is projected, like the ridge, the trees and the dove.
+   Same lens, same sagitta, same 2 px bar. A gate is met at about
+   twenty metres, which is where the rock lip is already assumed to
+   be read.
+   ================================================================== */
+say('');
+say('THE CLOUD LIP — the silhouette, through the lens');
+{
+  const probe3 = breath(proto);
+  const course3 = courseOf(proto, t => probe3.value(t));
+  let worst = { px: 0 }, seen = 0, worstDeg = 0, minOff = Infinity;
+  for(const g of course3.gates){
+    const zw = zWorldOf(g.zb);
+    if(zw > 0 || zw < -140) continue;
+    const Y = k => g.centre + g.half + cloudLip(g.i, k);
+    for(let k = 1; k < CGX.length - 1; k++){
+      const r = sagittaPx([CGX[k-1], Y(k-1), zw], [CGX[k], Y(k), zw], [CGX[k+1], Y(k+1), zw]);
+      if(r){ seen++; if(r.px > worst.px) worst = { ...r, gate:g.i, x:CGX[k] }; }
+      const s1 = (Y(k) - Y(k-1)) / (CGX[k] - CGX[k-1]);
+      const s2 = (Y(k+1) - Y(k)) / (CGX[k+1] - CGX[k]);
+      worstDeg = Math.max(worstDeg, Math.abs(Math.atan(s2) - Math.atan(s1)) * 180 / Math.PI);
+    }
+    for(let k = 0; k < CGX.length; k++) minOff = Math.min(minOff, cloudLip(g.i, k));
+  }
+  if(seen === 0){
+    bad('cloud lip: nothing projected — the instrument saw no gates');
+  } else {
+    const line = `cloud lip silhouette     worst ${worst.px.toFixed(2).padStart(5)} px off the chord` +
+                 ` at ${worst.dist.toFixed(0)} m (gate ${worst.gate}, x=${worst.x.toFixed(1)}),` +
+                 ` ${worstDeg.toFixed(1)} deg in world, ${seen} knots in frame  (bar ${PX_BAR} px)`;
+    if(worst.px <= PX_BAR) ok(line); else bad(line);
+  }
+  /* THE STANDING INVARIANT: variation only ever makes the hole
+     BIGGER. Three new cosine terms on the lip is three new chances to
+     get a sign wrong, and a negative offset would eat the opening the
+     whole on-pace guarantee is measured against. */
+  const ml = `cloud lip offset is non-negative everywhere (min ${minOff.toFixed(4)} m)`;
+  if(minOff >= -1e-12) ok(ml);
+  else bad(ml + '  — a bulge cuts INTO the opening');
 }
 
 /* PROVE THE PROJECTOR. A tool that reports pixels has to be shown to
