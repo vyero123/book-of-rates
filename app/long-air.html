@@ -1626,19 +1626,30 @@ function cloudGeometry(clouds){
       /* the ring: the underside out, then the crown back. Both curves
          already meet at |u| = 1 because puffEnd closes them, so the
          ring is closed without a seam vertex. */
+      /* THE CROSS-SECTION SHRINKS IN HEIGHT TOO, NOT ONLY IN WIDTH.
+         Scaling the ring laterally alone gives a body with the same
+         profile at every station — slab sides and a flat top, which
+         is exactly how it looked on the deployed build. Scaling the
+         offsets from the section's own midline as well rounds it off
+         front and back, so a cloud is a body rather than a card
+         swept sideways. The midline is per-column, so the base stays
+         flat where it is flat. */
       for(let k = 0; k < N; k++){
         const u = -1 + (k / (N - 1)) * 2;
         const yU = CLOUD.cloudUnderY(c, u);
-        b.vertex(c.x + u * c.halfW * sc, yU, z,
-          { aU:u, aSide:-1, aRate:c.rate, aPh:c.phase, aAmp:CLOUD.CLOUD_BILLOW * c.puff,
+        const yC = Math.max(CLOUD.cloudCrownY(c, u), yU);
+        const mid = (yU + yC) * 0.5;
+        b.vertex(c.x + u * c.halfW * sc, mid + (yU - mid) * sc, z,
+          { aU:u, aSide:-1, aRate:c.rate, aPh:c.phase, aAmp:CLOUD.CLOUD_BILLOW * c.puff * sc,
             aBaseZ:c.zb, aLipY:yU, aSeed:seed });
       }
       for(let k = N - 1; k >= 0; k--){
         const u = -1 + (k / (N - 1)) * 2;
-        const yC = CLOUD.cloudCrownY(c, u);
         const yU = CLOUD.cloudUnderY(c, u);
-        b.vertex(c.x + u * c.halfW * sc, Math.max(yC, yU), z,
-          { aU:u, aSide:1, aRate:c.rate, aPh:c.phase, aAmp:CLOUD.CLOUD_BILLOW * c.puff * 1.3,
+        const yC = Math.max(CLOUD.cloudCrownY(c, u), yU);
+        const mid = (yU + yC) * 0.5;
+        b.vertex(c.x + u * c.halfW * sc, mid + (yC - mid) * sc, z,
+          { aU:u, aSide:1, aRate:c.rate, aPh:c.phase, aAmp:CLOUD.CLOUD_BILLOW * c.puff * 1.3 * sc,
             aBaseZ:c.zb, aLipY:yU, aSeed:seed });
       }
     }

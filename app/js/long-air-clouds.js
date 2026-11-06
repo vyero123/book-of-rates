@@ -107,7 +107,7 @@ export const CLOUD_COLS = 101;
  *  being a cross-section hanging in the air — a cloud seen from
  *  beside the lane has to have a front and a back. Five is the
  *  fewest that gives a rounded body instead of a lozenge. */
-export const CLOUD_STATIONS = [0.0, 0.60, 1.0, 0.60, 0.0];
+export const CLOUD_STATIONS = [0.0, 0.52, 0.86, 1.0, 0.86, 0.52, 0.0];
 /** How deep in z, as a fraction of the cloud's own half-width. */
 export const CLOUD_Z_FRAC = 0.55;
 
