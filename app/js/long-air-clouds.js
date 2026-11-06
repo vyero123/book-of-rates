@@ -95,7 +95,12 @@ export const CLOUD_BILLOW = 1.6 * MAG_V;
    2.84 px against a 2 px bar; sagitta goes as the square of the
    column spacing, so this takes it to about 1.3. The reader has said
    not to be stingy. */
-export const CLOUD_COLS = 81;
+/* 101. The deeper, fluffier proportions put the shoulder back at
+   2.15 px and the bar is 2; sagitta goes as the square of the column
+   spacing so this takes it to about 1.4. 16 clouds at 101 columns is
+   a ring of 202 and 1,616 triangles each — 25,856 for the whole sky,
+   which is less than the 33-gate bank it replaced. */
+export const CLOUD_COLS = 101;
 
 /** The z-stations a cloud is swept through, as a fraction of its
  *  lateral scale. Zero at both ends so the body CLOSES rather than
@@ -150,7 +155,13 @@ export function cloudsFor(course){
        the shoulder, and 62 m over 15 m of x is a slope of four. The
        lobes were never the problem; reducing them made the
        measurement worse, which is how I know. */
-    const depth = halfW * (0.40 + 0.45 * h01(i, 3779));
+    /* DEEPER, AND CAPPED. At 0.40-0.85 of the half-width they came
+       out as flat lenses on the deployed build -- the proportions
+       were safe rather than cloud-like. 0.75-1.30 of the half-width
+       is a cumulus; the cap is what keeps the shoulder inside the
+       pixel bar on the widest ones, which is the constraint that
+       drove the first number too low. */
+    const depth = Math.min(halfW * (0.75 + 0.55 * h01(i, 3779)), 34);
     out.push({
       i, zb, x, halfW, base, depth,
       /* how lumpy, how fast it evolves, and where in its own cycle it
@@ -218,15 +229,15 @@ export function puffCrown(c, u){
 }
 
 /** 0 across the body, 1 where the cloud has closed. */
-/* THE SHOULDER STARTS AT 0.45, NOT 0.62, and the bar is what says
-   so. For a rise R over a span of f·halfW at 65 columns the sagitta
-   at the 40 m a cloud is nearest read at works out at about R/(f²·
-   4650) px, so f = 0.38 allowed a 16 m cloud and f = 0.55 allows 34.
-   With depth now at most 0.85·halfW that is inside it for every
-   cloud in the field. The base stays flat across the middle half,
-   which is what it is for. */
+/* THE SHOULDER. It started at 0.62, which gave a 15 m close on a
+   60 m depth -- a slope of four and the real silhouette fault. It
+   went to 0.45, which fixed the bar and made the clouds lenses. 0.55
+   with the depth capped at 34 m is the pair that holds both: the
+   base is flat across the middle 55% of every cloud, which is what a
+   flat base means, and the ends still close. Measured, not reasoned:
+   the sampler projects this curve. */
 export function puffEnd(u){
-  const t = Math.min(1, Math.max(0, (Math.abs(u) - 0.45) / 0.55));
+  const t = Math.min(1, Math.max(0, (Math.abs(u) - 0.55) / 0.45));
   return t * t * t * (t * (t * 6 - 15) + 10);
 }
 

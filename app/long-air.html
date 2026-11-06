@@ -1723,7 +1723,7 @@ const cloudMat = posterMat(THREE, {
       col = mix(col, uBody, (1.0 - aastep(0.55, dep)) * 0.85);
       /* a cloud is water in air and takes little of the haze: it IS
          the haze, locally */
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.45), alpha);
+      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.25), alpha);
     }
   `
 });
