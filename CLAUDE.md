@@ -163,22 +163,33 @@ one of them resolved by DELETION rather than by decision:
   the bar is cheap to hold: billboards (no interior knot at all) and one silhouette profile
   that lives in `long-air-terrain.js` so `continuity.mjs` measures what the GPU draws.
 
-## Long Air — the inside of a cloud still needs the reader's eye, 4 Nov 2026
+## Long Air — 6 November 2026
 
-The ceiling became buoyancy and the mechanic is right and gated: on-pace play never
-enters a bank (asserted, 0 frames), a reader holding the inhale gets 8.6 m in (asserted,
-so a build where the cloud is secretly a wall cannot pass), going in costs no drag and no
-skim, and `cloudSoft` — the thing the overlay reads — measures `still` on both clocks.
+The 4 November note here said the inside of a cloud was unresolved and that the honest fix
+was a blend rather than another cell size. That was taken: the cloud half of the gate
+material is transparent and both of its dissolves are alpha. The dither is gone. The note
+is replaced rather than left standing.
 
-What is NOT settled is what it LOOKS like in there. The bank is an opaque merged mesh and
-the lens rides eleven metres back, so inside one the slab filled the whole frame and the
-course was unreadable. It now dissolves in hard cells by `uInCloud`, which fixed the
-blackout; at 1.4 m cells that read as torn card, at 0.17 m it reads as a speckled dither.
-Better, and still not soft. A stochastic per-cell discard on an opaque surface IS a dither
-pattern — the honest fix is a transparent blend for this one material, which means
-sorting a large merged mesh and is a real change rather than a constant.
+Two things worth keeping from this pass:
 
-Do not tune the cell size again hoping it resolves. Either blend it or ask the reader.
+- **The pixel bar is the bar; the world-degree bar measures segment length.** The cloud lip
+  could not have visible bulges while it was held to 4 world degrees across 1 m columns —
+  that allows an eleven-centimetre bulge at eight metres across, and 4 degrees on a short
+  segment is 0.11 px at the range a gate is read at. Moving it to the projected sagitta
+  bought 41.5 degrees of world turn at 0.93 px. Anything new that shows as an EDGE should be
+  projected, not measured in world degrees: the ridge, the trees, the dove, the cloud lip,
+  the cloud crown and the buttress flank all are.
+- **A quintic smootherstep is only a smootherstep on [0,1].** `cloudLip` extrapolated it
+  when the columns were widened past the opening and returned four hundred metres. The
+  sampler caught it and was explained away once before it was believed. Clamp the parameter
+  at the point of use, not at the call site.
+
+**Cost is now the thing to watch.** 74,720 triangles / 12 draw calls at the start of the
+3 November pass; 91,694 / 16 now, a 23% rise, on a chapter the reader reported at 58–60 fps.
+That has NOT been measured on their phone — the sandbox bench runs on a desktop GPU and says
+nothing useful about it. If the chapter has gone soft, the first places to look are
+CLOUD_LIP_COLS (121) and BUTT_COLS (61), both of which are knobs with the arithmetic for
+what they buy written next to them in `long-air-terrain.js`.
 
 ## Other standing constraints for this project
 
