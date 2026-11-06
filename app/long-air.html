@@ -239,7 +239,7 @@ import { PROTOCOLS, CHOICE, validChoice,
          courseOf, gateAt, forgiveness, GATE_HALF, FORGIVE_MAX,
          DRAG_MAX_LOSS, DRAG_GAIN, DRAG_CLEAR,
          AVOID_MARGIN, AVOID_STRENGTH, MAX_DESYNC_M, V_MAX,
-         CLOUD_LIFT, CLOUD_REACH,
+         CLOUD_LIFT, CLOUD_REACH, MAG_V, MAG_T,
          ridgeAt, ceilAt, wanderAt } from './js/long-air-breath.js';
 /* THE TERRAIN IS A MODULE NOW — 2 November 2026.
    The reader asked for the scene to be sampled for continuity rather
@@ -418,6 +418,13 @@ const uWake    = { value: new THREE.Vector3(0, 0, 2.2) };
 /* 0 in clear air, 1 well inside a cloud bank. Softens the picture and
    hushes the streaks; it is never a warning and never a score. */
 const uInCloud = { value: 0 };
+/* THE FLIGHT DIRECTION, as a unit vector in the kite's own frame.
+   The streaks are airflow, so they belong along it; they were baked
+   along +z, which drew a level glide whatever the glider was doing.
+   On a climb at MAG 12 the kite is doing 41 degrees and the air
+   should say so. Smooth because it comes from the spring's velocity,
+   which is continuous. */
+const uFlow = { value: new THREE.Vector3(0, 0, 1) };
 
 /* THE §4.2a PRELUDES — 2 November 2026, carried over from Pearl Diver.
    A hard edge is not a jagged edge: the step stays where it was and the
@@ -1047,7 +1054,7 @@ const rockMat = posterMat(THREE, {
          fragment's own height, so dropping into the low ground puts
          the reader INTO the layer instead of merely near it.
          ============================================================== */
-      float lowAir = 1.0 - smoothstep(-7.0, 2.5, vY);
+      float lowAir = 1.0 - smoothstep(-7.0 * ${MAG_T.toFixed(4)}, 2.5 * ${MAG_T.toFixed(4)}, vY);
       vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
       gl_FragColor = vec4(
         mix(col, haze, min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir))), 1.0);
@@ -1461,7 +1468,7 @@ const gateMatFor = kind => posterMat(THREE, {
          hillside did would come straight back apart as a separate
          object — which is the whole fault this change is for. The
          cloud half is exempt: it IS the haze, locally. */
-      float lowAir = (1.0 - uIsCloud) * (1.0 - smoothstep(-7.0, 2.5, vY));
+      float lowAir = (1.0 - uIsCloud) * (1.0 - smoothstep(-7.0 * ${MAG_T.toFixed(4)}, 2.5 * ${MAG_T.toFixed(4)}, vY));
       vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
       gl_FragColor = vec4(mix(col, haze,
         min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir) * (1.0 - uIsCloud * 0.55))), alpha);
@@ -1565,7 +1572,7 @@ const treeMat = posterMat(THREE, {
          bend agree about where the sun is */
       col = mix(col, uShadow, (1.0 - aastep(0.0, vSide)) * 0.42);
       col = mix(col, uSheen, aastep(0.80, vF) * 0.22);
-      float lowAir = 1.0 - smoothstep(-7.0, 2.5, vY);
+      float lowAir = 1.0 - smoothstep(-7.0 * ${MAG_T.toFixed(4)}, 2.5 * ${MAG_T.toFixed(4)}, vY);
       vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
       gl_FragColor = vec4(
         mix(col, haze, min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir))), 1.0);
@@ -2103,16 +2110,23 @@ function lineGeometry(n){
   return b.geometry();
 }
 const lines = new THREE.Mesh(lineGeometry(44), posterMat(THREE, {
-  uniforms:{ uDist, uRush, uKite, uDrag, uPale:{value:C(AIR.flare)} },
+  uniforms:{ uDist, uRush, uKite, uDrag, uFlow, uPale:{value:C(AIR.flare)} },
   transparent:true, depthWrite:false, side:THREE.DoubleSide,
   vertex:`
     attribute float aEnd; attribute float aLen; attribute float aSeed; attribute float aRad;
-    uniform float uDist, uRush; uniform vec3 uKite;
+    uniform float uDist, uRush; uniform vec3 uKite, uFlow;
     varying float vA;
     void main(){
       vec3 p = position;
       float s = mod(p.z + aSeed * 7.3 - uDist * 1.3, ${LINE_Q}.0);
-      p.z = 12.0 - s + aEnd * aLen * uRush;
+      p.z = 12.0 - s;
+      /* THE STREAK LIES ALONG THE FLIGHT LINE. It extended along +z
+         regardless, so a 41 degree climb was drawn with level
+         airflow — the one layer whose entire job is to say how the
+         glider is moving, saying the wrong thing. These stay pinned
+         to the kite's frame, unlike the motes: airflow relative to
+         the glider is exactly what they are. */
+      p += uFlow * (aEnd * aLen * uRush);
       p.x += uKite.x; p.y += uKite.y;
       vA = floor(clamp(uRush * (1.0 - aRad / 12.0), 0.0, 0.999) * 3.0) / 2.0 * 0.19;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -2154,15 +2168,53 @@ scene.add(lines);
    only cue in Long Air that the glider is a body with a size: it
    otherwise never touches anything.
    ------------------------------------------------------------------ */
+/* ==================================================================
+   THE PARALLAX LEVER — 6 November 2026
+   ==================================================================
+   This is where most of the magnification comes from, and it comes
+   from a fault rather than from a bigger number.
+
+   The motes were positioned with `p.x += uKite.x; p.y += uKite.y`.
+   That pins them to the GLIDER'S OWN FRAME: they rode along with it,
+   perfectly stationary relative to the reader, and contributed
+   exactly nothing to the sense of climbing. The one layer close
+   enough to carry vertical parallax was the one layer that could not.
+
+   Horizontally that is right — they are the air immediately around
+   the kite and should travel with it. VERTICALLY it is the whole
+   sensation thrown away. A mote's world height is fixed now and the
+   kite moves THROUGH the field, so climbing makes them stream down
+   the frame. At eight metres' range that is five and a half times the
+   angular rate the ridge gives at forty-five, which is the second of
+   the two factors in MAG (see long-air-breath.js).
+
+   THEY WRAP, so the density stays constant however far the reader
+   climbs: each mote takes the copy of itself nearest the kite, out of
+   an infinite vertical lattice of period MOTE_VQ. The wrap is a
+   per-object teleport exactly like the strip's, and it happens at
+   half a period away — which is why MOTE_VQ is large and the fade
+   below is tied to it rather than picked: a mote has to be invisible
+   before it can jump.
+   ================================================================== */
 const MOTE_N = 120, MOTE_Q = 70;
+/* the vertical lattice, and the distance at which a mote is gone.
+   MOTE_FADE is 0.36 of the period, so a mote fades out well before
+   the half-period where it wraps. Both scale with the band: at MAG 12
+   the reader crosses 49 m in an inhale and a 26 m lattice would be
+   swept through twice a breath, which reads as rain rather than as
+   drifting seed. */
+const MOTE_VQ = 30 * MAG_V;
+const MOTE_FADE = MOTE_VQ * 0.36;
 function moteGeometry(n){
-  const b = builder(THREE, { aCorner:2, aSeed:1, aSize:1, aSlow:1 });
+  const b = builder(THREE, { aCorner:2, aSeed:1, aSize:1, aSlow:1, aY0:1 });
   for(let i = 0; i < n; i++){
     const ang = (i * 2.399) % 6.283;
     const rad = 1.6 + ((i * 7919) % 89) / 89 * 11.0;
     const hgt = -5.0 + ((i * 6367) % 71) / 71 * 11.0;
     const zb  = (i / n) * MOTE_Q;
     const A = { aSeed:(i * 1.91) % 6.283,
+                /* its own height in the vertical lattice */
+                aY0: ((i * 8191) % 211) / 211 * MOTE_VQ,
                 aSize: 0.030 + ((i * 5281) % 37) / 37 * 0.055,
                 /* some of them are seed heads and heavier, some are
                    down and barely fall at all */
@@ -2191,7 +2243,7 @@ const motes = new THREE.Mesh(moteGeometry(MOTE_N), posterMat(THREE, {
   prelude: PRE_AA,
   vertex: WIND_GLSL + `
     attribute vec2 aCorner; attribute float aSeed; attribute float aSize;
-    attribute float aSlow;
+    attribute float aSlow; attribute float aY0;
     uniform float uDist, uTime, uFill; uniform vec3 uKite;
     varying float vSlow; varying vec2 vC; varying float vFade;
     void main(){
@@ -2207,15 +2259,29 @@ const motes = new THREE.Mesh(moteGeometry(MOTE_N), posterMat(THREE, {
       p.z += lay.y * 1.4;
       /* down falls slowly and rises again on the gust; a seed head
          falls faster and is lifted less. One line, two kinds. */
-      p.y += uKite.y + sin(uTime * (0.21 + aSlow * 0.3) + aSeed) * (1.4 - aSlow)
-           + gust * (1.0 - aSlow) * 1.1;
+      /* ---- THE VERTICAL ANCHOR, which is the whole lever ----
+         Take the copy of this mote nearest the kite out of an
+         infinite lattice of period MOTE_VQ. Between wraps its world
+         height does not depend on uKite.y at all, so the reader
+         climbs THROUGH the field and it streams past; the wrap is a
+         teleport of half a period, which the fade below has already
+         taken to zero. The slow drift and the gust lift stay: a seed
+         head is not nailed to the sky. */
+      float lat = ${MOTE_VQ.toFixed(3)};
+      float wy = aY0 + floor((uKite.y - aY0) / lat + 0.5) * lat;
+      p.y = wy + sin(uTime * (0.21 + aSlow * 0.3) + aSeed) * (1.4 - aSlow)
+          + gust * (1.0 - aSlow) * 1.1;
       /* AND THE KITE PARTS THEM. Radial, inside a couple of metres,
          smooth in the distance so nothing can pop. */
       vec3 d = p - uKite;
       float r = length(d);
       float push = 1.0 - smoothstep(0.9, 3.4, r);
       p += (r > 0.001 ? d / r : vec3(0.0, 1.0, 0.0)) * push * 1.7;
-      vFade = 1.0 - smoothstep(26.0, 44.0, abs(p.z));
+      /* fade in z AND in height. The vertical one is what makes the
+         wrap invisible, so it is derived from the lattice rather than
+         chosen: gone by 0.36 of a period, wrapping at 0.5. */
+      vFade = (1.0 - smoothstep(26.0, 44.0, abs(p.z)))
+            * (1.0 - smoothstep(${(MOTE_FADE*0.55).toFixed(2)}, ${MOTE_FADE.toFixed(2)}, abs(p.y - uKite.y)));
       vSlow = aSlow; vC = aCorner;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       mv.xy += aCorner * aSize;
@@ -2641,7 +2707,14 @@ let started = false;
 const L = lens({ camBack: 13, kiteY: ALT_LOW });
 /* w = 6 rad/s: most of the way in about a third of a second, which is
    comfortably inside the time between gates at SPEED. */
-const FORG = tracker(0, 3.5);
+/* w SCALES AS 1/V. The §6.1 opening still arrives in four decided
+   sizes, and the raw step between two of them is FORGIVE_MAX/3 — now
+   V times bigger, because the opening scales with the band. The
+   smoothed arrival's velocity jump goes as w times that step, so
+   holding it where it was needs w proportional to 1/V. It settles in
+   0.68 s, still inside the 1.45 s between gates, which is the
+   constraint the original 3.5 was chosen against. */
+const FORG = tracker(0, 3.5 / MAG_V);
 let hit = 0;
 let RATE = rates(PROTOCOLS.box);
 
@@ -2671,6 +2744,7 @@ let COURSE = null;
 let subShown = '';
 
 const vHz = new THREE.Vector3();
+const vFlow = new THREE.Vector3(0, 0, 1);
 const cHaze = C(AIR.haze), cMid = C(R.at(MID));
 
 const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
@@ -2744,6 +2818,13 @@ const loop = clock((dt, now, running) => {
   const fill = KITE.fill;
   let kiteY = KITE.value;
   uFill.value = fill;
+
+  /* the flight direction: forward at the course's speed, vertical at
+     the glider's own. Normalised, so it is a direction and the
+     streaks' length stays uRush's business. */
+  vFlow.set(0, KITE.v, SPEED * DRAG.speedFactor);
+  if(vFlow.lengthSq() > 1e-9) vFlow.normalize(); else vFlow.set(0, 0, 1);
+  uFlow.value.copy(vFlow);
 
   const kiteX = Math.sin(t * 0.7) * 0.18;
   uKite.value.set(kiteX, kiteY, 0);
@@ -2896,7 +2977,10 @@ const loop = clock((dt, now, running) => {
   sail.position.set(kiteX, kiteY, 0);
   spars.position.copy(sail.position);
   // it pitches with its vertical speed and rolls a little with the luff
-  const pitch = clamp(-KITE.v * 0.055, -0.5, 0.5);
+  /* the gain scales as 1/V so the pitch covers the same angle for the
+     same FRACTION of the band travelled, instead of pinning at its
+     clamp the moment the chapter is magnified */
+  const pitch = clamp(-KITE.v * (0.055 / MAG_V), -0.5, 0.5);
   sail.rotation.x = pitch; spars.rotation.x = pitch;
   // and it banks away from whatever it is avoiding: the only place the
   // first of the two forces is visible before it has done anything
@@ -2942,9 +3026,13 @@ const loop = clock((dt, now, running) => {
      look like the shadow being broken rather than misplaced. --- */
   const period = worlds[B.proto.id].period;
   const alt = Math.max(0, kiteY - ridgeAt(dist + period * BEHIND, period));
-  const far = clamp01(alt / 30);
-  const fwd = clamp(alt * 2.4, 20, 72);
-  kiteShadow.visible = alt < 40;
+  /* ALL THREE SCALE WITH THE BAND. The forward throw is what fixes
+     the sun's elevation at atan(1/2.4), so the 2.4 is untouched and
+     only the clamps move; the fade and the cutoff are fractions of
+     how high the reader can get, which is now V times further. */
+  const far = clamp01(alt / (30 * MAG_V));
+  const fwd = clamp(alt * 2.4, 20, 72 * MAG_V);
+  kiteShadow.visible = alt < 40 * MAG_V;
   /* THE WAKE ON THE GRASS IS THE SHADOW'S OWN PLACEMENT, not a second
      derivation of it. `-fwd` is the world z the shadow falls at and the
      line below inverts the scroll exactly as the vertex loop does, so

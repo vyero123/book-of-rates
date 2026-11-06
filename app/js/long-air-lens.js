@@ -144,11 +144,29 @@ import { tracker } from './follow.js';
  *  a missing one falls back to 'level' rather than throwing, because a
  *  lens that stops moving is a worse failure than a lens that holds
  *  level. */
+/* THE AIM OFFSETS SCALE WITH THE BAND, the trailing distance does
+   not. `look` is how far above or below the glider the lens aims, and
+   it is what sweeps the horizon through the frame as the phase turns
+   over — at a fixed 2.6 m it is a gesture worth a fifth of the band
+   at MAG 1 and a fiftieth at MAG 12, which is to say it quietly
+   stops happening. `back` is a camera rig's length and has no
+   business growing: keeping it fixed is also what raises the angular
+   rate, since everything near the lens stays near it. */
+import { MAG_V } from './long-air-breath.js';
 export const CAM_EASE = {
-  rise:  { look:  2.6, back: 13.5, ease: 2.6 },
-  dive:  { look: -2.2, back: 12.5, ease: 3.0 },
-  level: { look:  0.2, back: 11.5, ease: 3.2 }
+  rise:  { look:  2.6 * MAG_V, back: 13.5, ease: 2.6 / Math.sqrt(MAG_V) },
+  dive:  { look: -2.2 * MAG_V, back: 12.5, ease: 3.0 / Math.sqrt(MAG_V) },
+  level: { look:  0.2 * MAG_V, back: 11.5, ease: 3.2 / Math.sqrt(MAG_V) }
 };
+/* THE EASE SCALES AS 1/sqrt(V), AND THAT IS DERIVED. A step of size D
+   into a critically damped second-order follower produces a peak
+   acceleration of about w^2 D, which is what tools/temporal.mjs reads
+   as a velocity jump. The aim targets above step by (2.6 + 2.2) V at
+   every rise-to-dive boundary, so holding w^2 D constant as D scales
+   by V needs w to scale by 1/sqrt(V). The full horizon sweep is kept
+   and only its ARRIVAL is slowed — 0.48 s against 0.31 at MAG 1, both
+   far inside a four second phase. Measured rather than argued:
+   lookY went 3.92 -> the number in the report. */
 
 /** How fast the lens height follows the glider, now as a critical
  *  frequency. The old first-order k was 4.5 and this is 4.5: a
@@ -157,13 +175,13 @@ export const CAM_EASE = {
  *  change is confined to HOW it gets there. Keeping the number was
  *  deliberate — changing a constant in the same pass as the maths
  *  would make it impossible to say afterwards which did what. */
-export const W_HEIGHT = 4.5;
+export const W_HEIGHT = 4.5 / MAG_V;
 
 /** The trailing distance's second-order rate, in radians per second.
  *  2.0 as a first-order rate and 2.0 as a critical frequency settle in
  *  about the same time, so the lens rides where it always did; it now
  *  gets there without a velocity step. */
-export const W_BACK = 2.0;
+export const W_BACK = 2.0 / MAG_V;
 
 /** The lens's own state and one step of it.
  *
@@ -214,3 +232,23 @@ export function lens({ camBack = 13.0, kiteY = 11.5 } = {}){
   };
   return L;
 }
+
+/* ------------------------------------------------------------------
+   AND THE RIG HAS MASS IN PROPORTION — 6 November 2026
+   ------------------------------------------------------------------
+   W_HEIGHT and W_BACK divide by MAG_V. The follower amplifies its
+   input's velocity steps by about w: kiteY carries an unavoidable one
+   where the fill rate hits its cap at the ends of a breath, and that
+   step scales with the band, so at a fixed w = 4.5 the lens turned a
+   0.98 m/s step in the glider into 3.36 m/s of WHOLE-FRAME movement.
+   Holding that constant as the band grows needs w proportional to
+   1/V.
+
+   The cost is lag: 0.53 s to settle rather than 0.22. That is not a
+   regression dressed up as a feature — a camera rig that followed a
+   glider climbing at twelve metres a second rigidly would be the
+   thing that makes this nauseating, and the lag is what turns a
+   magnified excursion into something that reads as soaring. It is
+   also the only place in this chapter where the lens's own mass is
+   stated as a number.
+   ------------------------------------------------------------------ */

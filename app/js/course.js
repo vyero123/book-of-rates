@@ -204,7 +204,28 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0, vMax 
        body that reaches the corridor edge mid-step must stop there
        rather than at the end of the frame. */
     settle(dt){
-      const n = Math.max(1, Math.ceil(dt * 60));
+      /* 240 Hz, RAISED FROM 60 ON 6 NOVEMBER, and the magnification
+         is why. Semi-implicit Euler is stable here but its trajectory
+         depends on the step size, and at 60 Hz the substep COUNT
+         flips between one and two as the reader's clock wanders
+         either side of 60 fps — so the integrator changes character
+         frame to frame. At MAG 1 that cost 1.38 in the frame-rate
+         ratio and was accepted as a documented residual; with the
+         band scaled the same relative error is V times more metres
+         and tools/temporal.mjs reads it as 1.45 m/s of visible
+         deviation, which is six pixels rather than two.
+
+         The reason it was 60 was that n = 1 made it bit-identical to
+         the un-substepped version at exactly 60 fps. That is no
+         longer worth anything: MAG has moved every number in this
+         chapter deliberately, so there is nothing left to be
+         bit-identical TO, and every tolerance downstream is
+         re-derived from the drawn behaviour rather than from the old
+         constants. Converging closer to the exact solution can only
+         make the real lag smaller than lag() predicts, which is the
+         safe direction for every tracking tolerance in
+         tools/regress.mjs. */
+      const n = Math.max(1, Math.ceil(dt * 240));
       const h = dt / n;
       for(let i = 0; i < n; i++){
         const want = C.atOf(b.fill);
@@ -307,11 +328,47 @@ export function body({ corridor: C, rates, k = 64.0, zeta = 0.9, fill = 0, vMax 
      *  C2 factors and is C2.
      */
     buoy({ base, bodyHalf = 0, dt, lift, env = 1 }){
-      const d = (b.value + bodyHalf) - base;
-      if(d <= 0 || env <= 0) return 0;
-      b.v -= lift * d * d * d * env * dt;
-      if(b.v < -vMax) b.v = -vMax;
-      return d * env;
+      const top = base - bodyHalf;
+      const d0 = b.value - top;
+      if(d0 <= 0 || env <= 0) return 0;
+      /* ==========================================================
+         SUBSTEPPED, AND THE MEASUREMENT IS WHY — 6 November 2026
+         ==========================================================
+         This applied one force for the whole frame with the depth
+         held constant across it. A cubic is stiff: at the depths a
+         reader reaches when the chapter is magnified the field is
+         doing better than eighty metres a second squared, so a
+         single 1/60 s application changes the velocity by 1.4 m/s
+         between two frames and the body's own self-limiting — it
+         sinks less deep, so the force eases — never gets a chance to
+         act within the step.
+
+         tools/temporal.mjs named it rather than my noticing: a
+         frame-rate ratio of 2.24 between the metronome clock and the
+         jittered one, which is the signature of an integrator that
+         depends on the step size and the exact thing that file was
+         built to find. The spring beside it has been substepped at
+         60 Hz since 3 November for the same reason.
+
+         `y` is a PREDICTION, not a second integration: the body's
+         position is settle()'s business and is untouched here. It
+         only exists so the depth can be re-read as the step
+         proceeds, which is what makes the force self-limiting
+         within a frame instead of across several. 240 Hz because
+         this field is four times stiffer than the spring.
+         ========================================================== */
+      const n = Math.max(1, Math.ceil(dt * 240));
+      const h = dt / n;
+      let y = b.value;
+      for(let i = 0; i < n; i++){
+        const d = y - top;
+        if(d > 0){
+          b.v -= lift * d * d * d * env * h;
+          if(b.v < -vMax) b.v = -vMax;
+        }
+        y += b.v * h;
+      }
+      return d0 * env;
     },
 
     /** SKIMMING, which replaces touch() in Long Air.

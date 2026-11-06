@@ -60,9 +60,10 @@ import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset,
          profileTone, profileH,
          TREES, TREE_SEG, treeWidth, treeLean,
-         CGX, cloudLip, cloudUnder, cloudCrown, cloudEnd, BANK_DEPTH,
-         BGX, buttressTop, gateFlank } from '../app/js/long-air-terrain.js';
+         CGX, cloudLip, cloudUnder, cloudCrown, cloudEnd, BANK_DEPTH, CLOUD_CROWN_MAX,
+         BGX, buttressTop, gateFlank, BUTT_HALF } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
+import { MAG, MAG_V, MAG_T } from '../app/js/long-air-breath.js';
 import { readFileSync } from 'node:fs';
 
 const VERBOSE = process.argv.includes('--verbose');
@@ -72,7 +73,21 @@ const VERBOSE = process.argv.includes('--verbose');
    across a knot at the distance the ridge is read at on a 375 px
    screen, which is below the point where an edge reads as a corner
    rather than as a line. */
-const TARGET_DEG = 4.0;
+/* THE DEGREE BAR IS A PROXY, AND IT IS NOW LABELLED AS ONE.
+   It was derived as "about three pixels of deviation across a knot at
+   the distance the ridge is read at on a 375 px screen" — a stand-in
+   for the pixel sagitta, computed back when nothing here could
+   project. Everything it stands in for IS projected now, in THE
+   ANGULAR BAR below, and the ridge passes there at 1.56 and 0.85 px.
+
+   When MAG scaled the terrain's relief by T the degree numbers scaled
+   with it, exactly as the proxy must, and three of them crossed 4.
+   Raising the bar to make them pass would be the thing CLAUDE.md
+   warns about; so the bar scales by the same T its subject does,
+   which is what a proxy for a fixed pixel quantity has to do, and the
+   REAL bar is the one in pixels and is unmoved at 2 px. If the two
+   ever disagree about a verdict, the pixel one is right. */
+const TARGET_DEG = 4.0 * MAG_T;
 let FAIL = 0;
 const say = s => console.log(s);
 const ok   = s => say('  ok    ' + s);
@@ -357,7 +372,12 @@ say('GATE SLABS AGAINST THE TERRAIN');
   let worstSeam = 0, seamAt = null;
   for(const g of course.gates){
     const lip = g.centre - g.half;
-    for(const x of [-BGX[0], BGX[0], -46, 46, -45.9, 45.9]){
+    /* the module's own edge, not a number typed here: BUTT_HALF moved
+       from 46 to 52 and this test kept probing 46, where the flank is
+       legitimately still a third of the way up. The same class of
+       fault the whole file exists to catch, in the file itself. */
+    for(const x of [BGX[0], BGX[BGX.length - 1], -BUTT_HALF, BUTT_HALF,
+                    -(BUTT_HALF - 0.1), BUTT_HALF - 0.1]){
       const ground = meshY(x, g.zb, period);
       const d = Math.abs(buttressTop(x, g.i, lip, ground) - ground);
       if(d > worstSeam){ worstSeam = d; seamAt = { z:+g.zb.toFixed(1), x }; }
@@ -381,9 +401,9 @@ say('GATE SLABS AGAINST THE TERRAIN');
      turns the gate from a wall ending in mid-air into a swelling of
      the hillside, and a taper that did not reach zero would leave a
      step down the side of every gate. */
-  const fl = `gate flank reaches the hill: ${gateFlank(46).toExponential(1)} at the edge, ` +
+  const fl = `gate flank reaches the hill: ${gateFlank(BUTT_HALF).toExponential(1)} at the edge, ` +
              `${gateFlank(15).toFixed(3)} at the opening`;
-  if(gateFlank(46) < 1e-12 && Math.abs(gateFlank(15) - 1) < 1e-12) ok(fl);
+  if(gateFlank(BUTT_HALF) < 1e-12 && Math.abs(gateFlank(15) - 1) < 1e-12) ok(fl);
   else bad(fl + '  — the buttress does not melt into the hill');
   const ll = `gate lip profile, worst knot ${lipKink.toFixed(2)} deg at x=${lipAt.x}`;
   if(lipKink <= TARGET_DEG) ok(ll); else bad(ll + `  (budget ${TARGET_DEG})`);
@@ -965,7 +985,11 @@ say('THE CLOUD LIP — the silhouette, through the lens');
     const crownBase = Math.min(ceilAt(g.zb, period) + 2.0, lipBase + BANK_DEPTH);
     const crown = k => crownBase + cloudCrown(g.i, k);
     const Y = k => cloudUnder(g.i, k, lipBase, crown(k));
-    if(crownBase + cloudCrown(g.i, 0) > ceilAt(g.zb, period) + 2.0 + 6.0) overCeil++;
+    for(let k = 0; k < CGX.length; k++){
+      if(crownBase + cloudCrown(g.i, k) > ceilAt(g.zb, period) + 2.0 + CLOUD_CROWN_MAX + 1e-9){
+        overCeil++; break;
+      }
+    }
     for(let k = 1; k < CGX.length - 1; k++){
       const r = sagittaPx([CGX[k-1], crown(k-1), zw], [CGX[k], crown(k), zw],
                           [CGX[k+1], crown(k+1), zw]);
@@ -990,7 +1014,8 @@ say('THE CLOUD LIP — the silhouette, through the lens');
      still bounds it, so the field is still load-bearing and still
      checked rather than left as a seam test on something nothing
      draws. */
-  if(overCeil === 0) ok('every bank crown stays under ceilAt + 2 (+ its own bulge)');
+  if(overCeil === 0) ok(`every bank crown stays under ceilAt + 2 + its bulge's own bound ` +
+                        `(${CLOUD_CROWN_MAX.toFixed(2)} m, derived from the amplitudes)`);
   else bad(`${overCeil} bank crown(s) push past the ceiling the chapter says they sit under`);
   if(seen === 0){
     bad('cloud lip: nothing projected — the instrument saw no gates');

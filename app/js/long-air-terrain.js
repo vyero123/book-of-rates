@@ -19,7 +19,13 @@
  * No three.js and no DOM here: numbers only.
  */
 
-import { ridgeAt, wanderAt, RIDGE_TOP, sat } from './long-air-breath.js';
+import { ridgeAt, wanderAt, RIDGE_TOP, sat, MAG_V, MAG_T } from './long-air-breath.js';
+/* Every vertical quantity in this file is a multiple of one of these
+   two. MAG_T for anything that is part of the HILL, MAG_V for
+   anything that belongs to the flight band — the gate lips, the cloud
+   banks. Raising MAG in long-air-breath.js moves all of it together,
+   which is the point of there being one knob. */
+const T = MAG_T, V = MAG_V;
 
 /* ------------------------------------------------------------------
    THE CROSS-SECTION, AS A FUNCTION RATHER THAN A TABLE
@@ -64,10 +70,10 @@ export function profileDy(x){
   const a = Math.abs(x);
   // the two shoulders: +0.35 at about 13 m, zero on the spine and zero
   // again by 34 m, and C2 at both ends because sin^2 is
-  const bump = a < 34 ? 0.40 * Math.pow(Math.sin(Math.PI * a / 34), 2) : 0;
+  const bump = a < 34 ? 0.40 * T * Math.pow(Math.sin(Math.PI * a / 34), 2) : 0;
   // the fall away, one smooth descent over the whole outer width
   const t = Math.min(1, Math.max(0, (a - 34) / (SPAN - 34)));
-  const drop = 15.0 * (t * t * t * (t * (t * 6 - 15) + 10));
+  const drop = 15.0 * T * (t * t * t * (t * (t * 6 - 15) + 10));
   return bump - drop;
 }
 
@@ -215,7 +221,7 @@ export function gradeAt(zb, x, period){
           + Math.sin(u * 11 + 2.3 + x * 0.047) * 0.34;
   // the raw sum spans +-0.96; saturate that into the range the
   // geometry is allowed to use
-  return sat(g, -1.6, 0.45, -0.96, 0.96);
+  return sat(g, -1.6 * T, 0.45 * T, -0.96, 0.96);
 }
 
 /* ------------------------------------------------------------------
@@ -419,7 +425,7 @@ export function treeLean(f, lean){ return lean * f * f; }
    this project: no Math.random anywhere, so the sampler measures the
    trees the page draws. */
 export const TREE_N = 56;
-export const TREE_MAX_H = 4.2;
+export const TREE_MAX_H = 3.6 * T;
 export const TREES = Array.from({ length: TREE_N }, (_, i) => {
   const side = (i % 2) ? 1 : -1;
   const r = k => ((i * k) % 97) / 97;
@@ -427,14 +433,14 @@ export const TREES = Array.from({ length: TREE_N }, (_, i) => {
     i,
     x:    side * (30 + r(7919) * 52),
     zf:   (i / TREE_N + r(6367) * 0.012) % 1,      // fraction of the strip
-    h:    2.4 + r(5281) * (TREE_MAX_H - 2.4),
-    wT:   0.26 + r(4409) * 0.16,
-    wC:   0.42 + r(3779) * 0.34,
+    h:    2.1 * T + r(5281) * (TREE_MAX_H - 2.1 * T),
+    wT:   (0.26 + r(4409) * 0.16) * T,
+    wC:   (0.42 + r(3779) * 0.34) * T,
     /* all of them lean the same way, because a prevailing wind is
        what bends a treeline and trees leaning at random would read
        as damage rather than as weather. +x is downwind: it is the
        sign of WIND.DIR_X in js/long-air-wind.js. */
-    lean: 0.30 + r(2749) * 0.24,
+    lean: (0.30 + r(2749) * 0.24) * T,
     seed: (i * 1.91) % 6.283
   };
 });
@@ -528,7 +534,7 @@ export function cloudCrown(gateI, k){
   const x = CGX[k];
   const ph = n => ((gateI * 1.733 * n + 2.1) % 6.283);
   const lobe = (amp, wave, n) => amp * 0.5 * (1 - Math.cos(x * (2 * Math.PI / wave) + ph(n)));
-  return lobe(3.20, 17.0, 1) + lobe(1.00, 8.0, 2) + lobe(0.30, 4.0, 3);
+  return lobe(3.20 * V, 17.0, 1) + lobe(1.00 * V, 8.0, 2) + lobe(0.30 * V, 4.0, 3);
 }
 
 /* HOW DEEP A BANK IS, and why it is not the ceiling any more.
@@ -555,7 +561,7 @@ export function cloudCrown(gateI, k){
    ceilAt still bounds it -- the crown may not exceed ceilAt + 2 --
    so the field still means something and is still checked, but it no
    longer POSITIONS the crown. */
-export const BANK_DEPTH = 12;
+export const BANK_DEPTH = 12 * V;
 
 /** The drawn underside of a bank at one column: the cauliflower where
  *  the opening is, rising to meet the crown where the bank closes.
@@ -575,7 +581,7 @@ export function cloudUnder(gateI, k, lipBase, crownY){
 export function cloudLip(gateI, k){
   const x = CGX[k];
   // the same decided per-gate opening the rock lip uses
-  const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8) / 0.6) * 0.6;
+  const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8 * V) / (0.6 * V)) * (0.6 * V);
   /* THE CLAMP IS LOAD-BEARING AND WAS MISSING. A quintic smootherstep
      is only a smootherstep on [0,1]; past it, t^3(6t^2-15t+10) grows
      without any bound at all. While CGX stopped at +-15 that could
@@ -591,7 +597,8 @@ export function cloudLip(gateI, k){
   const lobe = (amp, wave, n) => amp * 0.5 * (1 - Math.cos(x * (2 * Math.PI / wave) + ph(n)));
   // flattish under the middle of the opening, full at the sides
   const win = 0.28 + 0.72 * u;
-  return vmax * u + (lobe(1.80, 11.0, 1) + lobe(0.55, 5.5, 2) + lobe(0.15, 3.5, 3)) * win;
+  return vmax * u + (lobe(1.80 * V, 11.0, 1) + lobe(0.55 * V, 5.5, 2)
+                   + lobe(0.15 * V, 3.5, 3)) * win;
 }
 
 /** THE DRAWN UNDERSIDE OF A BANK IN THE KITE'S OWN LANE.
@@ -649,7 +656,7 @@ export function cloudBaseOffset(gateI){ return cloudLip(gateI, CLOUD_MID); }
 
 /** How much of the gate's own lip height survives at x. 1 across the
  *  opening, 0 by the time the buttress has melted into the hillside. */
-export const BUTT_HALF = 46;
+export const BUTT_HALF = 52;
 export function gateFlank(x){
   const t = Math.min(1, Math.max(0, (Math.abs(x) - 15) / (BUTT_HALF - 15)));
   return 1 - t * t * t * (t * (t * 6 - 15) + 10);
@@ -659,7 +666,7 @@ export function gateFlank(x){
  *  what the flank's own curvature needs to stay inside the pixel bar
  *  on the tallest gate; tools/continuity.mjs projects it rather than
  *  taking that on trust. */
-export const BUTT_COLS = 61;
+export const BUTT_COLS = 67;
 export const BGX = Array.from({ length: BUTT_COLS },
   (_, i) => -BUTT_HALF + (i / (BUTT_COLS - 1)) * BUTT_HALF * 2);
 
@@ -671,3 +678,11 @@ export function buttressTop(x, gateI, lipBase, groundY){
   const lipY = lipBase - lipOffsetAt(gateI, x);
   return groundY + (lipY - groundY) * gateFlank(x);
 }
+
+/** The most the crown's cauliflower can ever add. Each lobe is
+ *  amp * 0.5 * (1 - cos(...)), so its own maximum is amp; the sum is
+ *  the bound. Exported so tools/continuity.mjs can assert the crown
+ *  stays under the ceiling against the REAL bound instead of against
+ *  a slack number somebody typed — which is what it was doing, and
+ *  what broke the moment the amplitudes started scaling with MAG. */
+export const CLOUD_CROWN_MAX = (3.20 + 1.00 + 0.30) * V;

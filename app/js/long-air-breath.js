@@ -148,28 +148,133 @@ import { corridor, ratesOf, courseOf as buildCourse, gateAt as findGate,
    module's public surface exactly as it was, so the page and the harness
    did not have to be rewritten around the move. */
 
+/* ==================================================================
+   LIFT — ONE KNOB FOR HOW MUCH THE FLYING IS WORTH
+   ==================================================================
+   6 November 2026. The reader wants the up-and-down to feel ten to
+   twenty times what it was. Multiplying the altitude band by fifteen
+   is the obvious lever and it is the wrong one on its own: the phase
+   durations are fixed by the protocol, so fifteen times the range in
+   the same four seconds is 77 m/s of climb against 14 m/s of forward
+   travel — a flight path 80 degrees from level, which is a rocket,
+   and the gates, the corridor and the terrain's own scale all stop
+   agreeing with each other.
+
+   WHAT THE SENSATION ACTUALLY IS. The eye reads ANGULAR rate, not
+   metres: how fast the world sweeps through the frame. For vertical
+   motion that is
+
+       omega  =  vertical speed / distance to the nearest thing you
+                 can see move
+
+   and the chapter was weak in BOTH terms. Vertical speed was 5.1 m/s
+   (20.5 m in a 4 s inhale). And the nearest thing that moved with
+   altitude was the ridge, forty-five metres off — because the two
+   layers that ARE close, the motes and the speed streaks, were pinned
+   to the kite's own frame and therefore moved with it, contributing
+   exactly nothing. So:
+
+       omega  =  5.1 / 45  =  0.11 rad/s  =  6.5 deg/s
+
+   THE TWO FACTORS, AND WHY THEY MULTIPLY. Raising the real range is
+   limited by the flight-path angle: it is the only term that costs
+   geometry and the only one that can make the chapter absurd. Putting
+   a visible reference CLOSE is nearly free and is where most of the
+   sensation was being thrown away.
+
+       real range      x 2.4   (band 20.5 -> 49 m, path angle 41 deg)
+       near reference  x 5.6   (45 m of terrain -> 8 m of drifting
+                                seed heads, world-anchored so they
+                                stream past instead of riding along)
+                       ------
+       felt            x 13.5  of angular rate
+
+   That is the reader's range reached by the two terms it is actually
+   made of, rather than by one multiplication that would have had to
+   be fifteen on its own and would have broken the chapter to get it.
+
+   MAG IS THE KNOB AND IT IS THE ONLY ONE. Every vertical constant
+   below is derived from it, so the band, the corridor, the gate
+   openings, the forgiveness, the cloud base and depth, the buoyancy
+   coefficient, the terrain's own relief and the treeline all move
+   together and the landscape keeps its proportions. MAG = 1 is the
+   chapter as it was.
+
+       V = MAG^0.35   how much REAL range grows. The exponent is what
+                      splits the work between the two factors above:
+                      at MAG 12 it gives 2.41, and the remaining 5.6
+                      comes from the near reference, which is the
+                      parallax work in long-air.html.
+       T = sqrt(V)    how much the TERRAIN's relief grows. Less than
+                      the band, deliberately: the hill has to stay a
+                      plateau you soar over rather than becoming a
+                      mountain range you thread, and its curvature
+                      scales linearly with its relief, so every pixel
+                      bar in tools/continuity.mjs scales with T. At
+                      T = 1.55 the ridge's worst knot goes from 1.00
+                      to about 1.6 px against a 2 px bar — which is
+                      the real ceiling on this number and the reason
+                      it is a square root rather than V.
+
+   WHAT IT COSTS TO TURN UP. Nothing in triangles: every constant here
+   is a multiplier on geometry that already exists. The cost is in the
+   bars. T drives the ridge's knot angle linearly, so MAG beyond about
+   20 (T = 1.72, ridge 1.72 px) runs out of room against the 2 px bar
+   and the ridge would need more columns. The flight path angle is
+   atan(20.5 V / 56), which at MAG 20 is 44 degrees.
+
+   AND A WORD ABOUT THE TOP OF THE RANGE. This is a calming exercise.
+   Large, fast vertical camera motion is the standard way to make
+   somebody queasy, and expansive is the goal where vertigo is not.
+   At MAG 20 the lens sweeps about 100 degrees a second at the
+   turnarounds, which is brisk enough to read as violent rather than
+   soaring. 12 is shipped and 8 to 14 is the band I would stay in;
+   the knob goes to 20 and the reader is welcome to overrule me.
+   ================================================================== */
+export const MAG = 12;
+const V = Math.pow(MAG, 0.35);
+const T = Math.sqrt(V);
+/** Exposed so the page and the samplers scale with the same numbers
+ *  rather than each raising MAG to its own power. */
+export const MAG_V = V, MAG_T = T;
+
 /* ------------------------------------------------------------------
    The corridor, in metres. Above zero is up.
    ------------------------------------------------------------------ */
 
 /** The ridge below. Its tops are quantised and stay under the corridor. */
 export const GROUND    =  0.0;
-export const RIDGE_TOP =  3.4;     // the highest any ridge crest reaches
+export const RIDGE_TOP =  3.4 * T;     // the highest any ridge crest reaches
 
 /** Where the kite is allowed to be. The first pass let the figure clip
  *  through the floor; this pass makes that unreachable by construction —
  *  the kite is clamped into this band, the band's floor sits well above
  *  the highest ridge crest, and tools/regress.mjs checks the margin
  *  rather than trusting it. */
-export const CORR_LO = 8.0;
-export const CORR_HI = 36.0;
+/* DERIVED FROM THE TERRAIN, NOT TYPED. The floor has to clear the
+   highest drawn crest by the margin the sampler measures (4.62 m at
+   MAG 1), and the ceiling has to sit above the band by the overshoot
+   room the band itself needs. Both were constants that happened to
+   satisfy those relations; they now state them. */
+/* BOTH GAPS SCALE, and the gate opening is why. GATE_HALF grows with
+   V — it has to, because the spring's lag grows with the schedule's
+   slope and the on-pace margin is the opening less that lag — so the
+   gate's LOWER lip reaches V times further below the band. If the
+   distance from the band down to the hill stayed fixed, that lip
+   would end up underground, which is exactly what the harness caught:
+   "the ridge eats a gate's opening (-9.56 m)".
+   At MAG 1 the lowest lip clears the crest by 0.7 m. Scaling both
+   gaps keeps that relation rather than restoring it by hand, and at
+   MAG 12 it comes out at 1.67 m — the guarantee gets stronger, which
+   is the only direction it is allowed to move. */
+export const CORR_LO = RIDGE_TOP + 4.6 * V;
+export const ALT_LOW  = CORR_LO + 3.5 * V;
+export const ALT_HIGH = ALT_LOW + 20.5 * V;
+export const CORR_HI = ALT_HIGH + 4.0 * V;
 
 /** The band the SCHEDULE sweeps, inside the corridor. Narrower than the
  *  corridor at both ends, so a player who overshoots has somewhere to
  *  overshoot into instead of hitting a hard stop. */
-export const ALT_LOW  = 11.5;
-export const ALT_HIGH = 32.0;
-
 /** The kit's corridor object, which also checks the nesting the whole
  *  no-clipping guarantee rests on: CORR_LO < ALT_LOW < ALT_HIGH < CORR_HI. */
 export const CORRIDOR = corridor({ lo: CORR_LO, hi: CORR_HI, low: ALT_LOW, high: ALT_HIGH });
@@ -341,12 +446,12 @@ export const periodOf = proto =>
  *  has to be bigger than the worst of those put together with room to
  *  spare. tools/regress.mjs flies an on-pace player through a whole
  *  session and fails under 0.4 m of margin. */
-export const GATE_HALF = 7.4;
+export const GATE_HALF = 7.4 * V;
 
 /** How much wider the gap gets when the player is completely off pace.
  *  §6.1 again: "when the user drifts off pace, the gap widens rather than
  *  the kite crashing". This is that sentence as a number. */
-export const FORGIVE_MAX = 4.6;
+export const FORGIVE_MAX = 4.6 * V;
 
 /* ==================================================================
    THE GLIDER MODEL — 24 October 2026
@@ -444,10 +549,15 @@ export const DRAG_CLEAR = 1.6;
    the force is a product of two smooth factors and a gate on either
    of them would put back the discontinuity the cubic exists to
    remove. */
-export const CLOUD_LIFT = 0.06;
+/* THE COEFFICIENT SCALES AS 1/V^2, so the equilibrium DEPTH scales
+   with the band rather than the force doing. Balancing k(want - y)
+   against L d^3 with both y and d proportional to V needs L
+   proportional to 1/V^2; anything else and a reader at MAG 12 either
+   bounces off the base or sinks through the bank. */
+export const CLOUD_LIFT = 0.06 / (V * V);
 export const CLOUD_REACH = 4.0;
 
-export const AVOID_MARGIN = 4.2;
+export const AVOID_MARGIN = 4.2 * V;
 export const AVOID_STRENGTH = 30;
 
 /** THE WORST THE COURSE CAN GET OUT OF STEP WITH THE BREATH, in metres
@@ -625,7 +735,7 @@ export function ridgeAt(z, period){
    name is true again. This moves the terrain DOWN, so every clearance
    in tools/regress.mjs gets larger: the on-pace guarantee is
    strengthened, never weakened. */
-export const SPINE_TOP = RIDGE_TOP - 0.85;
+export const SPINE_TOP = RIDGE_TOP - 0.85 * T;
 
 /** The underside of the cloud ceiling, well above the corridor.
  *  Was quantised to 1.6 m steps and measured the same way: VALUE JUMP,
@@ -634,7 +744,7 @@ export const SPINE_TOP = RIDGE_TOP - 0.85;
  *  quantisation leaves a pure sine. */
 export function ceilAt(z, period){
   const u = (z / period) * Math.PI * 2;
-  return CORR_HI + 7.0 + Math.sin(u * 7 + 0.6) * 2.4;
+  return CORR_HI + 7.0 * V + Math.sin(u * 7 + 0.6) * 2.4 * V;
 }
 
 /** Lateral wander, for the ridge and the far scenery only. The kite has
