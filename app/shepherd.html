@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="light">
+<title>Book of Rates — The Shepherd (3-D)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#2C3A2E;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(44,58,46,.52);backdrop-filter:blur(6px);
+    color:#F6EFD6;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(246,239,214,.42)}
+  #stop i{width:11px;height:11px;background:#D9693B;display:block;border-radius:2px}
+
+  #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
+    font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+    color:rgba(44,58,46,.62);background:rgba(246,239,214,.42);border-radius:6px;
+    padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
+  #fps.off{opacity:0;pointer-events:none}
+  #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
+    width:22px;height:22px;border-radius:50%;display:none}
+  #fpsdot.on{display:block}
+
+  /* THE CUE, AND NOTHING ELSE OVER THE PICTURE. The phase word and
+     the countdown; no protocol line, no how-to, no progress bar. The
+     design carries the instruction — 6 November 2026. */
+  #cue{position:fixed;left:0;right:0;bottom:max(104px,calc(env(safe-area-inset-bottom) + 96px));
+    z-index:20;text-align:center;pointer-events:none;color:#FFF8E4}
+  #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
+    text-shadow:0 2px 16px rgba(30,40,32,.85)}
+
+  /* The invitation: two flat rules above and below the shepherd,
+     where you would press to send him up or let him come down. The
+     control is anywhere; these are only where to reach, and
+     js/invite.js stops them once the reader has shown they know. */
+  #reach{position:fixed;inset:0;z-index:25;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+  .mark{position:fixed;left:50%;z-index:26;pointer-events:none;
+    width:86px;margin-left:-43px;height:2px;
+    background:rgba(255,248,228,.92);
+    opacity:calc(var(--invite,0) * 0.9 + var(--held,0) * 0.75);
+    transform:translateY(-50%) scaleX(calc(0.55 + var(--invite,0) * 0.45))}
+  .mark::after{content:'';position:absolute;left:26px;right:26px;height:1px;
+    background:#D9693B;opacity:var(--after,0)}
+  #mUp::after{top:6px}
+  #mDn::after{bottom:6px}
+  @media (prefers-reduced-motion: reduce){
+    .mark{opacity:calc(var(--asking,0) * 0.5 + var(--held,0) * 0.75);transform:translateY(-50%)}
+  }
+
+  .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(30,40,32,.9);backdrop-filter:blur(3px);text-align:center;padding:28px;
+    overflow-y:auto}
+  .sheet.on{display:grid}
+  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F6EFD6;letter-spacing:.06em}
+  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
+    background:#F6EFD6;color:#2C3A2E;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    display:block;width:100%;max-width:320px}
+  .sheet button.alt{background:transparent;color:#F6EFD6;
+    box-shadow:inset 0 0 0 1.5px rgba(246,239,214,.48);font-weight:500}
+  .sheet button.link,.sheet a.link{background:transparent;color:rgba(246,239,214,.58);
+    box-shadow:none;font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
+    text-decoration:underline;padding:8px;margin-top:14px;display:block;text-align:center}
+  .sheet a.link{margin-top:4px}
+  .sheet p{margin:0 0 14px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(246,239,214,.8);max-width:320px}
+
+  #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
+    text-align:center;
+    background:linear-gradient(#EFE3B2 0%,#CFE0A6 30%,#9FBE84 52%,#6E8C5E 72%,#2C3A2E 100%)}
+  #fallback.on{display:grid}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#24301F;letter-spacing:.05em}
+  #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
+    color:rgba(36,48,31,.84);max-width:300px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="fpsdot" aria-hidden="true"></div>
+<div id="fps" role="status" title="Tap to hide">—</div>
+
+<div id="cue"><div id="phase">breathe in</div></div>
+
+<div id="reach" aria-label="Hold to send him up the hill; let go and he comes down"></div>
+<div id="mUp" class="mark" aria-hidden="true"></div>
+<div id="mDn" class="mark" aria-hidden="true"></div>
+
+<div id="gate" class="sheet"><div>
+  <h2>Walk the hill</h2>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4</button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 IN / 5 OUT / 3</button>
+</div></div>
+
+<div id="halt" class="sheet"><div>
+  <h2>Stopped</h2>
+  <button id="resume">RESUME</button>
+  <button id="rescreen" class="link">Choose a different pace</button>
+  <a class="link" href="./#contents">Back to the book</a>
+</div></div>
+
+<div id="fallback"><div>
+  <h2>The Shepherd needs WebGL</h2>
+  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
+  <p><a class="link" href="./#contents" style="color:inherit">Back to the book</a></p>
+</div></div>
+
+<script type="module">
+/* ============================================================
+   BOOK OF RATES — THE SHEPHERD
+   The first theme this book ever had, in three dimensions.
+
+   WHAT THE BREATH DRIVES: `s`, the shepherd's distance along a path
+   up a hillside. Hold and he climbs; let go and he comes back down.
+   The integration is the kit's — js/course.js body() — at the
+   protocol's own capped rate, so breathing twice as fast buys half
+   the walk, exactly as in Long Air and for the same reason.
+
+   WHAT THE WORLD DOES SO THE MOTION IS LEGIBLE: the lens does NOT
+   follow him. It is parked near the foot of the path, so he recedes
+   and returns, changing both position and size in frame. Behind him
+   the flock follows in a chain of lagged followers, and that line IS
+   the last several seconds of the reader's own pace, laid out across
+   the hillside. Change pace and the change travels down the line and
+   arrives at the last sheep seconds later.
+
+   Nothing is counted, timed, scored or compared. There is no failure
+   state and no way to be late: a reader who never touches the glass
+   gets a shepherd who stands at the foot of the hill with his flock
+   around him, which is a thing a shepherd does.
+
+   §1.6a is vacuous here: no water. SILENT: no AudioContext, no media.
+   ============================================================ */
+
+import { requireScroll } from './js/scroll.js';
+import { breath } from './js/breath.js';
+import { PROTOCOLS, CHOICE, validChoice, SESSION_CAP,
+         PATH_LO, PATH_HI, WALK_LO, WALK_HI, CORRIDOR, RANGE, normOf, atOf,
+         hillAt, pathX, groundAt, rates,
+         FLOCK_N, FLOCK_W, FLOCK_TRAIL, FLOCK_MIN_GAP, PATH_V_MAX,
+         CAM_AT, CAM_SIDE, CAM_UP, CAM_EASE } from './js/shepherd-breath.js';
+import { body } from './js/course.js';
+import { tracker } from './js/follow.js';
+import { WIND_GLSL } from './js/wind.js';
+import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
+         PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
+import { builder, bands, posterMat, screenQuad, part, linkReport } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, fps, choice, enter, soloReport,
+         flashMeter } from './js/stage.js';
+import { arrival } from './js/arrival.js';
+import { invite } from './js/invite.js';
+import { wireExits } from './js/bookframe.js';
+
+const ARRIVE = arrival({ dist: 9 });
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+/* §4.3 — a grazed upland at a warm hour. Six steps, palest first, and
+   every surface picks an index BY HAND. */
+const R = ramp([0xF2E8BE, 0xD7DC9A, 0xA9C07C, 0x7B9A5E, 0x4C6642, 0x2C3A2E]);
+const LAND = {
+  shadow:0x3E5540, shadowDeep:0x27351F,
+  accent:0xD9693B,
+  sheen:0xF4ECBE, bloom:0xE0A7C0,
+  hazeLow:0xDCD6A2
+};
+const AIR = {
+  skyHigh:0xBFD8E2, skyLow:0xEFE3B2,
+  sun:0xFFF6D8, halo:0xFFE9AE, halo2:0xF2C78C,
+  cloud:0xFFFFFF, cloudCool:0xC9D4E2, cloudBase:0xA8B6C8,
+  haze:0xD8E2BE
+};
+const WOOL = { lit:0xFFFFFF, body:0xF0EEE2, shade:0xC6C8BC, face:0x3B3A34 };
+const COAT = { cloak:0x7C5438, cloakLit:0x9C6F4C, skin:0xC79A72, crook:0x6B5134 };
+
+const $ = id => document.getElementById(id);
+const elPhase = $('phase');
+const elFps = $('fps'), elFpsDot = $('fpsdot');
+const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
+const elReach = $('reach'), elMUp = $('mUp'), elMDn = $('mDn');
+
+function fallback(why){
+  if(why) $('fbwhy').textContent = why;
+  elGate.classList.remove('on');
+  elFall.classList.add('on');
+  $('cue').style.display = 'none';
+  elReach.style.display = elMUp.style.display = elMDn.style.display = 'none';
+  elFps.classList.add('off');
+}
+
+boot({ cdn:CDN, fallback, start });
+
+/* ============================================================ */
+function start(THREE){
+
+const canvas = $('c');
+const B = breath(PROTOCOLS.box);
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const C = h => new THREE.Color(h);
+const ramp6 = R.steps.map(C);
+
+const uTime  = { value: 0 };
+const uFill  = { value: 0 };
+const uRamp  = { value: ramp6 };
+const uFog   = { value: C(AIR.haze) };
+const uHorizon = { value: 0.5 };
+/* where the shepherd is, in world space, for anything that answers him */
+const uWalker = { value: new THREE.Vector3() };
+
+const FOG = fogGlslAA({ near: 18, rate: 0.011, steps: 5, max: 0.46 });
+const PRE_AA   = AA_GLSL;
+const PRE_RAMP = AA_GLSL + RAMP_AA_GLSL;
+const PRE_SKY  = AA_GLSL + RAMP_AA_GLSL + GRAIN_GLSL;
+const PRE      = AA_GLSL + RAMP_AA_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
+
+const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
+  canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 62 : 52, far: 600
+});
+
+/* ------------------------------------------------------------------
+   1. SKY — the warm hour, with a wash where the light is and lobed
+   cloud. No disc: a drawn sun reads as a medallion in this idiom,
+   which the reader said of Long Air's and which is why that one lost
+   it. The light is a POSITION here and the clouds are lit from it.
+   ------------------------------------------------------------------ */
+const skyU = {
+  uTime, uAspect:{value:1}, uHorizon, uRamp, uFill,
+  uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
+  uSun:{value:C(AIR.sun)}, uHalo:{value:C(AIR.halo)}, uHalo2:{value:C(AIR.halo2)},
+  uCloud:{value:C(AIR.cloud)}, uCloudCool:{value:C(AIR.cloudCool)},
+  uCloudBase:{value:C(AIR.cloudBase)}, uHaze:{value:C(AIR.haze)}
+};
+onFit(() => { skyU.uAspect.value = camera.aspect; });
+scene.add(screenQuad(THREE, {
+  uniforms: skyU, prelude: PRE_SKY + WIND_GLSL,
+  fragment:`
+    varying vec2 vUv;
+    uniform float uTime, uAspect, uHorizon, uFill;
+    uniform vec3 uSkyHigh, uSkyLow, uSun, uHalo, uHalo2;
+    uniform vec3 uCloud, uCloudCool, uCloudBase, uHaze;
+    float disc(float d, float r){ return 1.0 - aastep(r, d); }
+    void main(){
+      float h = vUv.y - uHorizon;
+      vec3 col = mix(uSkyLow, uSkyHigh, posteriseAA(h / 0.9, 5.0));
+
+      /* the light, as a wash in three hard steps rather than a disc */
+      vec2 sp = vec2(0.70, uHorizon + 0.30);
+      vec2 q = vec2((vUv.x - sp.x) * uAspect, vUv.y - sp.y);
+      float sd = length(q);
+      float glow = posteriseAA(1.0 - clamp(sd / 0.56, 0.0, 1.0), 3.0);
+      col = mix(col, uHalo2, glow * 0.30 * aastep(-0.02, h));
+      col = mix(col, uHalo,  glow * glow * 0.24 * aastep(-0.02, h));
+
+      /* five lobed clouds, lit on the face turned towards the light
+         and shaded underneath — the §4.2 treatment of a round form */
+      float drift = uTime * 0.0032 * (0.55 + 0.85 * windGust(uFill));
+      float cl = 0.0, lit = 0.0, lo = 0.0;
+      for(int i = 0; i < 5; i++){
+        float fi = float(i);
+        float cx = fract(0.11 + fi * 0.23 + drift) * 1.8 - 0.4;
+        vec2 cc = vec2(cx, uHorizon + 0.21 + fi * 0.068);
+        vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.26, vUv.y - cc.y);
+        float ang = atan(d2.y, d2.x);
+        float rr = 0.024 * (1.0 + 0.34 * sin(ang * 3.0 + fi * 2.1)
+                                + 0.17 * sin(ang * 7.0 - fi * 1.3));
+        float inLobe = disc(length(d2), rr);
+        float up = clamp(d2.y / max(rr, 1e-4) * 0.5 + 0.5, 0.0, 1.0);
+        vec2 toSun = normalize(vec2((sp.x - cc.x) * uAspect, sp.y - cc.y) + 1e-5);
+        float facing = clamp(dot(normalize(d2 + 1e-5), toSun), 0.0, 1.0);
+        cl  = max(cl,  inLobe);
+        lit = max(lit, inLobe * aastep(0.45, facing));
+        lo  = max(lo,  inLobe * (1.0 - aastep(0.34, up)));
+      }
+      float sky = aastep(0.04, h);
+      col = mix(col, uCloud,     cl  * sky);
+      col = mix(col, uCloudBase, lo  * sky * 0.55);
+      col = mix(col, uSun,       lit * sky * 0.55);
+      col = mix(col, uHaze, (1.0 - aastep(0.0, h)) * 0.62);
+      col += (grainAt(vUv * 620.0) - 0.5) * 0.020;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+}));
+
+/* ------------------------------------------------------------------
+   2. THE FAR RANGE beyond the brow — the kit's parallax bands, hand
+   assigned tiers, deliberately not following the breath.
+   ------------------------------------------------------------------ */
+const mesas = new THREE.Mesh(bands(THREE, [
+  { z:-420, base: 26, amp:13, step:5.0, seed:5,  tier:1 },
+  { z:-300, base: 19, amp: 9, step:3.8, seed:17, tier:2 },
+  { z:-210, base: 13, amp: 6, step:2.8, seed:29, tier:3 }
+], { n: 40, span: 900, skirt: -30 }), posterMat(THREE, {
+  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)} }, prelude: PRE_RAMP,
+  vertex:`
+    attribute float aTier; varying float vTier;
+    void main(){ vTier = aTier;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying float vTier; uniform vec3 uHaze;
+    void main(){
+      vec3 col = rampPick((vTier + 0.5) / 6.0);
+      gl_FragColor = vec4(mix(col, uHaze, (3.0 - vTier) / 3.0 * 0.62), 1.0);
+    }
+  `
+}));
+scene.add(mesas);
+
+/* ------------------------------------------------------------------
+   3. THE HILL
+   ------------------------------------------------------------------
+   One continuous surface. `groundAt` is in js/shepherd-breath.js and
+   is the only definition of it — the shepherd stands on it, the sheep
+   stand on it, the contact shadows are placed on it and
+   tools/continuity.mjs projects it. The fault this project keeps
+   producing is a geometry builder with its own drifted copy of the
+   terrain, so this loop does no arithmetic: it asks the module.
+
+   ROWS AND COLUMNS are set by the PIXEL BAR through this chapter's
+   own lens, not by a world-space angle — the lesson from Long Air,
+   where a four degree bar across a short segment turned out to be
+   measuring the segment length. The hill's brow against the sky is
+   the longest silhouette in the chapter and is where a polygon would
+   show first, so it is the edge the numbers are chosen for.
+   ------------------------------------------------------------------ */
+const HILL_ROWS = 132;        // along the path, 0..PATH_HI
+const HILL_COLS = 97;         // across it, -HILL_HALF..+HILL_HALF
+const HILL_HALF = 54;
+function hillGeometry(){
+  const b = builder(THREE, { aS:1, aO:1 });
+  for(let i = 0; i <= HILL_ROWS; i++){
+    const s = (i / HILL_ROWS) * PATH_HI;
+    for(let k = 0; k < HILL_COLS; k++){
+      const o = -HILL_HALF + (k / (HILL_COLS - 1)) * HILL_HALF * 2;
+      b.vertex(pathX(s) + o, groundAt(s, o), -s, { aS:s, aO:o });
+    }
+  }
+  for(let i = 0; i < HILL_ROWS; i++){
+    for(let k = 0; k < HILL_COLS - 1; k++){
+      const a = i * HILL_COLS + k, c = (i + 1) * HILL_COLS + k;
+      b.tri(a, a + 1, c);
+      b.tri(a + 1, c + 1, c);
+    }
+  }
+  return b.geometry();
+}
+const hillMat = posterMat(THREE, {
+  uniforms:{ uRamp, uFog, uTime, uFill, uWalker,
+             uShadow:{value:C(LAND.shadow)}, uShadowDeep:{value:C(LAND.shadowDeep)},
+             uSheen:{value:C(LAND.sheen)}, uBloom:{value:C(LAND.bloom)},
+             uFogLow:{value:C(LAND.hazeLow)} },
+  side: THREE.DoubleSide, prelude: PRE + WIND_GLSL,
+  vertex:`
+    attribute float aS; attribute float aO;
+    varying float vS; varying float vO; varying float vDist; varying float vY;
+    varying vec3 vW;
+    void main(){
+      vS = aS; vO = aO; vY = position.y; vW = position;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vDist = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }
+  `,
+  fragment:`
+    varying float vS; varying float vO; varying float vDist; varying float vY;
+    varying vec3 vW;
+    uniform vec3 uShadow, uShadowDeep, uSheen, uBloom, uFogLow, uWalker;
+    uniform float uTime, uFill;
+    void main(){
+      /* ==========================================================
+         THE VALUE BANDS ARE BANDS OF THE SLOPE, not of distance
+         ==========================================================
+         §4.2: a value index is a decision about what a thing IS, and
+         is never a function of how far away it is. Here the decision
+         is the hillside's own geography — the worn path, the grazed
+         shoulder either side of it, and the rough ground beyond —
+         so the bands are bands of |o|, the distance ACROSS the path,
+         and they are evaluated per fragment from a varying that is
+         genuinely linear along a row. A tone interpolated between
+         columns would draw the band boundary as a straight line
+         inside every triangle, which is the fault that made Pearl
+         Diver's water and Long Air's hillside read as triangulated.
+         ========================================================== */
+      float ao = abs(vO);
+      float tone = 0.0
+        + 1.0 * aastep(2.6,  ao)       // the worn path, to the sward
+        + 1.0 * aastep(16.0, ao)       // the sward, to the rough
+        + 1.0 * aastep(34.0, ao);      // the rough, to the far flank
+      /* and it darkens going down the flank, which IS a decision
+         about the ground and not about distance: that is where the
+         bracken is */
+      float low = 1.0 - smoothstep(-6.0, 2.0, vY - ${'${'}0${'}'});
+      vec3 col = rampPickAA((tone + 0.5) / 6.0);
+
+      /* THE GRASS, from the kit's one wind field. Same construction
+         as Long Air's: the comb is sampled at a point DISPLACED
+         along the wind so the blades lie over rather than merely
+         lightening, and it is a shift within the hill's own ramp
+         step so it can never be a different hue family. */
+      vec2 gw = vec2(vO, vS);
+      float gust = windGust(uFill);
+      /* AND THE FLOCK PARTS IT. The shepherd and his sheep are the
+         only things that touch this hillside, so the grass lies away
+         from them — the one place the world answers the figure
+         directly rather than through the breath. */
+      vec2 dw = vec2(vW.x - uWalker.x, -vW.z - (-uWalker.z));
+      float rw = length(dw);
+      float wake = 1.0 - smoothstep(0.9, 5.2, rw);
+      vec2 away = rw > 0.001 ? dw / rw : vec2(0.0, 1.0);
+      vec2 gc = gw + windLay(gw, uTime, gust) * 2.2 + away * wake * 1.9;
+      float comb = windWave(gc, uTime);
+      float grass = (0.45 + 0.55 * (1.0 - aastep(34.0, ao)))
+                  * (1.0 - smoothstep(170.0, 330.0, vDist));
+      vec3 gLit  = rampPickAA((tone - 0.5) / 6.0);
+      vec3 gDeep = rampPickAA((tone + 1.5) / 6.0);
+      col = mix(col, gLit,  grass * aastep(0.34, comb) * 0.88);
+      col = mix(col, gDeep, grass * (1.0 - aastep(-0.34, comb)) * 0.88);
+      col = mix(col, uSheen, aastep(0.62, comb) * grass * (0.06 + 0.22 * gust));
+
+      /* wildflower colour, sparse, near the path only and gone
+         before a clump could fall under a pixel */
+      vec2 cell = gw * 0.62;
+      vec2 inCell = fract(cell) - 0.5;
+      col = mix(col, uBloom,
+        step(0.90, chipAt(floor(cell)))
+        * (1.0 - aastep(0.21, length(inCell)))
+        * (1.0 - smoothstep(6.0, 26.0, ao))
+        * (1.0 - smoothstep(40.0, 90.0, vDist)) * 0.45);
+
+      /* WHAT THE GROUND IS MADE OF — the fine scale, in the fragment
+         stage where it belongs. Two folded components at 2 m and
+         0.7 m, dissolving out before either could become noise. */
+      vec2 rp = vec2(vO, vS);
+      float m1 = sin(rp.x * 3.1 + sin(rp.y * 2.7) * 1.2);
+      float m2 = sin(rp.y * 9.4 - sin(rp.x * 7.9) * 0.9);
+      float matB = posteriseAA((m1 * 0.62 + m2 * 0.38) * 0.5 + 0.5, 3.0);
+      float matFar = 1.0 - smoothstep(60.0, 150.0, vDist);
+      col = mix(col, gDeep, (1.0 - matB) * 0.15 * matFar);
+      col = mix(col, gLit,  matB * matB * 0.11 * matFar);
+
+      /* the one hard shadow split (§4.4): the light is off to the
+         right, so the left flank of the draw is in shade. A hue
+         shift into green-blue, not a darkening. */
+      float sh = 1.0 - aastep(0.0, vO);
+      col = mix(col, uShadow, sh * 0.34);
+      col = mix(col, uShadowDeep, sh * low * 0.3);
+      col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vO * 0.21))) - 0.5) * 0.07;
+
+      /* TRUE AERIAL PERSPECTIVE: the haze is a layer, warmer and
+         denser in the low ground, so the brow stands clear of the
+         bank its own flanks sink into. */
+      float lowAir = 1.0 - smoothstep(-4.0, 9.0, vY);
+      vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
+      gl_FragColor = vec4(
+        mix(col, haze, min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir))), 1.0);
+    }
+  `
+});
+const hill = new THREE.Mesh(hillGeometry(), hillMat);
+hill.frustumCulled = false;
+scene.add(hill);
+
+/* ------------------------------------------------------------------
+   4. THE FIGURES — the shepherd and five sheep
+   ------------------------------------------------------------------
+   The project's figure idiom: a dozen stretched primitives sharing a
+   handful of flat materials, no lighting (§4.2 rule 1). The one place
+   that is not enough is a ROUND form seen in silhouette, where a
+   coarse sphere shows its rings — Pearl Diver's pearl had exactly
+   that fault — so the sheep's bodies get the finer sphere and their
+   two-value split is resolved across one pixel rather than landing on
+   the grid.
+   ------------------------------------------------------------------ */
+const SPH    = new THREE.SphereGeometry(1, 16, 12);
+const SPH_HI = new THREE.SphereGeometry(1, 28, 18);
+const BOX    = new THREE.BoxGeometry(1, 1, 1);
+const mk = (geo, mat, sx, sy, sz, px, py, pz, rz) => part(THREE, geo, mat, sx, sy, sz, px, py, pz, rz);
+
+const flatMat = hex => new THREE.MeshBasicMaterial({ color: hex });
+const matCloak = flatMat(COAT.cloak), matCloakLit = flatMat(COAT.cloakLit);
+const matSkin = flatMat(COAT.skin),  matCrook = flatMat(COAT.crook);
+const matFace = flatMat(WOOL.face);
+
+/* the fleece: two values with a RESOLVED terminator, so a sheep is a
+   round thing and not a faceted one */
+const fleeceMat = posterMat(THREE, {
+  uniforms:{ uLit:{value:C(WOOL.lit)}, uBody:{value:C(WOOL.body)},
+             uShade:{value:C(WOOL.shade)} },
+  prelude: PRE_AA,
+  vertex:`
+    varying vec3 vN;
+    void main(){ vN = normalMatrix * normal;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragment:`
+    varying vec3 vN;
+    uniform vec3 uLit, uBody, uShade;
+    void main(){
+      vec3 n = normalize(vN);
+      float l = dot(n, normalize(vec3(0.62, 0.70, 0.35)));
+      vec3 col = mix(uShade, uBody, aastep(-0.05, l));
+      col = mix(col, uLit, aastep(0.52, l));
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+
+function makeShepherd(){
+  const g = new THREE.Group();
+  g.add(mk(SPH_HI, matCloak, 0.30, 0.52, 0.26,  0,  0.52, 0));      // the cloak
+  g.add(mk(SPH_HI, matCloakLit, 0.22, 0.30, 0.20, 0.10, 0.70, 0.06));
+  g.add(mk(SPH_HI, matSkin, 0.15, 0.17, 0.15,  0,  1.12, 0));       // head
+  g.add(mk(SPH,    matCloak, 0.17, 0.10, 0.17,  0,  1.22, 0));      // hat
+  g.add(mk(SPH, matSkin, 0.055, 0.30, 0.055, -0.27, 0.52, 0, 0.18));
+  g.add(mk(SPH, matSkin, 0.055, 0.30, 0.055,  0.27, 0.52, 0, -0.18));
+  const legL = mk(SPH, matCloak, 0.075, 0.34, 0.075, -0.11, 0.00, 0);
+  const legR = mk(SPH, matCloak, 0.075, 0.34, 0.075,  0.11, 0.00, 0);
+  g.add(legL); g.add(legR);
+  g.add(mk(BOX, matCrook, 0.025, 1.45, 0.025, 0.30, 0.66, 0.02, 0.05));
+  return { group: g, legL, legR };
+}
+
+function makeSheep(){
+  const g = new THREE.Group();
+  const bodyM = mk(SPH_HI, fleeceMat, 0.34, 0.26, 0.46, 0, 0.40, 0);
+  g.add(bodyM);
+  g.add(mk(SPH_HI, fleeceMat, 0.17, 0.16, 0.17, 0, 0.50, -0.42));   // the neck's wool
+  g.add(mk(SPH, matFace, 0.105, 0.12, 0.14, 0, 0.44, -0.55));       // face
+  g.add(mk(SPH, matFace, 0.045, 0.06, 0.045, -0.09, 0.56, -0.50));  // ears
+  g.add(mk(SPH, matFace, 0.045, 0.06, 0.045,  0.09, 0.56, -0.50));
+  const legs = [];
+  for(const [lx, lz] of [[-0.15,-0.26],[0.15,-0.26],[-0.15,0.24],[0.15,0.24]]){
+    const l = mk(BOX, matFace, 0.045, 0.30, 0.045, lx, 0.16, lz);
+    legs.push(l); g.add(l);
+  }
+  return { group: g, legs };
+}
+
+const shepherd = makeShepherd();
+scene.add(shepherd.group);
+const flock = [];
+for(let i = 0; i < FLOCK_N; i++){
+  const sh = makeSheep();
+  scene.add(sh.group);
+  flock.push({ ...sh, follow: tracker(WALK_LO, FLOCK_W), s: WALK_LO });
+}
+
+/* ------------------------------------------------------------------
+   4a. CONTACT SHADOWS — so they stand ON the hill
+   ------------------------------------------------------------------
+   Nothing in this scene is lit, so nothing casts anything, and
+   without this a figure is a cut-out pasted over the hillside rather
+   than standing on it. Pearl Diver learned this; it is the same disc,
+   placed at the ground's own height under each figure, in the one
+   merged mesh so six of them are one draw call.
+   ------------------------------------------------------------------ */
+const SHADOW_SEG = 20;
+function shadowGeometry(n){
+  const b = builder(THREE, { aP:2, aIdx:1 });
+  for(let i = 0; i < n; i++){
+    for(let k = 0; k < SHADOW_SEG; k++){
+      const a0 = (k / SHADOW_SEG) * Math.PI * 2;
+      const a1 = ((k + 1) / SHADOW_SEG) * Math.PI * 2;
+      const base = b.count;
+      b.vertex(0, 0, 0, { aP:[0, 0], aIdx:i });
+      b.vertex(0, 0, 0, { aP:[Math.cos(a0), Math.sin(a0)], aIdx:i });
+      b.vertex(0, 0, 0, { aP:[Math.cos(a1), Math.sin(a1)], aIdx:i });
+      b.tri(base, base + 1, base + 2);
+    }
+  }
+  return b.geometry();
+}
+const N_SHADOW = FLOCK_N + 1;
+const shadowMat = posterMat(THREE, {
+  uniforms:{ uDeepS:{value:C(LAND.shadowDeep)},
+             uAt:{value: Array.from({length:N_SHADOW}, () => new THREE.Vector3())},
+             uRad:{value: new Float32Array(N_SHADOW)} },
+  side: THREE.DoubleSide, transparent:true, depthWrite:false, prelude: PRE_AA,
+  vertex:`
+    attribute vec2 aP; attribute float aIdx;
+    uniform vec3 uAt[${N_SHADOW}];
+    uniform float uRad[${N_SHADOW}];
+    varying vec2 vP; varying float vOn;
+    void main(){
+      int i = int(aIdx + 0.5);
+      vec3 at = uAt[0]; float r = uRad[0];
+      for(int k = 0; k < ${N_SHADOW}; k++){
+        if(k == i){ at = uAt[k]; r = uRad[k]; }
+      }
+      vP = aP; vOn = r > 0.001 ? 1.0 : 0.0;
+      vec3 p = at + vec3(aP.x * r, 0.0, aP.y * r);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragment:`
+    varying vec2 vP; varying float vOn;
+    uniform vec3 uDeepS;
+    void main(){
+      float a = posteriseAA(1.0 - length(vP), 3.0) * 0.42 * vOn;
+      if(a < 0.012) discard;
+      gl_FragColor = vec4(uDeepS, a);
+    }
+  `
+});
+const shadows = new THREE.Mesh(shadowGeometry(N_SHADOW), shadowMat);
+shadows.frustumCulled = false;
+shadows.renderOrder = 1;
+scene.add(shadows);
+
+/* ------------------------------------------------------------------
+   5. THE CONTROL — hold to send him up, let go and he comes down
+   ------------------------------------------------------------------
+   One pair of booleans, exactly as every other chapter: the touch
+   does not write the position, it writes a DIRECTION, and the
+   direction goes through the kit's capped integration. So breathing
+   twice as fast buys half the walk, and reaching is worth precisely
+   what a button was worth and no more.
+   ------------------------------------------------------------------ */
+let holding = false;
+const touches = new Set();
+(function(){
+  const el = elReach;
+  const put = e => { e.preventDefault(); touches.add(e.pointerId); holding = touches.size > 0; };
+  const drop = e => { touches.delete(e.pointerId); holding = touches.size > 0; };
+  el.addEventListener('pointerdown', put);
+  el.addEventListener('pointerup', drop);
+  el.addEventListener('pointercancel', drop);
+  el.addEventListener('pointerleave', drop);
+  window.addEventListener('blur', () => { touches.clear(); holding = false; });
+})();
+
+/* HOW FAST HE WALKS WHEN NOBODY IS STEERING. Not zero — that is a
+   punishment for declining, which §1.6b rules out — and not one,
+   which would make the chapter play itself. At 0.42 he drifts up the
+   lower slope and back, always a beat behind, visibly unled. */
+const SELF_WALK = 0.42;
+
+let t = 0, started = false;
+let RATE = rates(PROTOCOLS.box);
+let WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: PATH_V_MAX * 2.2 });
+const AIM = tracker(CAM_EASE.level.look, CAM_EASE.level.ease);
+const CAMS = tracker(WALK_LO, 1.5);
+const REACH_INVITE = invite();
+let forceHold = false;
+
+const vTmp = new THREE.Vector3();
+const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
+
+/** The world point of the path at distance s, and the ground there. */
+function pathPoint(s, out){
+  return out.set(pathX(s), hillAt(s), -s);
+}
+
+/** Place a figure on the path at s, facing the way it is going. */
+function placeOnPath(group, s, dir){
+  pathPoint(s, vTmp);
+  group.position.copy(vTmp);
+  /* the heading is the path's own tangent, taken from the module
+     rather than from a stored velocity, so it is right by
+     construction at every s */
+  const h = 0.4;
+  const ax = pathX(s + h) - pathX(s - h);
+  const az = -(h * 2);
+  group.rotation.y = Math.atan2(ax * dir, az * dir);
+  /* and it leans into the slope: a figure walking a hillside is not
+     vertical, and the lean is the slope's own gradient */
+  const grad = (hillAt(s + h) - hillAt(s - h)) / (h * 2);
+  group.rotation.x = -Math.atan(grad) * 0.55 * dir;
+}
+
+const loop = clock((dt, now, running) => {
+  if(!running){ fpsTick(now, true); return; }
+  if(started) t += dt;
+
+  const st = B.at(t);
+  const ph = st.p;
+  const sched = B.value(t);
+
+  /* --- THE WALK. The schedule says where he should be; the reader's
+     hold is what actually moves him, integrated at the protocol's
+     own capped rate. The two are separate on purpose: the flock
+     records the reader's walk, not the schedule's. --- */
+  if(started && !forceHold){
+    const want = clamp01(normOf(sched));
+    const gap = want - WALKER.fill;
+    const up = holding, down = !holding;
+    const pace = holding || Math.abs(gap) > 0.02 ? 1 : SELF_WALK;
+    const cap = (up ? RATE.fillPerSec : RATE.emptyPerSec) * pace * dt;
+    if(cap > 0){
+      let move = (up ? 1 : -1) * cap;
+      /* nobody steering: he follows the cue at SELF_WALK rather than
+         sliding to the foot of the hill and staying there */
+      if(!holding && !started) move = 0;
+      WALKER.fill = clamp01(WALKER.fill + move);
+    }
+    WALKER.settle(dt);
+  } else {
+    WALKER.drive(dt, holding, !holding);
+  }
+  const s = WALKER.value;
+  uFill.value = WALKER.fill;
+  uTime.value = t;
+
+  /* --- THE FLOCK. Each sheep follows the one ahead of it, so the
+     line is the last several seconds of the reader's own pace. The
+     chain is the whole mechanic and it is three lines. --- */
+  let prev = s;
+  for(const sh of flock){
+    sh.follow.step(dt, prev);
+    sh.s = sh.follow.value;
+    prev = sh.s;
+  }
+
+  /* --- placing them, and the walk cycle. The legs swing with the
+     figure's own SPEED, so standing still is standing still — a
+     walk cycle on a timer is the thing that makes a figure read as
+     a puppet. --- */
+  const dirS = WALKER.v >= 0 ? 1 : -1;
+  placeOnPath(shepherd.group, s, 1);
+  const stride = Math.sin(t * 7.0) * clamp(Math.abs(WALKER.v) * 0.09, 0, 0.5);
+  shepherd.legL.rotation.x =  stride;
+  shepherd.legR.rotation.x = -stride;
+
+  const at = shadowMat.uniforms.uAt.value, rad = shadowMat.uniforms.uRad.value;
+  pathPoint(s, vTmp); at[0].set(vTmp.x, vTmp.y + 0.03, vTmp.z); rad[0] = 0.62;
+  for(let i = 0; i < flock.length; i++){
+    const sh = flock[i];
+    placeOnPath(sh.group, sh.s, 1);
+    /* they fan slightly off the path, so five sheep are a flock and
+       not a queue. Deterministic per sheep, never random. */
+    sh.group.position.x += Math.sin(i * 2.399) * 0.9;
+    const sv = Math.abs(sh.follow.v);
+    const sstr = Math.sin(t * 8.0 + i * 1.7) * clamp(sv * 0.08, 0, 0.45);
+    sh.legs[0].rotation.x =  sstr; sh.legs[3].rotation.x =  sstr;
+    sh.legs[1].rotation.x = -sstr; sh.legs[2].rotation.x = -sstr;
+    at[i + 1].set(sh.group.position.x, hillAt(sh.s) + 0.03, -sh.s);
+    rad[i + 1] = 0.44;
+  }
+  shadowMat.uniforms.uAt.needsUpdate = true;
+  shadowMat.uniforms.uRad.needsUpdate = true;
+  uWalker.value.set(shepherd.group.position.x, shepherd.group.position.y, -s);
+
+  /* --- THE LENS. Parked near the foot, aiming at him with a slow
+     follower so he cannot leave the frame and the tracking is not
+     the thing the reader reads. --- */
+  const E = CAM_EASE[ph.cam] || CAM_EASE.level;
+  AIM.w = E.ease;
+  AIM.step(dt, E.look);
+  CAMS.step(dt, s);
+  camera.position.set(pathX(CAM_AT) + CAM_SIDE, hillAt(CAM_AT) + CAM_UP, -CAM_AT);
+  camera.up.set(0, 1, 0);
+  pathPoint(CAMS.value + AIM.value, vTmp);
+  camera.lookAt(vTmp.x, vTmp.y + 1.0, vTmp.z);
+  ARRIVE.apply(camera, now);
+
+  vTmp.set(camera.position.x, hillAt(PATH_HI) + 6, -PATH_HI - 260).project(camera);
+  uHorizon.value = vTmp.y * 0.5 + 0.5;
+
+  /* --- the invitation, projected from where he actually is --- */
+  const reachWanted = started && ph.k !== 'hold';
+  const rInv = REACH_INVITE.step(dt, { wanted: reachWanted, taken: holding });
+  vTmp.set(shepherd.group.position.x, shepherd.group.position.y + 1.2, -s).project(camera);
+  const sy = (-vTmp.y * 0.5 + 0.5) * size.H;
+  const spread = Math.max(60, size.H * 0.16);
+  elMUp.style.top = (sy - spread).toFixed(1) + 'px';
+  elMDn.style.top = (sy + spread).toFixed(1) + 'px';
+  for(const el of [elMUp, elMDn]){
+    el.style.setProperty('--invite', rInv.invite.toFixed(3));
+    el.style.setProperty('--held',   rInv.held.toFixed(3));
+    el.style.setProperty('--after',  rInv.after.toFixed(3));
+    el.style.setProperty('--asking', rInv.asking ? '1' : '0');
+  }
+
+  /* --- THE CUE IS ONE WORD. No countdown under it: the reader
+     removed that on 6 November having lived with it, so the phase
+     word carries the whole cue and the scene has to carry the rest.
+     In this chapter it does, and visibly: the shepherd STOPS on a
+     hold and the flock walks up and closes around him, which is a
+     phase boundary you can see from across the room. --- */
+  const cue = B.cue(t);
+  if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
+
+  renderer.render(scene, camera);
+  fpsTick(now, false);
+});
+
+/* ---------- the protocol choice ---------- */
+const picked = choice({ key:'bor.shepherd.protocol.v1', valid: validChoice });
+
+function beginWith(which, remember){
+  const id = CHOICE[which];
+  B.use(PROTOCOLS[id]);
+  RATE = rates(PROTOCOLS[id]);
+  if(remember) picked.write(which);
+  elGate.classList.remove('on');
+  started = true;
+  WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: PATH_V_MAX * 2.2 });
+  WALKER.reset(normOf(B.value(0)));
+  for(const sh of flock){ sh.follow.set(WALKER.value); sh.s = WALKER.value; }
+  AIM.set(CAM_EASE.level.look); CAMS.set(WALKER.value);
+  REACH_INVITE.reset();
+  touches.clear(); holding = false; forceHold = false;
+  t = 0; subShown = '';
+  ARRIVE.start();
+  loop.resync();
+}
+$('gateHolds').addEventListener('click', () => beginWith('holds', true));
+$('gateNo').addEventListener('click',    () => beginWith('noholds', true));
+
+$('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
+$('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
+$('rescreen').addEventListener('click', () => {
+  picked.clear();
+  elHalt.classList.remove('on');
+  elGate.classList.add('on');
+  started = false; loop.running = true; t = 0;
+});
+
+WALKER.reset(normOf(B.value(0)));
+for(const sh of flock){ sh.follow.set(WALKER.value); sh.s = WALKER.value; }
+
+const ack = picked.read();
+enter(requireScroll, () => {
+  if(ack) beginWith(ack.choice, false); else elGate.classList.add('on');
+});
+
+contextGuard(canvas, {
+  onLost(){ loop.stop(); elPhase.textContent = 'paused — the graphics context was lost'; },
+  onRestored(){ resize(); loop.resync(); loop.start(); }
+});
+
+/* ---------- inspection hook ---------- */
+window.__shepherd = {
+  begin(which){ beginWith(which === 'noholds' ? 'noholds' : 'holds', false); },
+  ack: () => picked.read(),
+  scene, camera, THREE,
+  pump(dt, n){ return loop.pump(dt, n); },
+  hold(on){ holding = !!on; forceHold = false; return holding; },
+  seek(v){ t = v; },
+  now(){
+    const st = B.at(t);
+    const gaps = [];
+    let prev = WALKER.value;
+    for(const sh of flock){ gaps.push(+(prev - sh.s).toFixed(2)); prev = sh.s; }
+    return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
+             phase:st.p.k, left:+st.left.toFixed(2),
+             schedule:+B.value(t).toFixed(2),
+             fill:+WALKER.fill.toFixed(3), s:+WALKER.value.toFixed(2),
+             v:+WALKER.v.toFixed(2),
+             error:+(WALKER.value - B.value(t)).toFixed(2),
+             flock: flock.map(f => +f.s.toFixed(2)),
+             gaps, trail:+(WALKER.value - flock[flock.length-1].s).toFixed(2),
+             holding, inviteLearned: REACH_INVITE.learned };
+  },
+  links(){ return linkReport(renderer, scene, camera); },
+  solo(){ return soloReport(); },
+  probe(){ return flashMeter({ renderer, scene, camera, step: dt => loop.pump(dt, 1) }); },
+  bench(n){
+    const gl = renderer.getContext();
+    renderer.render(scene, camera); gl.finish();
+    const a = performance.now();
+    for(let i = 0; i < n; i++) renderer.render(scene, camera);
+    gl.finish();
+    return { msPerRender:(performance.now()-a)/n, n,
+             drawCalls: renderer.info.render.calls,
+             triangles: renderer.info.render.triangles };
+  },
+  where(){
+    const put = o => { const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+      return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
+               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 }; };
+    return { shepherd:put(shepherd.group), last:put(flock[flock.length-1].group),
+             horizonUv:+uHorizon.value.toFixed(3) };
+  }
+};
+
+const exits = wireExits();
+if(exits < 1) console.warn('bor: no exit link was wired on this chapter');
+
+loop.start();
+}
+</script>
+</body>
+</html>

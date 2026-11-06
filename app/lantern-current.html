@@ -37,8 +37,6 @@
     z-index:20;text-align:center;pointer-events:none;color:#EFE4CC}
   #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
     text-shadow:0 2px 20px rgba(4,5,12,.98)}
-  #sub{margin-top:8px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
-    opacity:.8;text-transform:uppercase;text-shadow:0 2px 14px rgba(4,5,12,.98)}
   #hint{margin-top:14px;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
     text-transform:uppercase;color:rgba(201,168,106,0);transition:color .8s ease}
   #hint.on{color:rgba(201,168,106,.72)}
@@ -91,9 +89,13 @@
 <div id="fpsdot" aria-hidden="true"></div>
 <div id="fps" role="status" title="Tap to hide">—</div>
 
+<!-- THE PHASE WORD IS THE WHOLE CUE — 6 November 2026.
+     The line under it was the countdown ("breathe out in 3"). The
+     reader kept it two rounds ago, saw it live, and asked for it to
+     go. §2.4's countdown-pointing-at-air is amended in the design
+     doc rather than quietly stopped being true. -->
 <div id="cue">
   <div id="phase">breathe in</div>
-  <div id="sub">the boat lifts</div>
 </div>
 <!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
      Disclosure happens once, in the warning scroll (js/scroll.js),
@@ -217,7 +219,7 @@ const NIGHT = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub');
+const elPhase = $('phase');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -1297,8 +1299,6 @@ const loop = clock((dt, now, running) => {
      the phases that point AT THE NEXT BREATH, which is §2.4. The kit
      is untouched, so a chapter that wants its flavour line back needs
      one line here and nothing else. */
-  const showSub = B.at(t).p.count ? cue.sub : '';
-  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
 
   renderer.render(scene, camera);
   fpsTick(now, false);
@@ -1361,7 +1361,7 @@ contextGuard(canvas, {
   onLost(){
     loop.stop();
     elPhase.textContent = 'paused';
-    elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+    elPhase.textContent = 'paused — the graphics context was lost';
   },
   onRestored(){ resize(); loop.resync(); loop.start(); }
 });

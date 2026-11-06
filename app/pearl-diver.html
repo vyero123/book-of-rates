@@ -47,8 +47,6 @@
     z-index:20;text-align:center;pointer-events:none;color:#F2E3C8}
   #phase{font:300 26px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
     text-shadow:0 2px 16px rgba(20,10,14,.9)}
-  #sub{margin-top:9px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
-    opacity:.7;text-transform:uppercase;text-shadow:0 2px 12px rgba(20,10,14,.9)}
   #note{position:fixed;left:0;right:0;bottom:max(14px,calc(env(safe-area-inset-bottom) + 6px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(242,227,200,.5);letter-spacing:.06em;padding:0 20px;pointer-events:none;
@@ -100,7 +98,12 @@
 <div id="fps" role="status" title="Tap to hide">—</div>
 
 <div id="upnote">touch to come up</div>
-<div id="cue"><div id="phase">breathe in</div><div id="sub">above the water</div></div>
+<!-- THE PHASE WORD IS THE WHOLE CUE — 6 November 2026.
+     The line under it was the countdown ("breathe out in 3"). The
+     reader kept it two rounds ago, saw it live, and asked for it to
+     go. §2.4's countdown-pointing-at-air is amended in the design
+     doc rather than quietly stopped being true. -->
+<div id="cue"><div id="phase">breathe in</div></div>
 <!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
      Disclosure happens once, in the warning scroll (js/scroll.js),
      which sits between the cover and the book and which every reader
@@ -264,7 +267,7 @@ const AIR = {
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
 const elUpNote = $('upnote');
-const elPhase = $('phase'), elSub = $('sub');
+const elPhase = $('phase');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -2094,8 +2097,6 @@ const loop = clock((dt, now, running) => {
      the phases that point AT THE NEXT BREATH, which is §2.4. The kit
      is untouched, so a chapter that wants its flavour line back needs
      one line here and nothing else. */
-  const showSub = B.at(t).p.count ? cue.sub : '';
-  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
 
   renderer.render(scene, camera);
   fpsTick(now, false);
@@ -2148,7 +2149,7 @@ contextGuard(canvas, {
   onLost(){
     loop.stop();
     elPhase.textContent = 'paused';
-    elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+    elPhase.textContent = 'paused — the graphics context was lost';
   },
   onRestored(){ resize(); loop.resync(); loop.start(); }
 });

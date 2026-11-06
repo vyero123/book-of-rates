@@ -503,7 +503,7 @@ export const TREES = Array.from({ length: TREE_N }, (_, i) => {
     /* all of them lean the same way, because a prevailing wind is
        what bends a treeline and trees leaning at random would read
        as damage rather than as weather. +x is downwind: it is the
-       sign of WIND.DIR_X in js/long-air-wind.js. */
+       sign of WIND.DIR_X in js/wind.js. */
     lean: (0.30 + r(2749) * 0.24) * T,
     seed: (i * 1.91) % 6.283
   };

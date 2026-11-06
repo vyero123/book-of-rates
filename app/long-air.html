@@ -32,8 +32,6 @@
     z-index:20;text-align:center;pointer-events:none;color:#FFF6DC}
   #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
     text-shadow:0 2px 16px rgba(23,42,48,.85)}
-  #sub{margin-top:8px;font:500 10px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
-    opacity:.82;text-transform:uppercase;text-shadow:0 2px 12px rgba(23,42,48,.85)}
   #note{position:fixed;left:0;right:0;bottom:max(100px,calc(env(safe-area-inset-bottom) + 92px));
     z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
     color:rgba(255,246,220,.72);letter-spacing:.06em;padding:0 20px;pointer-events:none;
@@ -120,7 +118,12 @@
 <div id="fpsdot" aria-hidden="true"></div>
 <div id="fps" role="status" title="Tap to hide">—</div>
 
-<div id="cue"><div id="phase">breathe in</div><div id="sub">let it climb</div></div>
+<!-- THE PHASE WORD IS THE WHOLE CUE — 6 November 2026.
+     The line under it was the countdown ("breathe out in 3"). The
+     reader kept it two rounds ago, saw it live, and asked for it to
+     go. §2.4's countdown-pointing-at-air is amended in the design
+     doc rather than quietly stopped being true. -->
+<div id="cue"><div id="phase">breathe in</div></div>
 <!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
      Disclosure happens once, in the warning scroll (js/scroll.js),
      which sits between the cover and the book and which every reader
@@ -259,14 +262,14 @@ import { body, drag } from './js/course.js';
 import { lens } from './js/long-air-lens.js';
 /* ONE WIND OVER THE WHOLE PLATEAU — 3 November 2026.
    The detail pass adds several soft layers at once, and they are all
-   driven by the single field in js/long-air-wind.js rather than by one
+   driven by the single field in js/wind.js rather than by one
    noise function each. Pearl Diver's strongest move was that one light
    field lights the Snell window, the shafts and the seabed, so the
    reader sees one phenomenon in three places instead of three effects;
    this is the same argument applied to air. It is also the safe
    construction: independent per-element noise is unbounded curvature,
    which is exactly what had to be taken out of the gate lip. */
-import { WIND_GLSL } from './js/long-air-wind.js';
+import { WIND_GLSL } from './js/wind.js';
 /* THE CLOUDS ARE THEIR OWN FIELD NOW — 6 November 2026. They were the
    gates' upper lip, which made appearance and mechanic the same
    object and the sky a corrugation at the breath's own rhythm. See
@@ -358,7 +361,7 @@ const AIR = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub');
+const elPhase = $('phase');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 const elReach = $('reach'), elMUp = $('mUp'), elMDn = $('mDn');
@@ -881,7 +884,7 @@ const rockMat = posterMat(THREE, {
        without anything to measure — which is the same reason the value
        bands moved down here on 3 November.
 
-       THE COMB IS THE WIND, NOT A TEXTURE. js/long-air-wind.js defines
+       THE COMB IS THE WIND, NOT A TEXTURE. js/wind.js defines
        one field for the whole chapter; the grass samples it at a point
        DISPLACED along the wind, so the blades lie over rather than
        merely lightening and darkening in place. The displacement grows
@@ -3354,8 +3357,6 @@ const loop = clock((dt, now, running) => {
      ================================================================== */
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
-  const showSub = !!ph.count ? cue.sub : '';
-  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
 
   renderer.render(scene, camera);
   fpsTick(now, false);
@@ -3424,7 +3425,7 @@ contextGuard(canvas, {
   onLost(){
     loop.stop();
     elPhase.textContent = 'paused';
-    elSub.textContent = 'the graphics context was lost'; subShown = elSub.textContent;
+    elPhase.textContent = 'paused — the graphics context was lost';
   },
   onRestored(){ resize(); loop.resync(); loop.start(); }
 });

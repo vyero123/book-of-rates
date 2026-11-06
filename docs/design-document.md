@@ -549,6 +549,38 @@ enjoys the pearl diver is being trained that holding their breath is pleasant an
 Some fraction of them will be in a pool at some point. That's the real reason to keep the
 ceiling low and the framing pointed at surfacing.
 
+#### 2.4b The countdown is gone — amendment, 6 November 2026
+
+*Added by the author, who kept the countdown when the chapter copy was stripped two
+rounds earlier, lived with it, and then asked for it to go. It amends the countdown
+clauses of §2.4 and of the box-breathing argument above; the original reasoning stays
+standing, as this document's method requires.*
+
+> **The phase word is the whole cue. There is no counter under it.**
+
+What §2.4 asked the countdown to do was real and is worth restating before it is removed:
+a duration shown as time ELAPSED makes the hold a number the reader owns and tempts them
+to beat it, so the one on screen pointed the other way — at the next breath, at air. That
+argument was about which DIRECTION a counter points. It was never an argument that a
+counter has to exist.
+
+And the thing it was protecting against is unchanged and now structural rather than
+written. The holds are still set by the app, still exactly equal to the other phases, and
+still never lengthen. No duration is shown anywhere, which is a stronger statement than
+showing one that points the right way: there is now no number on screen at all, in any
+chapter, so there is nothing to own, beat, or compare. §2.4's "nothing that makes duration
+a number the user owns" is satisfied more completely by this than it was by the countdown.
+
+**What this moves onto the scene, and the one chapter where that is a question.** With no
+counter, the phase boundary has to be visible in the picture. Three of the four carry it
+plainly: Pearl Diver turns the diver at the surface and starts the bubbles on the exhale,
+Long Air reverses the kite's climb and the whole frame's motion with it, The Shepherd stops
+the walk dead and lets the flock close around him. **Bamboo Rain is the weak one** — its
+breath drives the rain's radius, which eases rather than turns, so the moment the phase
+changes is the moment a gradual thing changes direction, and that is the hardest kind of
+boundary to see. It is noted here rather than fixed, because fixing it is a change to that
+chapter's scene and not to this rule.
+
 ### 2.4a Retention as a locked future feature
 
 > **Status note, 23 Oct 2026.** Superseded for the pearl diver only, by the amendment at
