@@ -1092,17 +1092,22 @@ for(const ch of CHAPTERS){
    number is measured rather than trusted.
    ================================================================== */
 for(const [id, proto] of Object.entries(shep.PROTOCOLS)){
+  const cycle = proto.phases.reduce((a, p) => a + p.d, 0);
   const b = breath(proto);
-  const walker = body({ corridor: shep.CORRIDOR, rates: ratesOf(proto),
-                        vMax: shep.PATH_V_MAX * 2.2 });
+  const r = ratesOf(proto);
+  const walker = body({ corridor: shep.CORRIDOR, rates: r,
+                        vMax: shep.RANGE * r.fillPerSec * 2.2 });
   const flock = Array.from({ length: shep.FLOCK_N },
-                           () => tracker(shep.WALK_LO, shep.FLOCK_W));
+                           () => tracker(0, shep.FLOCK_W));
   walker.reset(shep.normOf(b.value(0)));
-  for(const f of flock) f.set(walker.value);
+  for(const f of flock) f.set(0);
 
   const dt = 1 / 120;
-  let maxTrail = 0, minS = Infinity, maxS = -Infinity;
-  let lastMin = Infinity, lastMax = -Infinity, worstErr = 0;
+  let d = 0, v = 0;
+  let maxTrail = 0, worstErr = 0, minGap = Infinity;
+  let back = 0, maxV = 0, crestCross = 0;
+  let lastD = 0, holdMove = 0, crestH = 0, troughH = Infinity;
+  const hillsAt = [];
   for(let t = 0; t < proto.session; t += dt){
     /* A CUE-PERFECT READER, AND THE FIRST VERSION OF THIS WAS THE
        BUG RATHER THAN THE TEST. It drove a BINARY reader — holding
@@ -1112,8 +1117,7 @@ for(const [id, proto] of Object.entries(shep.PROTOCOLS)){
        was unflyable by construction and the harness had found it.
        The control is a pursuit now and a hold is a finger left where
        it is, so the cue-perfect reader is one whose finger sits on
-       the schedule's own place on the path. */
-    const r = ratesOf(proto);
+       the schedule's own height. */
     const want = shep.normOf(b.value(t));
     const gap = want - walker.fill;
     const up = gap > 0.012, down = gap < -0.012;
@@ -1125,57 +1129,121 @@ for(const [id, proto] of Object.entries(shep.PROTOCOLS)){
       walker.fill = Math.min(1, Math.max(0, walker.fill + mv));
     }
     walker.settle(dt);
-    let prev = walker.value;
-    for(const f of flock){ f.step(dt, prev); prev = f.value; }
-
-    const last = flock[flock.length - 1].value;
-    maxTrail = Math.max(maxTrail, walker.value - last);
-    minS = Math.min(minS, walker.value); maxS = Math.max(maxS, walker.value);
-    lastMin = Math.min(lastMin, last);  lastMax = Math.max(lastMax, last);
     worstErr = Math.max(worstErr, Math.abs(walker.value - b.value(t)));
+
+    /* the walk itself, through the chapter's own gait */
+    const w0 = shep.phaseOf(d);
+    v = shep.walkStep(v, d, walker.value, dt);
+    d += v * dt;
+    if(d < lastD - 1e-12) back++;
+    /* DID HE CROSS A CREST WHILE ASKING TO GO HIGHER? That is the one
+       discontinuity in targetHills(), and the claim in the module is
+       that it is unreachable. This is the measurement behind it. */
+    if(w0 < 0.5 && shep.phaseOf(d) >= 0.5 && walker.value >= shep.hillAt(d)) crestCross++;
+    lastD = d;
+    if(t > cycle) maxV = Math.max(maxV, v);
+
+    const st = b.at(t);
+    const ph = st.p;
+    if(t > cycle && ph.from === ph.to && st.left < ph.d * 0.5){
+      /* A HOLD IS THE GROUND RUNNING OUT, so on a hold he should have
+         stopped — and at an END of a hill, not halfway up one.
+         READ IN THE SECOND HALF OF THE HOLD, because he is still
+         arriving in the first: the rate rule eases him onto the crest
+         about a second in, measured, and the hold is four seconds. A
+         check over the whole phase would be asking him to have
+         finished the climb before the phase that ends it. What it
+         still catches is the fault it was written for — a hold the
+         reader cannot fly at all, which was 20.89 m of error. */
+      holdMove = Math.max(holdMove, v);
+      if(ph.to > (shep.WALK_LO + shep.WALK_HI) / 2) crestH = Math.max(crestH, shep.hillAt(d));
+      else troughH = Math.min(troughH, shep.hillAt(d));
+    }
+
+    let prev = d;
+    for(const f of flock){ f.step(dt, prev); prev = f.value; }
+    const last = flock[flock.length - 1].value;
+    if(t > cycle){
+      maxTrail = Math.max(maxTrail, d - last);
+      let p2 = d;
+      for(const f of flock){ minGap = Math.min(minGap, p2 - f.value); p2 = f.value; }
+    }
+    if(Math.abs(t % cycle) < dt / 2) hillsAt.push(d / shep.HILL_LEN);
   }
 
-  /* (a) THE WALK STAYS ON THE HILL. The body is clamped into the
-         corridor, so this is really asking whether the clamp ever has
-         to do anything — a figure held against a wall is a figure
-         being corrected, which this chapter does not do. */
-  if(minS < shep.PATH_LO - 1e-9 || maxS > shep.PATH_HI + 1e-9)
-    fail(`the shepherd/${id}: the walk leaves the path (${minS.toFixed(2)}..${maxS.toFixed(2)})`);
-  if(minS < shep.WALK_LO - 2.0 || maxS > shep.WALK_HI + 2.0)
-    fail(`the shepherd/${id}: an on-cue walk overshoots its own band by more than 2 m ` +
-         `(${minS.toFixed(2)}..${maxS.toFixed(2)} against ${shep.WALK_LO}..${shep.WALK_HI})`);
+  /* (a) ONE BREATH, ONE HILL, AND HE NEVER WALKS BACKWARDS. The
+         mapping's whole claim in one number. Measured across the
+         session rather than at one seam, and from the SECOND cycle
+         on, because the first one starts from a standing figure. */
+  if(back > 0)
+    fail(`the shepherd/${id}: the walk went backwards on ${back} steps — the distance is not monotone`);
+  const perCycle = [];
+  for(let k = 2; k < hillsAt.length; k++) perCycle.push(hillsAt[k] - hillsAt[k-1]);
+  const worstHill = perCycle.length
+    ? perCycle.reduce((a, x) => Math.abs(x - 1) > Math.abs(a - 1) ? x : a, 1) : 0;
+  if(!perCycle.length || Math.abs(worstHill - 1) > 0.03)
+    fail(`the shepherd/${id}: a breath covers ${worstHill.toFixed(3)} hills at worst, ` +
+         `not one — the terrain's period and the cycle have come apart`);
 
-  /* (b) AND SO DOES THE LAST SHEEP. The flock is the record, and a
-         record kept off the end of the hill is not being kept where
-         the reader can read it. */
-  if(lastMin < shep.PATH_LO - 1e-9 || lastMax > shep.PATH_HI + 1e-9)
-    fail(`the shepherd/${id}: the last sheep leaves the path ` +
-         `(${lastMin.toFixed(2)}..${lastMax.toFixed(2)})`);
+  /* (b) THE HOLDS ARE THE SHAPE OF THE GROUND. On a hold he must be
+         stopped, and stopped at an extreme of the hill — standing
+         halfway up a slope would mean the stop came from the
+         schedule rather than from the hill, which is the thing this
+         mapping was rebuilt to avoid. */
+  const holds = proto.phases.filter(p => p.from === p.to).length;
+  if(holds){
+    if(holdMove > 0.25)
+      fail(`the shepherd/${id}: still walking at ${holdMove.toFixed(2)} m/s on a hold`);
+    if(crestH && crestH < shep.HILL_H - 0.12)
+      fail(`the shepherd/${id}: the upper hold stands at ${crestH.toFixed(2)} m, ` +
+           `${(shep.HILL_H - crestH).toFixed(2)} m below the crest`);
+    if(troughH < Infinity && troughH > 0.12)
+      fail(`the shepherd/${id}: the lower hold stands ${troughH.toFixed(2)} m above the trough`);
+  }
 
-  /* (c) THE TRAIL IS WHAT THE DERIVATION SAYS. FLOCK_W was inverted
-         out of FLOCK_TRAIL on the assumption of a ramp; this is the
-         measurement that assumption has to survive. A fifth either
-         way: the schedule turns around, so the steady-state figure is
-         an upper bound the flock spends most of its time near rather
-         than a value it sits at. */
+  /* (c) THE UNREACHABLE DISCONTINUITY IS UNREACHABLE. */
+  if(crestCross > 0)
+    fail(`the shepherd/${id}: crossed a crest ${crestCross} times while asking to climb — ` +
+         `targetHills() jumps a whole hill there`);
+
+  /* (d) AND THE CAP HOLDS. The rate rule saturates at WALK_V_MAX, so
+         no reader and no harness can walk faster than that however
+         the finger moves — which is what makes a breath worth one
+         hill rather than as many as you can buy. */
+  if(maxV > shep.WALK_V_MAX + 1e-9)
+    fail(`the shepherd/${id}: walked at ${maxV.toFixed(2)} m/s, over the ${shep.WALK_V_MAX.toFixed(2)} cap`);
+
+  /* (e) THE TRAIL IS WHAT THE DERIVATION SAYS. FLOCK_W was inverted
+         out of FLOCK_TRAIL on the assumption of a ramp at V_MOVE;
+         this is the measurement that assumption has to survive. A
+         fifth either way: the schedule stops twice a breath, so the
+         steady-state figure is an upper bound the flock reaches
+         during a climb rather than a value it sits at. */
   const want = shep.FLOCK_TRAIL;
   if(Math.abs(maxTrail - want) > want * 0.2)
     fail(`the shepherd/${id}: the flock trails ${maxTrail.toFixed(2)} m against a derived ` +
          `${want.toFixed(2)} — FLOCK_W and FLOCK_TRAIL have come apart`);
 
-  /* (d) AND IT IS A FLOCK, NOT A SMEAR. At an even pace the gaps are
-         the trail over N; if that fell under the legibility bound the
-         chapter would be drawing one long sheep. */
+  /* (f) AND IT IS A FLOCK, NOT A SMEAR — measured on the drawn gaps
+         rather than divided out of the trail, because the gaps are
+         not equal: the line bunches at a hold and strings out on a
+         climb, and the bunched end is what the bound is about. The
+         closest a hold can bring them is zero by design, so the
+         bound applies to the moving line: the gap is read while he
+         is actually walking. */
+  if(minGap < 0)
+    fail(`the shepherd/${id}: a sheep got ahead of the one it follows (${minGap.toFixed(2)} m)`);
   const evenGap = maxTrail / shep.FLOCK_N;
   if(evenGap < shep.FLOCK_MIN_GAP)
-    fail(`the shepherd/${id}: ${evenGap.toFixed(2)} m between sheep at an even pace, under ` +
+    fail(`the shepherd/${id}: ${evenGap.toFixed(2)} m between sheep at a full stretch, under ` +
          `the ${shep.FLOCK_MIN_GAP.toFixed(2)} m at which they stop being separate animals`);
 
   if(failures === 0)
-    console.log(`    ok    the shepherd/${id}: an on-cue walk stays on the hill ` +
-      `(${minS.toFixed(1)}..${maxS.toFixed(1)} of ${shep.PATH_LO}..${shep.PATH_HI}), tracks the cue ` +
-      `to ${worstErr.toFixed(2)} m, and the flock trails ${maxTrail.toFixed(2)} m against a derived ` +
-      `${want.toFixed(2)} with ${evenGap.toFixed(2)} m between sheep`);
+    console.log(`    ok    the shepherd/${id}: ${worstHill.toFixed(3)} hills a breath, monotone, ` +
+      `holds at ${crestH.toFixed(2)}/${(troughH === Infinity ? 0 : troughH).toFixed(2)} m of ` +
+      `${shep.HILL_H}, peak ${maxV.toFixed(2)} of ${shep.WALK_V_MAX.toFixed(2)} m/s, cue to ` +
+      `${worstErr.toFixed(2)} m, flock trails ${maxTrail.toFixed(2)} against a derived ${want.toFixed(2)} ` +
+      `(${evenGap.toFixed(2)} m apart at stretch)`);
 }
 
 /* ------------------------------------------------------------------

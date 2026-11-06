@@ -283,7 +283,25 @@ const EXPECTED = {
      kiteScreen, the difference, is, and it is judged everywhere kiteY
      used to be. kiteY stays in the report because a change in it is
      worth seeing and because it is half of the number that matters. */
-  kiteY: 'world-frame height; the lens follows it — kiteScreen is what moves on screen and is judged'
+  kiteY: 'world-frame height; the lens follows it — kiteScreen is what moves on screen and is judged',
+  /* ADDED 7 November 2026, for the Shepherd's gait.
+
+     `walkV` is the shepherd's walking RATE, so its velocity jump is
+     an ACCELERATION and its units are not the units this file's
+     thresholds are in. It is allowed to step, by design and in one
+     direction only: the gait lags the accelerations and does NOT lag
+     the decelerations, because lagging both makes him overshoot the
+     place he is walking to, and he cannot walk back — the measured
+     consequence was 2.94 hills a breath instead of one. So arriving
+     somewhere and stopping is a step in this field, peaking at
+     12.8 m/s^2 on the no-holds protocol as a figure reaches a crest,
+     and it is the right shape rather than a defect.
+
+     What it is responsible for is judged: `walk` is the position it
+     integrates to, and `shepScreen` is where that puts him in the
+     frame given a lens that trails him. Both are measured here and
+     both have to pass. */
+  walkV: 'the walking rate; its jump is an acceleration — `walk` and `shepScreen` are what move and are judged'
 };
 
 /* ------------------------------------------------------------------
@@ -938,15 +956,17 @@ function sampleShepherd(clk){
   const proto = SHEP.PROTOCOLS.box;
   const b = breath(proto);
   const R = rates(proto);
-  const W = body({ corridor: SHEP.CORRIDOR, rates: R, vMax: SHEP.PATH_V_MAX * 2.2 });
+  const W = body({ corridor: SHEP.CORRIDOR, rates: R,
+                   vMax: SHEP.RANGE * R.fillPerSec * 2.2 });
   const flock = Array.from({ length: SHEP.FLOCK_N },
-                           () => tracker(SHEP.WALK_LO, SHEP.FLOCK_W));
+                           () => tracker(0, SHEP.FLOCK_W));
   const aim = tracker(SHEP.CAM_EASE.level.look, SHEP.CAM_EASE.level.ease);
-  const cams = tracker(SHEP.WALK_LO, 1.5);
+  const camd = tracker(0, SHEP.CAM_W);
   W.reset(SHEP.normOf(b.value(0)));
-  for(const f of flock) f.set(W.value);
-  let t = 0, wall = 0;
-  const S = { walk:[], sheep1:[], sheepLast:[], trail:[], camAim:[], camAt:[] };
+  for(const f of flock) f.set(0);
+  let t = 0, wall = 0, d = 0, v = 0;
+  const S = { wantH:[], walkV:[], walk:[], sheep1:[], sheepLast:[], trail:[],
+              camAim:[], camAt:[], shepScreen:[] };
   for(const dt of clk){
     t += dt; wall += dt;
     const ph = b.at(t).p;
@@ -963,16 +983,33 @@ function sampleShepherd(clk){
       W.fill = Math.min(1, Math.max(0, W.fill + mv));
     }
     W.settle(dt);
-    let prev = W.value;
+    /* THE GAIT, which is new and is this chapter's own integrator:
+       a one-sided first-order lag on the walking rate, applied as
+       1 - exp(-dt/tau) so a step response is the same at any frame
+       rate. The dt/tau version of exactly this is what made 58 fps
+       look worse than 60 in Long Air, so it is judged here rather
+       than asserted in a comment. */
+    v = SHEP.walkStep(v, d, W.value, dt);
+    d += v * dt;
+    let prev = d;
     for(const f of flock){ f.step(dt, prev); prev = f.value; }
     const E = SHEP.CAM_EASE[ph.cam] || SHEP.CAM_EASE.level;
-    aim.w = E.ease; aim.step(dt, E.look); cams.step(dt, W.value);
-    S.walk.push     ({ t: wall, v: W.value });
+    aim.w = E.ease; aim.step(dt, E.look); camd.step(dt, d);
+    /* AND WHERE HE IS IN THE FRAME, which is the quantity the reader
+       actually sees: the lens TRAILS him, so his screen position is
+       the difference between two independently damped things and a
+       deviation in either shows up here. Long Air learned that the
+       world-frame height is not the judged field — the screen one
+       is. */
+    S.wantH.push    ({ t: wall, v: W.value });
+    S.walkV.push    ({ t: wall, v });
+    S.walk.push     ({ t: wall, v: d });
     S.sheep1.push   ({ t: wall, v: flock[0].value });
     S.sheepLast.push({ t: wall, v: flock[flock.length-1].value });
-    S.trail.push    ({ t: wall, v: W.value - flock[flock.length-1].value });
+    S.trail.push    ({ t: wall, v: d - flock[flock.length-1].value });
     S.camAim.push   ({ t: wall, v: aim.value });
-    S.camAt.push    ({ t: wall, v: cams.value });
+    S.camAt.push    ({ t: wall, v: camd.value - SHEP.CAM_BACK });
+    S.shepScreen.push({ t: wall, v: d - (camd.value - SHEP.CAM_BACK) });
   }
   return S;
 }
@@ -989,7 +1026,9 @@ say('THE SHEPHERD — the walk, the chain, and the lens');
       `${(rb.stepRatio === Infinity ? 'inf' : rb.stepRatio.toFixed(1)).padStart(9)}  ` +
       `${(rb.dvRatio === Infinity ? 'inf' : rb.dvRatio.toFixed(1)).padStart(9)}  ` +
       `${rb.maxDV.toFixed(3).padStart(9)}   ${r.kind}   fr x${r.frRatio === Infinity ? 'inf' : r.frRatio.toFixed(2)}`;
-    if(r.fails) bad(line); else ok(line);
+    if(EXPECTED[k])  say('  --    ' + line + `   EXPECTED: ${EXPECTED[k]}`);
+    else if(r.fails) bad(line);
+    else             ok(line);
   }
   /* AND THE CHAIN MUST NOT AMPLIFY. The whole hazard of followers
      feeding followers is that the tail is worse than the head; if it

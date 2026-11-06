@@ -1264,125 +1264,209 @@ say('THE PAGE AGAINST THE MODULE — one definition, not two that can drift');
    looks like success.
    ================================================================== */
 say('');
-say('THE SHEPHERD — the hill, through its own lens');
+say('THE SHEPHERD — the hills, through its own travelling lens');
 {
   /* the fields first: smooth under refinement, or the mesh cannot be
-     fixed by subdividing it however many rows are thrown at it */
+     fixed by subdividing it however many rows are thrown at it.
+
+     THE SWEEPS RUN OVER THE WHOLE STRIP AND THROUGH ZERO ON BOTH
+     AXES. Along the walk that matters because the strip is scrolled
+     and its ends meet — a term whose period does not divide
+     PATH_PERIOD is a step dragged through the frame once a lap, and
+     the sweep covers the join. Across, it matters because the kink
+     the first build had was exactly at o = 0, on the line the camera
+     is always pointed at, and a classifier that cannot reach the
+     defect reports smooth. */
   for(const [name, f] of [
     ['hillAt   (the path)',   x => SH.hillAt(x)],
     ['pathX    (the drift)',  x => SH.pathX(x)],
     ['groundAt (o = 0)',      x => SH.groundAt(x, 0)],
     ['groundAt (o = 18)',     x => SH.groundAt(x, 18)],
-    ['groundAt across, s=20', o => SH.groundAt(20, o)],
-    ['groundAt across, s=36', o => SH.groundAt(36, o)]
+    ['groundAt across, d=7',  o => SH.groundAt(7, o)],
+    ['groundAt across, d=31', o => SH.groundAt(31, o)]
   ]){
-    /* THE ACROSS SWEEPS RUN THROUGH ZERO. They used to run 0 upward,
-       which is the half of the hillside with no path down the middle
-       of it — and the kink the first build had was exactly at o = 0.
-       A classifier that cannot reach the defect reports smooth. */
     const across = name.includes('across');
     const r = across ? classify(f, -40, 40, 0.3)
-                     : classify(f, 0, SH.PATH_HI, 0.35);
+                     : classify(f, -SH.PATH_PERIOD * 0.2, SH.PATH_PERIOD * 1.2, 0.35);
     const line = `${name.padEnd(26)} ${r.kind.padEnd(11)} ` +
                  `slope x${String(r.slopeGrowth).padStart(5)}  curv x${String(r.curvGrowth).padStart(6)}`;
     if(r.kind === 'smooth') ok(line); else bad(line);
   }
 
-  /* the lens: parked at the foot, aiming up the path */
+  /* THE STRIP CLOSES ON ITSELF. Everything above is smooth, but
+     smooth is not the same as PERIODIC IN PATH_PERIOD, and the scroll
+     needs the second thing: the row at d = PATH_PERIOD is drawn as
+     the row at d = 0, so any mismatch in value or slope between them
+     is a crease at the wrap. Centred differences, because the seam
+     check in Long Air once failed a field that is exactly periodic
+     by construction and the fault was its own one-sided truncation
+     error. */
+  {
+    const P = SH.PATH_PERIOD, e = 0.05;
+    let worstV = 0, worstS = 0;
+    for(const o of [-40, -9, 0, 9, 40]){
+      const g = d => SH.groundAt(d, o);
+      worstV = Math.max(worstV, Math.abs(g(P) - g(0)));
+      const s0 = (g(e) - g(-e)) / (2*e), s1 = (g(P+e) - g(P-e)) / (2*e);
+      worstS = Math.max(worstS, Math.abs(s1 - s0));
+    }
+    const wx = Math.abs(SH.pathX(P) - SH.pathX(0));
+    const line = `the strip closes: worst value gap ${worstV.toExponential(1)} m, ` +
+                 `slope gap ${worstS.toExponential(1)}, pathX gap ${wx.toExponential(1)} m`;
+    if(worstV < 1e-9 && worstS < 1e-7 && wx < 1e-9) ok(line);
+    else bad(line + '  — the wrap is a crease once a lap');
+  }
+
+  /* ------------------------------------------------------------------
+     THE LENS, which now TRAVELS. It is off to the side, low, and
+     trailing him, so there is no single pose to read the hill from —
+     the hill's worst knot is at a different range depending on where
+     in a hill he is standing. So the sweep is run at three poses
+     spanning a hill and the worst of them is reported. The projector
+     is proved against two known cases before any of its numbers are
+     believed, exactly as Long Air's is: a silently broken projector
+     reports SMALL sagittas, which looks like success.
+     ------------------------------------------------------------------ */
   const ASPECT_S = 375 / 812;
   const FOV_S = ASPECT_S < 0.75 ? 62 : 52;
-  const CAM = [SH.pathX(SH.CAM_AT) + SH.CAM_SIDE,
-               SH.hillAt(SH.CAM_AT) + SH.CAM_UP,
-               -SH.CAM_AT];
-  /* it aims at the middle of the walk, which is where it spends most
-     of a session and where the hill fills most of the frame */
-  const AIMS = (SH.WALK_LO + SH.WALK_HI) / 2;
-  const LOOK = [SH.pathX(AIMS), SH.hillAt(AIMS) + 1.0, -AIMS];
-  const f = [LOOK[0]-CAM[0], LOOK[1]-CAM[1], LOOK[2]-CAM[2]];
-  const fl = Math.hypot(...f); for(let i = 0; i < 3; i++) f[i] /= fl;
-  const rr = [f[2], 0, -f[0]];
-  const rl = Math.hypot(...rr) || 1; for(let i = 0; i < 3; i++) rr[i] /= rl;
-  const uu = [rr[1]*f[2]-rr[2]*f[1], rr[2]*f[0]-rr[0]*f[2], rr[0]*f[1]-rr[1]*f[0]];
   const FY_S = 1 / Math.tan(FOV_S / 2 * Math.PI / 180);
-  const projS = (x, y, z) => {
-    const d = [x-CAM[0], y-CAM[1], z-CAM[2]];
-    const vz = d[0]*f[0] + d[1]*f[1] + d[2]*f[2];
-    if(vz <= 0.2) return null;
-    const vx = d[0]*rr[0] + d[1]*rr[1] + d[2]*rr[2];
-    const vy = d[0]*uu[0] + d[1]*uu[1] + d[2]*uu[2];
-    return [((FY_S/ASPECT_S)*vx/vz * 0.5 + 0.5) * 375,
-            (1 - (FY_S*vy/vz * 0.5 + 0.5)) * 812, vz];
-  };
-  const onS = q => q && q[0] > -60 && q[0] < 435 && q[1] > -60 && q[1] < 872;
-  const sagS = (A, P, Cc) => {
-    const a2 = projS(...A), p2 = projS(...P), c2 = projS(...Cc);
-    if(!a2 || !p2 || !c2 || !onS(a2) || !onS(p2) || !onS(c2)) return null;
-    const ex = c2[0]-a2[0], ey = c2[1]-a2[1];
-    const L = Math.hypot(ex, ey); if(L < 1e-6) return null;
-    return { px: Math.abs((p2[0]-a2[0])*ey - (p2[1]-a2[1])*ex) / L, dist: p2[2] };
-  };
+  const page = readFileSync(new URL('../app/shepherd.html', import.meta.url), 'utf8');
+  const ROWS = +(page.match(/const HILL_ROWS = (\d+)/) || [])[1];
+  const COLS = +(page.match(/const HILL_COLS = (\d+)/) || [])[1];
+  const HALF = +(page.match(/const HILL_HALF = (\d+)/) || [])[1];
+  const BEHIND = +(page.match(/const BEHIND = ([\d.]+)/) || [])[1];
+  if(!ROWS || !COLS || !HALF || !BEHIND)
+    bad('shepherd: could not read the hill mesh resolution out of the page');
 
-  /* PROVE IT FIRST */
+  /** Build the page's lens for a shepherd standing at D0. The world
+   *  is placed relative to him — z = -(d - D0) — which is what the
+   *  page does, so the ranges here are the ranges the GPU sees. */
+  function lensAt(D0){
+    const camD = D0 - SH.CAM_BACK;
+    const zOf = d => -(d - D0);
+    const CAM = [SH.pathX(camD) + SH.CAM_SIDE,
+                 SH.groundAt(camD, SH.CAM_SIDE) + SH.CAM_UP, zOf(camD)];
+    const aimD = D0 + SH.CAM_EASE.level.look;
+    const LOOK = [SH.pathX(aimD), SH.hillAt(aimD) + 1.0, zOf(aimD)];
+    const f = [LOOK[0]-CAM[0], LOOK[1]-CAM[1], LOOK[2]-CAM[2]];
+    const fl = Math.hypot(...f); for(let i = 0; i < 3; i++) f[i] /= fl;
+    const rr = [f[2], 0, -f[0]];
+    const rl = Math.hypot(...rr) || 1; for(let i = 0; i < 3; i++) rr[i] /= rl;
+    const uu = [rr[1]*f[2]-rr[2]*f[1], rr[2]*f[0]-rr[0]*f[2], rr[0]*f[1]-rr[1]*f[0]];
+    const proj = (x, y, z) => {
+      const d = [x-CAM[0], y-CAM[1], z-CAM[2]];
+      const vz = d[0]*f[0] + d[1]*f[1] + d[2]*f[2];
+      if(vz <= 0.2) return null;
+      const vx = d[0]*rr[0] + d[1]*rr[1] + d[2]*rr[2];
+      const vy = d[0]*uu[0] + d[1]*uu[1] + d[2]*uu[2];
+      return [((FY_S/ASPECT_S)*vx/vz * 0.5 + 0.5) * 375,
+              (1 - (FY_S*vy/vz * 0.5 + 0.5)) * 812, vz];
+    };
+    return { CAM, LOOK, proj, zOf };
+  }
+
+  /* PROVE IT FIRST, on the pose at a trough. */
   {
-    const c = projS(...LOOK);
+    const L = lensAt(0);
+    const c = L.proj(...L.LOOK);
     const dx = Math.abs(c[0] - 375/2), dy = Math.abs(c[1] - 812/2);
-    if(dx < 0.6 && dy < 0.6) ok(`shepherd projector: the aim lands at frame centre (off by ${dx.toFixed(2)}, ${dy.toFixed(2)} px)`);
+    if(dx < 0.6 && dy < 0.6)
+      ok(`shepherd projector: the aim lands at frame centre (off by ${dx.toFixed(2)}, ${dy.toFixed(2)} px)`);
     else bad(`shepherd projector: aim is ${dx.toFixed(1)}, ${dy.toFixed(1)} px off centre`);
     const want = 812 / (2 * Math.tan(FOV_S/2*Math.PI/180) * 40);
-    const pA = projS(...LOOK), pB = projS(LOOK[0], LOOK[1]+1, LOOK[2]);
-    const axis = Math.hypot(LOOK[0]-CAM[0], LOOK[1]-CAM[1], LOOK[2]-CAM[2]);
+    const pA = L.proj(...L.LOOK), pB = L.proj(L.LOOK[0], L.LOOK[1]+1, L.LOOK[2]);
+    const axis = Math.hypot(L.LOOK[0]-L.CAM[0], L.LOOK[1]-L.CAM[1], L.LOOK[2]-L.CAM[2]);
     const got = Math.abs(pB[1]-pA[1]) * axis / 40;
     if(Math.abs(got-want)/want < 0.02)
       ok(`shepherd projector: a 1 m stick at 40 m subtends ${want.toFixed(1)} px as the optics require`);
     else bad(`shepherd projector: 1 m at 40 m measured ${got.toFixed(2)} px, optics say ${want.toFixed(2)}`);
   }
 
-  /* the mesh's own knots, both axes. The row and column counts are
-     the page's, read from it rather than retyped — a second copy of
-     a resolution is a second thing to drift. */
-  const page = readFileSync(new URL('../app/shepherd.html', import.meta.url), 'utf8');
-  const ROWS = +(page.match(/const HILL_ROWS = (\d+)/) || [])[1];
-  const COLS = +(page.match(/const HILL_COLS = (\d+)/) || [])[1];
-  const HALF = +(page.match(/const HILL_HALF = (\d+)/) || [])[1];
-  if(!ROWS || !COLS || !HALF) bad('shepherd: could not read the hill mesh resolution out of the page');
-  const sAt = i => (i / ROWS) * SH.PATH_HI;
-  const oAt = k => -HALF + (k / (COLS - 1)) * HALF * 2;
-  const V = (i, k) => [SH.pathX(sAt(i)) + oAt(k), SH.groundAt(sAt(i), oAt(k)), -sAt(i)];
+  /* the mesh's own knots, both axes, worst over three poses spanning
+     a hill. The row and column counts are the page's, read from it
+     rather than retyped — a second copy of a resolution is a second
+     thing to drift. */
+  {
+    const rowAt = i => (i / ROWS) * SH.PATH_PERIOD;
+    const oAt = k => -HALF + (k / (COLS - 1)) * HALF * 2;
+    let along = { px: 0 }, across = { px: 0 }, skyline = { px: 0 }, seen = 0;
+    for(const frac of [0, 0.25, 0.5]){
+      const D0 = frac * SH.HILL_LEN;
+      const L = lensAt(D0);
+      const onS = q => q && q[0] > -60 && q[0] < 435 && q[1] > -60 && q[1] < 872;
+      const sag = (A, P, Cc) => {
+        const a2 = L.proj(...A), p2 = L.proj(...P), c2 = L.proj(...Cc);
+        if(!a2 || !p2 || !c2 || !onS(a2) || !onS(p2) || !onS(c2)) return null;
+        const ex = c2[0]-a2[0], ey = c2[1]-a2[1];
+        const Ln = Math.hypot(ex, ey); if(Ln < 1e-6) return null;
+        return { px: Math.abs((p2[0]-a2[0])*ey - (p2[1]-a2[1])*ex) / Ln, dist: p2[2] };
+      };
+      /* the strip, placed where the page places it: from
+         PATH_PERIOD*BEHIND behind him to the rest of it ahead */
+      const V = (i, k) => {
+        const d = rowAt(i) - SH.PATH_PERIOD * BEHIND + D0;
+        return [SH.pathX(d) + oAt(k), SH.groundAt(d, oAt(k)), L.zOf(d)];
+      };
+      for(let k = 0; k < COLS; k += 2){
+        for(let i = 1; i < ROWS; i++){
+          const r = sag(V(i-1, k), V(i, k), V(i+1, k));
+          if(r){ seen++; if(r.px > along.px)
+            along = { ...r, at:frac, o:+oAt(k).toFixed(1) }; }
+        }
+      }
+      for(let i = 0; i <= ROWS; i += 2){
+        for(let k = 1; k < COLS - 1; k++){
+          const r = sag(V(i, k-1), V(i, k), V(i, k+1));
+          if(r){ seen++; if(r.px > across.px)
+            across = { ...r, at:frac, o:+oAt(k).toFixed(1) }; }
+        }
+      }
+      /* AND THE SKYLINE, SEPARATELY, because it is the only place the
+         mesh can actually be SEEN. The hill is flat-shaded from
+         fields of (d, o) with no normal anywhere in it (§4.2 rule 1),
+         so an interior facet has no shading to reveal it — what shows
+         a row boundary is the edge where the ground meets the sky.
+         For each column that is the highest vertex on screen, which
+         near the lens is a few metres away and over a crest is a
+         hundred, so it is found rather than assumed. Kept apart from
+         the sweep above rather than replacing it: the interior number
+         is the one that would catch a tone boundary going polygonal,
+         and an argument for ignoring a measurement is worth less than
+         a mesh that does not need it. */
+      for(let k = 0; k < COLS; k += 2){
+        let bi = -1, by = 1e9;
+        for(let i = 1; i < ROWS; i++){
+          const q = L.proj(...V(i, k));
+          if(q && onS(q) && q[1] < by){ by = q[1]; bi = i; }
+        }
+        if(bi < 1 || bi >= ROWS) continue;
+        const r = sag(V(bi-1, k), V(bi, k), V(bi+1, k));
+        if(r && r.px > skyline.px) skyline = { ...r, at:frac, o:+oAt(k).toFixed(1) };
+      }
+    }
+    if(seen === 0) bad('shepherd: nothing projected — the instrument saw no hill');
+    else {
+      for(const [name, w] of [['hill along the walk', along], ['hill across it', across],
+                              ['hill where it meets sky', skyline]]){
+        const line = `${name.padEnd(24)} worst ${w.px.toFixed(2).padStart(5)} px off the chord at ` +
+                     `${w.dist.toFixed(0)} m (pose ${w.at} of a hill, o=${w.o}), ${seen} knots  (bar ${PX_BAR} px)`;
+        if(w.px <= PX_BAR) ok(line); else bad(line);
+      }
+    }
+  }
 
-  let along = { px: 0 }, across = { px: 0 }, seen = 0;
-  for(let k = 0; k < COLS; k += 2){
-    for(let i = 1; i < ROWS; i++){
-      const r = sagS(V(i-1, k), V(i, k), V(i+1, k));
-      if(r){ seen++; if(r.px > along.px) along = { ...r, s:+sAt(i).toFixed(1), o:+oAt(k).toFixed(1) }; }
-    }
-  }
-  for(let i = 0; i <= ROWS; i += 2){
-    for(let k = 1; k < COLS - 1; k++){
-      const r = sagS(V(i, k-1), V(i, k), V(i, k+1));
-      if(r){ seen++; if(r.px > across.px) across = { ...r, s:+sAt(i).toFixed(1), o:+oAt(k).toFixed(1) }; }
-    }
-  }
-  if(seen === 0) bad('shepherd: nothing projected — the instrument saw no hill');
-  else {
-    for(const [name, w] of [['hill along the path', along], ['hill across it', across]]){
-      const line = `${name.padEnd(24)} worst ${w.px.toFixed(2).padStart(5)} px off the chord at ` +
-                   `${w.dist.toFixed(0)} m (s=${w.s}, o=${w.o}), ${seen} knots  (bar ${PX_BAR} px)`;
-      if(w.px <= PX_BAR) ok(line); else bad(line);
-    }
-  }
-
-  /* AND THE FIGURES STAND ON THE SURFACE THAT IS DRAWN. They are
-     placed by hillAt and the hill is built from groundAt, and
-     groundAt(s, 0) is hillAt(s) only if the cross-slope terms vanish
+  /* AND THE FIGURES STAND ON THE SURFACE THAT IS DRAWN. The shepherd
+     is placed by hillAt and the hill is built from groundAt, and
+     groundAt(d, 0) is hillAt(d) only if the cross-slope terms vanish
      on the path. If they ever stop doing that the whole flock floats
      or sinks, silently, because nothing else would notice. */
   let worstFoot = 0, footAt = 0;
-  for(let x = 0; x <= SH.PATH_HI; x += 0.25){
+  for(let x = 0; x <= SH.PATH_PERIOD; x += 0.25){
     const d = Math.abs(SH.groundAt(x, 0) - SH.hillAt(x));
     if(d > worstFoot){ worstFoot = d; footAt = x; }
   }
-  const fl2 = `the path is the hill: worst |groundAt(s,0) - hillAt(s)| = ` +
-              `${worstFoot.toExponential(1)} m at s=${footAt.toFixed(1)}`;
+  const fl2 = `the path is the hill: worst |groundAt(d,0) - hillAt(d)| = ` +
+              `${worstFoot.toExponential(1)} m at d=${footAt.toFixed(1)}`;
   if(worstFoot < 1e-9) ok(fl2 + '  (the figures stand on what is drawn)');
   else bad(fl2 + '  — the flock is walking above or below the hillside');
 }

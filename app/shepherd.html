@@ -142,16 +142,18 @@
 import { requireScroll } from './js/scroll.js';
 import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice, SESSION_CAP,
-         PATH_LO, PATH_HI, WALK_LO, WALK_HI, CORRIDOR, RANGE, normOf, atOf,
-         hillAt, pathX, groundAt, rates,
-         FLOCK_N, FLOCK_W, FLOCK_TRAIL, FLOCK_MIN_GAP, PATH_V_MAX,
-         CAM_AT, CAM_SIDE, CAM_UP, CAM_EASE } from './js/shepherd-breath.js';
+         HT_LO, HT_HI, WALK_LO, WALK_HI, CORRIDOR, RANGE, normOf, atOf,
+         HILL_LEN, HILL_H, hillAt, hillSlope, phaseOf, pathX, groundAt, rates,
+         PATH_PERIOD, PATH_HILLS, walkStep, WALK_V_MAX, WALK_V_NOM, V_MOVE,
+         FLOCK_N, FLOCK_W, FLOCK_TRAIL, FLOCK_MIN_GAP,
+         CAM_SIDE, CAM_UP, CAM_BACK, CAM_W, CAM_EASE } from './js/shepherd-breath.js';
 import { body } from './js/course.js';
 import { tracker } from './js/follow.js';
 import { WIND_GLSL } from './js/wind.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
-import { builder, bands, posterMat, screenQuad, part, linkReport } from './js/mesh.js';
+import { builder, bands, posterMat, screenQuad, part, linkReport,
+         scrollGlsl } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter, soloReport,
          flashMeter } from './js/stage.js';
 import { arrival } from './js/arrival.js';
@@ -213,6 +215,13 @@ const uFog   = { value: C(AIR.haze) };
 const uHorizon = { value: 0.5 };
 /* where the shepherd is, in world space, for anything that answers him */
 const uWalker = { value: new THREE.Vector3() };
+/* THE SCROLL. The ground is one strip of PATH_PERIOD metres and it is
+   slid under the lens rather than rebuilt: `uDist` is where along the
+   walk the strip is currently placed and `uPeriod` is how long it is.
+   See js/mesh.js scrollGlsl(), and section 3 below for why the strip
+   closes on itself. */
+const uDist   = { value: 0 };
+const uPeriod = { value: PATH_PERIOD };
 
 const FOG = fogGlslAA({ near: 18, rate: 0.011, steps: 5, max: 0.46 });
 const PRE_AA   = AA_GLSL;
@@ -331,34 +340,63 @@ scene.add(mesas);
    the longest silhouette in the chapter and is where a polygon would
    show first, so it is the edge the numbers are chosen for.
    ------------------------------------------------------------------ */
-/* MEASURED AT THREE SETTINGS, not picked. The hill is this chapter's
-   whole triangle budget and the near ground is eight metres from a
-   parked lens, where a metre is ninety-four pixels — so the columns
-   are set by what the nearest knot subtends, not by what the hill
-   looks like from where the shepherd is.
+/* ==================================================================
+   THE HILL IS A STRIP NOW, not a path with two ends
+   ==================================================================
+   He makes progress, so the ground has to be endless. It is the
+   kit's standard construction and the one Long Air uses: bake a
+   whole number of hills once and wrap them by a modulo in the vertex
+   shader, so the world is endless for one draw call with no
+   streaming and no seam. Everything baked into it must be PERIODIC
+   in the strip length or the wrap leaves a visible step — hillAt is
+   a raised cosine, which matches in value, slope AND curvature
+   across the join, and pathX is built on periods that divide it.
 
-       161   42,240 tri   2.14 px across the path
-       193   50,688       1.51
-       225   59,136       1.10
+   MEASURED, AND THE LENS IS WHY THESE ARE BIG. It sits two and a
+   half metres above a ground that falls away under it, so the eye is
+   not much above the path and the whole scene is read at a GRAZING
+   angle: the nearest ground is 2.6 m away, where a metre is nearly
+   three hundred pixels. Nothing about the hill's own shape needs
+   this many rows; the range does.
 
-   193 ships: it is the first that clears the 2 px bar with room, and
-   the 8,400 triangles the next step buys go into the difference
-   between 1.51 px and 1.10 px, which nobody can see. The rows are
-   left at 132 because the same instrument reads 0.14 px ALONG the
-   path — the hill runs away from the lens there, so the same spacing
-   subtends a twentieth as much, and spending on it would be spending
-   on nothing. Measuring the two axes separately is the whole reason
-   they are different numbers. */
-const HILL_ROWS = 132;        // along the path, 0..PATH_HI
-const HILL_COLS = 193;        // across it, -HILL_HALF..+HILL_HALF
+   Measured through this chapter's lens at three poses spanning a
+   hill, worst case of the three, in tools/continuity.mjs:
+
+       rows   spacing   along   across   where it meets sky   tris
+        240    0.900   1.81*     2.30*          1.13          54k
+        420    0.514   (interpolated)           2.09          94k
+        560    0.386    1.71      1.69          1.16         125k
+
+       (* at COLS 161; the shipped 113 is coarser across and
+          finer along, which is why the first row is not a subset
+          of the last)
+
+   THREE NUMBERS RATHER THAN TWO, and the third is the one that
+   matters most. The hill is flat-shaded from fields of (d, o) with
+   no normal anywhere in it (§4.2 rule 1), so an INTERIOR facet has
+   no shading to reveal it — what can show a row boundary is the edge
+   where the ground meets the sky. That edge is found rather than
+   assumed, because with the lens this low it is a few metres away
+   for some columns and a hundred for others. The interior sweeps are
+   kept and gated as well: they are what would catch a posterised
+   tone boundary going polygonal, and a mesh that passes without
+   needing the argument is worth more than the argument. */
+const STRIP_LEN = PATH_PERIOD;               // 216 m, twelve hills
+const HILL_ROWS = 560;                       // along the walk, 0.386 m
+const HILL_COLS = 113;                       // across it, 0.964 m
 const HILL_HALF = 54;
+/** Fraction of the strip kept behind the lens, so the wrap happens
+ *  out of sight at both ends. */
+const BEHIND = 0.15;
+const SCROLL = scrollGlsl(BEHIND);
+
 function hillGeometry(){
-  const b = builder(THREE, { aS:1, aO:1 });
+  const b = builder(THREE, { aD:1, aO:1 });
   for(let i = 0; i <= HILL_ROWS; i++){
-    const s = (i / HILL_ROWS) * PATH_HI;
+    const d = (i / HILL_ROWS) * STRIP_LEN;   // the last row IS the first
     for(let k = 0; k < HILL_COLS; k++){
       const o = -HILL_HALF + (k / (HILL_COLS - 1)) * HILL_HALF * 2;
-      b.vertex(pathX(s) + o, groundAt(s, o), -s, { aS:s, aO:o });
+      b.vertex(pathX(d) + o, groundAt(d, o), d, { aD:d, aO:o });
     }
   }
   for(let i = 0; i < HILL_ROWS; i++){
@@ -371,65 +409,56 @@ function hillGeometry(){
   return b.geometry();
 }
 const hillMat = posterMat(THREE, {
-  uniforms:{ uRamp, uFog, uTime, uFill, uWalker,
+  uniforms:{ uRamp, uFog, uTime, uFill, uWalker, uDist, uPeriod,
              uShadow:{value:C(LAND.shadow)}, uShadowDeep:{value:C(LAND.shadowDeep)},
              uSheen:{value:C(LAND.sheen)}, uBloom:{value:C(LAND.bloom)},
              uFogLow:{value:C(LAND.hazeLow)} },
   side: THREE.DoubleSide, prelude: PRE + WIND_GLSL,
-  vertex:`
-    attribute float aS; attribute float aO;
-    varying float vS; varying float vO; varying float vDist; varying float vY;
+  vertex: SCROLL + `
+    attribute float aD; attribute float aO;
+    varying float vD; varying float vO; varying float vDist; varying float vY;
     varying vec3 vW;
     void main(){
-      vS = aS; vO = aO; vY = position.y; vW = position;
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      /* vD is the BAKED distance, taken before the scroll: anything
+         anchored to it belongs to the ground and travels with it,
+         which is what stops the grass and the grain crawling over a
+         surface that is sliding past. */
+      vD = aD; vO = aO;
+      vec3 p = scrolled(position);
+      vY = p.y; vW = p;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragment:`
-    varying float vS; varying float vO; varying float vDist; varying float vY;
+    varying float vD; varying float vO; varying float vDist; varying float vY;
     varying vec3 vW;
     uniform vec3 uShadow, uShadowDeep, uSheen, uBloom, uFogLow, uWalker;
     uniform float uTime, uFill;
     void main(){
-      /* ==========================================================
-         THE VALUE BANDS ARE BANDS OF THE SLOPE, not of distance
-         ==========================================================
-         §4.2: a value index is a decision about what a thing IS, and
-         is never a function of how far away it is. Here the decision
-         is the hillside's own geography — the worn path, the grazed
-         shoulder either side of it, and the rough ground beyond —
-         so the bands are bands of |o|, the distance ACROSS the path,
-         and they are evaluated per fragment from a varying that is
-         genuinely linear along a row. A tone interpolated between
-         columns would draw the band boundary as a straight line
-         inside every triangle, which is the fault that made Pearl
-         Diver's water and Long Air's hillside read as triangulated.
-         ========================================================== */
+      /* THE VALUE BANDS ARE BANDS OF THE SLOPE, not of distance
+         (§4.2): the worn path, the grazed sward either side of it,
+         and the rough ground beyond. Evaluated per fragment from a
+         varying that is genuinely linear along a row, because a tone
+         interpolated between columns draws its boundary as a
+         straight line inside every triangle. */
       float ao = abs(vO);
       float tone = 0.0
-        + 1.0 * aastep(2.6,  ao)       // the worn path, to the sward
-        + 1.0 * aastep(16.0, ao)       // the sward, to the rough
-        + 1.0 * aastep(34.0, ao);      // the rough, to the far flank
-      /* and it darkens going down the flank, which IS a decision
-         about the ground and not about distance: that is where the
-         bracken is */
-      float low = 1.0 - smoothstep(-6.0, 2.0, vY);
+        + 1.0 * aastep(2.6,  ao)
+        + 1.0 * aastep(16.0, ao)
+        + 1.0 * aastep(34.0, ao);
       vec3 col = rampPickAA((tone + 0.5) / 6.0);
 
-      /* THE GRASS, from the kit's one wind field. Same construction
-         as Long Air's: the comb is sampled at a point DISPLACED
-         along the wind so the blades lie over rather than merely
-         lightening, and it is a shift within the hill's own ramp
-         step so it can never be a different hue family. */
-      vec2 gw = vec2(vO, vS);
+      /* THE GRASS, from the kit's one wind field, combed at a point
+         displaced along the wind so the blades lie over. A shift
+         within the hill's own ramp step, so it can never be a
+         different hue family from the hill it grows on. */
+      vec2 gw = vec2(vO, vD);
       float gust = windGust(uFill);
-      /* AND THE FLOCK PARTS IT. The shepherd and his sheep are the
-         only things that touch this hillside, so the grass lies away
-         from them — the one place the world answers the figure
-         directly rather than through the breath. */
-      vec2 dw = vec2(vW.x - uWalker.x, -vW.z - (-uWalker.z));
+      /* AND THE FLOCK PARTS IT — the one place the world answers the
+         figures directly rather than through the breath. */
+      vec2 dw = vec2(vW.x - uWalker.x, vW.z - uWalker.z);
       float rw = length(dw);
       float wake = 1.0 - smoothstep(0.9, 5.2, rw);
       vec2 away = rw > 0.001 ? dw / rw : vec2(0.0, 1.0);
@@ -443,17 +472,9 @@ const hillMat = posterMat(THREE, {
       col = mix(col, gDeep, grass * (1.0 - aastep(-0.34, comb)) * 0.88);
       col = mix(col, uSheen, aastep(0.62, comb) * grass * (0.06 + 0.22 * gust));
 
-      /* wildflower colour, sparse, near the path only and gone
-         before a clump could fall under a pixel */
-      /* WILDFLOWERS, AND THE NEAR FADE IS THE POINT OF THIS BLOCK.
-         At 1.6 m cells with a 0.21 disc they were a metre across, and
-         the ground nearest the lens is six metres away — they drew as
-         stains on the grass rather than as flowers. A clump is small
-         and there are more of them: 0.55 m cells, a 0.13 disc. They
-         also fade IN with distance as well as out, because at arm's
-         length a posterised disc is a shape and not a flower, and the
-         foreground here is always close. Gone by 90 m at the other
-         end, before a clump could fall under a pixel. */
+      /* wildflowers, sparse, near the path, and fading IN with
+         distance as well as out: at arm's length a posterised disc
+         is a stain rather than a flower */
       vec2 cell = gw * 1.8;
       vec2 inCell = fract(cell) - 0.5;
       col = mix(col, uBloom,
@@ -463,10 +484,9 @@ const hillMat = posterMat(THREE, {
         * smoothstep(7.0, 16.0, vDist)
         * (1.0 - smoothstep(45.0, 90.0, vDist)) * 0.40);
 
-      /* WHAT THE GROUND IS MADE OF — the fine scale, in the fragment
-         stage where it belongs. Two folded components at 2 m and
-         0.7 m, dissolving out before either could become noise. */
-      vec2 rp = vec2(vO, vS);
+      /* what the ground is MADE of: the fine scale, in the fragment
+         stage where it belongs, dissolving before it could be noise */
+      vec2 rp = vec2(vO, vD);
       float m1 = sin(rp.x * 3.1 + sin(rp.y * 2.7) * 1.2);
       float m2 = sin(rp.y * 9.4 - sin(rp.x * 7.9) * 0.9);
       float matB = posteriseAA((m1 * 0.62 + m2 * 0.38) * 0.5 + 0.5, 3.0);
@@ -474,17 +494,14 @@ const hillMat = posterMat(THREE, {
       col = mix(col, gDeep, (1.0 - matB) * 0.15 * matFar);
       col = mix(col, gLit,  matB * matB * 0.11 * matFar);
 
-      /* the one hard shadow split (§4.4): the light is off to the
-         right, so the left flank of the draw is in shade. A hue
-         shift into green-blue, not a darkening. */
+      /* the one hard shadow split (§4.4), a hue shift rather than a
+         darkening: the light is off to the right */
       float sh = 1.0 - aastep(0.0, vO);
       col = mix(col, uShadow, sh * 0.34);
-      col = mix(col, uShadowDeep, sh * low * 0.3);
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vO * 0.21))) - 0.5) * 0.07;
 
-      /* TRUE AERIAL PERSPECTIVE: the haze is a layer, warmer and
-         denser in the low ground, so the brow stands clear of the
-         bank its own flanks sink into. */
+      /* true aerial perspective: the haze pools in the low ground, so
+         a crest stands clear of the bank its own flanks sink into */
       float lowAir = 1.0 - smoothstep(-4.0, 9.0, vY);
       vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
       gl_FragColor = vec4(
@@ -840,19 +857,52 @@ const SELF_WALK = 0.42;
 let t = 0, started = false;
 let RATE = rates(PROTOCOLS.box);
 let forceUp = false, forceDown = false;
-let WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: PATH_V_MAX * 2.2 });
+/** The height corridor's own cap: the band it sweeps, at the
+ *  protocol's own fill rate, with the same 2.2x headroom every
+ *  chapter gives its body. */
+const htVMax = r => RANGE * r.fillPerSec * 2.2;
+let WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: htVMax(RATE) });
+
+/* ==================================================================
+   THE TWO NUMBERS THE WHOLE SCENE IS PLACED FROM
+   ==================================================================
+   `dWalk`  metres walked. MONOTONE, and the one piece of state in
+            this chapter that has a memory.
+   `walkV`  how fast he is walking, which is the gait's own state —
+            see walkStep() in js/shepherd-breath.js for why it is
+            lagged on the way up and not on the way down.
+
+   THE WORLD IS PLACED RELATIVE TO HIM, not to an origin. The ground
+   is a strip scrolled so that `dWalk` sits at z = 0, and everything
+   else — the flock, the lens, the shadows — is placed at
+   z = -(d - dWalk). So the floating-point coordinates stay small
+   however long the session runs, which is the thing an endless walk
+   would otherwise break: at twenty minutes he is two kilometres
+   out, and a vertex two kilometres from the origin has lost the
+   bottom four digits of a float32. The strip's own wrap is what
+   makes this exact rather than approximate — PATH_PERIOD divides
+   every period in the surface. */
+let dWalk = 0, walkV = 0;
+/** Where the scroll has to be placed so that dWalk lands at z = 0.
+ *  scrolled() returns PERIOD*BEHIND - mod(z - uDist, PERIOD), so the
+ *  usable window runs from PATH_PERIOD*BEHIND behind him (32.4 m,
+ *  which has to cover the lens and the whole flock) to the rest of
+ *  the strip ahead (183.6 m, which has to cover the fog). */
+const scrollFor = d => d - PATH_PERIOD * BEHIND;
+/** And the matching placement in JS, for anything not in the strip.
+ *  No `mod` here on purpose: every figure is inside the window, and
+ *  a wrap in a FIGURE's position would stretch it across the world
+ *  rather than move it (js/mesh.js scrollWholeGlsl explains why). */
+const zOf = d => -(d - dWalk);
+
 const AIM = tracker(CAM_EASE.level.look, CAM_EASE.level.ease);
-const CAMS = tracker(WALK_LO, 1.5);
+/** The lens's own distance along the walk, trailing his. */
+const CAMD = tracker(0, CAM_W);
 const REACH_INVITE = invite();
 let forceHold = false;
 
 const vTmp = new THREE.Vector3();
 const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
-
-/** The world point of the path at distance s, and the ground there. */
-function pathPoint(s, out){
-  return out.set(pathX(s), hillAt(s), -s);
-}
 
 /** Write one figure's pose into the merged mesh's uniform arrays.
  *  `i` is 0 for the shepherd and 1..N for the flock.
@@ -866,12 +916,12 @@ function pathPoint(s, out){
  *  a geometry builder carrying its own copy of the terrain measured
  *  one surface while the GPU drew another. */
 const H = 0.4;
-function poseAt(i, s, lateral, stride){
+function poseAt(i, d, lateral, stride){
   const U = figMat.uniforms;
-  U.uPos.value[i].set(pathX(s) + lateral, hillAt(s), -s);
-  const ax = pathX(s + H) - pathX(s - H);
+  U.uPos.value[i].set(pathX(d) + lateral, groundAt(d, lateral), zOf(d));
+  const ax = pathX(d + H) - pathX(d - H);
   U.uYaw.value[i] = Math.atan2(ax, -(H * 2));
-  const grad = (hillAt(s + H) - hillAt(s - H)) / (H * 2);
+  const grad = (hillAt(d + H) - hillAt(d - H)) / (H * 2);
   U.uLean.value[i] = -Math.atan(grad) * 0.55;
   U.uStride.value[i] = stride;
 }
@@ -884,22 +934,16 @@ const loop = clock((dt, now, running) => {
   const ph = st.p;
   const sched = B.value(t);
 
-  /* --- THE WALK. The schedule says where he should be; the reader's
-     hold is what actually moves him, integrated at the protocol's
-     own capped rate. The two are separate on purpose: the flock
-     records the reader's walk, not the schedule's. --- */
+  /* --- THE HEIGHT HE IS ASKING FOR. The schedule says what it
+     should be; the reader's finger overrides it; the body spring
+     softens whichever is in charge. This is the one quantity the
+     reader controls and it is BOUNDED — the walk below is what
+     turns it into ground covered. --- */
   if(started && !forceHold){
-    /* THE HOLD IS THE WHOLE CONTROL. Holding sends him up at the
-       protocol's own fill rate; letting go lets him come down at its
-       empty rate. The touch writes a DIRECTION and the kit integrates
-       it, so breathing twice as fast buys half the walk — the same
-       cap, for the same reason, as every other chapter.
-
-       NOBODY STEERING IS NOT A FAILURE STATE. A reader who never
-       touches the glass gets a shepherd who drifts back down to the
-       foot of the hill at SELF_WALK and stands there with his flock
-       around him, which is a thing a shepherd does. Declining costs
-       nothing and is not corrected (§1.6b). */
+    /* NOBODY STEERING IS NOT A FAILURE STATE. A reader who never
+       touches the glass gets a shepherd who follows the cue a beat
+       behind, visibly unled, ambling his hills with his flock around
+       him. Declining costs nothing and is not corrected (§1.6b). */
     const schedFill = clamp01(normOf(sched));
     const target = reachAt !== null ? reachFill(reachAt) : schedFill;
     const gap = target - WALKER.fill;
@@ -916,14 +960,25 @@ const loop = clock((dt, now, running) => {
   } else {
     WALKER.drive(dt, forceUp, forceDown);
   }
-  const s = WALKER.value;
+  const wantH = WALKER.value;
   uFill.value = WALKER.fill;
   uTime.value = t;
 
-  /* --- THE FLOCK. Each sheep follows the one ahead of it, so the
-     line is the last several seconds of the reader's own pace. The
-     chain is the whole mechanic and it is three lines. --- */
-  let prev = s;
+  /* --- AND THE WALK. One line of mechanic: he walks towards the next
+     place ahead of him where the ground is the height he is asking
+     for. Monotone, so a hold is the ground running out of anywhere
+     to go rather than a branch in here. The rule and the gait both
+     live in js/shepherd-breath.js so the harnesses fly the same
+     shepherd this page draws. --- */
+  if(started) walkV = walkStep(walkV, dWalk, wantH, dt);
+  dWalk += walkV * dt;
+  uDist.value = scrollFor(dWalk);
+
+  /* --- THE FLOCK. Each sheep follows the one ahead of it IN METRES
+     WALKED, so the line is strung out along real ground he has
+     covered and the reader can see how long ago each sheep was where
+     he is. The chain is the whole mechanic and it is three lines. --- */
+  let prev = dWalk;
   for(const sh of flock){
     sh.follow.step(dt, prev);
     sh.s = sh.follow.value;
@@ -936,35 +991,46 @@ const loop = clock((dt, now, running) => {
      that makes a figure read as a puppet, and on a hold — where this
      chapter's whole point is that he STOPS — it would be the loudest
      possible lie about what the breath is doing. --- */
-  const stride = Math.sin(t * 7.0) * clamp(Math.abs(WALKER.v) * 0.09, 0, 0.5);
-  poseAt(0, s, 0, stride);
+  const stride = Math.sin(t * 7.0) * clamp(walkV * 0.16, 0, 0.5);
+  poseAt(0, dWalk, 0, stride);
 
   const at = shadowMat.uniforms.uAt.value, rad = shadowMat.uniforms.uRad.value;
-  at[0].set(pathX(s), hillAt(s) + 0.03, -s); rad[0] = 0.62;
+  at[0].set(pathX(dWalk), hillAt(dWalk) + 0.03, zOf(dWalk)); rad[0] = 0.62;
   for(let i = 0; i < flock.length; i++){
     const sh = flock[i];
     const sv = Math.abs(sh.follow.v);
     poseAt(i + 1, sh.s, sh.off,
-           Math.sin(t * 8.0 + i * 1.7) * clamp(sv * 0.08, 0, 0.45));
-    at[i + 1].set(pathX(sh.s) + sh.off, hillAt(sh.s) + 0.03, -sh.s);
+           Math.sin(t * 8.0 + i * 1.7) * clamp(sv * 0.14, 0, 0.45));
+    at[i + 1].set(pathX(sh.s) + sh.off, groundAt(sh.s, sh.off) + 0.03, zOf(sh.s));
     rad[i + 1] = 0.44;
   }
-  uWalker.value.set(pathX(s), hillAt(s), -s);
+  uWalker.value.set(pathX(dWalk), hillAt(dWalk), zOf(dWalk));
 
-  /* --- THE LENS. Parked near the foot, aiming at him with a slow
-     follower so he cannot leave the frame and the tracking is not
-     the thing the reader reads. --- */
+  /* --- THE LENS: off to the side, low, and TRAILING him rather than
+     riding him. Lantern Current's camera rode the thing its breath
+     moved and the motion cancelled out; this one follows his
+     distance through a slow tracker, so walking faster than the lens
+     carries him towards the front of the frame and easing off lets
+     him drift back. The walk is therefore displacement ACROSS the
+     picture, which is the only thing that made the numbers in
+     js/shepherd-breath.js worth writing down. --- */
   const E = CAM_EASE[ph.cam] || CAM_EASE.level;
   AIM.w = E.ease;
   AIM.step(dt, E.look);
-  CAMS.step(dt, s);
-  camera.position.set(pathX(CAM_AT) + CAM_SIDE, hillAt(CAM_AT) + CAM_UP, -CAM_AT);
+  CAMD.step(dt, dWalk);
+  const camD = CAMD.value - CAM_BACK;
+  camera.position.set(pathX(camD) + CAM_SIDE,
+                      groundAt(camD, CAM_SIDE) + CAM_UP,
+                      zOf(camD));
   camera.up.set(0, 1, 0);
-  pathPoint(CAMS.value + AIM.value, vTmp);
-  camera.lookAt(vTmp.x, vTmp.y + 1.0, vTmp.z);
+  const aimD = dWalk + AIM.value;
+  camera.lookAt(pathX(aimD), hillAt(aimD) + 1.0, zOf(aimD));
   ARRIVE.apply(camera, now);
 
-  vTmp.set(camera.position.x, hillAt(PATH_HI) + 6, -PATH_HI - 260).project(camera);
+  /* the horizon, for the sky's gradient: a point on the path as far
+     ahead as the strip goes, which is past the fog */
+  vTmp.set(pathX(dWalk + STRIP_LEN * 0.8), HILL_H * 0.5 + 4,
+           zOf(dWalk + STRIP_LEN * 0.8)).project(camera);
   uHorizon.value = vTmp.y * 0.5 + 0.5;
 
   /* --- the invitation, projected from where he actually is --- */
@@ -1005,10 +1071,14 @@ function beginWith(which, remember){
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
-  WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: PATH_V_MAX * 2.2 });
+  WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: htVMax(RATE) });
   WALKER.reset(normOf(B.value(0)));
-  for(const sh of flock){ sh.follow.set(WALKER.value); sh.s = WALKER.value; }
-  AIM.set(CAM_EASE.level.look); CAMS.set(WALKER.value);
+  /* HE STARTS AT A TROUGH, with the flock already around him: the
+     schedule's first phase climbs, and a figure that begins halfway
+     up a hill has nowhere to put the first inhale. */
+  dWalk = 0; walkV = 0; uDist.value = scrollFor(0);
+  for(const sh of flock){ sh.follow.set(0); sh.s = 0; }
+  AIM.set(CAM_EASE.level.look); CAMD.set(0);
   REACH_INVITE.reset();
   touches.clear(); readTouches(); forceHold = false; forceUp = forceDown = false;
   t = 0;
@@ -1028,7 +1098,7 @@ $('rescreen').addEventListener('click', () => {
 });
 
 WALKER.reset(normOf(B.value(0)));
-for(const sh of flock){ sh.follow.set(WALKER.value); sh.s = WALKER.value; }
+for(const sh of flock){ sh.follow.set(0); sh.s = 0; }
 
 const ack = picked.read();
 enter(requireScroll, () => {
@@ -1059,16 +1129,21 @@ window.__shepherd = {
   now(){
     const st = B.at(t);
     const gaps = [];
-    let prev = WALKER.value;
+    let prev = dWalk;
     for(const sh of flock){ gaps.push(+(prev - sh.s).toFixed(2)); prev = sh.s; }
     return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t,
              phase:st.p.k, left:+st.left.toFixed(2),
              schedule:+B.value(t).toFixed(2),
-             fill:+WALKER.fill.toFixed(3), s:+WALKER.value.toFixed(2),
-             v:+WALKER.v.toFixed(2),
+             fill:+WALKER.fill.toFixed(3),
+             wantH:+WALKER.value.toFixed(2), vH:+WALKER.v.toFixed(2),
              error:+(WALKER.value - B.value(t)).toFixed(2),
+             /* the walk itself: metres, hills, where on the hill, and
+                how high the ground under him is */
+             d:+dWalk.toFixed(2), hills:+(dWalk/HILL_LEN).toFixed(4),
+             w:+phaseOf(dWalk).toFixed(4), h:+hillAt(dWalk).toFixed(2),
+             walkV:+walkV.toFixed(3),
              flock: flock.map(f => +f.s.toFixed(2)),
-             gaps, trail:+(WALKER.value - flock[flock.length-1].s).toFixed(2),
+             gaps, trail:+(dWalk - flock[flock.length-1].s).toFixed(2),
              reachAt: reachAt === null ? null : +reachAt.toFixed(3),
              targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3),
              touches: touches.size, inviteLearned: REACH_INVITE.learned };
@@ -1086,6 +1161,8 @@ window.__shepherd = {
              drawCalls: renderer.info.render.calls,
              triangles: renderer.info.render.triangles };
   },
+  camD(){ return { camD:+(CAMD.value - CAM_BACK).toFixed(2),
+                   aim:+AIM.value.toFixed(2), uDist:+uDist.value.toFixed(2) }; },
   where(){
     const proj = v3 => { const v = v3.clone().project(camera);
       return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
