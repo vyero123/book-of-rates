@@ -431,23 +431,26 @@ export const FLOCK_N = 5;
  *
  *      w = 2 * N / FLOCK_MEMORY
  *
- *  Ten seconds, which is a bit over half a box breath and a bit
- *  under a whole no-holds one, so in both protocols the line spans
- *  the inhale you just took and some of what came before it. It is
- *  also one number for both protocols rather than one per protocol,
- *  which the trail-length derivation could not be.
+ *  FOUR AND A HALF SECONDS, and that is SHORTER THAN I WANTED, for a
+ *  reason that is about the FRAME rather than the mechanic. The lens
+ *  is side-on (see below), the phone is in portrait, and the
+ *  horizontal field is 31 degrees: a line of figures seen side-on at
+ *  22 m fits in about 12 m of picture, full stop. Ten seconds of
+ *  memory strings the flock out over seventeen and most of it is off
+ *  the right-hand edge — a record kept where the reader cannot read
+ *  it, which is the thing the derivation was supposed to prevent.
+ *  Four and a half still spans a whole inhale, and no other chapter
+ *  in the book shows more than three tenths of a second of anything.
  *
- *  FLOCK_TRAIL is now a CONSEQUENCE and the harness measures it:
- *  12.7 m on the box protocol and 16.7 on the no-holds one, against
- *  the 14 m this was designed around. A bit under a hill, so at a
- *  crest the last sheep is somewhere on the face below and the whole
- *  line is in frame; and five sheep over that is about three body
- *  lengths apart, which is how a flock following somebody walks.
- *  They close right up on a hold, which is the chapter working
- *  rather than the chapter failing. */
-export const FLOCK_MEMORY = 10.0;
+ *  FLOCK_TRAIL is a CONSEQUENCE now and the harness measures it:
+ *  7.5 m on the box protocol and 9.3 on the no-holds one, against
+ *  the 8.5 this was designed around. Half a hill, so the whole line
+ *  is on one face; and five sheep over that is about a metre and a
+ *  half apart, a close flock. They close right up on a hold, which
+ *  is the chapter working rather than the chapter failing. */
+export const FLOCK_MEMORY = 4.5;
 export const FLOCK_W = 2 * FLOCK_N / FLOCK_MEMORY;
-export const FLOCK_TRAIL = 14.0;
+export const FLOCK_TRAIL = 8.5;
 export const FLOCK_MIN_GAP = FLOCK_TRAIL / FLOCK_N * 0.5;
 
 /* ==================================================================
@@ -468,15 +471,38 @@ export const FLOCK_MIN_GAP = FLOCK_TRAIL / FLOCK_N * 0.5;
    and sinks behind him once per breath; and the flock strings out
    behind him along ground the reader has just watched him cover.
 
-   THE NUMBERS, because Lantern Current passed every gate in this
-   repo and still failed on exactly this. At 2.25 m/s moving, with
-   the lens nine metres to the side and two and a half above the
-   ground:
+   HOW FAR OFF, AND THE FIRST ANSWER WAS WRONG IN A WAY THE MAPPING
+   COULD NOT HAVE TOLD ME. Nine metres to the side and five behind
+   put the shepherd off the left-hand edge of a 375 px frame and the
+   last sheep seventeen hundred pixels past it: a side view of a line
+   of figures needs the line to FIT, and a portrait phone gives 31
+   degrees across. At 22 m that is 12.2 m of frame, which is what the
+   flock above was re-derived against.
 
-       ground abeam the lens, 9.4 m away      13.7 deg/s
-       the grass directly under it, 2.6 m     49.6 deg/s
-       Lantern Current, at its best            2.4 deg/s
-       Long Air at MAG 12                        88 deg/s
+   And a second fault the same search found, which no amount of
+   staring at the mapping would have shown either: a lens 22 m BEHIND
+   him cannot see him at all, because the hills are 18 m long and
+   there is a crest in the way. The sightline's clearance over the
+   ground is measured now, at twelve points around a hill, rather
+   than assumed.
+
+   THE NUMBERS, because Lantern Current passed every gate in this
+   repo and still failed on exactly this. At 2.25 m/s moving, 22 m
+   abeam and 3 m up:
+
+       he crosses the frame in 5.4 s     18% of the width a second
+       ground abeam the lens, 22 m                   5.9 deg/s
+       the grass directly under it, 3 m             43   deg/s
+       Lantern Current, at its best                  2.4 deg/s
+       Long Air at MAG 12                           88   deg/s
+
+   THE FIRST LINE IS THE ONE THAT MATTERS FOR A SHOT LIKE THIS, and
+   it is the one Lantern could not have produced at any distance: a
+   figure that crosses the whole picture once a breath. Angular rate
+   is the right test for a lens pointed ALONG the motion; across it,
+   what the reader reads is the fraction of the frame travelled, and
+   quoting the angular number alone here would be the measurement
+   pointing at the wrong thing.
 
    IT TRAILS RATHER THAN RIDING, which is the other half of Lantern's
    fault: its camera rode the thing the breath moved, so the motion
@@ -484,9 +510,9 @@ export const FLOCK_MIN_GAP = FLOCK_TRAIL / FLOCK_N * 0.5;
    tracker, so being ahead of or behind the pace is displacement
    within the frame — he walks towards the front of the picture on a
    fast climb and drifts back on a slow one. */
-export const CAM_SIDE = 9.0;    // metres off the path
-export const CAM_UP   = 2.6;    // metres above the ground beneath it
-export const CAM_BACK = 5.0;    // metres behind him along the walk
+export const CAM_SIDE = 22.0;   // metres off the path
+export const CAM_UP   = 3.0;    // metres above the ground beneath it
+export const CAM_BACK = 3.5;    // abeam the middle of the line
 export const CAM_W    = 1.1;    // how slowly it takes up his pace
 
 /** Per-phase lens behaviour, hand-assigned like every other decision
@@ -496,10 +522,16 @@ export const CAM_W    = 1.1;    // how slowly it takes up his pace
  *  the top is the one moment the far side of the hill is about to
  *  open up, and the lens looks further ahead for it. */
 export const CAM_EASE = {
-  climb:   { look:  5.0, ease: 2.2 },
-  crest:   { look:  8.0, ease: 2.0 },
-  descend: { look:  4.0, ease: 2.6 },
-  level:   { look:  3.0, ease: 2.8 }
+  /* SMALL, and that is the side-on lens again: at 22 m, aiming five
+     metres up the path swings the whole picture by thirteen degrees,
+     which is nearly half the frame. They are kept, because the lens
+     leaning ahead of him on a climb and settling back on a descent
+     is worth having; they are kept small because at this distance a
+     little of it goes a long way. */
+  climb:   { look:  2.0, ease: 2.2 },
+  crest:   { look:  3.0, ease: 2.0 },
+  descend: { look:  0.5, ease: 2.6 },
+  level:   { look:  0.0, ease: 2.8 }
 };
 
 /** The choice the gate offers, in the same two words the rest of the

@@ -359,38 +359,41 @@ scene.add(mesas);
    a raised cosine, which matches in value, slope AND curvature
    across the join, and pathX is built on periods that divide it.
 
-   MEASURED, AND THE LENS IS WHY THESE ARE BIG. It sits two and a
-   half metres above a ground that falls away under it, so the eye is
-   not much above the path and the whole scene is read at a GRAZING
-   angle: the nearest ground is 2.6 m away, where a metre is nearly
-   three hundred pixels. Nothing about the hill's own shape needs
-   this many rows; the range does.
+   THE TWO AXES ARE NOTHING LIKE EACH OTHER, and that is the lens.
+   It sits 22 m off the path, so ACROSS the walk the ground recedes
+   from it fast and a 1.7 m column is under half a pixel at the
+   middle distance — but ALONG the walk, the strip runs right past
+   the lens, and the nearest row is four or five metres away where a
+   metre is a hundred and seventy pixels. Nothing about the hill's
+   own shape needs 640 rows; the near miss does.
 
    Measured through this chapter's lens at three poses spanning a
    hill, worst case of the three, in tools/continuity.mjs:
 
-       rows   spacing   along   across   where it meets sky   tris
-        240    0.900   1.81*     2.30*          1.13          54k
-        420    0.514   (interpolated)           2.09          94k
-        560    0.386    1.71      1.69          1.16         125k
+       rows  cols   along   across   meets sky    tris
+        560   113    2.52     0.41       1.69     125k   FAILS
+        640    65    1.74     1.24       0.96      82k
+        720    65    1.35     1.24       0.76      92k
+        800    65    1.11     1.24       0.61     102k
 
-       (* at COLS 161; the shipped 113 is coarser across and
-          finer along, which is why the first row is not a subset
-          of the last)
+   640/65 ships: it is the cheapest setting that holds the 2 px bar
+   on all three, and it is CHEAPER than the mesh the first camera
+   needed, because moving the lens out bought more across than it
+   cost along.
 
    THREE NUMBERS RATHER THAN TWO, and the third is the one that
    matters most. The hill is flat-shaded from fields of (d, o) with
    no normal anywhere in it (§4.2 rule 1), so an INTERIOR facet has
    no shading to reveal it — what can show a row boundary is the edge
    where the ground meets the sky. That edge is found rather than
-   assumed, because with the lens this low it is a few metres away
-   for some columns and a hundred for others. The interior sweeps are
-   kept and gated as well: they are what would catch a posterised
-   tone boundary going polygonal, and a mesh that passes without
-   needing the argument is worth more than the argument. */
+   assumed, because it is a few metres away for some columns and a
+   hundred for others. The interior sweeps are kept and gated too:
+   they are what would catch a posterised tone boundary going
+   polygonal, and a mesh that passes without needing the argument is
+   worth more than the argument. */
 const STRIP_LEN = PATH_PERIOD;               // 216 m, twelve hills
-const HILL_ROWS = 560;                       // along the walk, 0.386 m
-const HILL_COLS = 113;                       // across it, 0.964 m
+const HILL_ROWS = 640;                       // along the walk, 0.338 m
+const HILL_COLS = 65;                        // across it, 1.688 m
 const HILL_HALF = 54;
 /** Fraction of the strip kept behind the lens, so the wrap happens
  *  out of sight at both ends. */
