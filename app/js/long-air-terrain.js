@@ -666,7 +666,14 @@ export function gateFlank(x){
  *  what the flank's own curvature needs to stay inside the pixel bar
  *  on the tallest gate; tools/continuity.mjs projects it rather than
  *  taking that on trust. */
-export const BUTT_COLS = 67;
+/* 85, RAISED FROM 67 ON 6 NOVEMBER. Burying the flank put a little
+   more curvature into it and the measurement went to 1.95 px against
+   a 2 px bar, which is passing by an amount I would not trust. The
+   reader has said the chapter runs at 60 fps and not to be stingy, so
+   this is bought rather than argued around: sagitta goes as the
+   square of the column spacing, so 67 -> 85 takes it to about 1.2 px.
+   Costs 2,376 triangles across the strip. */
+export const BUTT_COLS = 85;
 export const BGX = Array.from({ length: BUTT_COLS },
   (_, i) => -BUTT_HALF + (i / (BUTT_COLS - 1)) * BUTT_HALF * 2);
 
@@ -674,9 +681,46 @@ export const BGX = Array.from({ length: BUTT_COLS },
  *  the opening is, the hill where it is not, and one smooth blend
  *  between. `lipBase` is the gate's lower lip (centre - half) and
  *  `groundY` is meshY at this column and this row. */
+/* ==================================================================
+   THE BURIED FLANK — 6 November 2026
+   ==================================================================
+   The reader: at the lowest points, weird ridges of rock appear and
+   then disappear into the ground. Measured rather than guessed, and
+   two likelier-sounding explanations were tested and REFUSED first:
+   the drawn rock lip is never below the drawn terrain (zero columns
+   out of 2,211), and the lip ribbon's 2.6 m span cuts under the hill
+   by at most 3.3 cm. Neither is a visible anything.
+
+   What IS happening: the flank taper is a quintic, so it approaches
+   zero slowly, and the buttress therefore hugs the hill for several
+   metres at each edge. About five columns per gate — both flanks,
+   across the full 104 m width — sit within FIVE CENTIMETRES of the
+   terrain. Two surfaces that close are one surface as far as a depth
+   buffer is concerned, and they z-fight.
+
+   Which is also why it is "at the lowest points": the complaint is
+   about where the CAMERA is, not where the geometry is. Low in the
+   corridor the lens looks along the hill rather than down on it, so
+   the band is seen at a grazing angle — the worst case for depth
+   precision and the largest screen area the band ever covers.
+
+   THE FIX IS TO BURY THE FLANK RATHER THAN TO LAND IT. The rise is
+   unchanged where it matters: at the opening gateFlank is 1 and the
+   top is exactly the gate's own lip, so nothing about the mechanic or
+   the aimable edge moves. Away from it the top is pushed BELOW the
+   terrain by up to SINK, so the two surfaces separate instead of
+   converging and there is nothing left to fight. Both terms are C2,
+   so the flank is as smooth as it was.
+
+   SINK is 0.4 m, which is eight times the five centimetres measured
+   above and a quarter of the 1.67 m the lowest lip clears the crest
+   by — far enough to be certain, small enough that no reader will
+   ever see a buttress start a little way inside the hill. */
+export const BUTT_SINK = 0.4;
 export function buttressTop(x, gateI, lipBase, groundY){
   const lipY = lipBase - lipOffsetAt(gateI, x);
-  return groundY + (lipY - groundY) * gateFlank(x);
+  const f = gateFlank(x);
+  return groundY + (lipY - groundY) * f - BUTT_SINK * (1 - f);
 }
 
 /** The most the crown's cauliflower can ever add. Each lobe is

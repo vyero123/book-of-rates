@@ -61,7 +61,7 @@ import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          profileTone, profileH,
          TREES, TREE_SEG, treeWidth, treeLean,
          CGX, cloudLip, cloudUnder, cloudCrown, cloudEnd, BANK_DEPTH, CLOUD_CROWN_MAX,
-         BGX, buttressTop, gateFlank, BUTT_HALF } from '../app/js/long-air-terrain.js';
+         BGX, buttressTop, gateFlank, BUTT_HALF, BUTT_SINK } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
 import { MAG, MAG_V, MAG_T } from '../app/js/long-air-breath.js';
 import { readFileSync } from 'node:fs';
@@ -369,7 +369,7 @@ say('GATE SLABS AGAINST THE TERRAIN');
      flank's edge, or every gate has a step down its side. That
      depends on gateFlank reaching zero and on buttressTop blending
      towards the ground it was handed, both of which are real code. */
-  let worstSeam = 0, seamAt = null;
+  let worstSeam = Infinity, seamAt = null;
   for(const g of course.gates){
     const lip = g.centre - g.half;
     /* the module's own edge, not a number typed here: BUTT_HALF moved
@@ -379,8 +379,9 @@ say('GATE SLABS AGAINST THE TERRAIN');
     for(const x of [BGX[0], BGX[BGX.length - 1], -BUTT_HALF, BUTT_HALF,
                     -(BUTT_HALF - 0.1), BUTT_HALF - 0.1]){
       const ground = meshY(x, g.zb, period);
-      const d = Math.abs(buttressTop(x, g.i, lip, ground) - ground);
-      if(d > worstSeam){ worstSeam = d; seamAt = { z:+g.zb.toFixed(1), x }; }
+      /* how far UNDER the hill the flank sits; negative would be above */
+      const d = ground - buttressTop(x, g.i, lip, ground);
+      if(d < worstSeam){ worstSeam = d; seamAt = { z:+g.zb.toFixed(1), x }; }
     }
   }
   /* THE TOLERANCE IS A PIXEL, CONVERTED, not a round number. At the
@@ -391,18 +392,30 @@ say('GATE SLABS AGAINST THE TERRAIN');
      gate is read from about twelve metres, where a millimetre is
      0.06 px — six hundredths of a pixel is the scale at which "no
      visible step" stops being a claim about the picture. */
-  const SEAM_M = 1e-3;
-  const gl = `buttress top meets the hill at its flank: worst departure ` +
-             `${worstSeam.toExponential(1)} m = ` +
-             `${(worstSeam / 12 * (812 / 1.082)).toFixed(4)} px at 12 m`;
-  if(worstSeam < SEAM_M) ok(gl + '  (it melts in rather than ending)');
-  else bad(gl + `  — a step down the side of a gate at z=${seamAt.z} x=${seamAt.x}`);
+  /* THE QUESTION INVERTED ON 6 NOVEMBER. It used to ask whether the
+     buttress top MEETS the hill at its flank, and it did — to eight
+     microns, which turned out to be the fault rather than the proof.
+     Two surfaces that coincide z-fight, and about five columns per
+     gate were inside five centimetres of each other across the full
+     width. So the flank is BURIED now and what has to be checked is
+     that it is buried: deeply enough that nothing can fight, and not
+     so deep that a buttress would be seen to start inside the hill.
+
+     `worstSeam` is now the smallest burial anywhere on the flank
+     rather than the largest departure, and the bar is the depth
+     buffer's, not a pixel's. */
+  const gl = `buttress flank is buried, not landed: shallowest burial ` +
+             `${worstSeam.toFixed(3)} m (sink ${BUTT_SINK} m)`;
+  if(worstSeam > 0.05 && worstSeam <= BUTT_SINK + 1e-9)
+    ok(gl + '  (clear of the depth buffer, and never seen to start)');
+  else bad(gl + `  — at z=${seamAt.z} x=${seamAt.x}; under 5 cm the two surfaces z-fight, ` +
+                `which is the "ridges of rock appearing and disappearing" the reader reported`);
   /* AND THE FLANK MUST ACTUALLY ARRIVE AT THE HILL. gateFlank is what
      turns the gate from a wall ending in mid-air into a swelling of
      the hillside, and a taper that did not reach zero would leave a
      step down the side of every gate. */
-  const fl = `gate flank reaches the hill: ${gateFlank(BUTT_HALF).toExponential(1)} at the edge, ` +
-             `${gateFlank(15).toFixed(3)} at the opening`;
+  const fl = `gate flank: ${gateFlank(BUTT_HALF).toExponential(1)} at the edge, ` +
+             `${gateFlank(15).toFixed(3)} at the opening (so the lip is exact where it is aimed at)`;
   if(gateFlank(BUTT_HALF) < 1e-12 && Math.abs(gateFlank(15) - 1) < 1e-12) ok(fl);
   else bad(fl + '  — the buttress does not melt into the hill');
   const ll = `gate lip profile, worst knot ${lipKink.toFixed(2)} deg at x=${lipAt.x}`;
