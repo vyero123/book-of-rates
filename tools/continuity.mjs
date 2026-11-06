@@ -60,7 +60,7 @@ import { gradeAt, terrainY, meshY, columnsAt, rowsOf,
          highestDrawn, PROF, GX, lipOffset,
          profileTone, profileH,
          TREES, TREE_SEG, treeWidth, treeLean,
-         CGX, cloudLip } from '../app/js/long-air-terrain.js';
+         CGX, cloudLip, BGX, buttressTop, gateFlank } from '../app/js/long-air-terrain.js';
 import { CAM_EASE } from '../app/js/long-air-lens.js';
 import { readFileSync } from 'node:fs';
 
@@ -338,10 +338,52 @@ say('GATE SLABS AGAINST THE TERRAIN');
       if(d > lipKink){ lipKink = d; lipAt = { gate:g.i, x:GX[k] }; }
     }
   }
-  const gl = `rock slab far edge vs lowest terrain across the opening: ` +
-             `worst gap ${worstGap.toFixed(2)} m at z=${gapAt.z}`;
-  if(worstGap < 0) ok(gl + '  (buried everywhere, as it must be)');
-  else bad(gl + '  — the slab floats and you can see under it');
+  /* THE QUESTION CHANGED ON 6 NOVEMBER. It used to be "is the slab's
+     flat far edge below the lowest terrain across the opening", which
+     is the right question about a card propped against a hill. The
+     buttress has no flat far edge: its base is meshY sampled column
+     by column, so the honest question is whether it COINCIDES with
+     the drawn surface rather than whether it is buried under it. A
+     gap of any sign is a seam now. */
+  /* WHAT CAN ACTUALLY FAIL. The base is meshY by construction, so
+     comparing it with meshY is a check that cannot fail and is worth
+     nothing — the first version of this did exactly that and is the
+     reason this note exists. The identity that CAN break is at the
+     other end: the buttress TOP has to arrive at the hill at the
+     flank's edge, or every gate has a step down its side. That
+     depends on gateFlank reaching zero and on buttressTop blending
+     towards the ground it was handed, both of which are real code. */
+  let worstSeam = 0, seamAt = null;
+  for(const g of course.gates){
+    const lip = g.centre - g.half;
+    for(const x of [-BGX[0], BGX[0], -46, 46, -45.9, 45.9]){
+      const ground = meshY(x, g.zb, period);
+      const d = Math.abs(buttressTop(x, g.i, lip, ground) - ground);
+      if(d > worstSeam){ worstSeam = d; seamAt = { z:+g.zb.toFixed(1), x }; }
+    }
+  }
+  /* THE TOLERANCE IS A PIXEL, CONVERTED, not a round number. At the
+     edge itself gateFlank is exactly zero and the departure is
+     exactly zero; a hair inside it the quintic is 1 - 3e-7, which
+     against a 22 m lip is about eight microns. Asking for 1e-6 there
+     was asking the quintic to be something other than a quintic. A
+     gate is read from about twelve metres, where a millimetre is
+     0.06 px — six hundredths of a pixel is the scale at which "no
+     visible step" stops being a claim about the picture. */
+  const SEAM_M = 1e-3;
+  const gl = `buttress top meets the hill at its flank: worst departure ` +
+             `${worstSeam.toExponential(1)} m = ` +
+             `${(worstSeam / 12 * (812 / 1.082)).toFixed(4)} px at 12 m`;
+  if(worstSeam < SEAM_M) ok(gl + '  (it melts in rather than ending)');
+  else bad(gl + `  — a step down the side of a gate at z=${seamAt.z} x=${seamAt.x}`);
+  /* AND THE FLANK MUST ACTUALLY ARRIVE AT THE HILL. gateFlank is what
+     turns the gate from a wall ending in mid-air into a swelling of
+     the hillside, and a taper that did not reach zero would leave a
+     step down the side of every gate. */
+  const fl = `gate flank reaches the hill: ${gateFlank(46).toExponential(1)} at the edge, ` +
+             `${gateFlank(15).toFixed(3)} at the opening`;
+  if(gateFlank(46) < 1e-12 && Math.abs(gateFlank(15) - 1) < 1e-12) ok(fl);
+  else bad(fl + '  — the buttress does not melt into the hill');
   const ll = `gate lip profile, worst knot ${lipKink.toFixed(2)} deg at x=${lipAt.x}`;
   if(lipKink <= TARGET_DEG) ok(ll); else bad(ll + `  (budget ${TARGET_DEG})`);
 }
@@ -937,6 +979,46 @@ say('THE CLOUD LIP — the silhouette, through the lens');
   const ml = `cloud lip offset is non-negative everywhere (min ${minOff.toFixed(4)} m)`;
   if(minOff >= -1e-12) ok(ml);
   else bad(ml + '  — a bulge cuts INTO the opening');
+}
+
+/* ==================================================================
+   THE BUTTRESS SILHOUETTE
+   ==================================================================
+   New geometry across the whole width of the frame, and the flank is
+   where it lives: a gate's lip reaches 24.6 m and has to come down to
+   a hillside at about 2 m over the 31 m between the opening's edge
+   and the buttress's. That is the steepest smooth descent anywhere in
+   the chapter, so it is the knot most at risk and the one the row
+   spacing of 1.53 m was chosen against. Projected, like everything
+   else that shows as an edge.
+   ================================================================== */
+say('');
+say('THE BUTTRESS — the flank, through the lens');
+{
+  const probe4 = breath(proto);
+  const course4 = courseOf(proto, t => probe4.value(t));
+  let worst = { px: 0 }, seen = 0, tallest = 0;
+  for(const g of course4.gates){
+    const zw = zWorldOf(g.zb);
+    if(zw > 0 || zw < -140) continue;
+    const lip = g.centre - g.half;
+    tallest = Math.max(tallest, lip);
+    const Y = x => buttressTop(x, g.i, lip, meshY(x, g.zb, period));
+    for(let k = 1; k < BGX.length - 1; k++){
+      const r = sagittaPx([BGX[k-1], Y(BGX[k-1]), zw],
+                          [BGX[k],   Y(BGX[k]),   zw],
+                          [BGX[k+1], Y(BGX[k+1]), zw]);
+      if(r){ seen++; if(r.px > worst.px) worst = { ...r, gate:g.i, x:BGX[k] }; }
+    }
+  }
+  if(seen === 0){
+    bad('buttress: nothing projected — the instrument saw no gates in frame');
+  } else {
+    const line = `buttress flank           worst ${worst.px.toFixed(2).padStart(5)} px off the chord` +
+                 ` at ${worst.dist.toFixed(0)} m (gate ${worst.gate}, x=${worst.x.toFixed(1)}),` +
+                 ` tallest lip in frame ${tallest.toFixed(1)} m, ${seen} knots  (bar ${PX_BAR} px)`;
+    if(worst.px <= PX_BAR) ok(line); else bad(line);
+  }
 }
 
 /* PROVE THE PROJECTOR. A tool that reports pixels has to be shown to

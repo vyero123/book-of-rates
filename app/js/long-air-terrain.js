@@ -317,14 +317,18 @@ export const LIP_COLS = 31;
 export const GX = Array.from({ length: LIP_COLS },
   (_, i) => -15 + (i / (LIP_COLS - 1)) * 30);
 
-export function lipOffset(gateI, k){
-  const x = GX[k];
+/** The lip offset as a function of x rather than of a column index.
+ *  This is the primitive; lipOffset(gateI, k) is it sampled at GX[k].
+ *  The buttress needs it at columns GX does not have, and a second
+ *  copy of the formula for those is exactly the fault that had the
+ *  sampler measuring a surface the page did not draw. */
+export function lipOffsetAt(gateI, x){
   // the smooth part: a U across the opening, quantised PER GATE so a
   // gate still has one decided size rather than a continuum. Quantising
   // a per-object constant is harmless — there is no surface across
   // which it varies, so it has no derivative to be discontinuous in.
   const vmax = Math.round((((gateI * 31) % 11) / 11 * 1.8) / 0.6) * 0.6;
-  const t = Math.abs(x) / 15;
+  const t = Math.min(1, Math.abs(x) / 15);
   const u = t * t * t * (t * (t * 6 - 15) + 10);   // C2, flat at x = 0
   // the rough part: one smooth lobe along the lip, phase per gate,
   // raised so it never dips below zero
@@ -332,6 +336,7 @@ export function lipOffset(gateI, k){
   const j = 0.17 * (0.5 - 0.5 * Math.cos(x * 0.42 + ph));
   return vmax * u + j;
 }
+export function lipOffset(gateI, k){ return lipOffsetAt(gateI, GX[k]); }
 
 /** The highest the drawn surface ever reaches, sampled rather than
  *  reasoned about. The corridor floor has to clear this, and the
@@ -521,3 +526,68 @@ export function cloudLip(gateI, k){
  *  odd). Shared rather than re-derived at the three call sites. */
 export const CLOUD_MID = (CLOUD_LIP_COLS - 1) / 2;
 export function cloudBaseOffset(gateI){ return cloudLip(gateI, CLOUD_MID); }
+
+/* ==================================================================
+   THE GROUND IS ONE LANDSCAPE — 6 November 2026
+   ==================================================================
+   The reader: make the ground more continuous instead of interrupted
+   shapes as the basis. As built the course was a ridge with flat
+   slabs standing in it -- each rock gate ran from a plane at
+   GROUND - 3 up to its lip and stopped dead at x = +-15, so it read
+   as a card propped against the hill rather than as part of it.
+
+   WHAT WAS ACTUALLY TRIED FIRST, AND WHY IT IS NOT HERE. The obvious
+   reading is to fold the gates into columnsAt() so there is literally
+   one surface. That cannot be built at this mesh resolution and the
+   arithmetic says so rather than my taste: a gate's lower lip follows
+   the schedule and reaches 24.6 m, the rows are 2.6 m apart, and for
+   a smootherstep of height H over half-length L the worst knot angle
+   is about 5.77 H h / L^2. Over a 30 m rise that is 0.154 x 2.6 =
+   0.4 rad, twenty-three degrees at a single knot; to bring it under
+   the chapter's bar needs rows 0.45 m apart, which is 1,500 rows and
+   roughly 400,000 triangles for the ridge alone. A 24 m near-vertical
+   feature every twenty metres is architecture, not terrain, and §4.2
+   is explicit that a hard edge is legitimate -- the lip is the thing
+   the reader aims at and is SUPPOSED to be an edge.
+
+   So the gates stay their own mesh and stop being separate SHAPES,
+   which is what was actually wrong:
+
+     - the base is the DRAWN TERRAIN, sampled with meshY at every
+       column, instead of a flat plane below everything. There is no
+       junction to see and no gap that could open under one;
+     - the columns run out to +-46 m instead of stopping at +-15, and
+       the lip height blends down to that terrain across the flank,
+       so a gate is a buttress swelling out of the hillside rather
+       than a wall ending in mid-air;
+     - it is painted in the hill's own value language, including the
+       layered haze, so it reads as the same rock.
+
+   The flank taper is a quintic, C2 at both ends, so it adds no kink
+   where it meets the hill and none where it leaves the opening.
+   ================================================================== */
+
+/** How much of the gate's own lip height survives at x. 1 across the
+ *  opening, 0 by the time the buttress has melted into the hillside. */
+export const BUTT_HALF = 46;
+export function gateFlank(x){
+  const t = Math.min(1, Math.max(0, (Math.abs(x) - 15) / (BUTT_HALF - 15)));
+  return 1 - t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+/** The buttress columns. 61 across 92 m is 1.53 m apart, which is
+ *  what the flank's own curvature needs to stay inside the pixel bar
+ *  on the tallest gate; tools/continuity.mjs projects it rather than
+ *  taking that on trust. */
+export const BUTT_COLS = 61;
+export const BGX = Array.from({ length: BUTT_COLS },
+  (_, i) => -BUTT_HALF + (i / (BUTT_COLS - 1)) * BUTT_HALF * 2);
+
+/** The top of the buttress at one column: the gate's own lip where
+ *  the opening is, the hill where it is not, and one smooth blend
+ *  between. `lipBase` is the gate's lower lip (centre - half) and
+ *  `groundY` is meshY at this column and this row. */
+export function buttressTop(x, gateI, lipBase, groundY){
+  const lipY = lipBase - lipOffsetAt(gateI, x);
+  return groundY + (lipY - groundY) * gateFlank(x);
+}

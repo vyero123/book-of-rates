@@ -256,7 +256,8 @@ import { PROTOCOLS, CHOICE, validChoice,
    the page drew a 20.00 degree one. See the note in ridgeGeometry. */
 import { PROF, GX, gradeAt, meshY, rowsOf, lipOffset,
          columnsAt, TREES, TREE_SEG, treeWidth, treeLean,
-         CGX, cloudLip, cloudBaseOffset } from './js/long-air-terrain.js';
+         CGX, cloudLip, cloudBaseOffset,
+         BGX, buttressTop, gateFlank } from './js/long-air-terrain.js';
 import { body, drag } from './js/course.js';
 /* The lens is a module for the same reason the terrain is: a jerk can
    only be measured in Node, and tools/temporal.mjs has to drive the
@@ -1082,7 +1083,7 @@ const SLAB_Z = 2.6;
 const CAM_BACK_MIN = 11.5;
 const NEAR_FADE = nearFadeGlsl({ gone: CAM_BACK_MIN - 7.0, full: CAM_BACK_MIN - 0.5 });
 
-function gateGeometry(course, which){
+function gateGeometry(course, which, period){
   // which: -1 rock from below, +1 cloud from above
   /* aBaseZ: the gate's OWN anchor z, the same value on every vertex of
      that gate, so the scroll can wrap the gate as one object. See
@@ -1096,8 +1097,14 @@ function gateGeometry(course, which){
      Both come from js/long-air-terrain.js, so neither is a second
      copy of anything. */
   const isCloud = which > 0;
-  const XS  = isCloud ? CGX : GX;
-  const LIP = isCloud ? cloudLip : lipOffset;
+  /* THE ROCK HALF IS A BUTTRESS NOW, not a slab: 61 columns out to
+     +-46 m, its top blending from the gate's own lip down to the
+     hill, and its base ON the drawn terrain. See THE GROUND IS ONE
+     LANDSCAPE in js/long-air-terrain.js — including why folding it
+     into the ridge mesh outright is not affordable at this row
+     spacing, with the arithmetic rather than an opinion. */
+  const XS  = isCloud ? CGX : BGX;
+  const rows = rowsOf(period);
   const b = builder(THREE, { aLip:1, aLedge:1, aTone:1, aSun:1, aSide:1, aSeed:1,
                              aBaseZ:1, aLipY:1 });
   for(const g of course.gates){
@@ -1119,7 +1126,16 @@ function gateGeometry(course, which){
        future change to the grade would have shown daylight under a
        gate. Now buried by better than a metre everywhere, and the
        sampler checks it rather than the comment claiming it. */
-    const far = which < 0 ? GROUND - 3.0 : ceilAt(g.zb, course.period) + 2.0;
+    /* THE BASE IS THE HILL, COLUMN BY COLUMN. It was a flat plane at
+       GROUND - 3, which is what made a gate read as a card propped
+       against the terrain: there was a junction, and the sampler had
+       to check the slab was buried rather than that it MET anything.
+       meshY is the surface the GPU renders, so the two coincide by
+       construction. The small sink is for depth precision only — a
+       coincident surface z-fights. */
+    const farAt = k => which < 0
+      ? meshY(XS[k], g.zb, period, rows) - 0.25
+      : ceilAt(g.zb, course.period) + 2.0;
     const seed = ((g.i * 7919) % 97) / 97;
     /* the lip is level in the kite's own lane and steps away from it to
        the sides, so the centre lane is visibly the route and the sides
@@ -1128,14 +1144,16 @@ function gateGeometry(course, which){
        sampler: it used to turn 36 degrees at the knot directly in
        front of the reader, which was the sharpest jut in the chapter
        and on the one edge you actually aim at. */
-    const lipAt = k => lip + which * LIP(g.i, k);
+    const lipAt = k => isCloud
+      ? lip + cloudLip(g.i, k)
+      : buttressTop(XS[k], g.i, lip, meshY(XS[k], g.zb, period, rows));
     const base = b.count;
     for(let k = 0; k < XS.length; k++){
       b.vertex(XS[k], lipAt(k), g.zb,
                { aLip:1, aLedge:0, aTone: which < 0 ? MID : LIGHT, aSun: XS[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb, aLipY: lipAt(k) });
     }
     for(let k = 0; k < XS.length; k++){
-      b.vertex(XS[k], far, g.zb,
+      b.vertex(XS[k], farAt(k), g.zb,
                { aLip:0, aLedge:0, aTone: which < 0 ? BODY : MID, aSun: XS[k] <= 0 ? 1 : 0, aSide: which, aSeed: seed, aBaseZ: g.zb, aLipY: lipAt(k) });
     }
     // the back face, offset in z, so a slab reads as solid as it passes
@@ -1144,7 +1162,9 @@ function gateGeometry(course, which){
       // aLedge marks it, because the triangles between this row and the
       // front lip row form a HORIZONTAL SHELF thirty metres wide, and a
       // shelf is not an edge however much it shares an attribute with one.
-      b.vertex(XS[k], lipAt(k), g.zb - SLAB_Z,
+      b.vertex(XS[k], isCloud ? lipAt(k)
+                 : buttressTop(XS[k], g.i, lip, meshY(XS[k], g.zb - SLAB_Z, period, rows)),
+               g.zb - SLAB_Z,
                { aLip:1, aLedge:1, aTone: which < 0 ? BODY : MID, aSun: 0, aSide: which, aSeed: seed, aBaseZ: g.zb, aLipY: lipAt(k) });
     }
     /* WINDING, and it is why this mesh could not be front-face culled.
@@ -1185,6 +1205,7 @@ const gateMatFor = kind => posterMat(THREE, {
              uDeep:{value:C(kind === 'rock' ? ROCK.shadowDeep : AIR.cloudDeep)},
              uAccent:{value:C(ROCK.accent)},
              uLit:{value:C(AIR.cloudLit)},
+             uFogLow:{value:C(AIR.hazeLow)},
              uWarm:{value:C(AIR.bankWarm)}, uBody:{value:C(AIR.bankBody)},
              uCool:{value:C(AIR.bankCool)}, uBase:{value:C(AIR.bankBase)},
              uInCloud,
@@ -1244,7 +1265,7 @@ const gateMatFor = kind => posterMat(THREE, {
     varying float vDist; varying float vSide; varying float vSeed;
     varying float vY; varying float vX; varying float vBelow;
     uniform vec3 uShadow, uDeep, uAccent, uLit;
-    uniform vec3 uWarm, uBody, uCool, uBase;
+    uniform vec3 uWarm, uBody, uCool, uBase, uFogLow;
     uniform float uIsCloud, uNearFade, uTime, uFill, uInCloud;
     /* ==================================================================
        WOOL — giving the cloud bank a body
@@ -1425,7 +1446,15 @@ const gateMatFor = kind => posterMat(THREE, {
                    * 0.08 * (1.0 - uIsCloud);
       /* a cloud is water in air and takes far less of the haze than
          rock at the same distance does: it IS the haze, locally. */
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * (1.0 - uIsCloud * 0.55)), alpha);
+      /* THE SAME LAYERED HAZE THE HILL HAS. A buttress growing out of
+         the hillside that took a different amount of air than the
+         hillside did would come straight back apart as a separate
+         object — which is the whole fault this change is for. The
+         cloud half is exempt: it IS the haze, locally. */
+      float lowAir = (1.0 - uIsCloud) * (1.0 - smoothstep(-7.0, 2.5, vY));
+      vec3 haze = mix(uFog, uFogLow, lowAir * 0.85);
+      gl_FragColor = vec4(mix(col, haze,
+        min(0.58, fogAmount(vDist) * (0.74 + 0.54 * lowAir) * (1.0 - uIsCloud * 0.55))), alpha);
     }
   `
 });
@@ -1542,10 +1571,11 @@ for(const id of Object.keys(PROTOCOLS)){
   const proto = PROTOCOLS[id];
   const probe = breath(proto);
   const course = courseOf(proto, t => probe.value(t));
+  const period = periodOf(proto);
   const ridge = new THREE.Mesh(ridgeGeometry(proto), rockMat);
   const trees = new THREE.Mesh(treeGeometry(proto), treeMat);
-  const rock  = new THREE.Mesh(gateGeometry(course, -1), rockGateMat);
-  const cloud = new THREE.Mesh(gateGeometry(course, +1), cloudGateMat);
+  const rock  = new THREE.Mesh(gateGeometry(course, -1, period), rockGateMat);
+  const cloud = new THREE.Mesh(gateGeometry(course, +1, period), cloudGateMat);
   for(const m of [ridge, trees, rock, cloud]){ m.frustumCulled = false; m.visible = false; scene.add(m); }
   worlds[id] = { course, period: course.period, meshes:[ridge, trees, rock, cloud] };
 }
