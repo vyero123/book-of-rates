@@ -735,7 +735,15 @@ export function ridgeAt(z, period){
    name is true again. This moves the terrain DOWN, so every clearance
    in tools/regress.mjs gets larger: the on-pace guarantee is
    strengthened, never weakened. */
-export const SPINE_TOP = RIDGE_TOP - 0.85 * T;
+/** How much the fine relief octave adds, before T. It lives here
+ *  rather than in long-air-terrain.js because SPINE_TOP has to
+ *  subtract it — RIDGE_TOP means "the highest the DRAWN surface
+ *  reaches", and a new term stacked on the spine without being taken
+ *  off the saturation would make that constant a lie, which is the
+ *  fault RIDGE_TOP was re-derived to fix on 2 November. terrain.js
+ *  imports it; putting it there would be an import cycle. */
+export const RELIEF_AMP = 0.26;
+export const SPINE_TOP = RIDGE_TOP - (0.85 + RELIEF_AMP * 1.15) * T;
 
 /** The underside of the cloud ceiling, well above the corridor.
  *  Was quantised to 1.6 m steps and measured the same way: VALUE JUMP,

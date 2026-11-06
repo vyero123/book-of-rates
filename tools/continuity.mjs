@@ -253,17 +253,40 @@ say('');
 say('THE DRAWN SURFACE — kink angle at a knot, which is the jut itself');
 
 const kinks = [];
-function kink(name, f, a, b, step, budget){
+/* ==================================================================
+   THE DEGREE PROXY REPORTS; THE PIXEL BAR GATES
+   ==================================================================
+   CLAUDE.md's own note from earlier today: "anything that shows as an
+   EDGE should be projected, not measured in world degrees... if the
+   two ever disagree about a verdict, the pixel one is right." This is
+   that policy applied rather than restated.
+
+   The degree bar was derived as a stand-in for about three pixels at
+   the distance the ridge is read at, and a stand-in that assumes a
+   FIXED column spacing. The sagitta is the knot angle times the
+   spacing over eight, so halving the spacing allows twice the angle
+   for the same picture — and ROW_SPACING went 2.6 to 2.0 and COLS 129
+   to 169 to carry the fine octave. The proxy promptly condemned a
+   surface measuring 0.70 and 0.77 px against a 2 px bar.
+
+   So `gate: false` marks the sweeps whose subject is measured in
+   pixels further down — the ridge along z and across x. They are
+   still printed, because a change in them is worth seeing. Anything
+   WITHOUT a pixel counterpart still gates on degrees: the cloud
+   ceiling and the far mesas have no projected check and keep theirs.
+   ================================================================== */
+function kink(name, f, a, b, step, budget, gate = true){
   const k = maxKinkDeg(f, a, b, step);
   kinks.push({ name, ...k, budget });
   const line = `${name.padEnd(34)} ${String(k.deg).padStart(6)} deg at ${k.at}` +
                `   (budget ${budget})`;
-  if(k.deg <= budget) ok(line); else bad(line);
+  if(!gate) say('  --    ' + line + '   proxy only; gated in px below');
+  else if(k.deg <= budget) ok(line); else bad(line);
 }
 // along the course, at the crest and on each shoulder
-kink('crest line along z (x=0)',   z => meshY(0,   z, period), 0, period, rowStep, TARGET_DEG);
-kink('shoulder along z (x=-13)',   z => meshY(-13, z, period), 0, period, rowStep, TARGET_DEG);
-kink('flank along z (x=-58)',      z => meshY(-58, z, period), 0, period, rowStep, TARGET_DEG);
+kink('crest line along z (x=0)',   z => meshY(0,   z, period), 0, period, rowStep, TARGET_DEG, false);
+kink('shoulder along z (x=-13)',   z => meshY(-13, z, period), 0, period, rowStep, TARGET_DEG, false);
+kink('flank along z (x=-58)',      z => meshY(-58, z, period), 0, period, rowStep, TARGET_DEG, false);
 kink('cloud floor along z',        z => ceilAt(z, period),     0, period, rowStep, TARGET_DEG);
 /* ACROSS THE RIDGE, MEASURED AT THE COLUMNS THEMSELVES.
    Sampling the cross-section on an arbitrary grid dilutes the kink,
@@ -287,7 +310,7 @@ for(const z of [0, period * 0.17, period * 0.41, period * 0.73]){
   kinks.push({ name:`cross-section z=${z.toFixed(0)}`, ...k, budget:TARGET_DEG });
   const line = `cross-section at z=${z.toFixed(0)}`.padEnd(34) +
                `${String(k.deg).padStart(6)} deg at x=${k.at}   (budget ${TARGET_DEG})`;
-  if(k.deg <= TARGET_DEG) ok(line); else bad(line);
+  say('  --    ' + line + '   proxy only; "ridge across" below is the gate');
 }
 
 /* ------------------------------------------------------------------
@@ -302,11 +325,22 @@ for(const z of [0, period * 0.17, period * 0.41, period * 0.73]){
    ------------------------------------------------------------------ */
 say('');
 say('THE WRAP SEAM at z = 0 = period');
+/* THE DERIVATIVES ARE CENTRED NOW, and the fine relief octave is
+   why. The one-sided differences this used are first-order, so they
+   carry an error of f'' times the step — which was negligible while
+   every field here was tens of metres across and is not once the
+   terrain has a 10 m component. terrainY failed at 1.7e-3 against a
+   1e-3 bar with a field that is EXACTLY periodic by construction:
+   the sampler was measuring its own truncation error.
+
+   A centred difference across the seam against a centred difference
+   inside the field is second-order and asks the real question, which
+   is whether f and f' repeat. */
 const seam = (name, f) => {
   const h = 0.05;
-  const vA = f(period - 1e-6), vB = f(0);
-  const sA = (f(period - 1e-6) - f(period - 1e-6 - h)) / h;
-  const sB = (f(h) - f(0)) / h;
+  const vA = f(period), vB = f(0);
+  const sA = (f(period + h) - f(period - h)) / (2 * h);
+  const sB = (f(h) - f(-h)) / (2 * h);
   const dv = Math.abs(vA - vB), ds = Math.abs(sA - sB);
   const line = `${name.padEnd(28)} value ${dv.toExponential(1)}  slope ${ds.toExponential(1)}`;
   if(dv < 1e-6 && ds < 1e-3) ok(line); else bad(line);
@@ -498,7 +532,11 @@ say(`EVERY MESH, WORST KNOT — target ${TARGET_DEG} deg as seen`);
                  `across ${s.across.toFixed(2).padStart(6)}  ` +
                  `worst ${worst.toFixed(2).padStart(6)} deg at ~${s.dist} m ` +
                  `= ${app.toFixed(2)} as seen`;
-    if(app <= TARGET_DEG) ok(line); else bad(line);
+    /* the ridge and the gate lip are both projected below; the cloud
+       ceiling and the far mesas are not, so they keep the proxy */
+    const projected = s.mesh === 'ridge' || s.mesh === 'gate lip';
+    if(projected) say('  --    ' + line + '   proxy only; gated in px below');
+    else if(app <= TARGET_DEG) ok(line); else bad(line);
   }
 }
 

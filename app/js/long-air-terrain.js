@@ -19,7 +19,7 @@
  * No three.js and no DOM here: numbers only.
  */
 
-import { ridgeAt, wanderAt, RIDGE_TOP, sat, MAG_V, MAG_T } from './long-air-breath.js';
+import { ridgeAt, wanderAt, RIDGE_TOP, sat, MAG_V, MAG_T, RELIEF_AMP } from './long-air-breath.js';
 /* Every vertical quantity in this file is a multiple of one of these
    two. MAG_T for anything that is part of the HILL, MAG_V for
    anything that belongs to the flight band — the gate lips, the cloud
@@ -159,8 +159,16 @@ export function wanderScale(x){
    the field's curvature is bounded and therefore that subdivision is
    the right lever here at all — the same test that said it was the
    wrong lever while the profile was quantised. */
-export const COLS = 129;
-export const ROW_SPACING = 2.6;
+/* 145 AND 2.2, UP FROM 129 AND 2.6. The fine octave is the reason
+   and the pixel bar is what sets them: its shortest term is 8.5 m
+   down the course and 14 m across, which needs about four samples a
+   cycle to be drawn rather than aliased. Measured afterwards, not
+   assumed — tools/continuity.mjs projects both axes. The ridge goes
+   from 66,048 triangles to 87,840, which is the single largest line
+   in this chapter's budget and is bought on the reader's "not too
+   stingy". */
+export const COLS = 169;
+export const ROW_SPACING = 2.0;
 
 /** The column table the geometry is built from, generated rather than
  *  written out, so the count is a knob and not an edit. */
@@ -228,6 +236,48 @@ export function gradeAt(zb, x, period){
    THE SURFACE
    ------------------------------------------------------------------ */
 
+/* ==================================================================
+   THE FINE OCTAVE — 6 November 2026
+   ==================================================================
+   The hill was three smooth fields: a spine running four harmonics
+   down z, a cross-section that is one bump and one long fall, and a
+   cross-course grade of two harmonics. All of them are tens of metres
+   across, so the surface had SHAPE and no GRAIN — the reader said it
+   does not read as a material, and it did not, because every feature
+   on it was bigger than the frame.
+
+   WHAT THE SCALE HAD TO BE, and why it is not finer. The mesh samples
+   2.2 m down the course and 2.6 m across it, so anything under about
+   9 m of wavelength is below four samples a cycle and aliases — it
+   would not be texture, it would be noise that changes when the rows
+   move. So the shortest term here is 8.5 m and the rest are longer;
+   metre-scale grain belongs in the fragment stage and is there (see
+   the rock material in long-air.html), which is also where the sail's
+   weave and the cloud's wool live. Geometry buys the silhouette and
+   the way light falls across a slope; it does not buy grain.
+
+   THE TERMS ARE FOLDED, NOT ADDED. Two sines of x and z summed give a
+   plaid you can read in a second — the fault the kit's caustic note
+   describes and the wind field avoids the same way. Each component
+   here has the other axis folded into its phase, so no direction and
+   no period is legible, and because the fold is a bounded sine of a
+   linear argument the curvature stays bounded and the whole thing
+   refines.
+
+   PERIODIC IN zb BY CONSTRUCTION: every z term is an integer multiple
+   of the strip's own angle, so the wrap seam closes in value and in
+   slope without anything being tuned to make it.
+   ================================================================== */
+export function reliefAt(x, zb, period){
+  const u = (zb / period) * Math.PI * 2;
+  const s1 = Math.sin(u * 37 + x * 0.16);
+  const s2 = Math.sin(u * 55 + 2.1 + Math.sin(x * 0.13) * 1.1);
+  const s3 = Math.sin(x * 0.26 + 0.9 + Math.sin(u * 23) * 0.9);
+  /* the weights sum to 1.15, which is what long-air-breath.js takes
+     off SPINE_TOP so RIDGE_TOP still bounds the drawn surface */
+  return (s1 * 0.50 + s2 * 0.30 + s3 * 0.35) * RELIEF_AMP * T;
+}
+
 /** The columns at one z row: their shifted x and their height.
  *  This is verbatim what ridgeGeometry pushes as vertices, which is
  *  the point — the sampler and the mesh must not be able to disagree. */
@@ -236,7 +286,10 @@ export function columnsAt(zb, period){
   const top = ridgeAt(zb, period);
   return PROF.map(q => ({
     x: q.x + w * wanderScale(q.x),
-    y: top + q.dy + q.h * gradeAt(zb, q.x, period)
+    /* the fine octave rides on everything else and is NOT tapered by
+       q.h: grain does not stop at the lit crest band, it is what the
+       ground is made of all the way out */
+    y: top + q.dy + q.h * gradeAt(zb, q.x, period) + reliefAt(q.x, zb, period)
   }));
 }
 

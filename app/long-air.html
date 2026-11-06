@@ -1023,6 +1023,46 @@ const rockMat = posterMat(THREE, {
       /* the grain's cells are anchored to the PROFILE now, so they
          belong to the hill and cannot crawl along it as the tone
          varying slides past them */
+      /* ==============================================================
+         WHAT THE GROUND IS MADE OF
+         ==============================================================
+         The reader: the hill does not read as a material the way the
+         sail's weave and the cloud's wool do. It did not, and the
+         reason is that both of those are SHADING and the hill only
+         had shape — four value bands, a shadow split and a chip hash
+         that is one pixel of noise rather than a surface.
+
+         The geometry carries the mid scale now (reliefAt, 10 to 30 m,
+         bought with rows). Below that is the fragment stage's job and
+         always was: 2 m and 0.7 m here, which at the forty metres the
+         near hill is read at is 38 px and 13 px — coarse enough to be
+         a surface and far enough above a pixel not to crawl.
+
+         FOLDED, NOT ADDED, like every other two-scale field in this
+         chapter: each component has the other axis folded into its
+         phase, so it reads as broken ground rather than as a weave.
+         The weave is on the sail, where it belongs, because a sail IS
+         woven and a hillside is not.
+
+         ANCHORED TO (xp, zb) — the hill's own profile coordinate and
+         its baked z — so it belongs to the ground and cannot crawl
+         across it as the strip scrolls. Same argument as the grass
+         and the chip grain.
+
+         It is a VALUE shift inside the hill's own ramp step, not a
+         new colour: a material is the same rock lit differently, and
+         anything else would be a pattern painted on. */
+      vec2 rp = vec2(vXp, vZb);
+      float m1 = sin(rp.x * 3.1 + sin(rp.y * 2.7) * 1.2);
+      float m2 = sin(rp.y * 9.4 - sin(rp.x * 7.9) * 0.9);
+      float mat = (m1 * 0.62 + m2 * 0.38) * 0.5 + 0.5;
+      /* three steps, resolved, dissolving out where a 0.7 m cell
+         stops being more than a pixel — past that it is noise, which
+         is the Pearl Diver glitter lesson at the other end */
+      float matFar = 1.0 - smoothstep(90.0, 200.0, vDist);
+      float matB = posteriseAA(mat, 3.0);
+      col = mix(col, gDeep, (1.0 - matB) * 0.15 * matFar);
+      col = mix(col, gLit,  matB * matB * 0.11 * matFar);
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.6), floor(vXp * 0.21))) - 0.5) * 0.07;
 
       /* ==============================================================
