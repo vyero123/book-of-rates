@@ -105,7 +105,13 @@
 <div id="upnote">touch to come up</div>
 <div id="cue"><div id="phase">breathe in</div><div id="sub">above the water</div></div>
 <div id="bar"><div id="barfill"></div></div>
-<div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Never hold your breath in or near water. Ease off at any light-headedness.</div>
+<!-- THE FOOTER IS SPLIT, NOT REMOVED — 6 November 2026.
+     It was doing two jobs in one line: a protocol description (which
+     is the instructional copy the reader asked to go) and the safety
+     copy (which they have not asked for and decided deliberately).
+     The protocol name and "Silent by design" are gone; the
+     disclaimer and the physical cautions stay, verbatim. -->
+<div id="note">A personal project, offered as-is — use your own judgement. Never hold your breath in or near water. Ease off at any light-headedness.</div>
 
 <!-- A CHOICE, not a screening gate. The circumstances this practice asks
      for are disclosed by the warning scroll (js/scroll.js), which
@@ -115,8 +121,8 @@
 <div id="gate" class="sheet"><div>
   <h2>Which breath?</h2>
   <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols drive the same water. Neither is withheld from you and neither is better for you — pick the one you want.</p>
-  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">with two short holds · 3.75 a minute · she goes to the seabed</span></button>
-  <button id="gateNo" class="alt">NO HOLDS · 4 / 2 / 5<br><span class="sub2">a rest at empty instead · 5.45 a minute · a shallow reach</span></button>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4</button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 / 2 / 5</button>
   <p class="fine tiny">You breathe in at the surface in both. The holds are short, exactly equal to the other phases, and set by the app — they never lengthen, and nothing is timed by you or scored. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
@@ -2087,7 +2093,15 @@ const loop = clock((dt, now, running) => {
 
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
-  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
+  /* ONLY THE COUNTDOWN, NOT THE FLAVOUR LINE — 6 November 2026.
+     breath.js's cue() puts a countdown in `sub` when the phase has a
+     `count` and the phase's own flavour line there when it does not,
+     so the phase table is what decides. `count` is present exactly on
+     the phases that point AT THE NEXT BREATH, which is §2.4. The kit
+     is untouched, so a chapter that wants its flavour line back needs
+     one line here and nothing else. */
+  const showSub = B.at(t).p.count ? cue.sub : '';
+  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
   elBar.style.width = (100 * B.progress(t)).toFixed(2) + '%';
 
   renderer.render(scene, camera);
@@ -2104,7 +2118,6 @@ const picked = choice({ key:'bor.deeplight.protocol.v1', valid: validChoice });
 
 function beginWith(which, remember){
   B.use(PROTOCOLS[CHOICE[which]]);
-  $('proto').textContent = B.proto.name;
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;

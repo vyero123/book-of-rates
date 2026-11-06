@@ -97,10 +97,15 @@
 <div id="cue">
   <div id="phase">breathe in</div>
   <div id="sub">the boat lifts</div>
-  <div id="hint">rest a finger as you breathe in</div>
 </div>
 <div id="bar"><div id="barfill"></div></div>
-<div id="note"><span id="proto">Drifting · 4 in / 8 out · 5 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
+<!-- THE FOOTER IS SPLIT, NOT REMOVED — 6 November 2026.
+     It was doing two jobs in one line: a protocol description (which
+     is the instructional copy the reader asked to go) and the safety
+     copy (which they have not asked for and decided deliberately).
+     The protocol name and "Silent by design" are gone; the
+     disclaimer and the physical cautions stay, verbatim. -->
+<div id="note">A personal project, offered as-is — use your own judgement. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
 <!-- A CHOICE, not a screening gate. No breath is held anywhere in this
      chapter and nothing in it is fast breathing — the quicker of the two
@@ -110,14 +115,8 @@
 <div id="gate" class="sheet"><div>
   <h2>Go down the river</h2>
   <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. The last chapter before sleep.</p>
-  <div class="how">
-    <p><b>Rest a finger anywhere</b> as you breathe in. Light runs up the arches over the river — from the two lights nearest you, out and up, until it closes overhead on the second breath in.</p>
-    <p><b>Let go</b> as you breathe out and it goes back down the same path, from the top. The arches stay where they are, so you drift under them while they are going out.</p>
-    <p>A lantern on the water lights too, and that one stays. The boat lifts as you breathe in and settles as you breathe out. You are not steering and there is nothing to avoid.</p>
-    <p>It gets darker as the session goes on, and ends dark. Hold for all of it, or none. Nothing here is counted.</p>
-  </div>
-  <button id="gateDrift">DRIFTING · 4 IN / 8 OUT<br><span class="sub2">five breaths a minute</span></button>
-  <button id="gateSlower" class="alt">SLOWER · 4 IN / 9.3 OUT<br><span class="sub2">a longer exhale · four and a half a minute</span></button>
+  <button id="gateDrift">DRIFTING · 4 IN / 8 OUT</button>
+  <button id="gateSlower" class="alt">SLOWER · 4 IN / 9.3 OUT</button>
   <p class="fine tiny">The exhale is twice the length of the inhale in both, which some people find makes them yawn. That is fine and it is the point of this chapter. No breath is held anywhere here. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
@@ -224,7 +223,7 @@ const NIGHT = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill'), elHint = $('hint');
+const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -1297,8 +1296,15 @@ const loop = clock((dt, now, running) => {
      elapsed time (§2.4). Nothing here is a score. --- */
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
-  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
-  elHint.classList.toggle('on', started && !hintDone && t > 6);
+  /* ONLY THE COUNTDOWN, NOT THE FLAVOUR LINE — 6 November 2026.
+     breath.js's cue() puts a countdown in `sub` when the phase has a
+     `count` and the phase's own flavour line there when it does not,
+     so the phase table is what decides. `count` is present exactly on
+     the phases that point AT THE NEXT BREATH, which is §2.4. The kit
+     is untouched, so a chapter that wants its flavour line back needs
+     one line here and nothing else. */
+  const showSub = B.at(t).p.count ? cue.sub : '';
+  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
   elBar.style.width = (100 * prog).toFixed(2) + '%';
 
   renderer.render(scene, camera);
@@ -1327,7 +1333,6 @@ function beginWith(which, remember){
     for(let v = 0; v < LANTERN_VERTS; v++) WORLD.aLit.array[i * LANTERN_VERTS + v] = 0;
   }
   WORLD.aLit.needsUpdate = true;
-  $('proto').textContent = B.proto.name;
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;

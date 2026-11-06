@@ -121,7 +121,13 @@
 <div id="fps" role="status" title="Tap to hide">—</div>
 
 <div id="cue"><div id="phase">breathe in</div><div id="sub">let it climb</div></div>
-<div id="note"><span id="proto">Box breathing · 4-4-4-4 · 3.75 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
+<!-- THE FOOTER IS SPLIT, NOT REMOVED — 6 November 2026.
+     It was doing two jobs in one line: a protocol description (which
+     is the instructional copy the reader asked to go) and the safety
+     copy (which they have not asked for and decided deliberately).
+     The protocol name and "Silent by design" are gone; the
+     disclaimer and the physical cautions stay, verbatim. -->
+<div id="note">A personal project, offered as-is — use your own judgement. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
 <div id="reach" aria-label="Touch above or below the glider to move it there"></div>
 <div id="mUp" class="mark" aria-hidden="true"></div>
@@ -137,14 +143,8 @@
 <div id="gate" class="sheet"><div>
   <h2>Fly the kite</h2>
   <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols fly the same course. Pick the one you want.</p>
-  <div class="how">
-    <p><b>Hold IN</b> and the kite fills and climbs. <b>Hold OUT</b> and it empties and falls. Let go of both and it flies level.</p>
-    <p>The gaps in the course are placed where your breath should have taken you, so flying it well and breathing on pace are the same thing. You can see several breaths ahead of you.</p>
-    <p>It cannot crash. It steers away from a surface by itself, and if it does touch one it skims along it and slows down — and your next breath is what takes the friction off again. Drift off pace and the gaps open wider too.</p>
-    <p>Nothing here is timed, scored, counted or compared — not between sessions and not within one.</p>
-  </div>
-  <button id="gateHolds">BOX BREATHING · 4-4-4-4<br><span class="sub2">two short holds · 3.75 a minute · each one a level channel</span></button>
-  <button id="gateNo" class="alt">NO HOLDS · 4 IN / 5 OUT / 3<br><span class="sub2">three seconds at empty instead · 5 a minute</span></button>
+  <button id="gateHolds">BOX BREATHING · 4-4-4-4</button>
+  <button id="gateNo" class="alt">NO HOLDS · 4 IN / 5 OUT / 3</button>
   <p class="fine tiny">The holds are four seconds, exactly equal to the other three phases, set by the app — they never lengthen and nothing is timed by you. There is no fast breathing anywhere in this chapter: 3.75 breaths a minute is slower than anything else in the book. The kite will not go up faster than the pace allows, however hard you press. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
@@ -3381,7 +3381,6 @@ function beginWith(which, remember){
   for(const kk of Object.keys(worlds)){
     for(const m of worlds[kk].meshes) m.visible = (kk === id);
   }
-  $('proto').textContent = B.proto.name;
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;

@@ -125,10 +125,15 @@
 <div id="cue">
   <div id="phase">breathe in</div>
   <div id="sub">through the nose</div>
-  <div id="hint">hold anywhere to push</div>
 </div>
 <div id="bar"><div id="barfill"></div></div>
-<div id="note"><span id="proto">The sigh · 2 in, 1 more on top / 6 out · 6.7 breaths a minute</span> · a personal project, offered as-is — use your own judgement. Silent by design. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
+<!-- THE FOOTER IS SPLIT, NOT REMOVED — 6 November 2026.
+     It was doing two jobs in one line: a protocol description (which
+     is the instructional copy the reader asked to go) and the safety
+     copy (which they have not asked for and decided deliberately).
+     The protocol name and "Silent by design" are gone; the
+     disclaimer and the physical cautions stay, verbatim. -->
+<div id="note">A personal project, offered as-is — use your own judgement. Sitting or lying down, never standing. Ease off at any light-headedness.</div>
 
 <!-- A CHOICE, not a screening gate. No breath is held anywhere in this
      chapter and there is no fast breathing in it: the quickest protocol
@@ -139,13 +144,8 @@
 <div id="gate" class="sheet"><div>
   <h2>Wait out the rain</h2>
   <p class="fine own"><strong>A personal project</strong>, built by one person to his own taste, offered as-is for your own judgement. Two protocols, one storm.</p>
-  <div class="how">
-    <p><b>Hold anywhere</b> on the screen as you breathe out, and the rain is driven back across the clearing. Let go as you breathe in and it comes in again.</p>
-    <p>The storm clears on its own schedule. Press for all of it or none of it — it clears at the same moment either way, and there is nothing you can do to be late.</p>
-    <p>Nothing here is timed, scored, counted or compared.</p>
-  </div>
-  <button id="gateSigh">THE SIGH · 2 IN, 1 ON TOP / 6 OUT<br><span class="sub2">a double nasal inhale and a long exhale · 6.7 a minute</span></button>
-  <button id="gateSettled" class="alt">SETTLED · 5 IN / 6 OUT<br><span class="sub2">the steady half of the same chapter · 5.45 a minute</span></button>
+  <button id="gateSigh">THE SIGH · 2 IN, 1 ON TOP / 6 OUT</button>
+  <button id="gateSettled" class="alt">SETTLED · 5 IN / 6 OUT</button>
   <p class="fine tiny">There is lightning in this chapter and it lights the whole screen for a moment. It only ever strikes while you are breathing out, never while you are breathing in. No breath is held anywhere here and nothing in it is fast breathing. Your choice is remembered on this device and can be changed from the stop screen.</p>
 </div></div>
 
@@ -271,7 +271,7 @@ const AIR = {
 
 /* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill'), elHint = $('hint');
+const elPhase = $('phase'), elSub = $('sub'), elBar = $('barfill');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
 
@@ -1075,11 +1075,18 @@ const loop = clock((dt, now, running) => {
      elapsed time (§2.4). Nothing here is a score. --- */
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
-  if(cue.sub !== subShown){ elSub.textContent = cue.sub; subShown = cue.sub; }
+  /* ONLY THE COUNTDOWN, NOT THE FLAVOUR LINE — 6 November 2026.
+     breath.js's cue() puts a countdown in `sub` when the phase has a
+     `count` and the phase's own flavour line there when it does not,
+     so the phase table is what decides. `count` is present exactly on
+     the phases that point AT THE NEXT BREATH, which is §2.4. The kit
+     is untouched, so a chapter that wants its flavour line back needs
+     one line here and nothing else. */
+  const showSub = B.at(t).p.count ? cue.sub : '';
+  if(showSub !== subShown){ elSub.textContent = showSub; subShown = showSub; }
   // the hint appears on the exhale, and only until the reader has
   // pressed once. It is an instruction, not a prompt to perform.
   const wantHint = started && !hintShown && blowing === 1;
-  elHint.classList.toggle('on', wantHint);
   if(pressing) hintShown = true;
   elBar.style.width = (100 * prog).toFixed(2) + '%';
 
@@ -1097,7 +1104,6 @@ function beginWith(which, remember){
   // a fresh body for the new protocol: its rate cap is derived from the
   // protocol's own durations and cannot be carried over from the other
   CURTAIN = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
-  $('proto').textContent = B.proto.name;
   if(remember) picked.write(which);
   elGate.classList.remove('on');
   started = true;
