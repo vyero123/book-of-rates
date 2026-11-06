@@ -302,11 +302,18 @@ scene.add(screenQuad(THREE, {
    2. THE FAR RANGE beyond the brow — the kit's parallax bands, hand
    assigned tiers, deliberately not following the breath.
    ------------------------------------------------------------------ */
+/* SIZED AGAINST THE HILLS, and they had to be rebuilt when the hills
+   changed: a range that subtended five degrees over a nine metre
+   hill is a wall over a three metre one, and the lens is low enough
+   that a wall is what it looked like. Pushed out and cut down to
+   about two degrees each, which is a far range rather than a
+   backdrop. They are at a fixed z and do not scroll — the walk never
+   reaches them, which is the whole point of a horizon. */
 const mesas = new THREE.Mesh(bands(THREE, [
-  { z:-420, base: 26, amp:13, step:5.0, seed:5,  tier:1 },
-  { z:-300, base: 19, amp: 9, step:3.8, seed:17, tier:2 },
-  { z:-210, base: 13, amp: 6, step:2.8, seed:29, tier:3 }
-], { n: 40, span: 900, skirt: -30 }), posterMat(THREE, {
+  { z:-620, base: 15, amp: 8.0, step:5.0, seed:5,  tier:1 },
+  { z:-460, base: 10, amp: 5.5, step:3.8, seed:17, tier:2 },
+  { z:-340, base:  7, amp: 3.5, step:2.8, seed:29, tier:3 }
+], { n: 40, span: 1200, skirt: -30 }), posterMat(THREE, {
   uniforms:{ uRamp, uHaze:{value:C(AIR.haze)} }, prelude: PRE_RAMP,
   vertex:`
     attribute float aTier; varying float vTier;
@@ -895,6 +902,14 @@ const scrollFor = d => d - PATH_PERIOD * BEHIND;
  *  rather than move it (js/mesh.js scrollWholeGlsl explains why). */
 const zOf = d => -(d - dWalk);
 
+/* THE LENS'S OWN NUMBERS, COPIED INTO A MUTABLE OBJECT so they can
+   be moved from the console while the scene is running. Staging is
+   the one thing in this project that cannot be measured — it has to
+   be looked at — and a push-per-guess loop is how three hours get
+   spent on a camera. The module's constants are the source of truth
+   and these are seeded from them; __shepherd.cam() writes here. */
+const CAMV = { side:CAM_SIDE, up:CAM_UP, back:CAM_BACK, w:CAM_W,
+               lookScale:1, tilt:1.0 };
 const AIM = tracker(CAM_EASE.level.look, CAM_EASE.level.ease);
 /** The lens's own distance along the walk, trailing his. */
 const CAMD = tracker(0, CAM_W);
@@ -1017,14 +1032,15 @@ const loop = clock((dt, now, running) => {
   const E = CAM_EASE[ph.cam] || CAM_EASE.level;
   AIM.w = E.ease;
   AIM.step(dt, E.look);
+  CAMD.w = CAMV.w;
   CAMD.step(dt, dWalk);
-  const camD = CAMD.value - CAM_BACK;
-  camera.position.set(pathX(camD) + CAM_SIDE,
-                      groundAt(camD, CAM_SIDE) + CAM_UP,
+  const camD = CAMD.value - CAMV.back;
+  camera.position.set(pathX(camD) + CAMV.side,
+                      groundAt(camD, CAMV.side) + CAMV.up,
                       zOf(camD));
   camera.up.set(0, 1, 0);
-  const aimD = dWalk + AIM.value;
-  camera.lookAt(pathX(aimD), hillAt(aimD) + 1.0, zOf(aimD));
+  const aimD = dWalk + AIM.value * CAMV.lookScale;
+  camera.lookAt(pathX(aimD), hillAt(aimD) + CAMV.tilt, zOf(aimD));
   ARRIVE.apply(camera, now);
 
   /* the horizon, for the sky's gradient: a point on the path as far
@@ -1161,7 +1177,8 @@ window.__shepherd = {
              drawCalls: renderer.info.render.calls,
              triangles: renderer.info.render.triangles };
   },
-  camD(){ return { camD:+(CAMD.value - CAM_BACK).toFixed(2),
+  cam(o){ if(o) Object.assign(CAMV, o); return { ...CAMV }; },
+  camD(){ return { camD:+(CAMD.value - CAMV.back).toFixed(2),
                    aim:+AIM.value.toFixed(2), uDist:+uDist.value.toFixed(2) }; },
   where(){
     const proj = v3 => { const v = v3.clone().project(camera);
