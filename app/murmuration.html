@@ -665,6 +665,9 @@ window.__murmuration = {
     if(!size.H || !size.W)
       return { error: 'the canvas has no layout (W=' + size.W + ', H=' + size.H +
                       ') — measure this with the page visible' };
+    const out = { frame: { w: size.W, h: size.H, fovDeg: camera.fov,
+                           fovHDeg: +(2 * Math.atan(Math.tan(camera.fov / 2 * Math.PI / 180)
+                                      * camera.aspect) * 180 / Math.PI).toFixed(1) } };
     /* THE SCREEN BOUNDING BOX OF THE FLOCK'S OWN SURFACE, sampled.
        NOT two axes projected — that is the measurement that hid the
        foreshortening and cost a whole shape. At 72 degrees of
