@@ -665,6 +665,14 @@ window.__murmuration = {
     if(!size.H || !size.W)
       return { error: 'the canvas has no layout (W=' + size.W + ', H=' + size.H +
                       ') — measure this with the page visible' };
+    /* RUN ONE FRAME FIRST. Before the loop has ticked, the camera
+       has never been placed or had its matrices updated, and
+       project() comes back NaN — which toFixed turns into the string
+       "NaN" and JSON turns into null, so the report looked like a
+       flock that was not there. Pumping a frame also means what is
+       measured is placed by the SAME code that draws it, which is the
+       rule this project arrived at the hard way. */
+    loop.pump(1 / 60, 1);
     const out = { frame: { w: size.W, h: size.H, fovDeg: camera.fov,
                            fovHDeg: +(2 * Math.atan(Math.tan(camera.fov / 2 * Math.PI / 180)
                                       * camera.aspect) * 180 / Math.PI).toFixed(1) } };
@@ -690,7 +698,7 @@ window.__murmuration = {
           y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
         }
       }
-      return { w: x1 - x0, h: y1 - y0 };
+      return { w: x1 - x0, h: y1 - y0, bottom: y1 };
     };
     for(const [name, g] of [['spread', 0], ['gathered', 1]]){
       const geo = geometry(g), r = radiiAt(g), alt = altitudeAt(g);
@@ -751,29 +759,41 @@ window.__murmuration = {
       const p = uCentre.value.clone().add(off).project(camera);
       return [(p.x*0.5+0.5)*size.W, (-p.y*0.5+0.5)*size.H];
     };
-    const bottom = () => { const p = new THREE.Vector3(
-      X_C, uCentre.value.y - uRV.value, 0).project(camera);
-      return [(p.x*0.5+0.5)*size.W, (-p.y*0.5+0.5)*size.H]; };
+    /* THE DRAWN LOWER BOUNDARY of the flock, not a point on its
+       underside: at this elevation the underside centre moves almost
+       entirely in DEPTH and reported 2.4% of the frame a second,
+       which is a number about the wrong thing. */
+    const bottom = () => { const b = boxNow(); return [0, b.bottom]; };
     /* the drawn width, from the same surface sample rates() uses —
        the world-x pair this used before is seen nearly end-on at this
        elevation and reported zero */
-    const span = () => {
+    /* the drawn box, from the same surface sample rates() uses — the
+       world-x pair this used before is seen nearly end-on at this
+       elevation and reported zero */
+    const boxNow = () => {
       const rh = uRH.value, rv = uRV.value, y = uCentre.value.y;
-      let x0 = 1e9, x1 = -1e9; const t = new THREE.Vector3();
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; const t = new THREE.Vector3();
       for(let a = 0; a < 24; a++) for(let b2 = 0; b2 <= 12; b2++){
         const th = a / 24 * Math.PI * 2, ph = b2 / 12 * Math.PI - Math.PI / 2;
         t.set(X_C + rh * Math.cos(ph) * Math.cos(th), y + rv * Math.sin(ph),
               rh * Math.cos(ph) * Math.sin(th)).project(camera);
         if(t.z > 1) continue;
-        const sx = (t.x * 0.5 + 0.5) * size.W;
+        const sx = (t.x * 0.5 + 0.5) * size.W, sy = (-t.y * 0.5 + 0.5) * size.H;
         x0 = Math.min(x0, sx); x1 = Math.max(x1, sx);
+        y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
       }
-      return x1 - x0;
+      return { w: x1 - x0, h: y1 - y0, bottom: y1 };
     };
+    const span = () => boxNow().w;
 
-    /* start from the bottom of a breath, flown exactly on the cue */
+    /* START FROM A SETTLED BOTTOM OF A BREATH. Three whole cycles
+       first, because the body spring has not reached either end of
+       its band inside the first one — measuring a single inhale from
+       a standing start reports the shape change the spring got round
+       to, not the one the chapter has. */
     beginWith('holds', false);
-    loop.pump(1 / 60, Math.round(60 * (B.proto.phases.reduce((a,p)=>a+p.d,0) - 0.01)));
+    const cyc = B.proto.phases.reduce((a, p) => a + p.d, 0);
+    loop.pump(1 / 60, Math.round(60 * (cyc * 3 - 0.01)));
     let b0 = bird(), e0 = bottom(), s0 = span(), birdMax = 0, edgeMax = 0, prevB = b0, prevE = e0;
     const steps = Math.round(60 * inhale);
     for(let k = 0; k < steps; k++){
