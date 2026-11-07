@@ -465,3 +465,79 @@ and eight now. The idiom is about edges that mean something — a sky's do not.
 **Derive tolerances, don't widen them.** The mashing-reader check failed at 1e-9 because two
 sprung integrations differ by their rounding. The bar is one DRAWN PIXEL: the whole band is
 worth 482 px of flock width at 375x812, so one pixel is 1/482 of it.
+
+## The scroll puts a sheet through the scene — 7 November 2026
+
+The reader: *"flooded in the valleys with some kind of overlapping pane of grass."*
+
+**`js/mesh.js`'s `scrollGlsl()` takes `mod` of EACH VERTEX's own z, and that is NOT safe
+for a continuous surface.** mesh.js says it is, and says the hazard is only for separate
+objects. The thing that note missed is that a surface's rows are JOINED: a chain mapped
+onto a ring has to be cut somewhere, so every frame exactly ONE row of quads has its two
+ends on opposite sides of the wrap and is stretched across the whole period. The objects
+case loses one object; the surface case GAINS A SHEET — 216 m of flat ribbon at roughly
+ground height, spanning the view, with the hillside rising through it. There is no fixing
+it inside a vertex shader: it is one primitive out of 55,000 and a vertex shader cannot
+see primitives.
+
+**The fix is not to wrap.** Make the strip longer than the view by one terrain period and
+TRANSLATE the whole mesh by `distance mod TERRAIN_PERIOD`. The reset is invisible because
+the ground repeats on exactly that period. A row's world distance is then fixed at bake
+time and nothing moves between the vertices of a quad, so the fault cannot come back by a
+number being changed. The price: every field in the surface must close on the (now short)
+terrain period, and the strip costs the extra length — the Shepherd went 82k → 125k
+triangles.
+
+**`tools/continuity.mjs` now measures it:** "no stretched quad" compares the worst gap
+between consecutive drawn rows against the nominal spacing.
+
+**LONG AIR'S RIDGE STILL USES `scrollGlsl` AND STILL HAS THE DEFECT.** It is masked rather
+than absent: its cross-section barely varies along z, so the stretched quad looks like more
+canyon. Screenshotted and confirmed to look normal. Left alone deliberately — fixing it
+costs triangles on a chapter the reader is happy with — but it is a known latent fault, and
+if Long Air ever grows terrain that varies along the course it will appear.
+
+**Six poses, not three.** With a translated strip the slide moves the row grid relative to
+the lens, so the worst knot moves with it: three sample poses missed the Shepherd's worst
+by half a pixel and passed a mesh that failed.
+
+## The Murmuration does not read, and I think I know why — 7 November 2026
+
+Reader's verdict: *"just doesn't work."* Same verdict Lantern got, on numbers that measured
+well. Investigated device-first before changing anything.
+
+**Not the device, as far as I can establish.** Page 200, contents links to it, WebGL2,
+`precision highp float` declared, 23-bit mantissa in both stages, both materials linked,
+2 draw calls, 1,122 triangles, 63–107 fps. One real fragility found and removed: the
+per-bird `fract(sin(n*127.1)*43758.5453)` hash is handed ~74,000 radians and collapses from
+547 distinct values at highp to **SIX at mediump**, which would make every bird share an
+orbital plane. Baked as attributes from a 32-bit LCG now. Not proven to be the cause — the
+spec guarantees highp in the vertex stage — but **never ship a sin-hash with a large
+argument**; bake it.
+
+**THE REAL FAULT IS THE FRAMEWORK QUESTION, ANSWERED HONESTLY: the breath moves the flock's
+boundary RELATIVE TO NOTHING.** The frame is empty sky by design — "the chapter is the
+flock, not a landscape with a flock in it" — and an empty sky has no landmark and no scale.
+
+So: **a flock contracting in an empty sky is the same picture as the camera pulling back.**
+Scale and distance are unresolvable without a reference, so "it got smaller" and "I moved
+away from it" are indistinguishable, and the book never moves its camera, so the reader has
+no prior that resolves it. What they see is a zoom, and a zoom is not a breath.
+
+**And this is why my numbers were strong and still wrong.** 237% → 77% of frame is a true
+measurement of how much of the picture the flock covers — but COVERAGE IS EXACTLY WHAT A
+ZOOM CHANGES TOO. The Shepherd's 18% of frame width a second is displacement *past fixed
+landmarks*, which a zoom cannot fake. I measured the right number for a different chapter.
+**A frame-fraction figure only means something when something else in the frame is holding
+still.** Add that to the pair rule: angular rate along the motion, frame fraction across
+it, and either one is void without a fixed reference in shot.
+
+Churn (41 → 102 deg/s) is real and is not the problem, but it has no boundary: busy-ness
+has no direction, so it cannot carry in-versus-out on its own.
+
+**Fixable, at about 60/40.** The fix is a fixed reference in frame — drop the lens so a
+treeline or roofline is in shot and let part of the flock pass in front of it. Better still
+and the version I would build: **a roost.** A tree or pylon in frame; the exhale settles
+birds onto it, the inhale lifts them off. The reference is in shot, nothing travels, and
+the quantity is a count of birds in the air rather than a size — unmistakable, and it
+cannot be confused with a camera move. Not built: a rebuild is the reader's call.
