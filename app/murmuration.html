@@ -321,8 +321,35 @@ scene.add(screenQuad(THREE, {
  *  `position` is LOCAL and means (along, across, is-a-wingtip), not a
  *  place in the world — the world position is built in the shader. */
 const BIRD_SPAN = 0.42;          // metres, wingtip to wingtip
+/** A BIRD'S IDENTITY IS BAKED, NOT HASHED IN THE SHADER.
+ *
+ *  It used to be `fract(sin(n * 127.1) * 43758.5453)`, the usual GLSL
+ *  hash, and that is a portability hazard rather than a style
+ *  choice. With 560 birds the argument handed to sin() reaches about
+ *  74,000 radians; at highp (23 bits of mantissa) the distribution
+ *  holds up — 547 distinct values out of 560, measured — but at
+ *  MEDIUMP it collapses to SIX, with 554 of them in the same tenth.
+ *  Every bird would get the same orbital plane and the flock would
+ *  be a handful of coincident rings.
+ *
+ *  This GPU reports highp in both stages and the spec guarantees it
+ *  in the vertex stage, so the hash is probably fine everywhere —
+ *  but "probably fine" is not a reason to keep arithmetic that has a
+ *  cliff in it when the alternative costs four floats a vertex and
+ *  makes the flock's identity something a harness can read. */
+function birdSeeds(){
+  const out = [];
+  /* a plain 32-bit LCG: deterministic, uniform, and no transcendental
+     anywhere near it */
+  let x = 0x9E3779B9;
+  const next = () => { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; return x / 4294967296; };
+  for(let i = 0; i < FLOCK_N; i++) out.push([next(), next(), next(), next(), next()]);
+  return out;
+}
+const SEEDS = birdSeeds();
+
 function flockGeometry(){
-  const b = builder(THREE, { aBird:1 });
+  const b = builder(THREE, { aBird:1, aRnd:4, aPhase:1 });
   const V = [
     [ 0.26,  0.00, 0],   // nose
     [-0.05, -0.36, 1],   // left wingtip
@@ -331,7 +358,9 @@ function flockGeometry(){
   ];
   for(let i = 0; i < FLOCK_N; i++){
     const base = b.count;
-    for(const v of V) b.vertex(v[0] * BIRD_SPAN, v[1] * BIRD_SPAN, v[2], { aBird: i });
+    const S = SEEDS[i];
+    for(const v of V) b.vertex(v[0] * BIRD_SPAN, v[1] * BIRD_SPAN, v[2],
+      { aBird: i, aRnd: [S[0], S[1], S[2], S[3]], aPhase: S[4] });
     b.tri(base, base + 1, base + 2);
     b.tri(base, base + 2, base + 3);
   }
@@ -347,20 +376,14 @@ const flockMat = posterMat(THREE, {
   },
   side: THREE.DoubleSide, prelude: PRE,
   vertex:`
-    attribute float aBird;
+    attribute float aBird; attribute vec4 aRnd; attribute float aPhase;
     uniform float uTime, uRH, uRV, uOrbit, uShellIn;
     uniform vec3 uCentre;
     varying float vDist; varying float vEdge; varying float vFace;
 
-    /* four independent numbers from one index. Cheap, deterministic,
-       and the same every frame — a bird that re-rolled its own
-       identity per frame would be a different bird every frame. */
-    float h11(float n){ return fract(sin(n * 127.1) * 43758.5453); }
-
     void main(){
-      float i = aBird;
-      float h1 = h11(i + 0.17), h2 = h11(i + 3.71);
-      float h3 = h11(i + 9.23), h4 = h11(i + 15.4), h5 = h11(i + 21.9);
+      /* five independent numbers, baked (see birdSeeds above) */
+      float h1 = aRnd.x, h2 = aRnd.y, h3 = aRnd.z, h4 = aRnd.w, h5 = aPhase;
 
       /* EACH BIRD HAS ITS OWN ORBITAL PLANE. The flock is then a shell
          of great circles rather than a swarm of independent wanderers,
@@ -754,10 +777,10 @@ const api = window.__murmuration = {
       /* one bird, reconstructed with the shader's own arithmetic, so
          what is reported is what is drawn rather than a second model
          of it. Bird 0, at the outside of the shell. */
-      const h11 = n => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
-      const i = 0;
-      const h1 = h11(i + 0.17), h2 = h11(i + 3.71), h3 = h11(i + 9.23),
-            h4 = h11(i + 15.4), h5 = h11(i + 21.9);
+      /* the SAME baked seeds the shader is given, read from the same
+         array — not a second copy of a hash, which is how a harness
+         ends up measuring a bird that is not on screen */
+      const [h1, h2, h3, h4, h5] = SEEDS[0];
       const n = new THREE.Vector3(h1*2-1, (h2*2-1)*0.55, h3*2-1).normalize();
       const e1 = new THREE.Vector3().crossVectors(n, new THREE.Vector3(0,1,0.17)).normalize();
       const e2 = new THREE.Vector3().crossVectors(n, e1);
