@@ -144,7 +144,8 @@ import { breath } from './js/breath.js';
 import { PROTOCOLS, CHOICE, validChoice, SESSION_CAP,
          HT_LO, HT_HI, WALK_LO, WALK_HI, CORRIDOR, RANGE, normOf, atOf,
          HILL_LEN, HILL_H, hillAt, hillSlope, phaseOf, pathX, groundAt, rates,
-         PATH_PERIOD, PATH_HILLS, walkStep, WALK_V_MAX, WALK_V_NOM, V_MOVE,
+         TERRAIN_PERIOD, TERRAIN_HILLS, STRIP_BEHIND, STRIP_AHEAD, STRIP_LEN,
+         walkStep, WALK_V_MAX, WALK_V_NOM, V_MOVE,
          FLOCK_N, FLOCK_W, FLOCK_TRAIL, FLOCK_MIN_GAP,
          CAM_SIDE, CAM_UP, CAM_BACK, CAM_W, CAM_EASE } from './js/shepherd-breath.js';
 import { body } from './js/course.js';
@@ -152,8 +153,7 @@ import { tracker } from './js/follow.js';
 import { WIND_GLSL } from './js/wind.js';
 import { ramp, fogGlslAA, AA_GLSL, RAMP_AA_GLSL, GRAIN_GLSL, CHIP_GLSL,
          PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
-import { builder, bands, posterMat, screenQuad, part, linkReport,
-         scrollGlsl } from './js/mesh.js';
+import { builder, bands, posterMat, screenQuad, part, linkReport } from './js/mesh.js';
 import { boot, stage, clock, contextGuard, fps, choice, enter, soloReport,
          flashMeter } from './js/stage.js';
 import { arrival } from './js/arrival.js';
@@ -215,13 +215,8 @@ const uFog   = { value: C(AIR.haze) };
 const uHorizon = { value: 0.5 };
 /* where the shepherd is, in world space, for anything that answers him */
 const uWalker = { value: new THREE.Vector3() };
-/* THE SCROLL. The ground is one strip of PATH_PERIOD metres and it is
-   slid under the lens rather than rebuilt: `uDist` is where along the
-   walk the strip is currently placed and `uPeriod` is how long it is.
-   See js/mesh.js scrollGlsl(), and section 3 below for why the strip
-   closes on itself. */
-const uDist   = { value: 0 };
-const uPeriod = { value: PATH_PERIOD };
+/* NO SCROLL UNIFORMS ANY MORE. The strip is translated as a whole —
+   see section 3. */
 
 const FOG = fogGlslAA({ near: 18, rate: 0.011, steps: 5, max: 0.46 });
 const PRE_AA   = AA_GLSL;
@@ -367,19 +362,21 @@ scene.add(mesas);
    metre is a hundred and seventy pixels. Nothing about the hill's
    own shape needs 640 rows; the near miss does.
 
-   Measured through this chapter's lens at three poses spanning a
-   hill, worst case of the three, in tools/continuity.mjs:
+   Measured through this chapter's lens at SIX poses spanning a hill,
+   worst case of the six, in tools/continuity.mjs. Six rather than
+   three because the strip is translated now: the slide moves the row
+   grid relative to the lens, so the worst knot moves with it and
+   three samples missed it by half a pixel.
 
        rows  cols   along   across   meets sky    tris
-        560   113    2.52     0.41       1.69     125k   FAILS
-        640    65    1.74     1.24       0.96      82k
-        720    65    1.35     1.24       0.76      92k
-        800    65    1.11     1.24       0.61     102k
+        870    65    2.22     1.54       2.17     111k   FAILS
+        980    65    1.76     1.54       1.72     125k
+       1040    65    1.56     1.54       1.55     133k
+       1120    65    1.35     1.54       1.33     143k
 
-   640/65 ships: it is the cheapest setting that holds the 2 px bar
-   on all three, and it is CHEAPER than the mesh the first camera
-   needed, because moving the lens out bought more across than it
-   cost along.
+   980/65 ships: the cheapest setting that holds the 2 px bar on all
+   three. 1040 buys two tenths of a pixel for eight thousand
+   triangles, and "not too stingy" is not a licence to waste.
 
    THREE NUMBERS RATHER THAN TWO, and the third is the one that
    matters most. The hill is flat-shaded from fields of (d, o) with
@@ -391,22 +388,52 @@ scene.add(mesas);
    they are what would catch a posterised tone boundary going
    polygonal, and a mesh that passes without needing the argument is
    worth more than the argument. */
-const STRIP_LEN = PATH_PERIOD;               // 216 m, twelve hills
-const HILL_ROWS = 640;                       // along the walk, 0.338 m
+const HILL_ROWS = 980;                       // along the walk, 0.300 m
 const HILL_COLS = 65;                        // across it, 1.688 m
 const HILL_HALF = 54;
-/** Fraction of the strip kept behind the lens, so the wrap happens
- *  out of sight at both ends. */
-const BEHIND = 0.15;
-const SCROLL = scrollGlsl(BEHIND);
 
+/* ==================================================================
+   AND IT IS TRANSLATED, NOT WRAPPED — 7 November 2026
+   ==================================================================
+   This used to be a 216 m strip slid under the lens by mesh.js's
+   scrollGlsl(), and the reader reported the result: "flooded in the
+   valleys with some kind of overlapping pane of grass".
+
+   THE MECHANISM, because it is a trap anybody would fall into again.
+   scrolled() takes `mod` of EACH VERTEX's own z. The rows of a strip
+   are a CHAIN, and a chain mapped onto a ring has to be cut
+   somewhere: every frame, exactly one row of quads has its two ends
+   on opposite sides of the wrap, so that quad is stretched across
+   the entire period. 216 m of flat ribbon at roughly ground height,
+   spanning the whole view, with the hillside rising through it. The
+   note in mesh.js describes this fault for separate OBJECTS and says
+   a continuous surface is safe; what it missed is that a surface's
+   rows are JOINED, so the objects case loses one object and the
+   surface case gains a sheet. There is no way to drop that quad from
+   a vertex shader — it is one primitive out of 55,000 and the shader
+   cannot see primitives.
+
+   SO THERE IS NO WRAP. The strip is longer than the view by one
+   terrain period and the whole mesh is TRANSLATED by
+   `dWalk mod TERRAIN_PERIOD`, which is invisible because the ground
+   repeats on exactly that period (72 m, four hills — every field in
+   js/shepherd-breath.js closes on it, and tools/continuity.mjs
+   measures that it does). A row's world distance is then fixed at
+   bake time and nothing moves between vertices of the same quad.
+
+   The price is the strip: 294 m rather than 216, which is 870 rows
+   instead of 640 and 111,360 triangles instead of 81,920. Worth it
+   for a class of bug that cannot recur. */
 function hillGeometry(){
   const b = builder(THREE, { aD:1, aO:1 });
   for(let i = 0; i <= HILL_ROWS; i++){
-    const d = (i / HILL_ROWS) * STRIP_LEN;   // the last row IS the first
+    /* u runs down the strip; w is the world distance the row stands
+       for, with w = 0 at the walker when the translation is zero */
+    const u = (i / HILL_ROWS) * STRIP_LEN;
+    const w = u - STRIP_BEHIND;
     for(let k = 0; k < HILL_COLS; k++){
       const o = -HILL_HALF + (k / (HILL_COLS - 1)) * HILL_HALF * 2;
-      b.vertex(pathX(d) + o, groundAt(d, o), d, { aD:d, aO:o });
+      b.vertex(pathX(w) + o, groundAt(w, o), -w, { aD:w, aO:o });
     }
   }
   for(let i = 0; i < HILL_ROWS; i++){
@@ -419,23 +446,24 @@ function hillGeometry(){
   return b.geometry();
 }
 const hillMat = posterMat(THREE, {
-  uniforms:{ uRamp, uFog, uTime, uFill, uWalker, uDist, uPeriod,
+  uniforms:{ uRamp, uFog, uTime, uFill, uWalker,
              uShadow:{value:C(LAND.shadow)}, uShadowDeep:{value:C(LAND.shadowDeep)},
              uSheen:{value:C(LAND.sheen)}, uBloom:{value:C(LAND.bloom)},
              uFogLow:{value:C(LAND.hazeLow)} },
   side: THREE.DoubleSide, prelude: PRE + WIND_GLSL,
-  vertex: SCROLL + `
+  vertex: `
     attribute float aD; attribute float aO;
     varying float vD; varying float vO; varying float vDist; varying float vY;
     varying vec3 vW;
     void main(){
-      /* vD is the BAKED distance, taken before the scroll: anything
-         anchored to it belongs to the ground and travels with it,
-         which is what stops the grass and the grain crawling over a
-         surface that is sliding past. */
+      /* vD is the row's BAKED world distance. Anything anchored to it
+         belongs to the ground and travels with it, which is what
+         stops the grass and the grain crawling over a surface that is
+         sliding past — and since the strip is translated rather than
+         wrapped, it is simply the vertex's own attribute. */
       vD = aD; vO = aO;
-      vec3 p = scrolled(position);
-      vY = p.y; vW = p;
+      vec3 p = position;
+      vY = p.y; vW = (modelMatrix * vec4(p, 1.0)).xyz;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
       gl_Position = projectionMatrix * mv;
@@ -883,22 +911,23 @@ let WALKER = body({ corridor: CORRIDOR, rates: RATE, vMax: htVMax(RATE) });
             lagged on the way up and not on the way down.
 
    THE WORLD IS PLACED RELATIVE TO HIM, not to an origin. The ground
-   is a strip scrolled so that `dWalk` sits at z = 0, and everything
-   else — the flock, the lens, the shadows — is placed at
-   z = -(d - dWalk). So the floating-point coordinates stay small
-   however long the session runs, which is the thing an endless walk
-   would otherwise break: at twenty minutes he is two kilometres
-   out, and a vertex two kilometres from the origin has lost the
-   bottom four digits of a float32. The strip's own wrap is what
-   makes this exact rather than approximate — PATH_PERIOD divides
-   every period in the surface. */
+   is a strip slid so that `dWalk` sits at z = 0, and everything else
+   — the flock, the lens, the shadows — is placed at z = -(d - dWalk).
+   So the floating-point coordinates stay small however long the
+   session runs, which is the thing an endless walk would otherwise
+   break: at twenty minutes he is two kilometres out, and a vertex
+   two kilometres from the origin has lost the bottom four digits of
+   a float32. TERRAIN_PERIOD is what makes this exact rather than
+   approximate — it divides every period in the surface, so sliding
+   the strip back by one is the identity. */
 let dWalk = 0, walkV = 0;
-/** Where the scroll has to be placed so that dWalk lands at z = 0.
- *  scrolled() returns PERIOD*BEHIND - mod(z - uDist, PERIOD), so the
- *  usable window runs from PATH_PERIOD*BEHIND behind him (32.4 m,
- *  which has to cover the lens and the whole flock) to the rest of
- *  the strip ahead (183.6 m, which has to cover the fog). */
-const scrollFor = d => d - PATH_PERIOD * BEHIND;
+/** HOW FAR THE STRIP IS SLID, in metres of +z. It is `dWalk` modulo
+ *  the terrain's own period, so the reset is invisible: the ground
+ *  72 m on is the same ground. A row baked for world distance w then
+ *  sits at world z = -w + slide, and since dWalk == slide (mod the
+ *  period) that row stands for the world distance the walker is
+ *  actually passing. */
+const slideFor = d => ((d % TERRAIN_PERIOD) + TERRAIN_PERIOD) % TERRAIN_PERIOD;
 /** And the matching placement in JS, for anything not in the strip.
  *  No `mod` here on purpose: every figure is inside the window, and
  *  a wrap in a FIGURE's position would stretch it across the world
@@ -990,7 +1019,7 @@ const loop = clock((dt, now, running) => {
      shepherd this page draws. --- */
   if(started) walkV = walkStep(walkV, dWalk, wantH, dt);
   dWalk += walkV * dt;
-  uDist.value = scrollFor(dWalk);
+  hill.position.z = slideFor(dWalk);
 
   /* --- THE FLOCK. Each sheep follows the one ahead of it IN METRES
      WALKED, so the line is strung out along real ground he has
@@ -1095,7 +1124,7 @@ function beginWith(which, remember){
   /* HE STARTS AT A TROUGH, with the flock already around him: the
      schedule's first phase climbs, and a figure that begins halfway
      up a hill has nowhere to put the first inhale. */
-  dWalk = 0; walkV = 0; uDist.value = scrollFor(0);
+  dWalk = 0; walkV = 0; hill.position.z = slideFor(0);
   for(const sh of flock){ sh.follow.set(0); sh.s = 0; }
   AIM.set(CAM_EASE.level.look); CAMD.set(0);
   REACH_INVITE.reset();
@@ -1182,7 +1211,8 @@ window.__shepherd = {
   },
   cam(o){ if(o) Object.assign(CAMV, o); return { ...CAMV }; },
   camD(){ return { camD:+(CAMD.value - CAMV.back).toFixed(2),
-                   aim:+AIM.value.toFixed(2), uDist:+uDist.value.toFixed(2) }; },
+                   aim:+AIM.value.toFixed(2),
+                   slide:+hill.position.z.toFixed(2) }; },
   where(){
     const proj = v3 => { const v = v3.clone().project(camera);
       return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),

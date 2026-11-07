@@ -307,24 +307,56 @@ export function walkStep(v, d, wantH, dt){
 /* ------------------------------------------------------------------
    THE PATH AND THE GROUND EITHER SIDE OF IT
    ------------------------------------------------------------------
-   EVERYTHING HERE CLOSES AT PATH_PERIOD, and that is not a stylistic
-   choice. The hill mesh is one strip of PATH_PERIOD metres scrolled
-   under the lens, so any term in the surface whose period does not
-   divide the strip's exactly is a VALUE JUMP at the wrap, dragged
-   through the frame once per lap. The periods below are PATH_PERIOD
-   over an integer, and the integers are chosen so that nothing
-   rhymes with the hill — a lateral feature that repeats every whole
-   number of hills would make every breath look like the last one.
+   EVERYTHING HERE CLOSES AT TERRAIN_PERIOD, and that is not a
+   stylistic choice. The hill mesh is translated by `dWalk mod
+   TERRAIN_PERIOD`, so any term in the surface whose period does not
+   divide that exactly is a VALUE JUMP once every 72 m. The periods
+   below are TERRAIN_PERIOD over an integer, and TERRAIN_PERIOD is a
+   whole number of hills so that hillAt closes too.
    ------------------------------------------------------------------ */
-/** The strip, in hills. 12 is 216 m, which is past the fog. */
-export const PATH_HILLS = 12;
-export const PATH_PERIOD = HILL_LEN * PATH_HILLS;
+/* ==================================================================
+   THE TERRAIN'S PERIOD IS SHORT NOW, AND A BUG IS WHY — 7 Nov 2026
+   ==================================================================
+   The ground used to be a 216 m strip scrolled under the lens by
+   js/mesh.js's scrollGlsl(), which takes `mod` of EACH VERTEX's own
+   z. mesh.js says that is right for a continuous surface. IT IS NOT,
+   and the reader found it: a surface built as a chain of rows has
+   exactly ONE row of quads per frame whose two ends fall either side
+   of the wrap, and that quad is stretched across the ENTIRE PERIOD.
+   Two hundred and sixteen metres of flat ribbon at roughly ground
+   height, spanning the whole view, with the real hillside rising
+   through it — reported as "flooded in the valleys with some kind of
+   overlapping pane of grass", which is exactly what it is.
+
+   The mesh.js note describes the same fault for separate OBJECTS and
+   concludes a continuous surface is safe. The difference it missed is
+   that a surface's rows are JOINED: the objects case loses one
+   object, the surface case gains a sheet. A ring cut onto a line has
+   to be cut somewhere, and in a vertex shader there is no way to drop
+   the quad that straddles the cut.
+
+   SO THE STRIP IS NOT WRAPPED AT ALL ANY MORE. It is longer than the
+   view and simply TRANSLATED, by `dWalk mod TERRAIN_PERIOD`, which is
+   invisible because the terrain repeats on exactly that period. No
+   mod per vertex, no straddling quad, and the fault cannot come back
+   by a number being changed.
+
+   The price is that every field in the ground has to close on
+   TERRAIN_PERIOD rather than on 216 m, and the strip has to be the
+   view plus one period long — 110,000 triangles instead of 82,000.
+   Four hills is the compromise: long enough that the lateral drift
+   does not rhyme with the breath, short enough that the extra strip
+   is 72 m rather than 216. */
+export const TERRAIN_HILLS = 4;
+export const TERRAIN_PERIOD = HILL_LEN * TERRAIN_HILLS;   // 72 m
 
 /** The lateral drift of the path, so the walk is not a ruled line.
- *  One slow component over the whole strip and one at 2.4 hills. */
+ *  Both components close on TERRAIN_PERIOD, and neither closes on
+ *  HILL_LEN: 4 hills and 0.8 of one, so a bend never lands on the
+ *  same part of a breath twice running. */
 export function pathX(d){
-  return Math.sin(d * (Math.PI * 2 / PATH_PERIOD)) * 4.6
-       + Math.sin(d * (Math.PI * 2 / (PATH_PERIOD / 5)) + 2.1) * 1.3;
+  return Math.sin(d * (Math.PI * 2 / TERRAIN_PERIOD)) * 4.6
+       + Math.sin(d * (Math.PI * 2 / (TERRAIN_PERIOD / 5)) + 2.1) * 1.3;
 }
 
 /** The ground either side of the path. `o` is metres across from it.
@@ -341,7 +373,7 @@ export function pathX(d){
 export function groundAt(d, o){
   const q = o * o;
   const fall = 0.012 * q / (1 + 0.0015 * q);
-  const cross = Math.sin(d * (Math.PI * 2 / (PATH_PERIOD / 5)) + o * 0.08 + 1.7)
+  const cross = Math.sin(d * (Math.PI * 2 / (TERRAIN_PERIOD / 3)) + o * 0.08 + 1.7)
               * 0.7 * (1 - Math.exp(-0.0032 * q));
   return hillAt(d) - fall + cross;
 }
@@ -510,6 +542,16 @@ export const FLOCK_MIN_GAP = FLOCK_TRAIL / FLOCK_N * 0.5;
    tracker, so being ahead of or behind the pace is displacement
    within the frame — he walks towards the front of the picture on a
    fast climb and drifts back on a slow one. */
+/** How much of the strip is kept BEHIND the walker and how much
+ *  ahead. The lens is 3.5 m behind him, so 32 m of tail is ample;
+ *  the 184 ahead is set by the fog, which tops out at 0.46 and so
+ *  never hides an edge however far away it is. */
+export const STRIP_BEHIND = 32.0;
+export const STRIP_AHEAD  = 184.0;
+/** And the strip is the view plus one period, with a little margin,
+ *  because it slides by up to a whole period before it resets. */
+export const STRIP_LEN = STRIP_BEHIND + STRIP_AHEAD + TERRAIN_PERIOD + 6;
+
 export const CAM_SIDE = 22.0;   // metres off the path
 export const CAM_UP   = 3.0;    // metres above the ground beneath it
 export const CAM_BACK = 3.5;    // abeam the middle of the line

@@ -1287,22 +1287,22 @@ say('THE SHEPHERD — the hills, through its own travelling lens');
   ]){
     const across = name.includes('across');
     const r = across ? classify(f, -40, 40, 0.3)
-                     : classify(f, -SH.PATH_PERIOD * 0.2, SH.PATH_PERIOD * 1.2, 0.35);
+                     : classify(f, -SH.TERRAIN_PERIOD * 0.4, SH.TERRAIN_PERIOD * 2.4, 0.35);
     const line = `${name.padEnd(26)} ${r.kind.padEnd(11)} ` +
                  `slope x${String(r.slopeGrowth).padStart(5)}  curv x${String(r.curvGrowth).padStart(6)}`;
     if(r.kind === 'smooth') ok(line); else bad(line);
   }
 
-  /* THE STRIP CLOSES ON ITSELF. Everything above is smooth, but
-     smooth is not the same as PERIODIC IN PATH_PERIOD, and the scroll
-     needs the second thing: the row at d = PATH_PERIOD is drawn as
-     the row at d = 0, so any mismatch in value or slope between them
-     is a crease at the wrap. Centred differences, because the seam
+  /* THE TERRAIN CLOSES ON ITS PERIOD. Everything above is smooth,
+     but smooth is not the same as PERIODIC IN TERRAIN_PERIOD, and
+     the chapter needs the second thing: the hill mesh is slid back
+     by one period whenever the walk passes one, and that reset is
+     only invisible if the ground 72 m on is the same ground. Centred differences, because the seam
      check in Long Air once failed a field that is exactly periodic
      by construction and the fault was its own one-sided truncation
      error. */
   {
-    const P = SH.PATH_PERIOD, e = 0.05;
+    const P = SH.TERRAIN_PERIOD, e = 0.05;
     let worstV = 0, worstS = 0;
     for(const o of [-40, -9, 0, 9, 40]){
       const g = d => SH.groundAt(d, o);
@@ -1311,10 +1311,10 @@ say('THE SHEPHERD — the hills, through its own travelling lens');
       worstS = Math.max(worstS, Math.abs(s1 - s0));
     }
     const wx = Math.abs(SH.pathX(P) - SH.pathX(0));
-    const line = `the strip closes: worst value gap ${worstV.toExponential(1)} m, ` +
+    const line = `the terrain closes on its period: worst value gap ${worstV.toExponential(1)} m, ` +
                  `slope gap ${worstS.toExponential(1)}, pathX gap ${wx.toExponential(1)} m`;
     if(worstV < 1e-9 && worstS < 1e-7 && wx < 1e-9) ok(line);
-    else bad(line + '  — the wrap is a crease once a lap');
+    else bad(line + '  — the slide back is a jolt once every 72 m');
   }
 
   /* ------------------------------------------------------------------
@@ -1334,8 +1334,7 @@ say('THE SHEPHERD — the hills, through its own travelling lens');
   const ROWS = +(page.match(/const HILL_ROWS = (\d+)/) || [])[1];
   const COLS = +(page.match(/const HILL_COLS = (\d+)/) || [])[1];
   const HALF = +(page.match(/const HILL_HALF = (\d+)/) || [])[1];
-  const BEHIND = +(page.match(/const BEHIND = ([\d.]+)/) || [])[1];
-  if(!ROWS || !COLS || !HALF || !BEHIND)
+  if(!ROWS || !COLS || !HALF)
     bad('shepherd: could not read the hill mesh resolution out of the page');
 
   /** Build the page's lens for a shepherd standing at D0. The world
@@ -1387,10 +1386,10 @@ say('THE SHEPHERD — the hills, through its own travelling lens');
      rather than retyped — a second copy of a resolution is a second
      thing to drift. */
   {
-    const rowAt = i => (i / ROWS) * SH.PATH_PERIOD;
+    const rowAt = i => (i / ROWS) * SH.STRIP_LEN;
     const oAt = k => -HALF + (k / (COLS - 1)) * HALF * 2;
     let along = { px: 0 }, across = { px: 0 }, skyline = { px: 0 }, seen = 0;
-    for(const frac of [0, 0.25, 0.5]){
+    for(const frac of [0, 0.17, 0.33, 0.5, 0.67, 0.83]){
       const D0 = frac * SH.HILL_LEN;
       const L = lensAt(D0);
       const onS = q => q && q[0] > -60 && q[0] < 435 && q[1] > -60 && q[1] < 872;
@@ -1403,9 +1402,16 @@ say('THE SHEPHERD — the hills, through its own travelling lens');
       };
       /* the strip, placed where the page places it: from
          PATH_PERIOD*BEHIND behind him to the rest of it ahead */
+      /* THE STRIP AS THE PAGE NOW BUILDS IT: baked for world
+         distance w = u - STRIP_BEHIND and translated by
+         dWalk mod TERRAIN_PERIOD. No wrap, so a row's z is a
+         straight function of its index — which is the property the
+         check below exists to keep. */
+      const slide = ((D0 % SH.TERRAIN_PERIOD) + SH.TERRAIN_PERIOD) % SH.TERRAIN_PERIOD;
+      const wAt = i => (i / ROWS) * SH.STRIP_LEN - SH.STRIP_BEHIND;
       const V = (i, k) => {
-        const d = rowAt(i) - SH.PATH_PERIOD * BEHIND + D0;
-        return [SH.pathX(d) + oAt(k), SH.groundAt(d, oAt(k)), L.zOf(d)];
+        const w = wAt(i);
+        return [SH.pathX(w) + oAt(k), SH.groundAt(w, oAt(k)), -w + slide];
       };
       for(let k = 0; k < COLS; k += 2){
         for(let i = 1; i < ROWS; i++){
@@ -1443,6 +1449,28 @@ say('THE SHEPHERD — the hills, through its own travelling lens');
         const r = sag(V(bi-1, k), V(bi, k), V(bi+1, k));
         if(r && r.px > skyline.px) skyline = { ...r, at:frac, o:+oAt(k).toFixed(1) };
       }
+    }
+    /* NO QUAD MAY BE STRETCHED. This is the check the reader's
+       "flooded in the valleys with some kind of overlapping pane of
+       grass" should have had: scrollGlsl() takes mod of each
+       VERTEX's own z, so a strip's rows — which are a chain — always
+       have exactly one quad with its two ends on opposite sides of
+       the wrap, stretched across the whole period. The strip is
+       translated rather than wrapped now, so consecutive rows are
+       always one spacing apart; this is what says so, and it is what
+       will fail if anybody puts the scroll back. */
+    {
+      const slide = 0, wAt2 = i => (i / ROWS) * SH.STRIP_LEN - SH.STRIP_BEHIND;
+      const nominal = SH.STRIP_LEN / ROWS;
+      let worstGap = 0, at = 0;
+      for(let i = 0; i < ROWS; i++){
+        const g = Math.abs((-wAt2(i + 1) + slide) - (-wAt2(i) + slide));
+        if(g > worstGap){ worstGap = g; at = i; }
+      }
+      const gl = `no stretched quad: worst row gap ${worstGap.toFixed(3)} m against a ` +
+                 `nominal ${nominal.toFixed(3)} (row ${at} of ${ROWS})`;
+      if(worstGap < nominal * 1.001) ok(gl);
+      else bad(gl + '  — a row of quads is spanning the strip');
     }
     if(seen === 0) bad('shepherd: nothing projected — the instrument saw no hill');
     else {
