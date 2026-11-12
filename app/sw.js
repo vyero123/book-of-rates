@@ -7,7 +7,7 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v20';
+const CACHE = 'bor-v21';
 const SHELL = [
   './', './index.html', './journey.html',
   './pearl-diver.html', './deep-light.html',  // the old address, a forwarding stub
@@ -40,7 +40,18 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
-const isCode = url => /\.(?:js|html)$/.test(url.pathname) || url.pathname.endsWith('/');
+/* CSS IS CODE. It was not in this test, so css/bookframe.css — the single
+ * definition of the gold tooling, the board and the fore-edge — was served
+ * CACHE-FIRST. On 12 November a material pass changed that file and nothing
+ * else about the board, and the deployed page would have gone on painting
+ * the previous stylesheet until the cache version happened to be bumped for
+ * some unrelated reason. That is precisely the failure already written up
+ * under "Deployment can hide a fix", in the same shape and one file type
+ * over: a page running a mixture of old and new.
+ *
+ * The version bump below fixes it once. This line is what stops it coming
+ * back the next time the stylesheet changes. */
+const isCode = url => /\.(?:js|css|html)$/.test(url.pathname) || url.pathname.endsWith('/');
 
 self.addEventListener('fetch', e => {
   const r = e.request;

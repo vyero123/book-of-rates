@@ -29,18 +29,86 @@
  * exit overlay and the page frame can wear the same clothes.
  */
 
+/* ==================================================================
+   THE MATERIAL PASS — 12 November 2026
+   ==================================================================
+   The board was CHESTNUT, not oxblood: #4A2418 is a mid chocolate
+   brown with no red in it at all. The brief has always said oxblood
+   leather with gold stitching, and the hue was the one thing nobody
+   had checked against the words. It is a dark brownish red now, and
+   the gold reads differently against it — warmer, and with more
+   separation, because gold and red are further apart in hue than gold
+   and brown.
+
+   Three other things changed with it, all of them about LIGHT rather
+   than about colour:
+
+   1. THE GRAIN WAS A CORDUROY. Three repeating-linear-gradients at
+      26deg, -54deg and 0deg, at a 1 px pitch, is a woven plaid: the
+      two diagonals beat against each other and the result is a moire
+      that crawls when the board turns, and on a 3x phone the 1 px
+      stripes land on a sub-pixel grid and shimmer. Leather grain is
+      ISOTROPIC — it has no direction, because it is a pebble and not
+      a weave. One feTurbulence tile does that honestly, costs one
+      rasterisation, and cannot moire because it has no period inside
+      the tile.
+   2. THE GOLD HAD NO DIRECTION. Every rule was `2px solid var(--gold)`
+      on all four sides. A metal rule lit from one place is lighter on
+      two sides and darker on the other two; the cover's own front face
+      has had a highlight at 18% 6% since it was written, so the light
+      has always been at the top left and the tooling was simply not
+      lit by it. Per-side border colours are free and they are what
+      makes a flat rule read as a struck one.
+   3. THE TOOLING WAS NOT PRESSED INTO ANYTHING. Gold tooling is
+      stamped, so there is a groove: with light from above, the near
+      wall of a groove is in shadow and the far wall is lit, which is
+      a dark hairline above the rule and a pale one below it. Two
+      box-shadows.
+
+   Everything here is CSS. No new element, no new image file, no JS.
+   ================================================================== */
 :root{
-  --leather:#4A2418; --leatherHi:#6E3A24; --leatherLo:#24100A;
+  --leather:#4C1420; --leatherHi:#79272F; --leatherLo:#1C060C;
   --gold:#C9A227; --goldHi:#EFD98B; --goldLo:#8A6A14; --board:14px;
+
+  /* ONE noise tile, used by the leather, the paste-down and the board
+     edge. feTurbulence is deterministic per spec, so this is the same
+     pebble everywhere rather than three different ones. */
+  --bor-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.68' numOctaves='3' seed='11'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='150' height='150' filter='url(%23g)'/%3E%3C/svg%3E");
+  /* A coarser one for the pebble lumps under the fine grain. */
+  --bor-pebble:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09' numOctaves='2' seed='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23p)'/%3E%3C/svg%3E");
 }
 
 /* ---------- gold tooling: a double rule with a stitch line between ----------
    The idiom, and the only part of this file the contents uses. */
 .bor-tool{position:absolute;inset:16px 14px;pointer-events:none}
-.bor-tool .outer{position:absolute;inset:0;border:2px solid var(--gold);opacity:.78}
-.bor-tool .inner{position:absolute;inset:9px;border:1px solid var(--goldHi);opacity:.5}
-.bor-tool .stitch{position:absolute;inset:4px;border:1px dashed rgba(239,217,139,.72)}
-.bor-tool svg{position:absolute;width:34px;height:34px;opacity:.9}
+/* Per-side colour is the bevel; the two box-shadows are the groove it
+   sits in. Light from the top left, matching .bor-front's highlight. */
+.bor-tool .outer{position:absolute;inset:0;border:2px solid var(--gold);opacity:.84;
+  border-top-color:var(--goldHi);border-left-color:#DCC063;
+  border-bottom-color:var(--goldLo);border-right-color:#A98420;
+  box-shadow:0 -1px 0 rgba(0,0,0,.55), 0 1px 0 rgba(255,232,190,.14),
+             inset 0 1px 0 rgba(0,0,0,.30), inset 0 -1px 0 rgba(255,232,190,.12)}
+.bor-tool .inner{position:absolute;inset:9px;border:1px solid var(--goldHi);opacity:.55;
+  border-bottom-color:var(--gold);border-right-color:var(--gold);
+  box-shadow:0 -1px 0 rgba(0,0,0,.34)}
+/* THE STITCHING. It was one dashed hairline, which is a dotted line and
+   not a stitch: thread sits ON the leather, so it has a shadow under it
+   and a lit top. Two copies of the same dash, the lower one dark and
+   offset by a pixel, and the dash is longer than the gap because a
+   saddle stitch shows more thread than hole. */
+.bor-tool .stitch{position:absolute;inset:4px;
+  border:1px dashed rgba(243,225,160,.80)}
+/* inset:0, NOT -1px. A dashed border's dash phase is set by the length
+   of the side, so a box even two pixels larger starts its dashes
+   somewhere else and the shadow lands between the stitches instead of
+   under them — two dotted lines out of register rather than one stitch
+   with a shadow. Same box, shifted by a pixel, is the only version of
+   this that works. */
+.bor-tool .stitch::before{content:'';position:absolute;inset:0;
+  border:1px dashed rgba(0,0,0,.42);transform:translateY(1.2px)}
+.bor-tool svg{position:absolute;width:34px;height:34px;opacity:.92;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
 .bor-tool .c1{top:-5px;left:-5px}
 .bor-tool .c2{top:-5px;right:-5px;transform:scaleX(-1)}
 .bor-tool .c3{bottom:-5px;left:-5px;transform:scaleY(-1)}
@@ -112,27 +180,46 @@
   border-radius:3px 8px 8px 3px}
 .bor-front{transform:translateZ(calc(var(--board) / 2));
   background:
-    radial-gradient(135% 95% at 18% 6%, rgba(255,226,180,.16), transparent 58%),
-    radial-gradient(90% 70% at 85% 95%, rgba(0,0,0,.42), transparent 60%),
+    radial-gradient(135% 95% at 18% 6%, rgba(255,214,170,.17), transparent 58%),
+    radial-gradient(90% 70% at 85% 95%, rgba(0,0,0,.46), transparent 60%),
     linear-gradient(158deg,var(--leatherHi) 0%,var(--leather) 46%,var(--leatherLo) 100%);
+  /* THE BOARD'S OWN BEVEL. A bound board is not a flat rectangle: it is
+     covered leather turned over an edge, so the perimeter has a lit lip
+     at the top and left and a dark one at the bottom and right, and the
+     whole face is very slightly domed. Four inset shadows, no element. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,220,180,.22), inset 1px 0 0 rgba(255,220,180,.13),
+    inset 0 -2px 2px rgba(0,0,0,.55),    inset -2px 0 2px rgba(0,0,0,.42),
+    inset 0 0 44px rgba(0,0,0,.34);
   display:grid;place-items:center;padding:30px 26px;text-align:center}
-/* pebbled leather grain, flat and hard-edged */
-.bor-front::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
-  background:
-    repeating-linear-gradient(26deg, rgba(0,0,0,.14) 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(-54deg, rgba(255,214,160,.07) 0 1px, transparent 1px 5px),
-    repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0 2px, transparent 2px 6px)}
+/* PEBBLED MOROCCO GRAIN, in two scales and with no direction in either.
+   The fine tile is the grain; the coarse one is the lump under it, and
+   it is what stops the fine tile from reading as television snow. Both
+   are multiply-free — a plain low-opacity overlay keeps the leather's
+   own light gradient visible through them, which a blend mode on a
+   3-D-transformed face does not reliably do. */
+.bor-front::before{content:'';position:absolute;inset:0;pointer-events:none;
+  opacity:.17;background-image:var(--bor-grain);background-size:150px 150px}
+.bor-front::after{content:'';position:absolute;inset:0;pointer-events:none;
+  opacity:.14;background-image:var(--bor-pebble);background-size:220px 220px}
 .bor-back{transform:translateZ(calc(var(--board) / -2)) rotateY(180deg);
   background:
     radial-gradient(110% 80% at 70% 20%, rgba(255,240,210,.1), transparent 60%),
     linear-gradient(200deg,#5A3A5E 0%,#3E2746 50%,#241630 100%)}
-/* a marbled paste-down on the inside of the board */
-.bor-back::before{content:'';position:absolute;inset:0;opacity:.5;
+/* A marbled paste-down on the inside of the board. Marbling is combed
+   ink floated on size: the figure is WAVY and the waves are the whole
+   point, so two straight repeating gradients could never have been it.
+   Two offset radial fields at different scales give the swirl, and the
+   fine tile gives it the grain of the paper underneath. */
+.bor-back::before{content:'';position:absolute;inset:0;opacity:.55;
   background:
-    repeating-linear-gradient(74deg, rgba(201,162,39,.16) 0 2px, transparent 2px 9px),
-    repeating-linear-gradient(104deg, rgba(243,234,215,.10) 0 1px, transparent 1px 7px)}
+    repeating-radial-gradient(60% 120% at 18% 30%, rgba(201,162,39,.20) 0 3px, transparent 3px 13px),
+    repeating-radial-gradient(130% 70% at 86% 74%, rgba(243,234,215,.13) 0 2px, transparent 2px 11px),
+    repeating-radial-gradient(90% 150% at 50% 110%, rgba(70,214,200,.07) 0 2px, transparent 2px 17px)}
 .bor-back::after{content:'';position:absolute;inset:14px;
-  border:1px solid rgba(201,162,39,.3)}
+  border:1px solid rgba(201,162,39,.34);
+  border-top-color:rgba(239,217,139,.42);
+  box-shadow:0 -1px 0 rgba(0,0,0,.4)}
 
 /* the fore-edge of the board — the actual thickness, standing in Z.
    translateZ first, THEN rotate, so the strip spans +half to -half of
@@ -140,17 +227,28 @@
 .bor-edge{position:absolute;top:0;bottom:0;right:0;width:var(--board);
   transform-origin:right center;
   transform:translateZ(calc(var(--board) / 2)) rotateY(90deg);
-  background:linear-gradient(180deg,#3A1C12 0%,#73411F 12%,#4A2418 48%,#1E0D08 100%);
-  box-shadow:inset 0 1px 0 rgba(255,214,160,.2)}
+  background:linear-gradient(180deg,#330A12 0%,#7A2A33 10%,#4C1420 46%,#170509 100%);
+  box-shadow:inset 0 1px 0 rgba(255,206,170,.22), inset 0 -1px 0 rgba(0,0,0,.6)}
+/* the fore-edge carries the grain too, or the board is leather on the
+   face and plastic on the side */
+.bor-edge::before{content:'';position:absolute;inset:0;opacity:.2;
+  background-image:var(--bor-grain);background-size:150px 150px}
 
-/* the spine, with raised bands.
-   Pushed just in front of the front face, or the faces would hide it. */
+/* THE SPINE, with raised bands and gold between them.
+   Pushed just in front of the front face, or the faces would hide it.
+   A spine is a cylinder, so its cross-section gradient is the lighting
+   and wants more stops than a flat strip; and every band on a real
+   binding has a tooled gold line on each side of it, which is the one
+   place the gold meets the reader's eye edge-on. */
 .bor-spine{position:absolute;top:0;bottom:0;left:0;width:26px;
   transform:translateZ(calc(var(--board) / 2 + 1px));
-  background:linear-gradient(90deg,#1A0A06 0%,#3E1D11 42%,#5A2E1C 72%,#2A120C 100%)}
+  background:linear-gradient(90deg,#120308 0%,#3A0F18 26%,#6B2029 56%,#4C1420 78%,#1C060C 100%)}
+.bor-spine::before{content:'';position:absolute;inset:0;opacity:.2;
+  background-image:var(--bor-grain);background-size:150px 150px}
 .bor-spine i{position:absolute;left:0;right:0;height:7px;
-  background:linear-gradient(180deg,rgba(255,214,160,.26),rgba(0,0,0,.5));
-  box-shadow:0 1px 0 rgba(0,0,0,.5)}
+  background:linear-gradient(180deg,rgba(255,206,170,.30),rgba(0,0,0,.52));
+  box-shadow:0 1px 0 rgba(0,0,0,.55),
+             0 -2px 0 rgba(201,162,39,.55), 0 9px 0 rgba(201,162,39,.45)}
 
 /* ---------- the exit: the board closing over a chapter ----------
    The overlay the chapters mount. The chapter's own last frame is left

@@ -344,6 +344,91 @@ Where each chapter stood when this was written, audited rather than assumed:
 | Bamboo Rain | complies, and was the model for it. The storm clears **on the schedule and not on the effort**: lift your finger for the whole session and it still clears. Releasing mid-exhale now stops the pushing rather than undoing it. | |
 | Lantern Current | complies. The darkening is on the schedule alone and the lanterns do not go out. Lighting is rate-limited so a palm left on the glass cannot spend the chapter, which is a limit on gaining rather than a penalty for declining. | |
 
+### 1.7 Human-led motion — the reader sets the rate
+
+*Added 12 November 2026, by the author, as a universal design principle for the project and
+"the tenet for a variety of rates". It is given its own number rather than a letter under
+§1.6 because it is not an amendment to any one rule: it changes what the app's schedule IS.
+Everything built before this date was built against the opposite assumption, and §1.7a
+records what that costs.*
+
+> **Human-led motion — for example, starting with stillness and having the person initiate
+> the sequence rather than be subject to it. They set the rate, not us. We create the
+> boundaries that motivate them to move to particular rates, but we do not hinder their
+> ability to express their own rates. Instead we adapt to their rates in order to find
+> synchronicity where their motion can align with our general patterns, through the
+> principle of superstructures.**
+>
+> **Superstructures: rates harmoniously superimposed onto smaller, more erratic structures
+> in order to normalise or stabilise them closer to a particular rhythm without causing them
+> to vanish.**
+>
+> **So if a user engages a rate and they happen to be panicking, their breathing rate as
+> expressed by their motions on the screen would be quick and/or erratic. Instead of telling
+> them their behaviour does not conform to the standards of the app, or disregarding their
+> motions as irrelevant, we transform the motif into one more suited to that rate of rhythm.
+> A 4-4-4-4 glider should be able to become a 0.5-0.5 motion.**
+>
+> **Speeding up the same glider effect 8× would not be nice. We'd want to simplify the
+> imagery as though we were in a panicked state — periphery fuzzy and less detailed at higher
+> speeds, centre remains locked and steady. If 2-2-2-2 feels more right, that's what you
+> should do, but the offering for a slower pace should be there in the environment, not as a
+> 4-4-4-4 but maybe just a fraction off the 2s, inviting you to slowly extend your rate.**
+
+**How it relates to §1.6 and §1.6b, which are its neighbours and not its equals.** The three
+are the same conviction at three depths, and they answer three different questions.
+
+- **§1.6 asks who may begin.** Its subject is *practices*, and its answer is that the app
+  discloses circumstances rather than gatekeeping them, because what a practitioner does
+  with their own body in their own room is outside the app's sight.
+- **§1.6b asks what the app may require once they have begun.** Its subject is *permission*,
+  and its answer is that the rhythm is recommended rather than required: declining a phase
+  costs nothing and is not a failure.
+- **§1.7 asks who leads.** Its subject is *authorship of the rate*, and its answer is that
+  the reader does. This is the one that bites, because §1.6b is satisfied by an app-owned
+  schedule that is merely forgiving — a clock that does not punish you for being out of step
+  with it is still a clock you are out of step with. §1.7 says the reader's own rhythm is
+  the input and the schedule is the invitation. §1.6b made deviation free; §1.7 makes
+  deviation the signal.
+
+And §1.6a is untouched by all of it. A reader-led inhale is still never depicted underwater,
+and because the reader may now take one at any instant, the surface condition becomes a
+property the scene must hold continuously rather than a property of a phase at a known time.
+See §1.7a.
+
+#### 1.7a What it costs — stated plainly, because it is not a feature
+
+*Recorded 12 November 2026 so that the size of this principle is on the record next to the
+principle itself, and is not discovered a chapter at a time.*
+
+Every chapter in the book as it stands drives its scene from an app-owned schedule and
+measures the reader against it. `app/js/breath.js` is a pure function of elapsed time: the
+reading head takes `t`, finds the phase, and returns the figure's height, the expressive
+scalar, and the cue. `tools/regress.mjs` then flies that schedule perfectly and asserts the
+result — and the headline guarantee it enforces, *"on-pace play never touches a surface"*, is
+in its own words a promise about a reader who conforms to **our** rate. Under §1.7 there is
+no such reader to promise anything about.
+
+So this is a change to the kit's spine, not a chapter tweak. Concretely:
+
+- **`breath.js`** stops being `f(t)` and becomes a state machine over reader input. A phase
+  ends when the reader ends it, so `at(t)`, `value(t)`, `cue(t)` and `progress(t)` all lose
+  their defining property — that the same `t` always gives the same answer.
+- **The protocol engine** stops being a list of fixed durations and becomes a *target* the
+  scene is pulled towards. Durations become preferences, not facts.
+- **`regress.mjs`'s entire guarantee structure** rests on being able to fly a session
+  deterministically and assert what the scene did. With a reader-led rate there is no single
+  session to fly; the assertions have to become properties that hold over a *family* of
+  reader behaviours, including pathological ones. This is a larger rewrite than any chapter
+  in the book.
+- **The cue** can no longer be an instruction about what to do now, because the reader is
+  the one deciding. It becomes a report of what is happening plus an invitation to a
+  neighbouring rate — which is the "fraction off the 2s" clause above, and it has to live
+  entirely in the imagery, since by the author's decision there is no instructional text
+  anywhere in the app.
+
+None of that is an argument against the principle. It is the price of it, written down.
+
 ---
 
 ## 2. Safety: the architecture, not the disclaimer

@@ -56,13 +56,69 @@ export function cssReady(){
 }
 
 /* The corner ornament. One shape, drawn four times with the class doing
-   the mirroring — a second hand-drawn corner is a second corner. */
-const CORNER = `
-  <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#C9A227"/>
-  <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#EFD98B" opacity=".65"/>
-  <circle cx="16" cy="16" r="2.1" fill="#EFD98B" opacity=".8"/>`;
+   the mirroring — a second hand-drawn corner is a second corner.
+ *
+ * MATERIAL PASS, 12 November 2026. It was three flat fills, and at 375 px
+ * it read as a blob with a dot beside it. Three things changed, none of
+ * them the shape:
+ *
+ *  - The gold is a GRADIENT along the arc rather than one colour. Gold is
+ *    a mirror; a mirror bent through ninety degrees cannot be one value.
+ *  - There is a DEBOSS copy underneath, offset a fraction of a unit and
+ *    nearly black, so the ornament is pressed into the leather rather
+ *    than lying on it. It is drawn first so the gold covers all but the
+ *    lower lip of it.
+ *  - The bare dot became a FLEURON — a small struck lozenge with two
+ *    buds, which is what a corner tool actually leaves. It is the same
+ *    quarter-turn symmetry as the arcs, so the mirroring still works.
+ *
+ * THE LIGHT DOES NOT MIRROR, AND THE SHAPE DOES. This is the whole
+ * reason `corner()` now takes arguments. The four corners are one
+ * ornament flipped by CSS (`scaleX(-1)`, `scaleY(-1)`, `scale(-1,-1)`),
+ * which is right for the SHAPE and wrong for everything that encodes a
+ * light direction: a deboss shadow written as `translate(0, +0.9)`
+ * becomes `-0.9` under a vertical flip, so the bottom two corners would
+ * be lit from BELOW, and the gradient would run uphill on the right-hand
+ * pair. Mirroring a highlight is the classic way to get four corners
+ * that are individually plausible and collectively impossible.
+ *
+ * So the flip is passed in, and the two light-bearing quantities are
+ * pre-compensated in SVG space so that after the CSS flip they all point
+ * at the top left — which is where `.bor-front`'s own highlight has
+ * always been.
+ *
+ * Each corner therefore needs its OWN gradient id, because the four
+ * gradients genuinely differ now. They did not before, which is why one
+ * shared id was survivable; it would not be survivable here.
+ */
+const cornerBody = (id, fx, fy) => `
+  <defs>
+    <linearGradient id="${id}" x1="${fx > 0 ? 0 : 1}" y1="${fy > 0 ? 0 : 1}"
+                               x2="${fx > 0 ? 1 : 0}" y2="${fy > 0 ? 1 : 0}">
+      <stop offset="0" stop-color="#F6E7AE"/><stop offset=".38" stop-color="#C9A227"/>
+      <stop offset=".62" stop-color="#8A6A14"/><stop offset="1" stop-color="#E2CC7C"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(0,${(0.9 * fy).toFixed(2)})" opacity=".62">
+    <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="#12040A"/>
+    <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="#12040A"/>
+    <path d="M16 12.6 L18.1 16 L16 19.4 L13.9 16 Z" fill="#12040A"/>
+  </g>
+  <path d="M2 14 Q2 2 14 2 L14 5 Q5 5 5 14 Z" fill="url(#${id})"/>
+  <path d="M8 20 Q8 8 20 8 L20 10 Q10 10 10 20 Z" fill="url(#${id})" opacity=".78"/>
+  <path d="M16 12.6 L18.1 16 L16 19.4 L13.9 16 Z" fill="#EFD98B" opacity=".9"/>
+  <circle cx="16" cy="16" r=".9" fill="#5A4208" opacity=".7"/>
+  <path d="M11.4 11.4 Q13.4 12.6 13.9 14.2" stroke="#EFD98B" stroke-width=".9"
+        fill="none" opacity=".5" stroke-linecap="round"/>`;
 
-const corner = cls => `<svg class="${cls}" viewBox="0 0 34 34" aria-hidden="true">${CORNER}</svg>`;
+/* A counter, so a page carrying the cover's tooling AND a closing board's
+   tooling does not end up with two elements answering to `#borCg-c1`. */
+let cornerSeq = 0;
+
+const corner = (cls, fx, fy) => {
+  const id = 'borCg-' + cls + '-' + (++cornerSeq);
+  return `<svg class="${cls}" viewBox="0 0 34 34" aria-hidden="true">${cornerBody(id, fx, fy)}</svg>`;
+};
 
 /** The gold tooling: outer rule, stitch line, inner rule, four corners.
  *  `page` holds it to the viewport instead of to its parent, for a
@@ -72,7 +128,7 @@ export function toolHTML({ page = false } = {}){
   <div class="outer"></div>
   <div class="stitch"></div>
   <div class="inner"></div>
-  ${corner('c1')}${corner('c2')}${corner('c3')}${corner('c4')}
+  ${corner('c1', 1, 1)}${corner('c2', -1, 1)}${corner('c3', 1, -1)}${corner('c4', -1, -1)}
 </div>`;
 }
 

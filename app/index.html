@@ -53,24 +53,78 @@
   #coverWrap.ready{opacity:1}
   @media (prefers-reduced-motion: reduce){ #coverWrap{transition:none} }
 
-  #plate{position:relative;z-index:2}
+  /* ==================================================================
+     THE COVER PLATE — material pass, 12 November 2026
+     ==================================================================
+     The board, its grain and its gold tooling are in css/bookframe.css
+     and changed there. What changed HERE is the lettering and the two
+     struck objects, on the same principle: gold is a MIRROR, so no part
+     of it may be one flat colour, and everything stamped into leather
+     has a groove — dark on the side nearest the light, pale on the far
+     side.
+
+     The title was `color:var(--goldHi)` with two 1 px text-shadows.
+     That is a pale yellow word with a drop shadow; it is not gold leaf,
+     because gold leaf has a bright top, a dark belly and a lit lower
+     lip, which is three values down the height of a single letter. A
+     background-clip gradient gives all three for nothing.
+
+     And the plate sits ABOVE centre now. It was dead-centre in a tall
+     board, which left roughly equal emptiness above and below and read
+     as a web page centred in a viewport rather than as a cover. §4.2
+     rule 6 wants the negative space; a cover puts it at the foot. */
+  #plate{position:relative;z-index:2;transform:translateY(-5%)}
   .mark{width:74px;height:74px;margin:0 auto;display:block}
+  /* A STRUCK MEDAL, not a disc with rings round it. The three flat
+     box-shadow rings became a rim with a bevel: dark where the metal
+     turns away at the top, bright where it comes back at the bottom,
+     with the groove it is set into outside that. */
   #medallion{width:106px;height:106px;margin:0 auto 18px;position:relative;
     display:grid;place-items:center;border-radius:50%;
-    background:radial-gradient(circle at 34% 28%, rgba(239,217,139,.3), rgba(0,0,0,.25) 68%);
-    box-shadow:0 0 0 2px var(--gold), 0 0 0 4px rgba(0,0,0,.4), 0 0 0 5px rgba(201,162,39,.4),
-               inset 0 2px 7px rgba(0,0,0,.5)}
-  #cover h1{font:300 34px/1.06 ui-serif,Georgia,serif;margin:0;letter-spacing:.02em;
-    color:var(--goldHi);text-shadow:0 1px 0 rgba(0,0,0,.65), 0 -1px 0 rgba(255,232,180,.22)}
+    background:
+      radial-gradient(circle at 34% 28%, rgba(239,217,139,.34), rgba(0,0,0,.30) 68%);
+    box-shadow:
+      0 0 0 2px var(--gold), 0 0 0 4px rgba(0,0,0,.52), 0 0 0 5px rgba(201,162,39,.34),
+      0 2px 4px rgba(0,0,0,.5),
+      inset 0 2px 8px rgba(0,0,0,.55), inset 0 -2px 4px rgba(255,226,180,.16)}
+  /* the rim's own highlight, a lit arc at the top left and nowhere else */
+  #medallion::before{content:'';position:absolute;inset:-5px;border-radius:50%;
+    pointer-events:none;
+    background:conic-gradient(from 200deg,
+      rgba(255,236,190,.42) 0deg, rgba(255,236,190,0) 70deg,
+      rgba(0,0,0,.34) 150deg, rgba(0,0,0,0) 230deg, rgba(255,236,190,.22) 330deg,
+      rgba(255,236,190,0) 360deg);
+    -webkit-mask:radial-gradient(circle, transparent 0 calc(50% - 6px), #000 calc(50% - 6px) 50%, transparent 50%);
+            mask:radial-gradient(circle, transparent 0 calc(50% - 6px), #000 calc(50% - 6px) 50%, transparent 50%)}
+  #cover h1{font:300 36px/1.06 ui-serif,Georgia,serif;margin:0;letter-spacing:.02em;
+    background:linear-gradient(176deg,
+      #FFF3CD 0%, #EFD98B 26%, #C9A227 52%, #8A6A14 72%, #E6CE7E 94%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 1px 0 rgba(0,0,0,.72)) drop-shadow(0 -1px 0 rgba(255,232,180,.18))}
   #cover .of{display:block;font:400 12px/1 ui-serif,Georgia,serif;
-    letter-spacing:.46em;text-transform:uppercase;color:var(--gold);opacity:.82;
-    margin-bottom:10px;text-indent:.46em}
+    letter-spacing:.46em;text-transform:uppercase;color:var(--gold);opacity:.88;
+    margin-bottom:10px;text-indent:.46em;
+    text-shadow:0 1px 0 rgba(0,0,0,.6), 0 -1px 0 rgba(255,232,180,.12)}
   #cover .sub{margin-top:16px;font:500 8.5px/1.6 ui-sans-serif;letter-spacing:.32em;
-    text-transform:uppercase;color:rgba(239,217,139,.5)}
+    text-transform:uppercase;color:rgba(239,217,139,.52);
+    text-shadow:0 1px 0 rgba(0,0,0,.5)}
+  /* THE WAY IN WAS A WEB BUTTON. A 999 px pill with a hairline border is
+     the one element on the cover that belonged to a settings sheet
+     rather than to a bound object; it is a tooled CARTOUCHE now — a
+     shallow panel pressed into the leather, with the same bevelled gold
+     rule as the frame and the word sitting in the bottom of it. Nothing
+     about the target size or the affordance changes: same padding, same
+     word, same tap. */
   #cover .open{margin-top:26px;font:500 8.5px/1 ui-sans-serif;letter-spacing:.3em;
-    text-transform:uppercase;color:rgba(239,217,139,.78);
-    border:1px solid rgba(201,162,39,.5);border-radius:999px;padding:11px 22px;
-    display:inline-block;background:rgba(0,0,0,.2)}
+    text-transform:uppercase;color:rgba(248,232,186,.9);
+    border:1px solid var(--gold);border-radius:2px;padding:11px 24px;
+    border-top-color:var(--goldHi);border-left-color:#DCC063;
+    border-bottom-color:var(--goldLo);border-right-color:#A98420;
+    display:inline-block;
+    background:linear-gradient(180deg, rgba(0,0,0,.34), rgba(0,0,0,.12));
+    box-shadow:0 -1px 0 rgba(0,0,0,.5), 0 1px 0 rgba(255,232,190,.14),
+               inset 0 2px 4px rgba(0,0,0,.45);
+    text-shadow:0 1px 0 rgba(0,0,0,.6)}
 
   /* ==================================================================
      THE CONTENTS IS AN OPEN BOOK — 31 October 2026

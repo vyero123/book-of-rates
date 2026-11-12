@@ -286,6 +286,44 @@ settings (161/193/225 columns → 2.14/1.51/1.10 px) and 193 shipped; rows left 
 because the same instrument reads 0.14 px along the path, where the hill runs away from
 the lens. Measure the two axes separately — that is why they are different numbers.
 
+## HUMAN-LED MOTION — the reader sets the rate
+
+Design doc **§1.7**, added by the user on 12 November 2026, as a universal design principle
+for the project and "the tenet for a variety of rates". A standing constraint on everything
+built from here, and the biggest one in this file.
+
+> Human-led motion — for example, starting with stillness and having the person initiate the
+> sequence rather than be subject to it. **They set the rate, not us.** We create the
+> boundaries that motivate them to move to particular rates, but we do not hinder their
+> ability to express their own rates. Instead we adapt to their rates in order to find
+> synchronicity where their motion can align with our general patterns, through the principle
+> of **superstructures**.
+>
+> Superstructures: rates harmoniously superimposed onto smaller, more erratic structures in
+> order to normalise or stabilise them closer to a particular rhythm **without causing them
+> to vanish**.
+>
+> A 4-4-4-4 glider should be able to become a **0.5-0.5** motion. Speeding up the same glider
+> 8× would not be nice — **simplify the imagery** as though in a panicked state: periphery
+> fuzzy and less detailed at higher speeds, centre locked and steady. The offering for a
+> slower pace should be there **in the environment**, not as a 4-4-4-4 but maybe just a
+> fraction off the 2s, inviting you to slowly extend your rate.
+
+Where it sits: §1.6 governs who may begin (disclosure, not gatekeeping). §1.6b governs what
+may be required once they have (the rhythm is an invitation). **§1.7 governs who leads**, and
+it is the one that bites, because a forgiving app-owned clock satisfies §1.6b and still fails
+this. §1.6a is untouched — but a reader-led inhale can arrive at any instant, so "no inhale
+underwater" becomes a property the scene must hold CONTINUOUSLY, not at known phase times.
+
+**This is a change to the kit's spine, not a chapter tweak, and must be treated as one.**
+`breath.js` is `f(t)`: same `t`, same answer. Under §1.7 a phase ends when the reader ends
+it, so `at/value/cue/progress` all lose that property. The protocol becomes a target rather
+than a schedule of durations. And `regress.mjs`'s whole guarantee structure — including
+"on-pace play never touches a surface", which is explicitly a promise about a reader
+conforming to OUR rate — depends on flying one deterministic session; it has to become
+properties over a family of reader behaviours, pathological ones included. Full cost
+accounting at design doc §1.7a. Do not start that rebuild without the author's say-so.
+
 ## Other standing constraints for this project
 
 - **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**
