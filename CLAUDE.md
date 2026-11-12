@@ -324,6 +324,45 @@ conforming to OUR rate — depends on flying one deterministic session; it has t
 properties over a family of reader behaviours, pathological ones included. Full cost
 accounting at design doc §1.7a. Do not start that rebuild without the author's say-so.
 
+## Cost: the recorded numbers were stale, and the axis was the wrong one — 12 November 2026
+
+Measured on the deployed build at 375x812 (buffer 562x1218, MSAA 4 granted, DPR_CAP 1.5),
+on an AMD Radeon 780M via ANGLE — a laptop iGPU, so read the caveat below before using any
+of it.
+
+    The Shepherd      145,470 tri /  5 calls   <- this file said 81,920. Wrong by 78%.
+    Long Air          140,454 tri / 14 calls   <- agrees with the 3 Nov figure
+    Pearl Diver        46,912 tri / 17 calls   <- never recorded anywhere before
+    Bamboo Rain         3,388 tri / 13 calls   <- never recorded anywhere before
+    The Murmuration     1,122 tri /  2 calls   <- agrees
+
+**THE BENCH IS NOT TRUSTWORTHY AND HERE IS THE NUMBER.** Eight consecutive `bench(60)` runs
+on one page, same scene, same buffer, inside sixty seconds: 0.100 0.085 0.100 0.057 0.062
+0.098 0.192 0.077 ms. **3.4x spread on identical work.** Use medians of eight or do not
+quote a time. A resolution-scaling test was attempted and could not be run — changing the
+emulated viewport did not propagate to the drawing buffer — and is reported as not-run
+rather than worked around.
+
+**THE TRIANGLE BUDGET IS NOT THE BINDING CONSTRAINT, AND SEVERAL PASSES HAVE BEEN WORRYING
+ABOUT THE WRONG AXIS.** Medians of eight at comparable buffer sizes: Long Air 140,454
+triangles at 0.083 ms over 786k px; Bamboo Rain 3,388 triangles at ~0.090 ms over 685k px.
+**Forty-one times the geometry, the same frame time.** Cost tracks PIXELS, not primitives.
+The Shepherd carries more geometry than Long Air in five draw calls and costs less. So:
+subdivision is cheap and buying columns was right for a reason nobody stated; the expensive
+axis is per-fragment arithmetic on the surfaces that FILL THE FRAME. The largest single
+identifiable waste is `rampPickAA` — 5 unrolled smoothsteps plus a fwidth to choose between
+six colours, called three times on the ridge, which is about half that shader's whole
+smoothstep budget. Only one of the five risers is ever near the fragment's value.
+
+**What is still unmeasured is the only thing that matters.** Instantaneous margin on a
+desktop iGPU says nothing about a phone over a five-minute session, where THERMAL is the
+constraint and a chapter that runs at 60 fps for thirty seconds and 40 at four minutes fails
+exactly when the breathing is working. Every chapter already exposes `__chapter.bench()`;
+surfacing a median frame time behind an Options toggle and asking the reader to read it off
+their own phone at the start and end of a session is the only way to get the number.
+
+Full working, and the two other questions it came from, in `docs/2026-11-12-analysis.md`.
+
 ## Other standing constraints for this project
 
 - **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**
