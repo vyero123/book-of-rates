@@ -82,20 +82,31 @@
   #medallion{width:106px;height:106px;margin:0 auto 18px;position:relative;
     display:grid;place-items:center;border-radius:50%;
     background:
-      radial-gradient(circle at 34% 28%, rgba(239,217,139,.34), rgba(0,0,0,.30) 68%);
+      radial-gradient(circle at 36% 26%, rgba(255,236,190,.17), rgba(0,0,0,.55) 64%),
+      linear-gradient(166deg,#3A101A,#190509);
     box-shadow:
-      0 0 0 2px var(--gold), 0 0 0 4px rgba(0,0,0,.52), 0 0 0 5px rgba(201,162,39,.34),
-      0 2px 4px rgba(0,0,0,.5),
-      inset 0 2px 8px rgba(0,0,0,.55), inset 0 -2px 4px rgba(255,226,180,.16)}
-  /* the rim's own highlight, a lit arc at the top left and nowhere else */
-  #medallion::before{content:'';position:absolute;inset:-5px;border-radius:50%;
-    pointer-events:none;
-    background:conic-gradient(from 200deg,
-      rgba(255,236,190,.42) 0deg, rgba(255,236,190,0) 70deg,
-      rgba(0,0,0,.34) 150deg, rgba(0,0,0,0) 230deg, rgba(255,236,190,.22) 330deg,
-      rgba(255,236,190,0) 360deg);
-    -webkit-mask:radial-gradient(circle, transparent 0 calc(50% - 6px), #000 calc(50% - 6px) 50%, transparent 50%);
-            mask:radial-gradient(circle, transparent 0 calc(50% - 6px), #000 calc(50% - 6px) 50%, transparent 50%)}
+      0 0 0 2px var(--gold), 0 0 0 4px rgba(0,0,0,.58), 0 0 0 5px rgba(201,162,39,.34),
+      0 2px 5px rgba(0,0,0,.55),
+      inset 0 2px 9px rgba(0,0,0,.62), inset 0 -2px 4px rgba(255,226,180,.14)}
+  /* THE RIM'S HIGHLIGHT — a lit arc at the top left and nowhere else.
+     A CONIC GRADIENT WAS THE FIRST ATTEMPT AND IT IS THE WRONG TOOL.
+     A conic has a SEAM at its start angle, which on a rim this small is
+     a visible notch; and clipping it to a ring needs a mask with hard
+     radial stops, which is an unresolved edge on a curve — the exact
+     defect design doc §4.2a is about, arriving in CSS instead of in a
+     shader. Deployed, looked at, and it read as a smudged lens.
+
+     A border on a circle is the whole thing for free: the browser
+     antialiases the ring, the four side colours blend across the
+     diagonals, and there is no seam anywhere because there is no start
+     angle. Lit at the top and left, dark at the bottom and right, which
+     is where the board's own light has always been. */
+  #medallion::before{content:'';position:absolute;inset:-4px;border-radius:50%;
+    pointer-events:none;border:2px solid transparent;
+    border-top-color:rgba(255,240,205,.50);
+    border-left-color:rgba(255,240,205,.26);
+    border-bottom-color:rgba(0,0,0,.46);
+    border-right-color:rgba(0,0,0,.30)}
   #cover h1{font:300 36px/1.06 ui-serif,Georgia,serif;margin:0;letter-spacing:.02em;
     background:linear-gradient(176deg,
       #FFF3CD 0%, #EFD98B 26%, #C9A227 52%, #8A6A14 72%, #E6CE7E 94%);

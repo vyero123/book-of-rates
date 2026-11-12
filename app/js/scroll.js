@@ -120,7 +120,7 @@ const CSS = `
     repeating-linear-gradient(0deg,
       rgba(120,84,46,.050) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg,
-      rgba(120,84,46,.085) 0 1px, transparent 1px 27px)}
+      rgba(120,84,46,.052) 0 1px, transparent 1px 31px)}
 #bor-scroll .vellum::after{content:'';position:absolute;inset:0;pointer-events:none;
   opacity:.14;background-size:180px 180px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='v'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.035' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23v)'/%3E%3C/svg%3E")}
