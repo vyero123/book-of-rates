@@ -4,278 +4,184 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="color-scheme" content="dark">
-<title>Book of Rates — Chapter eight: Bamboo Rain (3-D)</title>
+<title>Book of Rates — Bamboo Rain</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#2A2740;
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#12141F;
     font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
   canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
-
-  /* THE PRESS TARGET IS THE WHOLE SCREEN. §6 row 5 names no control
-     surface, and the gesture is "push" — which wants a palm, not a
-     button. It sits under the stop button and over everything else. */
-  #push{position:fixed;inset:0;z-index:15;touch-action:none;user-select:none;
-    -webkit-user-select:none;background:transparent}
-  /* THE VIBRATION IS VISUAL. Two hard rules low on the screen, where a
-     thumb already is. The upper one carries the invitation and the
-     press; the lower one is the release, in the plum that Lantern
-     Current's figure also uses for a release — richer and darker than
-     what it replaces, then gone.
-
-     Flat, hard-edged, no glow and no gradient: it is a mark in the
-     chapter's own idiom rather than a UI affordance pasted on top. The
-     scalars come from js/invite.js as custom properties, so the whole
-     behaviour — present only when a push would do something, absent
-     once the reader has understood — lives in one shared module and
-     not in this stylesheet. */
-  #push::before{content:'';position:absolute;left:14%;right:14%;
-    bottom:max(152px,calc(env(safe-area-inset-bottom) + 144px));height:2px;
-    background:rgba(255,242,168,.9);
-    opacity:calc(var(--invite,0) * 0.85 + var(--held,0) * 1.0);
-    transform:scaleX(calc(0.62 + var(--invite,0) * 0.38 + var(--held,0) * 0.0))}
-  #push::after{content:'';position:absolute;left:20%;right:20%;
-    bottom:max(145px,calc(env(safe-area-inset-bottom) + 137px));height:1px;
-    background:#7A3A72;opacity:var(--after,0)}
-  @media (prefers-reduced-motion: reduce){
-    /* The oscillation is the whole instrument, so asked for stillness
-       the mark holds at a steady half rather than flashing. It still
-       says "press here now"; it just stops moving. */
-    #push::before{opacity:calc(var(--invite,0) * 0.0 + var(--held,0) * 1.0 + 0.0);
-      transform:none}
-  }
 
   #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
     appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
     display:flex;align-items:center;gap:8px;
-    background:rgba(42,39,64,.56);backdrop-filter:blur(6px);
-    color:#FFF2A8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
-    box-shadow:0 0 0 1.5px rgba(255,242,168,.4)}
-  #stop i{width:11px;height:11px;background:#FFF2A8;display:block;border-radius:2px}
+    background:rgba(18,20,31,.5);backdrop-filter:blur(6px);
+    color:#F2E3C8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(242,227,200,.4)}
+  #stop i{width:11px;height:11px;background:#E8725A;display:block;border-radius:2px}
 
   #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
-    font:500 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
-    color:rgba(226,230,240,.78);background:rgba(42,39,64,.5);border-radius:6px;
+    font:500 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    color:rgba(242,227,200,.78);background:rgba(18,20,31,.5);border-radius:6px;
     padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
   #fps.off{opacity:0;pointer-events:none}
   #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
-    width:22px;height:22px;border-radius:50%;display:none}
+    width:26px;height:26px;border-radius:50%;display:none}
   #fpsdot.on{display:block}
 
-  #cue{position:fixed;left:0;right:0;bottom:max(104px,calc(env(safe-area-inset-bottom) + 96px));
-    z-index:20;text-align:center;pointer-events:none;color:#F2F4FA}
-  #phase{font:300 25px/1.1 ui-serif,Georgia,serif;letter-spacing:.3em;text-transform:lowercase;
-    text-shadow:0 2px 18px rgba(20,18,34,.95)}
-  #hint{margin-top:14px;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;
-    text-transform:uppercase;color:rgba(255,242,168,.0);transition:color .5s ease}
-  #hint.on{color:rgba(255,242,168,.78)}
-  #note{position:fixed;left:0;right:0;bottom:max(22px,calc(env(safe-area-inset-bottom) + 14px));
-    z-index:20;text-align:center;font:400 9px/1.4 ui-sans-serif,sans-serif;
-    color:rgba(242,244,250,.6);letter-spacing:.06em;padding:0 20px;pointer-events:none;
-    text-shadow:0 1px 8px rgba(20,18,34,.95)}
+  #reach{position:fixed;inset:0;z-index:25;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+
+  /* THE ONE MARK, and it is not an instruction: a ring on the tail of
+     the bamboo that breathes until the glass has been pressed, and then
+     never again (§1.6b — a prompt that keeps prompting is a mild way of
+     requiring). It sits on the tail because that is the end a finger
+     would push; the press works anywhere. */
+  #ring{position:fixed;left:0;top:0;z-index:26;pointer-events:none;
+    width:74px;height:74px;margin:-37px 0 0 -37px;border-radius:50%;
+    box-shadow:0 0 0 1.5px rgba(242,227,200,.85), 0 0 18px rgba(242,227,200,.35);
+    opacity:calc(var(--invite,0) * 0.85);
+    transform:scale(calc(1.12 - var(--invite,0) * 0.30))}
+  @media (prefers-reduced-motion: reduce){
+    #ring{opacity:calc(var(--asking,0) * 0.5);transform:none}
+  }
 
   .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
-    background:rgba(28,26,44,.93);backdrop-filter:blur(3px);text-align:center;padding:28px;
+    background:rgba(12,14,22,.9);backdrop-filter:blur(3px);text-align:center;padding:28px;
     overflow-y:auto}
   .sheet.on{display:grid}
-  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#FFF2A8;letter-spacing:.06em}
-  .sheet p{margin:0 0 14px;font:400 13px/1.6 ui-sans-serif,sans-serif;color:rgba(242,244,250,.82);max-width:320px}
-  .sheet .fine{font-size:11.5px;line-height:1.55;color:rgba(242,244,250,.64)}
+  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.06em}
   .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
-    background:#FFF2A8;color:#2A2740;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    background:#F2E3C8;color:#12141F;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
     display:block;width:100%;max-width:320px}
-  .sheet button.alt{background:transparent;color:#FFF2A8;
-    box-shadow:inset 0 0 0 1.5px rgba(255,242,168,.5);font-weight:500}
-  .sheet button.link,.sheet a.link{background:transparent;color:rgba(242,244,250,.6);
-    box-shadow:none;font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
+  .sheet a.link{background:transparent;color:rgba(242,227,200,.6);
+    font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
     text-decoration:underline;padding:8px;margin-top:14px;display:block;text-align:center}
-  .sheet a.link{margin-top:4px}
-  .sheet strong{color:#FFF2A8;font-weight:600}
-  .sheet .own{border-left:2px solid rgba(255,242,168,.34);padding-left:12px;text-align:left;
-    margin-bottom:16px}
-  .sheet .how{text-align:left;max-width:320px;margin:0 auto 16px;
-    font:400 12px/1.6 ui-sans-serif;color:rgba(242,244,250,.78)}
-  .sheet .how b{color:#FFF2A8}
-  .sheet .tiny{font-size:10.5px;line-height:1.5;color:rgba(242,244,250,.5);margin-top:16px}
-  .sheet .sub2{display:block;margin-top:5px;font:400 9.5px/1.3 ui-sans-serif,sans-serif;
-    letter-spacing:.06em;text-transform:none;opacity:.64}
 
   #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
-    text-align:center;
-    background:linear-gradient(#5B4B7A 0%,#6E6391 30%,#B7C0D8 56%,#66638E 74%,#2F3E4D 100%)}
+    text-align:center;background:linear-gradient(#1B1E33 0%,#3D4264 45%,#7F8099 100%)}
   #fallback.on{display:grid}
-  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#211E33;letter-spacing:.05em}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.05em}
   #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
-    color:rgba(33,30,51,.86);max-width:300px}
-  #fallback code{font:400 11px/1.5 ui-monospace,Menlo,monospace;color:rgba(242,244,250,.92)}
+    color:rgba(242,227,200,.84);max-width:300px}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="push" aria-label="Press and hold to push the rain away"></div>
 
 <button id="stop" aria-label="Stop the session"><i></i>STOP</button>
 <div id="fpsdot" aria-hidden="true"></div>
 <div id="fps" role="status" title="Tap to hide">—</div>
 
-<!-- THE PHASE WORD IS THE WHOLE CUE — 6 November 2026.
-     The line under it was the countdown ("breathe out in 3"). The
-     reader kept it two rounds ago, saw it live, and asked for it to
-     go. §2.4's countdown-pointing-at-air is amended in the design
-     doc rather than quietly stopped being true. -->
-<div id="cue">
-  <div id="phase">breathe in</div>
-</div>
-<!-- NO SAFETY TEXT IN THE CHAPTERS — 6 November 2026.
-     Disclosure happens once, in the warning scroll (js/scroll.js),
-     which sits between the cover and the book and which every reader
-     passes. It carries the circumstances the practice asks for, the
-     screening list and the not-medical-advice line. What was here was
-     a SECOND COPY of a disclosure that has already happened, inside
-     the experience it was disclosing about. Removing it removes the
-     repetition, not the disclosure. The scroll is untouched. -->
-
-<!-- A CHOICE, not a screening gate. No breath is held anywhere in this
-     chapter and there is no fast breathing in it: the quickest protocol
-     here is 6.7 breaths a minute, which is slower than ordinary resting
-     breathing. The blocking step is the warning scroll (js/scroll.js),
-     which discloses what the practice asks for and gets out of the way:
-     design doc §1.6. -->
-<div id="gate" class="sheet"><div>
-  <h2>Wait out the rain</h2>
-  <button id="gateSigh">THE SIGH · 2 IN, 1 ON TOP / 6 OUT</button>
-  <button id="gateSettled" class="alt">SETTLED · 5 IN / 6 OUT</button>
-</div></div>
+<div id="reach" aria-label="Press and hold anywhere: the bamboo lifts under the rain and fills. Let go and it tips and pours."></div>
+<div id="ring" aria-hidden="true"></div>
 
 <div id="halt" class="sheet"><div>
   <h2>Stopped</h2>
   <button id="resume">RESUME</button>
-  <button id="rescreen" class="link">Choose a different protocol</button>
   <a class="link" href="./#contents">Back to the book</a>
 </div></div>
 
 <div id="fallback"><div>
   <h2>Bamboo Rain needs WebGL</h2>
-  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
-  <p>The 2-D prototypes do the same job without it.</p>
-  <p><code>prototypes/01-long-shore.html · 02-still-pool.html · 03-the-tide.html</code></p>
-  <p style="margin-top:18px"><a class="link" href="./#contents" style="color:inherit">Back to the book</a></p>
+  <p id="fbwhy">This page paints its scene on the graphics card, and this browser could not give it a WebGL context.</p>
+  <p><a class="link" href="./#contents" style="color:inherit">Back to the book</a></p>
 </div></div>
 
 <script type="module">
 /* ============================================================
-   BOOK OF RATES — Chapter eight: BAMBOO RAIN
-   A 3-D treatment of design doc §6 row 5. Settled, after distress.
+   BOOK OF RATES — BAMBOO RAIN, the second version
+   13 November 2026. Chapter 1 of the book as it is now organised:
+   ONE DEGREE OF FREEDOM. All the reader can do is press, anywhere,
+   and the only thing they choose is how long.
 
-   WHY THIS ONE IS IN THREE DIMENSIONS. Because the rain is a VOLUME
-   with a near face, and the interaction the row names — "each exhale
-   pushes the rain band further off" — is pushing that face away from
-   you through depth. Flat, "further off" can only mean smaller or
-   fainter. Here it means the near slivers stop existing while the far
-   ones stay, the splash line retreats across the ground in front of
-   you, and a lightning stroke behind the curtain shows you how deep the
-   gap you opened now is. The depth IS the mechanic.
+   The first Bamboo Rain is kept, unlisted, as bamboo-rain-storm.html.
+   The design doc had already called it "the weak one" — its breath
+   drove the distance of a rain curtain, which eases and never turns,
+   seen through a lens that moved — and the author called it one of
+   the worst and asked for a redesign from the principles. This is
+   that, and each principle is answered below rather than assumed.
 
-   THREE SCALARS, kept apart, exactly as in Long Air:
+   THE EXPERIENCE. A garden in the rain at the end of a storm. A
+   length of bamboo on a pivot hangs mouth-down; the rain's trickle
+   runs past it. Press and the tail goes down onto its stone, the
+   mouth comes up under the trickle, and it fills while you hold —
+   breathe in. Let go and its own weight tips it: it pours, a little
+   longer than it filled — breathe out — down a chain of stone bowls
+   that light as the water reaches them. The model is in
+   js/sozu-breath.js and has no picture in it.
 
-     SCHEDULE   B.value(t) — where the protocol says the curtain is.
-                Unaffected by the reader.
-     FILL       0..1, integrated from the press at the protocol's own
-                rates, SWAPPED so the exhale is what drives it out.
-     FRONT      springs towards fill, with mass, because a wall of water
-                does not stop the instant you stop pushing.
+   THE PRINCIPLES, ONE AT A TIME.
 
-   And a fourth that no control touches at all: CLEARING, a function of
-   session progress, which lifts the whole band away and thins the rain.
-   §6: the interaction guarantees success. Press for all of it or none
-   of it and the storm clears at the same moment.
+   What does the breath move, relative to what? (CLAUDE.md, from
+   Lantern Current.) The tube TURNS about a pivot on a post in the
+   ground, in front of a lens that does not move at all: this page
+   has no camera to move — it is one painted frame. The mouth travels
+   a tenth of the frame's height in under a fifth of a second, twice
+   a breath. The stream is a ninth of the frame tall for the whole
+   exhale. The lights run down a third of the frame. All of it past
+   stones that hold still.
 
-   THE FIGURE DOES NOT MOVE. This is the first chapter where the breath
-   moves the world and leaves the body sitting still, which is what
-   "settled, after distress" should feel like. What the world does in
-   response to her is the whole of the feedback: the curtain's distance,
-   the gust through the grove on every exhale, the splash line, and the
-   light.
+   The control is the motion. (The author, on the Murmuration: "we
+   want the control over the behavior to be intuitive to the motion
+   itself.") A press pushes the tail DOWN. Nothing has to be learnt.
 
-   §1.6a is not applicable and that is a judgement, written down in
-   js/bamboo-rain-breath.js rather than assumed. Nobody is submerged and
-   there is no surface to be under; the rule binds water themes and the
-   design doc's own list of those does not include this row. If a figure
-   is ever put in the water here, the chapter joins the WATER list in
-   tools/regress.mjs in the same commit.
+   The phase boundary is in the picture. (Design doc 2.4b, where this
+   chapter was the one that failed it.) Two turns and a knock.
 
-   SILENT. No AudioContext, no media elements — in the chapter most
-   tempting to put thunder in.
+   They set the rate, not us. (1.7) There is no schedule here, no cue
+   word and no protocol sheet: it opens in stillness and waits. The
+   boundary that leans them slower is the plumbing — the tube empties
+   1.3 times slower than it fills — and the OFFER is in the
+   environment: the bowl one past their last reach glimmers. And the
+   superstructure: the grove sways on a rhythm that settles a little
+   slower than theirs, and leans with every pour.
+
+   The rhythm is an invitation. (1.6b) Never pressed, it rains, and
+   the storm clears on the page's own clock at the same moment it
+   would have. Nothing is counted, timed, scored or kept.
+
+   Disclosure, not gatekeeping; and nothing that could hurt. (1.6, 2)
+   No hold is asked for — held past full it overflows. It caps at
+   about five breaths a minute. The lightning is GONE: the first
+   version lit the whole frame, and the design doc records that as a
+   caution with no home. A storm that is ending needs no flash.
+
+   What the look is for. (4.2b) Reads at a glance: one bright diagonal
+   — the bamboo — on a dark ground. Designed values: dark stones,
+   mid greens, pale water, one warm light. Few hues, mood in the air:
+   indigo rain going to dusk. Depth: hills, mist, two groves, the
+   garden, the rain in front. One structure: cool sky from above, one
+   lantern, and the bowls' own lights. Original: the garden is
+   composed here; rain drawn as fine slanted lines is a manner, not a
+   picture.
+
+   §1.6a does not apply: there is no figure, and nothing is submerged.
+
+   SILENT. No AudioContext, no media elements.
    ============================================================ */
 
 import { requireScroll } from './js/scroll.js';
-import { breath } from './js/breath.js';
-import { PROTOCOLS, CHOICE, validChoice, CORRIDOR, RANGE,
-         FOCUS, attention, drawDecay,
-         RAIN_NEAR, RAIN_FAR, WALL_NEAR, WALL_FAR, normOf, distOf,
-         CLEAR_SHIFT, clearingAt, pushRates, pushes, SPRING,
-         stemAt, strokeAt } from './js/bamboo-rain-breath.js';
-import { body } from './js/course.js';
-import { ramp, fogGlsl, RAMP_GLSL, STEP_GLSL, GRAIN_GLSL, CHIP_GLSL,
-         PALE, LIGHT, MID, BODY, DEEP, DARK } from './js/palette.js';
-import { builder, bands, particles,
-         posterMat, screenQuad, overlayQuad, part , linkReport} from './js/mesh.js';
-import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, soloReport} from './js/stage.js';
-import { arrival } from './js/arrival.js';
+import { leader, superstructure, phaseGap } from './js/lead.js';
+import { newSozu, step, offerOf, reachOf, T_FULL, POUR_RATIO, UP, DOWN } from './js/sozu-breath.js';
+import { screenQuad, linkReport } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, enter, soloReport } from './js/stage.js';
 import { invite } from './js/invite.js';
 import { wireExits } from './js/bookframe.js';
 
-/* FALLING IN. The lens starts back and rushes to its place over
-   700 ms when the chapter begins. Built from this chapter's own
-   camera rather than an overlay, because an overlay is a picture
-   of a transition and this is the world moving. Inert under
-   prefers-reduced-motion — not shortened, absent. See
-   js/arrival.js. */
-const ARRIVE = arrival({ dist: 18 });
-
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
-/* ---------- the storm family. Six steps, palest first, hand-assigned
-   per surface: the wet ground takes the dark end because it is a mirror
-   of a dark sky, the bamboo leaves take mid because they are the thing
-   the gust has to be legible against, and the stems take the pale end
-   because wet bamboo catches what little light there is. Decisions
-   about what each thing IS. Never a function of distance (§4.2 rule 5,
-   and Deep Light's first pass got exactly this wrong). ---------- */
-const R = ramp([0xE2E6F0, 0xB7C0D8, 0x8D96B4, 0x66638E, 0x44405F, 0x2A2740]);
+/** How long the storm takes to clear, seconds. The reader has no hand
+ *  in it: design doc §6, "the storm clears on schedule". */
+const CLEARS_IN = 180;
 
-/* §4.3 settled-storm row: sky #5B4B7A → #B7C0D8, shadow #2F3E4D,
-   accent #FFF2A8. The shadow is a HUE SHIFT into slate, not a
-   darkening — §4.2 rule 2. */
-const STORM = {
-  shadow:0x2F3E4D, shadowDeep:0x1E2433,
-  accent:0xFFF2A8, wet:0x56627A, splash:0xCBD6E8
-};
-const AIR = {
-  skyHigh:0x5B4B7A, skyLow:0xB7C0D8,
-  cloud:0x4A4066, cloudLo:0x332C49,
-  rain:0xC8D4E6, haze:0x8D96B4, flash:0xFFF8D8,
-  leaf:0x6E7F82, leafLo:0x44535A, cleared:0xD9D3E8,
-  /* THE EXHALE'S OWN COLOURS. The inhale and the exhale are two
-     regimes (js/bamboo-rain-breath.js) and they are two palettes, so
-     that the difference is legible before anything has moved. Drawing
-     in is cold, blue and closed; pushing out is warm, pale and open.
-     Neither is the other brightened — they are named colours and the
-     scene mixes between them on uWarm. */
-  rainWarm:0xEDE4D2, hazeWarm:0xB2A892,
-  skyHighWarm:0x7A5F6B, skyLowWarm:0xE4CBA8
-};
-
-/* ---------- DOM ---------- */
 const $ = id => document.getElementById(id);
-const elPhase = $('phase');
-const elFps = $('fps'), elFpsDot = $('fpsdot');
-const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
+const elFps = $('fps'), elFpsDot = $('fpsdot'), elHalt = $('halt'), elFall = $('fallback');
+const elReach = $('reach'), elRing = $('ring');
 
 function fallback(why){
   if(why) $('fbwhy').textContent = why;
-  elGate.classList.remove('on');
   elFall.classList.add('on');
-  $('cue').style.display = $('bar').style.display = $('push').style.display = 'none';
+  elReach.style.display = elRing.style.display = 'none';
   elFps.classList.add('off');
 }
 
@@ -285,955 +191,492 @@ boot({ cdn:CDN, fallback, start });
 function start(THREE){
 
 const canvas = $('c');
-const B = breath(PROTOCOLS.sigh);
-
 const clamp01 = x => Math.min(1, Math.max(0, x));
-const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-const C = h => new THREE.Color(h);
-const ramp6 = R.steps.map(C);
-
-/* shared uniforms */
-const uTime   = { value: 0 };
-const uFront  = { value: RAIN_FAR };   // the curtain's near face, metres out
-const uFill   = { value: 0 };          // the reader's own push, 0..1
-const uClear  = { value: 0 };          // session progress, 0..1
-const uGust   = { value: 0 };          // how hard the exhale is blowing
-const uFlash  = { value: 0 };          // lightning, 0..1
-const uBreath = { value: 0 };          // the figure's own fullness, 0..1
-/* THE TWO OBJECTS OF FOCUS, and the two regimes' colour. All three are
-   eased towards their target rather than snapped, so the sip lifts the
-   canopy rather than switching it on. See the long notes in
-   js/bamboo-rain-breath.js. */
-const uRing   = { value: 0 };          // the wet ring at the edge of the dry circle
-const uCanopy = { value: 0 };          // the rain overhead, which the sip lifts
-const uWarm   = { value: 0 };          // 0 drawing in (cold), 1 pushing out (warm)
-const uFog    = { value: C(AIR.haze) };
-const uRamp   = { value: ramp6 };
-const uHorizon= { value: 0.5 };
-
-const FOG = fogGlsl({ near: 8, rate: 0.026, steps: 5, max: 0.52 });
-/* STEP_GLSL is in here and is not in Long Air's prelude, because the
-   ground shader posterises its own wet sheen. A prelude that is missing
-   a function the shader calls does not throw anything a tool call can
-   see: the program simply fails to link, the draw call is still counted,
-   the frame still renders and the surface is just gone. That is how Long
-   Air shipped a kite with no sail for an afternoon. The console says so
-   plainly; nothing else does. */
-const PRE = RAMP_GLSL + STEP_GLSL + FOG + GRAIN_GLSL + CHIP_GLSL;
+const smoothstep = (a, b, x) => { const u = clamp01((x - a) / (b - a)); return u * u * (3 - 2 * u); };
 
 const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
-  canvas, clear: R.at(DARK), fov: a => a < 0.75 ? 64 : 54, far: 300
+  canvas, clear: 0x12141F, fov: 50, near: 0.1, far: 10
 });
 
 /* ------------------------------------------------------------------
-   1. SKY — hard bands, a low cloud deck, and a band of clear light that
-   opens at the horizon as the session goes on. §4.2 rule 4: choose the
-   sky first and let it be the loudest thing. Here it is also the clock:
-   the storm clearing is mostly this.
+   THE WHOLE PICTURE IS ONE PAINTED FRAME
+   ------------------------------------------------------------------
+   A side view of a thing turning about a pin is a flat picture, and
+   this draws it as one: every shape is a distance to an edge, every
+   edge is softened over exactly one pixel, and there is no mesh to
+   have a knot in and no lens to stage. Depth is done the way a print
+   does it — by overlap, by value, and by mist between the layers.
+
+   Coordinates: y is 0 at the foot of the glass and 1 at the top; x is
+   0 on the centre line and measured in the same units, so a portrait
+   phone runs about -0.23 to 0.23 and a wider window simply sees more
+   garden either side.
    ------------------------------------------------------------------ */
-const skyU = {
-  uTime, uAspect:{value:1}, uHorizon, uRamp, uClear, uFlash,
-  uSkyHigh:{value:C(AIR.skyHigh)}, uSkyLow:{value:C(AIR.skyLow)},
-  uCloud:{value:C(AIR.cloud)}, uCloudLo:{value:C(AIR.cloudLo)},
-  uHaze:{value:C(AIR.haze)}, uClearCol:{value:C(AIR.cleared)},
-  uFlashCol:{value:C(AIR.flash)}
+const U = {
+  uTime:   { value: 0 },
+  uAspect: { value: 1 },
+  uPx:     { value: 1 / 812 },
+  uAngle:  { value: DOWN },
+  uFill:   { value: 0 },
+  uFlow:   { value: 0 },
+  uOver:   { value: 0 },
+  uCatch:  { value: 0 },
+  uKnock:  { value: 0 },
+  uBowl:   { value: new THREE.Vector4(0, 0, 0, 0) },
+  uOffer:  { value: -1 },
+  uRain:   { value: 1 },
+  uClear:  { value: 0 },
+  uSway:   { value: 0 },
+  uWake:   { value: 0 }
 };
-onFit(() => { skyU.uAspect.value = camera.aspect; });
+onFit(() => {
+  U.uAspect.value = camera.aspect;
+  U.uPx.value = 1 / Math.max(1, size.H * renderer.getPixelRatio());
+});
+
 scene.add(screenQuad(THREE, {
-  uniforms: skyU, prelude: RAMP_GLSL + GRAIN_GLSL,
+  uniforms: U,
   fragment:`
     varying vec2 vUv;
-    uniform float uTime, uAspect, uHorizon, uClear, uFlash;
-    uniform vec3 uSkyHigh, uSkyLow, uCloud, uCloudLo, uHaze, uClearCol, uFlashCol;
-    void main(){
-      float h = vUv.y - uHorizon;
-      float b = floor(clamp(h / 0.9, 0.0, 0.999) * 5.0) / 4.0;
-      vec3 col = mix(uSkyLow, uSkyHigh, b);
+    uniform float uTime, uAspect, uPx, uAngle, uFill, uFlow, uOver, uCatch, uKnock;
+    uniform float uOffer, uRain, uClear, uSway, uWake;
+    uniform vec4 uBowl;
 
-      // the cloud deck: flat lobes drifting, lifting as the storm clears
-      float deck = uHorizon + 0.10 + uClear * 0.26;
-      float cl = 0.0;
-      for(int i = 0; i < 4; i++){
-        float fi = float(i);
-        float cx = fract(0.13 + fi * 0.27 + uTime * 0.0042) * 1.9 - 0.45;
-        vec2 cc = vec2(cx, deck + fi * 0.055);
-        vec2 d2 = vec2((vUv.x - cc.x) * uAspect * 0.20, vUv.y - cc.y);
-        cl = max(cl, step(length(d2), 0.030 + fi * 0.004));
+    /* arithmetic hashes only: a sin-hash collapses at mediump, and this
+       project has that on record */
+    float h12(vec2 p){
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+    float vnoise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h12(i), h12(i + vec2(1.0, 0.0)), f.x),
+                 mix(h12(i + vec2(0.0, 1.0)), h12(i + vec2(1.0, 1.0)), f.x), f.y);
+    }
+    float fbm(vec2 p){
+      float a = 0.5, s = 0.0;
+      for(int i = 0; i < 4; i++){ s += a * vnoise(p); p = p * 2.03 + vec2(17.3, 9.1); a *= 0.5; }
+      return s;
+    }
+
+    /* inside a shape whose signed distance is d: 1 inside, 0 outside,
+       and exactly one pixel of ramp between */
+    float inside(float d){ return 1.0 - smoothstep(-uPx, uPx, d); }
+    float sdBox(vec2 p, vec2 b, float r){
+      vec2 q = abs(p) - b + r;
+      return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+    }
+    float sdEll(vec2 p, vec2 r){ return (length(p / r) - 1.0) * min(r.x, r.y); }
+    float sdSeg(vec2 p, vec2 a, vec2 b){
+      vec2 pa = p - a, ba = b - a;
+      return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+    }
+
+    /* a grove: one stalk to a column, leaning a little, bending more
+       the higher it goes, with a ring at every joint. Returns how much
+       of a stalk is here and how lit that part of it is. */
+    vec2 grove(vec2 p, float cell, float seed, float w0, float sway){
+      float h = max(p.y - 0.455, 0.0);
+      float x = p.x - sway * h * h * 1.6;
+      float c = floor(x / cell);
+      float m = 0.0, lit = 0.0;
+      for(int i = -1; i <= 1; i++){
+        float ci = c + float(i);
+        float r = h12(vec2(ci, seed));
+        float has = step(0.30, h12(vec2(ci + 7.0, seed)));
+        float cx = (ci + 0.2 + 0.6 * r) * cell;
+        float xx = x - cx - (r - 0.5) * 0.12 * h;
+        float w = w0 * (0.7 + 0.6 * h12(vec2(ci, seed + 3.0)));
+        float mm = inside(abs(xx) - w) * has;
+        float joint = 1.0 - smoothstep(0.0, 0.0022, abs(fract((p.y + r) * 12.0) - 0.5) / 12.0);
+        float l = (0.5 - 0.5 * clamp(xx / w, -1.0, 1.0)) * (1.0 - 0.45 * joint);
+        lit = mix(lit, l, mm);
+        m = max(m, mm);
       }
-      // one hard band of underside shadow along the bottom of the deck
-      float under = step(h, 0.10 + uClear * 0.26) * step(0.0, h);
-      col = mix(col, uCloudLo, under * 0.55);
-      col = mix(col, uCloud, cl * step(0.03, h) * (1.0 - uClear * 0.45));
+      return vec2(m * step(0.455, p.y), lit);
+    }
 
-      // THE CLEARING: a band of pale light opening along the horizon.
-      // Hard-edged and stepped, like everything else (§4.2 rule 5) —
-      // this is a gap in the weather, not a glow.
-      float gap = floor(clamp(uClear * 1.15, 0.0, 0.999) * 4.0) / 3.0;
-      float lit = step(abs(h - 0.035), 0.012 + gap * 0.085);
-      col = mix(col, uClearCol, lit * gap * 0.85);
+    /* fine slanted lines, in the manner of a rain print */
+    float rainLines(vec2 p, float scale, float speed, float seed, float slant){
+      vec2 q = vec2(p.x + p.y * slant, p.y) * scale;
+      float cols = 30.0;
+      float col = floor(q.x * cols);
+      float r = h12(vec2(col, seed));
+      float y = q.y * 2.2 + uTime * speed * (0.75 + 0.5 * r) + r * 10.0;
+      float seg = fract(y);
+      float on = step(1.0 - 0.60 * uRain, h12(vec2(col, floor(y) + seed)));
+      float thin = 1.0 - smoothstep(0.0, 0.10, abs(fract(q.x * cols) - 0.5));
+      return thin * smoothstep(0.0, 0.12, seg) * (1.0 - smoothstep(0.35, 0.80, seg)) * on;
+    }
 
-      col = mix(col, uHaze, (1.0 - step(0.0, h)) * 0.55);
-      col = mix(col, uFlashCol, uFlash * 0.55);
-      col += (grainAt(vUv * 620.0) - 0.5) * 0.024;
+    /* a stone bowl with water in it; returns the colour laid over col */
+    vec3 bowl(vec3 col, vec2 p, vec2 c, float lit, float offered, vec3 skyRef){
+      vec2 d = p - c;
+      float body = inside(sdEll(d + vec2(0.0, 0.008), vec2(0.044, 0.024)));
+      vec3 stone = vec3(0.27, 0.29, 0.34) * (0.55 + 0.75 * smoothstep(-0.03, 0.03, -d.x * 0.5 + d.y));
+      col = mix(col, stone, body);
+      float water = inside(sdEll(d, vec2(0.033, 0.0095)));
+      /* the ring a drop makes, running out across it while it is lit */
+      float rr = length(d / vec2(0.033, 0.0095));
+      float ring = 0.5 + 0.5 * sin(rr * 9.0 - uTime * 5.0);
+      vec3 wcol = mix(skyRef * 0.85, vec3(1.0, 0.80, 0.50), lit * (0.55 + 0.35 * ring));
+      col = mix(col, wcol, water);
+      /* its light: a small warm float on the water, and what it throws */
+      float glow = exp(-dot(d, d) / 0.0016);
+      col += vec3(1.0, 0.62, 0.26) * glow * lit * 0.55;
+      col = mix(col, vec3(1.0, 0.93, 0.75), inside(length(d - vec2(0.0, 0.004)) - 0.0048) * lit);
+      /* THE OFFER: the bowl one past the last reach, barely, breathing */
+      float ask = offered * (0.5 + 0.5 * sin(uTime * 1.6));
+      col += vec3(1.0, 0.75, 0.45) * exp(-dot(d, d) / 0.0011) * ask * 0.30;
+      return col;
+    }
+
+    void main(){
+      vec2 p = vec2((vUv.x - 0.5) * uAspect, vUv.y);
+      float clear = uClear;
+
+      /* ---------------- the sky: storm, going to dusk ---------------- */
+      vec3 top = mix(vec3(0.085, 0.095, 0.195), vec3(0.10, 0.15, 0.36), clear);
+      vec3 mid = mix(vec3(0.235, 0.255, 0.400), vec3(0.50, 0.37, 0.54), clear);
+      vec3 low = mix(vec3(0.500, 0.520, 0.620), vec3(1.00, 0.72, 0.48), clear);
+      float sy = smoothstep(0.45, 1.0, p.y);
+      vec3 col = mix(low, mid, smoothstep(0.0, 0.45, sy));
+      col = mix(col, top, smoothstep(0.35, 1.0, sy));
+      float cl = fbm(vec2(p.x * 3.0 + uTime * 0.02, p.y * 5.0));
+      col = mix(col, col * 0.70, smoothstep(0.45, 0.80, cl) * (1.0 - 0.75 * clear) * smoothstep(0.58, 0.95, p.y));
+      /* and when it has cleared, a moon */
+      vec2 mo = p - vec2(0.115, 0.875);
+      col = mix(col, vec3(0.98, 0.95, 0.86), inside(length(mo) - 0.017) * clear * clear);
+      col += vec3(0.9, 0.85, 0.7) * exp(-dot(mo, mo) / 0.004) * clear * clear * 0.18;
+
+      /* ---------------- far hills, and the mist at their feet ---------------- */
+      float r1 = 0.625 + 0.065 * fbm(vec2(p.x * 2.2 + 3.0, 1.0));
+      float r2 = 0.565 + 0.055 * fbm(vec2(p.x * 3.1 + 9.0, 4.0));
+      col = mix(col, mix(low, mid, 0.60) * 0.95, inside(p.y - r1));
+      col = mix(col, mix(mid, vec3(0.13, 0.19, 0.24), 0.55), inside(p.y - r2));
+      col = mix(col, low, 0.50 * exp(-pow((p.y - 0.505) / 0.045, 2.0)));
+
+      /* ---------------- the groves ---------------- */
+      vec2 g1 = grove(p, 0.034, 3.0, 0.0030, uSway * 0.8);
+      col = mix(col, mix(vec3(0.22, 0.31, 0.32), low, 0.40) * (0.80 + 0.35 * g1.y), g1.x * 0.9);
+      col = mix(col, low, 0.22 * exp(-pow((p.y - 0.49) / 0.05, 2.0)));
+      vec2 g2 = grove(p, 0.072, 11.0, 0.0060, uSway);
+      vec3 stalk = mix(vec3(0.085, 0.175, 0.150), vec3(0.46, 0.60, 0.40), g2.y);
+      col = mix(col, stalk, g2.x);
+      /* leaf, massed at the top of the frame and moving with the stalks */
+      float leaf = fbm(vec2((p.x - uSway * 0.05) * 9.0, p.y * 7.0) + vec2(uTime * 0.03, 0.0));
+      col = mix(col, vec3(0.065, 0.135, 0.120) * (0.8 + 0.6 * leaf),
+                smoothstep(0.54, 0.66, leaf + (p.y - 0.90) * 1.6) * 0.90);
+
+      /* ---------------- the ground ---------------- */
+      float ground = inside(p.y - (0.455 + 0.004 * sin(p.x * 11.0)));
+      vec3 gcol = mix(vec3(0.085, 0.125, 0.130), mix(vec3(0.26, 0.36, 0.30), low * 0.70, 0.35),
+                      smoothstep(0.0, 0.455, p.y));
+      gcol *= 0.82 + 0.36 * fbm(p * vec2(34.0, 70.0));
+      /* rings where the rain lands, and fewer of them as it eases */
+      vec2 rg = p * vec2(9.0, 26.0);
+      vec2 rc = floor(rg);
+      float rph = fract(uTime * 0.9 + h12(rc) * 7.0);
+      float rd = length((fract(rg) - 0.5) * vec2(1.0, 0.55));
+      gcol += vec3(0.5, 0.56, 0.66) * (1.0 - smoothstep(0.0, 0.03, abs(rd - rph * 0.30)))
+              * (1.0 - rph) * step(1.0 - 0.5 * uRain, h12(rc + 5.0)) * 0.22;
+      col = mix(col, gcol, ground);
+
+      /* ---------------- the lantern, and the one warm light ---------------- */
+      vec2 L = vec2(-0.172, 0.455);
+      float lpost = inside(sdBox(p - vec2(L.x, 0.492), vec2(0.0075, 0.038), 0.002));
+      float lbox  = inside(sdBox(p - vec2(L.x, 0.545), vec2(0.023, 0.019), 0.003));
+      float lroof = inside(sdBox(p - vec2(L.x, 0.571), vec2(0.036, 0.0065), 0.004));
+      float lcap  = inside(sdBox(p - vec2(L.x, 0.582), vec2(0.010, 0.006), 0.004));
+      float lbase = inside(sdBox(p - vec2(L.x, 0.458), vec2(0.020, 0.006), 0.003));
+      col = mix(col, vec3(0.20, 0.21, 0.26), max(max(lpost, lbase), max(lbox, max(lroof, lcap))));
+      float flick = 0.86 + 0.14 * vnoise(vec2(uTime * 2.3, 1.0));
+      float warm = (0.55 + 0.45 * clear) * flick;
+      col = mix(col, vec3(1.0, 0.80, 0.46), inside(sdBox(p - vec2(L.x, 0.545), vec2(0.013, 0.011), 0.002)) * warm);
+      vec2 ld = p - vec2(L.x, 0.545);
+      col += vec3(1.0, 0.58, 0.24) * exp(-dot(ld, ld) / 0.010) * warm * 0.30;
+      /* and its smear on the wet ground under it */
+      col += vec3(1.0, 0.58, 0.24) * exp(-pow((p.x - L.x) / 0.03, 2.0)) * exp(-max(0.455 - p.y, 0.0) / 0.10)
+             * ground * warm * 0.14;
+
+      /* ---------------- the feed: a thin pipe, and the trickle off its end ---------------- */
+      vec3 bamboo = vec3(0.60, 0.67, 0.40);
+      col = mix(col, vec3(0.10, 0.11, 0.13), inside(sdBox(p - vec2(-0.222, 0.560), vec2(0.0045, 0.106), 0.002)));
+      float pipe = sdSeg(p, vec2(-0.34, 0.690), vec2(-0.150, 0.664)) - 0.0058;
+      col = mix(col, bamboo * (0.60 + 0.5 * smoothstep(-0.006, 0.006, p.y - mix(0.690, 0.664, clamp((p.x + 0.34) / 0.19, 0.0, 1.0)))),
+                inside(pipe));
+
+      /* ---------------- the big basin ---------------- */
+      vec2 bc = vec2(-0.128, 0.392);
+      float bbody = inside(sdEll(p - bc + vec2(0.0, 0.018), vec2(0.090, 0.050)));
+      col = mix(col, vec3(0.27, 0.29, 0.34) * (0.50 + 0.85 * smoothstep(-0.06, 0.05, -(p.x - bc.x) * 0.5 + (p.y - bc.y))), bbody);
+      vec2 bw = p - vec2(bc.x, 0.404);
+      float bwater = inside(sdEll(bw, vec2(0.070, 0.0150)));
+      vec3 skyRef = mix(mid, low, 0.55);
+
+      /* ---------------- the tube's geometry (needed by the water too) ---------------- */
+      vec2 P = vec2(0.030, 0.585);
+      float ca = cos(uAngle), sa = sin(uAngle);
+      /* along the tube towards the TAIL, and across it */
+      vec2 e = vec2(ca, -sa), n = vec2(sa, ca);
+      vec2 q = vec2(dot(p - P, e), dot(p - P, n));
+      vec2 M = P - e * 0.172;                      // the mouth
+      vec2 Tl = P + e * 0.112;                     // the tail
+
+      /* where the pour lands: thrown a little way out of the mouth */
+      float land = M.x - 0.036;
+      float wr = length((p - vec2(land, 0.404)) / vec2(0.070, 0.0150));
+      float wring = 0.5 + 0.5 * sin(wr * 12.0 - uTime * 7.0);
+      vec3 wcol = skyRef * (0.85 + 0.25 * wring * (uFlow * (1.0 - smoothstep(0.0, 1.6, wr)) + 0.25 * uRain));
+      wcol += vec3(1.0, 0.70, 0.38) * 0.10 * warm;
+      col = mix(col, wcol, bwater);
+
+      /* ---------------- the chain of bowls ---------------- */
+      vec2 B0 = vec2(-0.006, 0.336), B1 = vec2(0.086, 0.277), B2 = vec2(0.140, 0.207), B3 = vec2(0.052, 0.150);
+      /* the threads of water between them, bright only while it runs */
+      float th0 = sdSeg(p, vec2(-0.050, 0.398), B0 + vec2(-0.012, 0.004)) - 0.0016;
+      float th1 = sdSeg(p, B0 + vec2(0.030, 0.000), B1 + vec2(-0.012, 0.004)) - 0.0016;
+      float th2 = sdSeg(p, B1 + vec2(0.028, 0.000), B2 + vec2(-0.006, 0.006)) - 0.0016;
+      float th3 = sdSeg(p, B2 + vec2(-0.026, -0.002), B3 + vec2(0.014, 0.005)) - 0.0016;
+      vec3 thread = vec3(0.82, 0.88, 0.96);
+      col = mix(col, thread, inside(th0) * uBowl.x * 0.85);
+      col = mix(col, thread, inside(th1) * uBowl.y * 0.85);
+      col = mix(col, thread, inside(th2) * uBowl.z * 0.85);
+      col = mix(col, thread, inside(th3) * uBowl.w * 0.85);
+      col = bowl(col, p, B0, uBowl.x, 1.0 - step(0.5, abs(uOffer - 0.0)), skyRef);
+      col = bowl(col, p, B1, uBowl.y, 1.0 - step(0.5, abs(uOffer - 1.0)), skyRef);
+      col = bowl(col, p, B2, uBowl.z, 1.0 - step(0.5, abs(uOffer - 2.0)), skyRef);
+      col = bowl(col, p, B3, uBowl.w, 1.0 - step(0.5, abs(uOffer - 3.0)), skyRef);
+
+      /* ---------------- the stone the tail comes down on ---------------- */
+      vec2 ks = p - vec2(0.152, 0.500);
+      float rock = inside(sdEll(ks, vec2(0.036 + 0.016 * (1.0 - smoothstep(-0.05, 0.03, ks.y)), 0.066)) + 0.003 * sin(ks.y * 60.0));
+      col = mix(col, vec3(0.25, 0.27, 0.32) * (0.45 + 0.95 * smoothstep(-0.05, 0.06, -ks.x * 0.7 + ks.y)), rock);
+      /* THE KNOCK: two small arcs off the top of it, for a quarter of a second */
+      float kr = length(p - vec2(0.142, 0.572));
+      float kn = (1.0 - smoothstep(0.0, 0.0022, abs(kr - (0.016 + 0.030 * (1.0 - uKnock)))))
+               * step(0.572, p.y) * uKnock;
+      col = mix(col, vec3(0.95, 0.92, 0.82), kn * 0.8);
+
+      /* ---------------- the post and the pin ---------------- */
+      col = mix(col, vec3(0.095, 0.100, 0.120), inside(sdBox(p - vec2(P.x, 0.518), vec2(0.0060, 0.068), 0.002)));
+
+      /* ---------------- the trickle: into the mouth when it is up, past it when not ---------------- */
+      float fx = -0.150;
+      float fEnd = mix(0.405, M.y + 0.004, uCatch);
+      float fy = clamp((0.662 - p.y) / max(0.662 - fEnd, 0.001), 0.0, 1.0);
+      float feed = inside(abs(p.x - fx - 0.0012 * sin(p.y * 90.0 + uTime * 9.0)) - 0.0016)
+                 * step(fEnd, p.y) * step(p.y, 0.662)
+                 * (0.55 + 0.45 * vnoise(vec2(3.0, p.y * 60.0 + uTime * 14.0)));
+      col = mix(col, vec3(0.84, 0.90, 0.97), feed * 0.80);
+
+      /* ---------------- THE POUR ---------------- */
+      float py = clamp((M.y - p.y) / max(M.y - 0.404, 0.001), 0.0, 1.0);
+      float sx = M.x - 0.036 * sqrt(py);
+      float sw = (0.0018 + 0.0056 * uFlow) * (1.0 - 0.35 * py);
+      float stream = inside(abs(p.x - sx) - sw) * step(0.404, p.y) * step(p.y, M.y)
+                   * smoothstep(0.0, 0.03, uFlow);
+      float streak = 0.70 + 0.30 * vnoise(vec2(p.x * 300.0, p.y * 40.0 + uTime * 16.0));
+      col = mix(col, vec3(0.86, 0.92, 0.98) * streak, stream * 0.92);
+      /* the overflow of a full tube: a thin second thread down the lip */
+      float ov = inside(abs(p.x - (M.x - 0.004)) - 0.0012) * step(0.405, p.y) * step(p.y, M.y - 0.008);
+      col = mix(col, vec3(0.84, 0.90, 0.97), ov * uOver * 0.7
+                * (0.5 + 0.5 * vnoise(vec2(1.0, p.y * 50.0 + uTime * 12.0))));
+      /* where it lands */
+      float sp = exp(-pow((p.x - land) / 0.016, 2.0)) * exp(-pow((p.y - 0.410) / 0.010, 2.0));
+      col += vec3(0.8, 0.86, 0.95) * sp * uFlow * 0.5;
+
+      /* ---------------- THE BAMBOO ---------------- */
+      float tube = sdBox(q - vec2(-0.030, 0.0), vec2(0.142, 0.0115), 0.004);
+      float tm = inside(tube);
+      float round = clamp(q.y / 0.0115, -1.0, 1.0);
+      vec3 tcol = mix(vec3(0.26, 0.34, 0.19), vec3(0.86, 0.90, 0.60), smoothstep(-0.9, 0.9, round));
+      tcol *= 1.0 - 0.30 * round * round;
+      /* the joints */
+      float jd = min(min(abs(q.x + 0.105), abs(q.x + 0.030)), abs(q.x - 0.050));
+      tcol *= 1.0 - 0.50 * (1.0 - smoothstep(0.0010, 0.0030, jd));
+      /* wet along the top, and the lantern catching its near side */
+      tcol += vec3(1.0, 0.62, 0.28) * 0.10 * warm * smoothstep(0.0, 0.14, -q.x);
+      col = mix(col, tcol, tm);
+      /* the mouth: a dark opening, and the water in it coming up as it fills */
+      vec2 mq = q - vec2(-0.170, 0.0);
+      float mouth = inside(sdEll(mq, vec2(0.0055, 0.0098)));
+      float level = smoothstep(-0.0098, 0.0098, -mq.y + (uFill * 2.0 - 1.0) * 0.0098);
+      vec3 mcol = mix(vec3(0.045, 0.06, 0.05), vec3(0.74, 0.84, 0.92), level * step(0.002, uFill));
+      col = mix(col, mcol, mouth);
+      /* the pin it turns on */
+      col = mix(col, vec3(0.08, 0.085, 0.10), inside(length(p - P) - 0.0055));
+      col = mix(col, vec3(0.55, 0.56, 0.50), inside(length(p - P) - 0.0022));
+
+      /* ---------------- mist, drifting, thinning as it clears ---------------- */
+      float mist = fbm(vec2(p.x * 4.0 - uTime * 0.03, p.y * 9.0));
+      col = mix(col, low, 0.16 * mist * (1.0 - 0.7 * clear) * smoothstep(0.42, 0.50, p.y) * (1.0 - smoothstep(0.60, 0.80, p.y)));
+
+      /* ---------------- THE RAIN, in front of everything ---------------- */
+      float slant = 0.16 + 0.10 * uSway;
+      float rain = 0.24 * rainLines(p, 1.0, 3.2, 1.0, slant) + 0.14 * rainLines(p, 1.8, 2.3, 5.0, slant);
+      col = mix(col, vec3(0.80, 0.84, 0.93), rain);
+
+      /* ---------------- the frame ---------------- */
+      vec2 vg = (vUv - 0.5) * vec2(1.0, 1.15);
+      col *= 1.0 - 0.30 * smoothstep(0.34, 0.85, length(vg));
+      /* arriving: it comes up out of the dark */
+      col *= 0.25 + 0.75 * uWake;
+      col += (h12(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) * 0.018;
       gl_FragColor = vec4(col, 1.0);
     }
   `
 }));
 
-/* ------------------------------------------------------------------
-   2. THE FAR SIDE OF THE CLEARING — the kit's parallax band pattern,
-   hand-assigned tiers, deliberately not following the breath.
-   ------------------------------------------------------------------ */
-const hills = new THREE.Mesh(bands(THREE, [
-  { z:-190, base: 26, amp:11, step:4.5, seed:3,  tier:2 },
-  { z:-120, base: 17, amp: 7, step:3.5, seed:19, tier:3 },
-  { z: -74, base: 10, amp: 4, step:2.5, seed:31, tier:4 }
-], { n: 36, span: 420, skirt: -30 }), posterMat(THREE, {
-  uniforms:{ uRamp, uHaze:{value:C(AIR.haze)}, uClear }, prelude: RAMP_GLSL,
-  vertex:`
-    attribute float aTier; varying float vTier;
-    void main(){ vTier = aTier;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-  `,
-  fragment:`
-    varying float vTier; uniform vec3 uHaze; uniform float uClear;
-    void main(){
-      vec3 col = rampPick((vTier + 0.5) / 6.0);
-      // clamped well short of the haze colour so the layers stay
-      // distinguishable from each other — that is the point of them.
-      // They come FORWARD out of the murk as the storm clears, which is
-      // the cheapest honest way to show the air getting clearer.
-      float murk = (5.0 - vTier) / 3.0 * (0.62 - uClear * 0.34);
-      gl_FragColor = vec4(mix(col, uHaze, clamp(murk, 0.0, 0.8)), 1.0);
-    }
-  `
-}));
-scene.add(hills);
-
-/* ------------------------------------------------------------------
-   3. THE GROVE. One merged mesh: stems and leaf blades together, with
-   aSway carrying how much each vertex answers the gust. The gust is the
-   exhale, so the grove leans away from the figure every time she pushes
-   — the most legible thing in the frame and the only part of the
-   scenery that answers her at all.
-   ------------------------------------------------------------------ */
-const STEMS = 42;
-function groveGeometry(){
-  const b = builder(THREE, { aSway:1, aTone:1, aSun:1, aSeed:1, aLeaf:1 });
-  for(let i = 0; i < STEMS; i++){
-    const u = i / STEMS;
-    const a = u * Math.PI * 2;
-    // a ring of stems around the clearing, pushed out of the near lane
-    const rad = 9.0 + ((i * 7919) % 53) / 53 * 16.0;
-    const x = Math.sin(a * 1.0 + ((i * 31) % 7)) * rad * 0.9;
-    const z = -6.0 - Math.abs(Math.cos(a)) * rad * 1.6 - ((i * 6367) % 29) / 29 * 9.0;
-    const h = stemAt(u);
-    const w = 0.085 + ((i * 5281) % 17) / 17 * 0.05;
-    const seed = ((i * 2311) % 101) / 101;
-    const lean = (seed - 0.5) * 0.5;
-    const tone = (i % 3 === 0) ? LIGHT : (i % 3 === 1 ? PALE : MID);
-
-    // the stem: one tall ribbon in SEG segments, sway growing with height
-    const SEG = 5;
-    for(let s = 0; s <= SEG; s++){
-      const f = s / SEG;
-      const y = f * h;
-      const dx = lean * f * f * 1.4;
-      const sway = f * f;                      // a stem bends at the top
-      b.vertex(x + dx - w, y, z, { aSway:sway, aTone:tone, aSun:1, aSeed:seed, aLeaf:0 });
-      b.vertex(x + dx + w, y, z, { aSway:sway, aTone:tone, aSun:0, aSeed:seed, aLeaf:0 });
-    }
-    b.strip(SEG, false);
-
-    // three leaf blades near the top: flat triangles, hard-edged
-    for(let k = 0; k < 3; k++){
-      const f = 0.62 + k * 0.13;
-      const y = f * h, dx = lean * f * f * 1.4;
-      const side = (k % 2) ? 1 : -1;
-      const L = 0.9 + ((i * 97 + k * 13) % 11) / 11 * 0.7;
-      const base = b.count;
-      const at = { aSway: f * f, aTone: BODY, aSun: side > 0 ? 1 : 0, aSeed: seed, aLeaf: 1 };
-      b.vertex(x + dx,                y,            z,        at);
-      b.vertex(x + dx + side * L,     y + L * 0.30, z - 0.22, at);
-      b.vertex(x + dx + side * L*0.5, y - L * 0.26, z + 0.12, at);
-      b.tri(base, base+1, base+2);
-    }
-  }
-  return b.geometry();
-}
-const grove = new THREE.Mesh(groveGeometry(), posterMat(THREE, {
-  uniforms:{ uRamp, uFog, uGust, uTime, uClear,
-             uShadow:{value:C(STORM.shadow)}, uDeep:{value:C(STORM.shadowDeep)},
-             uLeaf:{value:C(AIR.leaf)}, uLeafLo:{value:C(AIR.leafLo)} },
-  side: THREE.DoubleSide, prelude: PRE,
-  vertex:`
-    attribute float aSway; attribute float aTone; attribute float aSun;
-    attribute float aSeed; attribute float aLeaf;
-    uniform float uGust, uTime;
-    varying float vTone; varying float vSun; varying float vSeed;
-    varying float vLeaf; varying float vDist; varying float vY;
-    void main(){
-      vec3 p = position;
-      // the gust: a lean away from the figure, plus a fast flutter that
-      // only exists while it is blowing. Both scale with aSway, so the
-      // bases stay planted and the tops do the moving.
-      float g = uGust * aSway;
-      p.z -= g * 1.5;
-      p.x += g * 0.7 + sin(uTime * 7.0 + aSeed * 11.0) * g * 0.35;
-      p.y -= g * aSway * 0.45;
-      vTone = aTone; vSun = aSun; vSeed = aSeed; vLeaf = aLeaf; vY = p.y;
-      vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      vDist = -mv.z;
-      gl_Position = projectionMatrix * mv;
-    }
-  `,
-  fragment:`
-    varying float vTone; varying float vSun; varying float vSeed;
-    varying float vLeaf; varying float vDist; varying float vY;
-    uniform vec3 uShadow, uDeep, uLeaf, uLeafLo;
-    uniform float uClear;
-    void main(){
-      vec3 col = rampPick((vTone + 0.5) / 6.0);
-      col = mix(col, uLeaf, vLeaf);
-      float sh = 1.0 - step(0.5, vSun);
-      col = mix(col, mix(uShadow, uLeafLo, vLeaf), sh * 0.55);
-      col = mix(col, uDeep, sh * (1.0 - vLeaf) * 0.25);
-      // wet bamboo catches a hard highlight down one side as it clears
-      col *= 1.0 + (chipAt(vec2(floor(vY * 2.2), floor(vSeed * 37.0))) - 0.5) * 0.10;
-      col = mix(col, vec3(1.0), step(0.5, vSun) * uClear * 0.06);
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
-    }
-  `
-}));
-grove.frustumCulled = false;
-scene.add(grove);
-
-/* ------------------------------------------------------------------
-   4. THE RAIN — ONE MESH, AND THE WHOLE MECHANIC IS IN ITS VERTEX
-   SHADER.
-   ------------------------------------------------------------------
-   A slab of slivers filling the clearing from the far wall to the
-   figure. Each sliver knows its own distance out, `aOut`. The shader
-   kills every sliver NEARER than uFront — not fades it, kills it — so
-   pushing the curtain back genuinely empties the near volume rather
-   than making the picture fainter. That difference is the chapter.
-
-   Falling is a modulo on height, so there is no particle system and no
-   per-frame buffer write for eleven hundred slivers: one draw call,
-   one uniform.
-   ------------------------------------------------------------------ */
-const DROPS = 1100;
-const RAIN_H = 17.0;
-/* The slab has to be deeper than the furthest the front can ever get,
-   or the storm runs out of rain before it runs out of session: the
-   front reaches the far wall PLUS the whole clearing shift, and a slab
-   built only to the wall would be completely empty halfway through. */
-const RAIN_DEPTH = WALL_FAR + CLEAR_SHIFT + 12.0;
 /* ==================================================================
-   THE RAIN SURROUNDS HER — 31 October 2026
-   ==================================================================
-   WHAT CHANGED AND WHY IT IS THE RIGHT CHANGE.
-
-   Every chapter in this book uses depth for something different:
-   Pearl Diver is vertical descent, Long Air is forward travel and the
-   parallax that comes with it, Lantern Current is a path fixed in the
-   world that carries you through it. Bamboo was "a volume with a near
-   face that you push away" — depth as DISTANCE, which is the least
-   distinctive of the four and is the one thing a flat picture can
-   nearly do.
-
-   The thing this chapter has and none of the others do is that THE
-   FIGURE IS STATIONARY AND ENCLOSED. It is the only one where you are
-   inside the volume rather than moving through it. So depth here
-   should be SURROUNDING, not receding: the breath changes the RADIUS
-   OF THE WORLD rather than your position in it.
-
-   Mechanically that is a small change and a large one. The slivers are
-   now laid out in POLAR coordinates — an angle all the way round and a
-   radius out — so the curtain is a cylindrical wall standing round the
-   shelter and `uFront` is the radius of the dry circle you are sitting
-   in. The shader's near-face test is unchanged, because `aOut` was
-   already a distance and is now a radius: the same one hard step kills
-   everything nearer than the front, and it now kills it in every
-   direction at once.
-
-   What that buys, and what the slab could not do:
-
-     - the wall is in your PERIPHERY and BEHIND you, so pushing it out
-       empties the edges of the frame, not just the middle;
-     - the dry ground is a growing DISC with you at its centre, and the
-       splash line is a ring rather than a line, so the thing you are
-       pushing has a size rather than a position;
-     - looking up, the wall is a wall all the way round, which is what
-       makes the sip's overhead focus possible at all;
-     - a lightning stroke behind the curtain lights the whole
-       circumference, so it tells you the DIAMETER of the room you have
-       opened.
-
-   The near wall is at 4 m and the lens sits about 3.4 m behind her, so
-   the camera is inside the clear circle by construction: there is
-   never rain between the reader and the figure. That is the same kind
-   of guarantee as the corridor floor — true because of where the wall
-   is, not because it is unlikely.
+   THE CONTROL — one press, anywhere
    ================================================================== */
-function rainGeometry(n){
-  const b = builder(THREE, { aOut:1, aEnd:1, aSeed:1, aLen:1, aNear:1, aHigh:1 });
-  for(let i = 0; i < n; i++){
-    // radius out is biased towards the far end, so a curtain pushed
-    // halfway back still has most of its slivers
-    const f = Math.pow(i / n, 0.78);
-    const out = 1.2 + f * RAIN_DEPTH;
-    /* All the way round. The angle is a hash rather than a sweep so
-       the wall does not read as a comb, and it is deterministic so the
-       same session twice is the same session. */
-    const th = (((i * 7919) % 2017) / 2017) * Math.PI * 2;
-    const dx = Math.sin(th), dz = -Math.cos(th);
-    const tx = Math.cos(th), tz = Math.sin(th);
-    const y0 = ((i * 6367) % 173) / 173 * RAIN_H;
-    const len = 0.55 + ((i * 5281) % 59) / 59 * 1.15;
-    // the half width is laid along the TANGENT, so a sliver is thin
-    // seen from the middle of the circle wherever it stands
-    const hw = 0.016 + ((i * 2311) % 23) / 23 * 0.016;
-    const seed = ((i * 1933) % 97) / 97;
-    const base = b.count;
-    /* aHigh marks the slivers in the top third of the column. They are
-       what the sip's overhead focus lifts — the rain seen from
-       underneath — and marking them at build time costs one float and
-       keeps the fragment shader free of a height test. */
-    const at = { aOut: out, aSeed: seed, aLen: len, aNear: 1.0 - f,
-                 aHigh: y0 > RAIN_H * 0.62 ? 1 : 0 };
-    const px = dx * out, pz = dz * out;
-    b.vertex(px - tx*hw, y0, pz - tz*hw, { ...at, aEnd:0 });
-    b.vertex(px + tx*hw, y0, pz + tz*hw, { ...at, aEnd:0 });
-    b.vertex(px - tx*hw, y0, pz - tz*hw, { ...at, aEnd:1 });
-    b.vertex(px + tx*hw, y0, pz + tz*hw, { ...at, aEnd:1 });
-    b.tri(base, base+1, base+2); b.tri(base+1, base+3, base+2);
-  }
-  return b.geometry();
-}
-const rain = new THREE.Mesh(rainGeometry(DROPS), posterMat(THREE, {
-  uniforms:{ uTime, uFront, uClear, uGust, uFlash, uFog, uCanopy, uWarm,
-             uRain:{value:C(AIR.rain)}, uFlashCol:{value:C(AIR.flash)},
-             uRainWarm:{value:C(AIR.rainWarm)} },
-  transparent:true, depthWrite:false, side:THREE.DoubleSide, prelude: FOG,
-  vertex:`
-    attribute float aOut; attribute float aEnd; attribute float aSeed;
-    attribute float aLen; attribute float aNear; attribute float aHigh;
-    uniform float uTime, uFront, uClear, uGust, uCanopy;
-    varying float vA; varying float vDist; varying float vNear; varying float vHigh;
-    void main(){
-      vec3 p = position;
-      // fall: a modulo on height, so every sliver is always falling and
-      // nothing is ever spawned or retired
-      float fall = mod(p.y - uTime * (13.0 + aSeed * 5.0) - aSeed * 29.0, ${RAIN_H.toFixed(1)});
-      p.y = fall - aEnd * aLen;
-
-      /* THE GUST IS RADIAL NOW. On a slab the slant was a push in x; on
-         a wall that stands all the way round, the only direction that
-         means "away from her" is outward along the radius, and a slant
-         in x would lean half the circle the wrong way. The sideways
-         component goes along the tangent instead, so the whole wall
-         turns slightly rather than leaning. */
-      vec2 dir = normalize(position.xz + vec2(1e-5, 0.0));
-      vec2 tang = vec2(-dir.y, dir.x);
-      p.xz += dir  * uGust * 0.8;
-      p.xz += tang * uGust * (3.0 - fall * 0.06) * 0.6;
-
-      // THE CURTAIN'S NEAR FACE — now a RADIUS, and the test is
-      // unchanged because aOut was always a distance. One hard step,
-      // with a one-metre lip so the edge is an edge rather than a saw.
-      float beyond = smoothstep(uFront - 1.0, uFront + 0.2, aOut);
-      // and it thins as the storm clears, from the near side outwards
-      float thinned = step(aNear * 0.85, 1.0 - uClear * 0.72);
-      vA = beyond * thinned * (0.30 + aNear * 0.42);
-      // the sip lifts the overhead rain: the top of the wall gains body
-      // while the rest of it does not, so looking up is a different
-      // picture from looking out
-      vA += aHigh * uCanopy * beyond * thinned * 0.30;
-
-      vec4 mv = modelViewMatrix * vec4(p, 1.0);
-      vDist = -mv.z; vNear = aNear; vHigh = aHigh;
-      gl_Position = projectionMatrix * mv;
-    }
-  `,
-  fragment:`
-    varying float vA; varying float vDist; varying float vNear; varying float vHigh;
-    uniform vec3 uRain, uFlashCol, uRainWarm; uniform float uFlash, uCanopy, uWarm;
-    void main(){
-      if(vA < 0.03) discard;
-      /* TWO PALETTES, NOT ONE DIMMED. uWarm is 0 through the inhale and
-         1 through the exhale, and the rain is a different colour in
-         each: cold and blue while the wall is drawing in, warm and pale
-         while it is being pushed out. Mixed between two named colours
-         rather than brightened, so neither is the other turned down. */
-      vec3 base = mix(uRain, uRainWarm, uWarm);
-      // two values only: near rain reads paler than far rain, and that
-      // is the whole of its shading. No gradient down a sliver.
-      vec3 col = mix(base * 0.72, base, step(0.45, vNear));
-      // the overhead rain takes the sip's light
-      col = mix(col, uFlashCol, vHigh * uCanopy * 0.45);
-      col = mix(col, uFlashCol, uFlash * 0.8);
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.6), vA);
-    }
-  `
-}));
-rain.frustumCulled = false;
-rain.renderOrder = 5;
-scene.add(rain);
-
-/* ------------------------------------------------------------------
-   5. THE GROUND — wet, and a mirror of a dark sky, with the splash line
-   drawn where the curtain is actually standing. The ring ripples exist
-   only BEYOND the front, so the dry ground in front of you grows as you
-   push, which is the second place the mechanic is legible.
-   ------------------------------------------------------------------ */
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300, 1, 1), posterMat(THREE, {
-  uniforms:{ uTime, uFront, uClear, uRamp, uFog, uFlash, uRing, uWarm,
-             uWet:{value:C(STORM.wet)}, uSplash:{value:C(STORM.splash)},
-             uAccent:{value:C(STORM.accent)}, uDeep:{value:C(STORM.shadowDeep)} },
-  prelude: PRE,
-  vertex:`
-    varying vec3 vW; varying float vDist;
-    void main(){
-      vec4 w = modelMatrix * vec4(position, 1.0);
-      vW = w.xyz;
-      vec4 mv = modelViewMatrix * vec4(position, 1.0);
-      vDist = -mv.z;
-      gl_Position = projectionMatrix * mv;
-    }
-  `,
-  fragment:`
-    varying vec3 vW; varying float vDist;
-    uniform float uTime, uFront, uClear, uFlash, uRing, uWarm;
-    uniform vec3 uWet, uSplash, uAccent, uDeep;
-    void main(){
-      // NOT the three-letter word this used to be: it is RESERVED in GLSL and this shader has
-      // never compiled because of it. The ground has been missing from
-      // this chapter since it shipped -- no error, no thrown exception,
-      // the draw call still counted. Found by the linkReport instrument
-      // while sweeping the chapters for the Long Air flash.
-      /* RADIAL, because the rain is a wall all the way round her now.
-         it was -vW.z, which made the splash line a line across the
-         view and the dry ground a region in front. It is the distance
-         from the middle of the clearing, so the dry ground is a DISC
-         with her at its centre and the splash line is a RING. The
-         thing the reader is pushing now has a size rather than a
-         position, which is the whole point of the change. */
-      float away = length(vW.xz);
-      /* The two regimes' palettes reach the ground as well: a step
-         paler while the wall is being pushed out, a step deeper while
-         it is drawing in. Picked from the ramp rather than tinted, so
-         it stays posterised. */
-      vec3 col = rampPick(mix(4.3, 3.5, uWarm) / 6.0);
-      // wet sheen in hard terraces, not a gradient
-      float sheen = posterise(clamp(away / 46.0, 0.0, 1.0), 5.0);
-      col = mix(col, uWet, sheen * 0.55);
-      col = mix(col, uDeep, (1.0 - sheen) * 0.30);
-
-      // RIPPLES, only beyond the curtain's near face. Hard rings in
-      // quantised cells — §4.2 rule 5 applies to water too.
-      float wet = step(uFront, away);
-      vec2 cell = floor(vec2(vW.x, vW.z) * 0.55);
-      float ph = chipAt(cell) * 6.283;
-      float r = fract(uTime * 0.9 + ph);
-      vec2 q = fract(vec2(vW.x, vW.z) * 0.55) - 0.5;
-      float d = length(q) * 2.0;
-      float ring = step(abs(d - r), 0.14) * (1.0 - r);
-      col = mix(col, uSplash, wet * ring * 0.42);
-
-      /* THE SPLASH RING: one hard accent band standing exactly where
-         the curtain meets the ground. It is the first inhale's object
-         of focus, so uRing widens and brightens it — the ring is what
-         comes in with the wall, at your feet, and it is the thing to
-         watch on the first breath. */
-      float halfW = 0.55 + uRing * 0.85;
-      float line = step(abs(away - uFront), halfW);
-      col = mix(col, uAccent, line * (0.40 + uRing * 0.34));
-      // a second, fainter ring just inside it, present only while the
-      // ring has attention: two marks read as a band being watched,
-      // one reads as a line that was always there
-      float inner = step(abs(away - uFront + 1.6), 0.30) * uRing;
-      col = mix(col, uSplash, inner * 0.45);
-
-      col = mix(col, vec3(1.0), uFlash * 0.35);
-      col *= 1.0 + (grainAt(vW.xz * 7.0) - 0.5) * 0.07;
-      gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist)), 1.0);
-    }
-  `
-}));
-ground.rotation.x = -Math.PI / 2;
-/* CENTRED ON HER, not pushed down the view. The dry ground is a disc
-   around the figure now, so the plane has to reach behind the lens as
-   well as in front of it or the ring is cut off at the bottom of the
-   frame. 300 m covers the far wall plus the whole clearing shift in
-   every direction. */
-ground.position.set(0, 0, 0);
-ground.renderOrder = 1;
-scene.add(ground);
-
-/* ------------------------------------------------------------------
-   6. THE SHELTER AND THE FIGURE. A dozen stretched primitives sharing
-   three flat materials (§4.2 rule 1: no lighting, no lines). She sits
-   still; her chest and shoulders carry the breath, and nothing else
-   about her moves.
-   ------------------------------------------------------------------ */
-const matOf = hex => new THREE.MeshBasicMaterial({ color: hex });
-const mFig   = matOf(R.at(LIGHT));
-const mFigSh = matOf(STORM.shadow);
-const mWood  = matOf(0x4A3F46);
-const mRoof  = matOf(R.at(DEEP));
-const mLamp  = matOf(STORM.accent);
-
-const box = new THREE.BoxGeometry(1, 1, 1);
-const ball = new THREE.SphereGeometry(0.5, 10, 7);
-
-const shelter = new THREE.Group();
-shelter.add(part(THREE, box, mRoof, 4.6, 0.16, 3.0,  0, 2.30, -1.0, 0.07));
-shelter.add(part(THREE, box, mRoof, 4.2, 0.10, 0.5,  0, 2.16,  0.4, 0.07));
-shelter.add(part(THREE, box, mWood, 0.14, 2.30, 0.14, -2.00, 1.15, -0.2));
-shelter.add(part(THREE, box, mWood, 0.14, 2.30, 0.14,  2.00, 1.15, -0.2));
-shelter.add(part(THREE, box, mWood, 4.3, 0.09, 0.09,  0, 2.02, -0.2));
-scene.add(shelter);
-
-/* the lamp hanging from the roof: the one warm thing in the frame, and
-   the only place the accent appears besides the splash line */
-const lamp = part(THREE, box, mLamp, 0.26, 0.34, 0.26, 1.55, 1.72, -0.2);
-scene.add(lamp);
-
-const figure = new THREE.Group();
-const chest = part(THREE, ball, mFig, 0.76, 0.80, 0.62, 0, 0.76, -0.4);
-const head  = part(THREE, ball, mFig, 0.42, 0.46, 0.40, 0, 1.30, -0.42);
-const lapL  = part(THREE, ball, mFigSh, 0.95, 0.34, 0.80, -0.03, 0.34, -0.26);
-const armL  = part(THREE, ball, mFigSh, 0.26, 0.60, 0.26, -0.46, 0.70, -0.34, 0.18);
-const armR  = part(THREE, ball, mFigSh, 0.26, 0.60, 0.26,  0.46, 0.70, -0.34, -0.18);
-figure.add(lapL, chest, armL, armR, head);
-scene.add(figure);
-
-/* ------------------------------------------------------------------
-   7. SPLASH — a pool of hard lozenges kicked up along the curtain's
-   foot. They spawn ON the splash line, so when the line moves away the
-   splashes move away with it, and the ground in front of the figure
-   goes quiet.
-   ------------------------------------------------------------------ */
-const splash = particles(THREE, {
-  n: 120, renderOrder: 6,
-  material: posterMat(THREE, {
-    uniforms:{ uSplash:{value:C(STORM.splash)}, uPale:{value:C(R.at(PALE))},
-               uAccent:{value:C(STORM.accent)} },
-    transparent:true, depthWrite:false, side:THREE.DoubleSide,
-    vertex:`
-      attribute vec2 aCorner; attribute float aSeed; attribute float aSize; attribute float aKind;
-      varying vec2 vC; varying float vSize; varying float vKind;
-      void main(){
-        vC = aCorner; vSize = aSize; vKind = aKind;
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        mv.xy += aCorner * aSize;
-        gl_Position = projectionMatrix * mv;
-      }
-    `,
-    fragment:`
-      varying vec2 vC; varying float vSize; varying float vKind;
-      uniform vec3 uSplash, uPale, uAccent;
-      void main(){
-        if(vSize <= 0.0) discard;
-        if(abs(vC.x) + abs(vC.y) > 1.0) discard;   // a hard lozenge
-        vec3 col = mix(uSplash, uPale, step(0.0, vC.y) * 0.5);
-        col = mix(col, uAccent, vKind * 0.35);
-        gl_FragColor = vec4(col, mix(0.42, 0.8, vKind));
-      }
-    `
-  })
-});
-scene.add(splash.mesh);
-let splashAccum = 0;
-const drop = (front, kind) => splash.spawn(p => {
-  p.kind = kind;
-  const spread = 3.0 + front * 0.7;
-  p.x = (Math.random() - 0.5) * spread;
-  p.y = 0.03;
-  p.z = -front + (Math.random() - 0.5) * 1.1;
-  p.r = 0.035 + Math.random() * 0.055;
-  p.vx = (Math.random() - 0.5) * 1.1;
-  p.vy = 1.1 + Math.random() * 1.9;
-  p.vz = (Math.random() - 0.5) * 1.1;
-});
-function stepSplash(dt){
-  splash.step(dt, (p, d) => {
-    p.vy -= d * 7.5;
-    p.x += p.vx*d; p.y += p.vy*d; p.z += p.vz*d;
-    p.r *= 1.0 - d * 0.9;
-    return p.y > 0.0 && p.r > 0.010;
-  });
-}
-
-/* ------------------------------------------------------------------
-   8. THE FLASH. §6 row 5 asks for a full-frame flash, and it is the one
-   thing in this chapter that could startle, so it is constrained rather
-   than softened: it is struck ONLY on the exhale (js/bamboo-rain-breath.js
-   decides, tools/regress.mjs checks), it is short, it is warm rather
-   than white, and it never lands while the reader is being asked to
-   breathe in.
-   ------------------------------------------------------------------ */
-const flashQuad = overlayQuad(THREE, {
-  uniforms:{ uFlash, uFlashCol:{value:C(AIR.flash)} },
-  fragment:`
-    varying vec2 vUv;
-    uniform float uFlash; uniform vec3 uFlashCol;
-    void main(){
-      float a = uFlash * 0.40;
-      if(a < 0.02) discard;
-      // brighter at the top, where the sky is, in three hard steps
-      float v = floor(clamp(vUv.y, 0.0, 0.999) * 3.0) / 2.0;
-      gl_FragColor = vec4(uFlashCol, a * (0.45 + v * 0.55));
-    }
-  `
-});
-scene.add(flashQuad);
-
-/* ------------------------------------------------------------------
-   THE CONTROL. One press target, the whole screen.
-   ------------------------------------------------------------------ */
-let pressing = false;
+const touches = new Set();
+let finger = false, forced = null;
 (function(){
-  const el = $('push');
-  const on  = e => { e.preventDefault(); pressing = true;  };
-  const off = e => { if(e) e.preventDefault(); pressing = false; };
-  el.addEventListener('pointerdown', on);
-  el.addEventListener('pointerup', off);
-  el.addEventListener('pointercancel', off);
-  el.addEventListener('pointerleave', off);
-  // a pointer that leaves the window entirely never delivers pointerup
-  window.addEventListener('blur', () => off());
+  const down = e => { e.preventDefault(); touches.add(e.pointerId); finger = touches.size > 0; };
+  const up   = e => { touches.delete(e.pointerId); finger = touches.size > 0; };
+  elReach.addEventListener('pointerdown', down);
+  elReach.addEventListener('pointerup', up);
+  elReach.addEventListener('pointercancel', up);
+  elReach.addEventListener('pointerleave', up);
+  window.addEventListener('blur', () => { touches.clear(); finger = false; });
+  /* and the space bar, for a reader at a keyboard */
+  window.addEventListener('keydown', e => { if(e.code === 'Space' && !e.repeat){ e.preventDefault(); touches.add('key'); finger = true; } });
+  window.addEventListener('keyup',   e => { if(e.code === 'Space'){ touches.delete('key'); finger = touches.size > 0; } });
 })();
 
-/* ------------------------------------------------------------------
-   The loop
-   ------------------------------------------------------------------ */
-let t = 0;
-let started = false;
-let camZ = 3.4, camY = 1.95, camLook = 0.9;
-let gust = 0;
-let RATE = pushRates(PROTOCOLS.sigh);
-/* The inhale's relaxation rate, derived from the protocol's own inhale
-   duration rather than chosen. Declared HERE and not up with the other
-   colours, because it reads RATE: a `let` read in its own temporal dead
-   zone throws, and this project has already lost an afternoon to one. */
-let DECAY = drawDecay(RATE);
+const S = newSozu();
+const LEAD = leader();
+/* nobody leading, the grove takes eleven and a half seconds: the rate
+   the full tube would give */
+const WORLD = superstructure({ rest: T_FULL * (1 + POUR_RATIO) });
+const INVITE = invite({ cycles: 1 });
+let t = 0, started = false, wake = 0, lean = 0, pressedOnce = false;
 
-/* The curtain's body is the kit's — js/course.js. tools/regress.mjs
-   flies THE SAME OBJECT with the same corridor and the same stiffness. */
-let CURTAIN = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
-
-let subShown = '', hintShown = false;
-const vHz = new THREE.Vector3();
-const cHaze = C(AIR.haze), cCleared = C(AIR.cleared);
-const cHazeWarm = C(AIR.hazeWarm);
-/* The shared affordance. Here a press is correct on the EXHALE, which
-   is the opposite of Lantern Current — and the reader is never told
-   either rule, because in both chapters the thing that invites a press
-   only invites it when pressing is the right thing to do. */
-const INVITE = invite();
-const elPush = $('push');
-
-
-const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
+/* ---------- the meter ---------- */
+const meter = (function(){
+  const buf = [], secs = [];
+  let acc = 0, n = 0, lastSec = performance.now(), prev = performance.now(), ran = 0;
+  elFps.addEventListener('click', () => { elFps.classList.add('off'); elFpsDot.classList.add('on'); });
+  elFpsDot.addEventListener('click', () => { elFps.classList.remove('off'); elFpsDot.classList.remove('on'); });
+  return function(now, idle){
+    const d = now - prev; prev = now;
+    if(!idle && d > 0 && d < 500){ buf.push(d); if(buf.length > 240) buf.shift(); acc += d; n++; ran += d; }
+    if(now - lastSec >= 1000){
+      const fpsNow = n ? 1000 / (acc / n) : 0;
+      secs.push(fpsNow); if(secs.length > 10) secs.shift();
+      const sorted = buf.slice().sort((a, b) => a - b), med = sorted.length ? sorted[sorted.length >> 1] : 0;
+      const m = Math.floor(ran / 60000), s = Math.floor(ran / 1000) % 60;
+      elFps.textContent = idle ? 'paused'
+        : fpsNow.toFixed(0) + ' fps   ' + med.toFixed(1) + ' ms\n'
+          + 'low ' + Math.min(...secs).toFixed(0) + '   ' + m + ':' + String(s).padStart(2, '0')
+          + '\n' + size.W + '×' + size.H + ' @' + renderer.getPixelRatio().toFixed(2);
+      acc = 0; n = 0; lastSec = now;
+    }
+  };
+})();
 
 const loop = clock((dt, now, running) => {
-  if(!running){ fpsTick(now, true); return; }
+  if(!running){ meter(now, true); return; }
   if(started) t += dt;
+  U.uTime.value += dt;
 
-  const st = B.at(t);
-  const ph = st.p;
-  const prog = B.progress(t);
+  /* --- THE BAMBOO --- */
+  const pressed = started && (forced !== null ? forced : finger);
+  if(pressed) pressedOnce = true;
+  step(S, pressed, dt);
 
-  /* --- TWO REGIMES, AND THE DIFFERENCE IS VISIBLE IN THE MOTION.
-     See the long note in js/bamboo-rain-breath.js.
+  /* --- THE READER'S RHYTHM, read off the water in the tube, and the
+     grove's answer to it: a sway that settles a fraction slower than
+     they are going, and a lean with every pour — the breath out moves
+     the air. --- */
+  if(started){ LEAD.step(dt, S.fill); WORLD.step(dt, LEAD); }
+  lean += (S.flow - lean) * (1 - Math.exp(-dt * 2.2));
+  U.uSway.value = 0.22 * WORLD.sin + 0.38 * lean;
 
-     THE EXHALE IS DRIVEN: first-order integration of the reader's own
-     hand at a constant capped rate — a straight line at a fixed speed.
-     A full exhale of pressing crosses the band exactly once and
-     nothing presses it further. Releasing mid-exhale STOPS the
-     pushing; it does not undo it. Declining the invitation costs
-     nothing, it simply does not gain anything.
+  /* --- THE STORM, which is nobody's to hurry --- */
+  const prog = clamp01(t / CLEARS_IN);
+  U.uRain.value = 1 - smoothstep(0.12, 0.92, prog);
+  U.uClear.value = smoothstep(0.30, 1.0, prog);
+  wake += ((started ? 1 : 0.35) - wake) * (1 - Math.exp(-dt * 1.4));
+  U.uWake.value = wake;
 
-     THE INHALE IS RELAXATION: the reader has no control over it at
-     all, and it is not the same walk run backwards. The fill decays
-     towards empty with a time constant, so the wall comes in fast and
-     arrives slowly. A curve, not a line.
+  U.uAngle.value = S.angle;
+  U.uFill.value = S.fill;
+  U.uFlow.value = S.flow;
+  U.uOver.value = S.over;
+  U.uCatch.value += ((S.catching ? 1 : 0) - U.uCatch.value) * (1 - Math.exp(-dt * 14));
+  U.uKnock.value = S.knock;
+  U.uBowl.value.set(S.bowl[0], S.bowl[1], S.bowl[2], S.bowl[3]);
+  U.uOffer.value = offerOf(S);
 
-     Both still answer to the spring, so both still have mass. --- */
-  if(pushes(ph.k)){
-    CURTAIN.drive(dt, pressing && started, false);
-  } else {
-    CURTAIN.fill -= CURTAIN.fill * DECAY * dt;
-    CURTAIN.settle(dt);
-  }
-  const fill = CURTAIN.fill;
-
-  /* --- THE CLEARING. A function of elapsed time and nothing else. The
-     reader cannot hurry it and cannot miss it. --- */
-  const clearing = clearingAt(prog);
-  uClear.value = prog;
-  uFill.value = fill;
-  uFront.value = CURTAIN.value + clearing;
-
-  /* --- the gust: present while the exhale is actually blowing, and
-     stronger when the reader is pushing with it. This is the one place
-     the press changes something other than the distance, and it is what
-     makes a press feel like a push rather than a slider. --- */
-  /* --- ATTENTION. Two objects across the double inhale: the wet ring
-     at your feet on the first breath, the rain overhead on the sip.
-     Eased, not snapped, so the sip LIFTS the canopy rather than
-     switching it on. They are separate scalars because there is a
-     moment at the top of the sip where both are full. --- */
-  const att = attention(B, t);
-  uRing.value   += (att.ring   - uRing.value)   * Math.min(1, dt * 3.4);
-  uCanopy.value += (att.canopy - uCanopy.value) * Math.min(1, dt * 3.0);
-
-  /* --- THE TWO PALETTES. 0 while the wall is drawing in, 1 while it
-     is being pushed out. The easing is slower than the attention's so
-     the colour is a weather change rather than a switch. --- */
-  const wantWarm = pushes(ph.k) ? 1 : 0;
-  uWarm.value += (wantWarm - uWarm.value) * Math.min(1, dt * 1.1);
-
-  /* --- THE INVITATION. Pressing is correct on the EXHALE here, which
-     is the opposite of Lantern Current, and the reader is never told
-     so: the press target shimmers only while a push would do
-     something. js/invite.js, and it stops once they have shown they
-     have understood. --- */
-  const inv = INVITE.step(dt, { wanted: started && pushes(ph.k), taken: pressing });
-  elPush.style.setProperty('--invite', inv.invite.toFixed(3));
-  elPush.style.setProperty('--held', inv.held.toFixed(3));
-  elPush.style.setProperty('--after', inv.after.toFixed(3));
-
-  const blowing = pushes(ph.k) ? 1 : 0;
-  const wantGust = blowing * (0.35 + (pressing ? 0.65 : 0.0));
-  gust += (wantGust - gust) * Math.min(1, dt * 3.2);
-  uGust.value = gust;
-
-  /* --- lightning. Decided in the protocol file, never here, so the
-     "exhale only" guarantee is one function the harness can sample. --- */
-  uFlash.value = started ? strokeAt(t, B.cycle) : 0;
-
-  /* --- the figure. Her chest and shoulders carry the phase's own
-     expressive curve and nothing else about her moves. --- */
-  const full = B.scalar(t);
-  uBreath.value = full;
-  chest.scale.set(0.76 + full * 0.10, 0.80 + full * 0.07, 0.62 + full * 0.09);
-  chest.position.y = 0.76 + full * 0.035;
-  head.position.y  = 1.30 + full * 0.055;
-  head.rotation.x  = -full * 0.10;
-  armL.position.y = armR.position.y = 0.70 + full * 0.045;
-  lamp.scale.set(0.26 + full * 0.05, 0.34, 0.26 + full * 0.05);
-  // the lamp swings a little in the gust, because it is under the roof
-  lamp.rotation.z = gust * 0.22 + Math.sin(t * 1.6) * 0.03;
-
-  /* --- splash along the foot of the curtain. Its rate falls with the
-     clearing, so the ground quietens as the storm goes. --- */
-  const front = uFront.value;
-  if(front < WALL_FAR + 6){
-    splashAccum += dt * (26 * (1 - prog * 0.75));
-    while(splashAccum >= 1){ splashAccum -= 1; drop(front, Math.random() < 0.12 ? 1 : 0); }
-  }
-  stepSplash(dt);
-
-  /* --- THE CAMERA. Behind her shoulder, leaning in as the rain closes
-     and back as it goes, and rising a little as the sky opens. The
-     breath drives it; the reader's press does not, because a camera
-     that answered the control would hide what the control does. --- */
-  let wantZ, wantY, wantLook;
-  if(ph.cam === 'push'){ wantZ = 4.3; wantY = 2.10; wantLook = 1.25; }
-  // THE SIP LOOKS UP. Its own shot, because the second breath is taken
-  // somewhere the first was not — the camera settles back and raises
-  // its gaze into the canopy rather than staying on the ground line.
-  else if(ph.cam === 'lift'){ wantZ = 3.4; wantY = 1.70; wantLook = 3.40; }
-  else                 { wantZ = 3.0; wantY = 1.82; wantLook = 0.80; }
-  camZ    += (wantZ    - camZ)    * Math.min(1, dt * 1.5);
-  camY    += (wantY    - camY)    * Math.min(1, dt * 1.8);
-  camLook += (wantLook - camLook) * Math.min(1, dt * 1.8);
-  const back = camZ * (camera.aspect < 0.75 ? 1.0 : 1.35);
-  camera.position.set(0.55, camY + prog * 0.30, back);
-  camera.up.set(0, 1, 0);
-  camera.lookAt(0.12, camLook + full * 0.10, -14 - front * 0.25);
-  /* The arrival displacement goes HERE: after the chapter has set the
-     pose, and before anything below reads camera.position, so the
-     uniforms see the camera that actually renders. */
-  ARRIVE.apply(camera, now);
-
-  vHz.set(camera.position.x, 0.0, camera.position.z - 240).project(camera);
-  uHorizon.value = vHz.y * 0.5 + 0.5;
-
-  uTime.value = t;
-  uFog.value.copy(cHaze).lerp(cHazeWarm, uWarm.value)
-           .lerp(cCleared, prog * 0.55);
-
-  /* --- cue text. The countdown points at the next breath, never at
-     elapsed time (§2.4). Nothing here is a score. --- */
-  const cue = B.cue(t);
-  if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
-  /* ONLY THE COUNTDOWN, NOT THE FLAVOUR LINE — 6 November 2026.
-     breath.js's cue() puts a countdown in `sub` when the phase has a
-     `count` and the phase's own flavour line there when it does not,
-     so the phase table is what decides. `count` is present exactly on
-     the phases that point AT THE NEXT BREATH, which is §2.4. The kit
-     is untouched, so a chapter that wants its flavour line back needs
-     one line here and nothing else. */
-  // the hint appears on the exhale, and only until the reader has
-  // pressed once. It is an instruction, not a prompt to perform.
-  const wantHint = started && !hintShown && blowing === 1;
-  if(pressing) hintShown = true;
+  /* --- the ring on the tail, until the glass has been pressed once --- */
+  const inv = INVITE.step(dt, { wanted: started, taken: pressedOnce });
+  const W = size.W || window.innerWidth || 1, H = size.H || window.innerHeight || 1;
+  const tx = 0.030 + Math.cos(S.angle) * 0.112, ty = 0.585 - Math.sin(S.angle) * 0.112;
+  elRing.style.left = ((tx / camera.aspect + 0.5) * W).toFixed(1) + 'px';
+  elRing.style.top  = ((1 - ty) * H).toFixed(1) + 'px';
+  elRing.style.setProperty('--invite', inv.invite.toFixed(3));
+  elRing.style.setProperty('--asking', inv.asking ? '1' : '0');
 
   renderer.render(scene, camera);
-  fpsTick(now, false);
+  meter(now, false);
 });
 
-/* ---------- the protocol choice ---------- */
-const picked = choice({ key:'bor.bamboo.protocol.v1', valid: validChoice });
-
-function beginWith(which, remember){
-  const id = CHOICE[which];
-  B.use(PROTOCOLS[id]);
-  RATE = pushRates(PROTOCOLS[id]);
-  // a fresh body for the new protocol: its rate cap is derived from the
-  // protocol's own durations and cannot be carried over from the other
-  CURTAIN = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
-  if(remember) picked.write(which);
-  elGate.classList.remove('on');
-  started = true;
-  DECAY = drawDecay(RATE);
-  INVITE.reset();   // a new session is a new reader
-  t = 0; gust = 0; subShown = ''; hintShown = false;
-  ARRIVE.start();
+/* ---------- in and out ---------- */
+function begin(){
+  started = true; t = 0;
   loop.resync();
 }
-$('gateSigh').addEventListener('click',    () => beginWith('sigh', true));
-$('gateSettled').addEventListener('click', () => beginWith('settled', true));
-
 $('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
 $('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
-$('rescreen').addEventListener('click', () => {
-  picked.clear();
-  elHalt.classList.remove('on');
-  elGate.classList.add('on');
-  started = false; loop.running = true; t = 0;
-});
 
-const ack = picked.read();
-enter(requireScroll, () => {
-  if(ack) beginWith(ack.choice, false); else elGate.classList.add('on');
-});
+enter(requireScroll, begin);
 
-/* ---------- context loss ---------- */
 contextGuard(canvas, {
-  onLost(){
-    loop.stop();
-    elPhase.textContent = 'paused';
-    elPhase.textContent = 'paused — the graphics context was lost';
-  },
+  onLost(){ loop.stop(); },
   onRestored(){ resize(); loop.resync(); loop.start(); }
 });
 
-/* ---------- inspection hook ----------
-   A hidden browser pane gets NO rAF callbacks at all, so the frame body
-   is otherwise unreachable from a tool call and a throw in there is
-   indistinguishable from a stalled loop. See clock().pump in js/stage.js. */
+/* ---------- inspection hook ---------- */
 window.__bamboo = {
-  begin(which){ beginWith(which === 'settled' ? 'settled' : 'sigh', false); },
-  ack: () => picked.read(),
   scene, camera, THREE,
-  pump(dt, n){ return loop.pump(dt, n); },
-  press(down){ pressing = !!down; return pressing; },
+  begin, pump(dt, n){ return loop.pump(dt, n); },
+  /** hold the glass down (true), let it go (false), or give it back to the reader (null) */
+  press(v){ forced = (v === null || v === undefined) ? null : !!v; return forced; },
   seek(v){ t = v; },
   now(){
-    const s = B.at(t);
-    return { protocol:B.proto.id, cycle:B.cycle, session:B.session, t:+t.toFixed(3),
-             phase:s.p.k, cam:s.p.cam, sub:s.p.count || s.p.sub, left:+s.left.toFixed(2),
-             schedule:+B.value(t).toFixed(2),
-             fill:+CURTAIN.fill.toFixed(3),
-             curtain:+CURTAIN.value.toFixed(2),
-             clearing:+clearingAt(B.progress(t)).toFixed(2),
-             front:+uFront.value.toFixed(2),
-             error:+(CURTAIN.value - B.value(t)).toFixed(2),
-             gust:+gust.toFixed(3), flash:+uFlash.value.toFixed(2),
-             breath:+B.scalar(t).toFixed(3),
-             progress:+B.progress(t).toFixed(3),
-             liveSplash: splash.live(), pressing };
-  },
-  /* The claim the chapter rests on, in one call: the storm clears on the
-     schedule and not on the effort. Run a whole session twice, once
-     never pressing and once always pressing, and the clearing must be
-     the same both times — while the curtain's own position must not. */
-  provePassiveClears(){
-    const was = { t, fill: CURTAIN.fill, v: CURTAIN.v, value: CURTAIN.value };
-    const run = (press) => {
-      const c = body({ corridor: CORRIDOR, rates: RATE, k: SPRING, fill: 1 });
-      const dt = 1/60; let spread = 0;
-      for(let tt = 0; tt < B.session; tt += dt){
-        c.drive(dt, press, !press);
-        spread = Math.max(spread, c.value);
-      }
-      return { endClearing:+clearingAt(1).toFixed(3), furthestCurtain:+spread.toFixed(2) };
+    return {
+      t:+t.toFixed(2), started, pressed: S.pressed,
+      angle:+S.angle.toFixed(3), fill:+S.fill.toFixed(3), flow:+S.flow.toFixed(3),
+      over:+S.over.toFixed(2), pouring:S.pouring, delivered:+S.delivered.toFixed(3),
+      bowl:S.bowl.map(b => +b.toFixed(2)), offer: offerOf(S), reach: reachOf(S.lastFill),
+      rain:+U.uRain.value.toFixed(3), clear:+U.uClear.value.toFixed(3),
+      reader:{ period: LEAD.period === null ? null : +LEAD.period.toFixed(2), measured: LEAD.measured },
+      world:{ period:+WORLD.period.toFixed(2), behindDeg:+(phaseGap(LEAD.phase, WORLD.phase) * 360).toFixed(1) },
+      sway:+U.uSway.value.toFixed(3)
     };
-    const idle = run(false), hard = run(true);
-    t = was.t; CURTAIN.fill = was.fill; CURTAIN.v = was.v; CURTAIN.value = was.value;
-    return { idle, hard,
-             clearingIdentical: idle.endClearing === hard.endClearing,
-             curtainDiffers: idle.furthestCurtain !== hard.furthestCurtain };
   },
-  /* Did every shader actually link? A broken one still issues
-     its draw call and still shows up in renderer.info, so the
-     only other way to find out is to read the console. */
   links(){ return linkReport(renderer, scene, camera); },
-  /* EXACTLY ONE RENDERER AND ONE LOOP is the only healthy answer for a
-     chapter page. Two things drawing to one surface is invisible to a
-     screenshot and to draw-call counts, which is why it gets its own
-     question rather than an argument. */
   solo(){ return soloReport(); },
-  /* The frame-to-frame meter: a whole scene swapping scores in the
-     tens, ordinary motion scores in single figures. prove() first --
-     the readback has to be shown able to tell two scenes apart before
-     any of its numbers mean anything. */
-  probe(){ return flashMeter({ renderer, scene, camera,
-    step: (dt) => loop.pump(dt, 1) }); },
-
   bench(n){
     const gl = renderer.getContext();
     renderer.render(scene, camera); gl.finish();
-    const s = performance.now();
+    const a = performance.now();
     for(let i = 0; i < n; i++) renderer.render(scene, camera);
     gl.finish();
-    return { msPerRender:(performance.now()-s)/n, n,
-             drawCalls: renderer.info.render.calls,
-             triangles: renderer.info.render.triangles };
-  },
-  where(){
-    const put = o => {
-      const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
-      return { x:+((v.x*0.5+0.5)*size.W).toFixed(0), y:+((-v.y*0.5+0.5)*size.H).toFixed(0),
-               inFrame: Math.abs(v.x)<1 && Math.abs(v.y)<1 && v.z<1 };
-    };
-    return { figure:put(chest), lamp:put(lamp), horizonUv:+uHorizon.value.toFixed(3),
-             viewport:[size.W, size.H] };
+    return { msPerFrame: (performance.now() - a) / n, n,
+             drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
   }
 };
 
-/* LEAVING READS AS THE BOARD CLOSING.
-   The way in is the cover's board swinging open on its spine — a solid
-   with two faces and a real fore-edge. The way out is that same board,
-   run backwards, out of js/bookframe.js. Not a second mechanism and not
-   a crossfade: the thickness is the point.
-
-   The chapter's own canvas is left underneath and untouched. A snapshot
-   is the obvious alternative and is worse — PageTurn's costs a backing
-   store the size of the viewport, and the board covers the frame within
-   a couple of hundred milliseconds anyway.
-
-   The count is checked. A link that silently did not get wired is the
-   same class of fault as a shader that silently did not link. */
 const exits = wireExits();
-if(exits < 1) console.warn('bor: no exit link was wired on this chapter');
-
+/* The loop has to be STARTED: two chapters shipped without this line. */
 loop.start();
+void exits; void UP;
 }
 </script>
 </body>

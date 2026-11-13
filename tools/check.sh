@@ -166,6 +166,21 @@ else
   say "  ok    reader-led spine: estimator, coupling, 1.6a invariant, ramp"
 fi
 
+# --- 4f. Bamboo Rain's water-tipper ---
+# The second Bamboo Rain (13 November 2026) is reader-led and one degree
+# of freedom: press to fill, let go to pour. tools/sozu.mjs flies its
+# model (js/sozu-breath.js) over a family of readers and checks what
+# the chapter's header promises: it turns fast, the pour outlasts the
+# fill at every rate, it caps, it cannot be failed, and a longer breath
+# reaches further. It carries a case that is required to fail.
+if ! node "$ROOT/tools/sozu.mjs" > /dev/null 2>&1; then
+  say "  FAIL  bamboo rain's water-tipper"
+  node "$ROOT/tools/sozu.mjs" 2>&1 | grep -E "FAIL" | head -10
+  FAIL=1
+else
+  say "  ok    bamboo rain: turns, pours longer than it fills, caps, cannot be failed"
+fi
+
 # --- 4d. the back button must stay sensible ---
 # The reader hit a real bug here on 6 November: every exit assigned
 # location.href, which PUSHES a history entry, so Back from the

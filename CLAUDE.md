@@ -529,6 +529,45 @@ synthetic persisted pageshow and a real round trip in the pane; **the pane did n
 page cache on that trip (navigation type `back_forward`), so the real restore path is
 unproved until the reader's phone has done it.**
 
+## Bamboo Rain is a different chapter now — 13 November 2026
+
+The author: *"bamboo rain is one of the worst ones ... use all of our design principles to
+devise a really good experience here in 1d."* Rebuilt from the principles rather than
+repaired. The first version is kept, unlisted, as `app/bamboo-rain-storm.html` (it still uses
+`bamboo-rain-breath.js`, which `regress.mjs` still covers).
+
+**The thing.** A bamboo water-tipper in a garden at the end of a storm. Left alone it hangs
+mouth-down and the rain's trickle runs past. PRESS anywhere: the tail goes down on its stone,
+the mouth comes up under the trickle, it fills while held — in. LET GO: it tips and pours,
+1.3 times longer than it filled — out — down four stone bowls that light as the water
+reaches them. Model in `js/sozu-breath.js` (pure), checked by `tools/sozu.mjs` (gate 4f).
+
+**Why this shape, because each line is a principle and the next 1D chapter should be argued
+the same way:**
+
+- *What moves, relative to what:* the tube TURNS about a pin on a post in the ground. There
+  is no lens — the page is one painted frame (signed distances, one pixel of ramp at every
+  edge, no mesh). A side view of a thing turning about a pin is a flat picture; draw it as
+  one. 1 draw call, 2 triangles, and the cost is all per-pixel.
+- *The control is the motion:* a press pushes the tail DOWN. Nothing to learn.
+- *The boundary is a turn:* 0.18 s, twice a breath, with a knock. The first version eased.
+- *They set the rate; the boundary is in the world:* no schedule, no cue word, no protocol
+  sheet. The long exhale is in the PLUMBING (it empties slower than it fills), the offer is
+  the bowl one past their last reach glimmering, and the grove sways a little slower than
+  they go and leans with every pour.
+- *Cannot be failed, and cannot hurt:* never pressed, it rains and clears on the page's own
+  180 s. Held past full it overflows. Caps at 5.16 breaths a minute. **The lightning is gone**
+  — the design doc had it down as a full-frame flash with no disclosure home.
+
+**A level, not a rate, is what makes one touch work** — same finding as the Murmuration's
+`d=1`. And a pour is a FUNCTION of how far through it is, not a rate proportional to what is
+left; that shape has cost this project twice.
+
+Seen locally at 375x812 in stepped stills: at rest, held, pouring with two bowls, and cleared
+(dusk, moon, no rain, four bowls). **Not seen in motion, not on a phone, cost not measured**
+(the bench returned nonsense with the pane hidden). The contents plate still shows the OLD
+storm's thumbnail.
+
 ## LEVEL OF EFFORT FOR THE §1.7 / §4.2b CONVERSION — 12 November 2026
 
 Asked for by the author before any conversion starts. Full working in
