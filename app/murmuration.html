@@ -37,17 +37,21 @@
 
   #reach{position:fixed;inset:0;z-index:25;touch-action:none;user-select:none;
     -webkit-user-select:none;background:transparent}
-  .mark{position:fixed;left:50%;z-index:26;pointer-events:none;
-    width:86px;margin-left:-43px;height:2px;
-    background:rgba(255,248,228,.92);
-    opacity:calc(var(--invite,0) * 0.9 + var(--held,0) * 0.75);
-    transform:translateY(-50%) scaleX(calc(0.55 + var(--invite,0) * 0.45))}
-  .mark::after{content:'';position:absolute;left:26px;right:26px;height:1px;
-    background:#C86A4A;opacity:var(--after,0)}
-  #mUp::after{top:6px}
-  #mDn::after{bottom:6px}
+  /* ONE RING, CENTRED ON THE FLOCK'S HEART. It replaced two bars, one
+     above and one below, which asked for a reach UP the glass — a
+     control with nothing in common with what the flock does. The flock
+     gathers to a centre and opens away from it, so the control is the
+     distance from that centre, and the invitation is a ring that draws
+     in and lets out. */
+  #ring{position:fixed;left:50%;top:50%;z-index:26;pointer-events:none;
+    width:var(--d,220px);height:var(--d,220px);margin:calc(var(--d,220px) / -2) 0 0 calc(var(--d,220px) / -2);
+    border-radius:50%;border:1.5px solid rgba(255,248,228,.9);
+    opacity:calc(var(--invite,0) * 0.75);
+    transform:scale(calc(1 - var(--invite,0) * 0.42))}
+  #ring::after{content:'';position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;
+    border-radius:50%;background:rgba(255,248,228,.95)}
   @media (prefers-reduced-motion: reduce){
-    .mark{opacity:calc(var(--asking,0) * 0.5 + var(--held,0) * 0.75);transform:translateY(-50%)}
+    #ring{opacity:calc(var(--asking,0) * 0.5);transform:none}
   }
 
   .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
@@ -84,9 +88,8 @@
 
 <div id="cue"><div id="phase">breathe in</div></div>
 
-<div id="reach" aria-label="Reach up the glass to gather the flock; let it fall and the flock opens"></div>
-<div id="mUp" class="mark" aria-hidden="true"></div>
-<div id="mDn" class="mark" aria-hidden="true"></div>
+<div id="reach" aria-label="Touch near the centre and the flock gathers; touch further out and it opens towards you"></div>
+<div id="ring" aria-hidden="true"></div>
 
 <div id="gate" class="sheet"><div>
   <h2>Watch the flock</h2>
@@ -161,28 +164,39 @@ import { wireExits } from './js/bookframe.js';
 const ARRIVE = arrival({ dist: 7 });
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
 
-/* §4.3 — an evening sky, pale and warm low down, cool and deep
-   overhead, and the birds in the last two steps of it. Six steps,
-   palest first, and every surface picks an index BY HAND. */
-const R = ramp([0xF6E7BC, 0xE6D39A, 0xBFC3A4, 0x8C9CA8, 0x4E5F70, 0x232B36]);
-const AIR = {
-  low:0xF7EAC4, mid:0xDCDCB2, high:0xA9B6B4, zenith:0x6E8292,
-  cirrus:0xFFF4D4, warm:0xEFC89A
-};
-const BIRD = { body:0x232B36, lit:0x4E5F70, far:0x8C9CA8 };
+/* COLOUR, 12 November 2026, on the author's instruction: "add some
+   color to it, both the swarm and some pretty dynamic backdrop —
+   nature, and something relatively soothing." §4.2b had already
+   withdrawn the hard idiom rules, so this is the look restated rather
+   than an exception to it.
+
+   The backdrop is a dusk sky seen straight up through a clearing: rose
+   and peach low in the frame, periwinkle overhead, slow cloud, and a
+   ring of leaves round the edge of the glass that sways. The leaves
+   are also the thing this chapter never had — SOMETHING HOLDING STILL.
+   The diagnosis on record is that a flock contracting in an empty sky
+   is the same picture as the camera pulling back; a canopy that does
+   not contract with it is what makes the flock's change the flock's.
+
+   The ramp is kept because the fog and the kit's helpers take one. */
+const R = ramp([0xFBE3C4, 0xF2C4B4, 0xC9B4D6, 0x8E9AD0, 0x4E5F9A, 0x232B4A]);
+const AIR = { haze:0xD9BFD2 };
+/* starlings are not black: the sheen runs teal to plum, with the odd
+   bird catching the low light gold */
+const BIRD = { teal:0x2C97A0, plum:0x9457B4, gold:0xF2A552, far:0xA79CC4 };
 
 const $ = id => document.getElementById(id);
 const elPhase = $('phase');
 const elFps = $('fps'), elFpsDot = $('fpsdot');
 const elGate = $('gate'), elHalt = $('halt'), elFall = $('fallback');
-const elReach = $('reach'), elMUp = $('mUp'), elMDn = $('mDn');
+const elReach = $('reach'), elRing = $('ring');
 
 function fallback(why){
   if(why) $('fbwhy').textContent = why;
   elGate.classList.remove('on');
   elFall.classList.add('on');
   $('cue').style.display = 'none';
-  elReach.style.display = elMUp.style.display = elMDn.style.display = 'none';
+  elReach.style.display = elRing.style.display = 'none';
   elFps.classList.add('off');
 }
 
@@ -201,7 +215,7 @@ const ramp6 = R.steps.map(C);
 const uTime   = { value: 0 };
 const uFill   = { value: 0 };
 const uRamp   = { value: ramp6 };
-const uHaze   = { value: C(AIR.mid) };
+const uHaze   = { value: C(AIR.haze) };
 /* the three numbers the whole flock is drawn from. TWO RADII, not
    one: the flock is a tall column rather than a ball, because the
    phone is in portrait and a 31 degree frame cannot hold a sphere
@@ -214,6 +228,13 @@ const uCentre = { value: new THREE.Vector3(X_C, ALT_SPREAD, 0) };
    uTime — a shared phase that jumped whenever the flock changed
    shape would tear the whole pattern apart once a breath. */
 const uOrbit  = { value: 0 };
+/* where the reader's finger is, as a direction from the heart of the
+   flock and how far out (0..1), in SCREEN axes; and the lens's own
+   right and up, so the shader can turn that into a place in the air */
+const uPull   = { value: new THREE.Vector2(0, 0) };
+const uCamR   = { value: new THREE.Vector3(1, 0, 0) };
+const uCamU   = { value: new THREE.Vector3(0, 1, 0) };
+const uHeart  = { value: new THREE.Vector2(0.5, 0.5) };
 
 const FOG = fogGlslAA({ near: 14, rate: 0.009, steps: 5, max: 0.52 });
 const PRE_SKY = AA_GLSL + RAMP_AA_GLSL + GRAIN_GLSL;
@@ -235,58 +256,85 @@ const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
    zenith, in five posterised steps, with a few bands of high cirrus
    low in the frame to give the depth a figure would otherwise give.
    ------------------------------------------------------------------ */
-const skyU = {
-  uTime, uAspect:{ value: 1 }, uRamp, uFill,
-  uLow:{ value:C(AIR.low) }, uMid:{ value:C(AIR.mid) }, uHigh:{ value:C(AIR.high) },
-  uZen:{ value:C(AIR.zenith) },
-  uCirrus:{ value:C(AIR.cirrus) }, uWarm:{ value:C(AIR.warm) }
-};
+const skyU = { uTime, uAspect:{ value: 1 }, uFill, uHeart };
 onFit(() => { skyU.uAspect.value = camera.aspect; });
 scene.add(screenQuad(THREE, {
   uniforms: skyU, prelude: PRE_SKY,
   fragment:`
     varying vec2 vUv;
     uniform float uTime, uAspect, uFill;
-    uniform vec3 uLow, uMid, uHigh, uZen, uCirrus, uWarm;
+    uniform vec2 uHeart;
+
+    /* No sin() anywhere near a hash — this file already records what a
+       sin-hash does at mediump. Arithmetic only, small arguments. */
+    float h12(vec2 p){
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+    float vnoise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h12(i), h12(i + vec2(1.0, 0.0)), f.x),
+                 mix(h12(i + vec2(0.0, 1.0)), h12(i + vec2(1.0, 1.0)), f.x), f.y);
+    }
+    float fbm(vec2 p){
+      float a = 0.5, s = 0.0;
+      for(int i = 0; i < 4; i++){ s += a * vnoise(p); p = p * 2.03 + vec2(17.3, 9.1); a *= 0.5; }
+      return s;
+    }
+
     void main(){
       /* vUv.y is up the frame, which here IS elevation: the lens does
-         not move, so there is no horizon term to subtract. */
-      /* MANY STEPS, NOT A FEW, AND THAT IS A DEPARTURE WORTH STATING.
-         Every other surface in this book posterises at three to six,
-         because §4.2's steps are hand-assigned values on an OBJECT
-         and a hard edge between two of them is legitimate. A sky
-         behind nothing is the case that breaks: with no horizon to
-         compress the gradient into the bottom of the picture, six
-         steps across 812 px are six SLABS, the edges read as
-         horizons, and they cut straight through the flock. Sixteen,
-         with the grain on top, is a gradation rather than a stack.
-         The idiom is about edges that mean something; these mean
-         nothing, so they go. */
-      float h = pow(clamp(vUv.y, 0.0, 1.0), 0.85);
-      vec3 col = mix(uLow, uMid, posteriseAA(clamp(h / 0.48, 0.0, 1.0), 8.0));
-      col = mix(col, uHigh, posteriseAA(clamp((h - 0.30) / 0.46, 0.0, 1.0), 8.0));
-      col = mix(col, uZen,  posteriseAA(clamp((h - 0.72) / 0.28, 0.0, 1.0), 6.0));
+         not move. A GRADIENT now, not steps — the six-slab sky and the
+         "dunes" it drew are both on record, and 4.2b lets the sky be
+         what a sky is. */
+      float h = vUv.y;
+      /* the whole key drifts between rose-gold and lilac over about
+         three minutes, so the evening is going somewhere */
+      float key = 0.5 + 0.5 * sin(uTime * 0.035);
+      vec3 low  = mix(vec3(0.99, 0.82, 0.64), vec3(0.98, 0.76, 0.72), key);
+      vec3 mid  = mix(vec3(0.95, 0.72, 0.72), vec3(0.80, 0.72, 0.88), key);
+      vec3 high = mix(vec3(0.54, 0.60, 0.84), vec3(0.44, 0.54, 0.82), key);
+      vec3 zen  = vec3(0.25, 0.34, 0.64);
+      vec3 col = mix(low, mid, smoothstep(0.0, 0.42, h));
+      col = mix(col, high, smoothstep(0.30, 0.78, h));
+      col = mix(col, zen,  smoothstep(0.70, 1.05, h));
 
-      /* a warm wash low and off to one side, so the light has a place
-         it comes from without a disc anywhere — the reader called a
-         drawn sun a cameo and Long Air lost its for that reason */
-      /* THE WARM WASH WAS THE "DUNES". Posterised at three steps
-         across three quarters of the frame, its contours are three
-         enormous arcs — which read as rolling ground in the one
-         chapter that has deliberately left the ground out, exactly
-         where a reader looks for a horizon. Eight steps and weaker. */
-      vec2 q = vec2((vUv.x - 0.26) * uAspect, vUv.y - 0.02);
-      col = mix(col, uWarm, posteriseAA(1.0 - clamp(length(q) / 0.86, 0.0, 1.0), 8.0) * 0.22);
+      /* slow cloud, lit warm from below where the sun has gone */
+      vec2 lp = vec2(vUv.x * uAspect, vUv.y);
+      vec2 cp = lp * vec2(2.6, 4.2) + vec2(uTime * 0.012, uTime * 0.004);
+      float c = fbm(cp) + 0.25 * fbm(cp * 2.1 + 5.0);
+      float cloud = smoothstep(0.62, 0.90, c);
+      vec3 cloudCol = mix(vec3(1.0, 0.87, 0.76), vec3(0.87, 0.74, 0.88), smoothstep(0.15, 0.9, h));
+      col = mix(col, cloudCol, cloud * 0.6);
 
-      /* THIN CIRRUS, LOW, AND MUCH LESS OF IT. The first version was
-         broad slow curves and read as sand dunes — a horizon the
-         chapter does not have, drawn by accident in the one place the
-         reader looks for one. */
-      float band = sin(vUv.y * 74.0 + sin(vUv.x * 2.3 + 1.7) * 0.9 + uTime * 0.008);
-      float lane = smoothstep(0.02, 0.14, vUv.y) * (1.0 - smoothstep(0.16, 0.34, vUv.y));
-      col = mix(col, uCirrus, aastep(0.80, band) * lane * 0.22);
+      /* THE HEART. A warm glow behind the flock that tightens and
+         brightens as it gathers — the air answering the shape. */
+      vec2 d = vec2((vUv.x - uHeart.x) * uAspect, vUv.y - uHeart.y);
+      float g = exp(-dot(d, d) * (5.0 + 9.0 * uFill));
+      col += vec3(1.0, 0.76, 0.48) * g * (0.08 + 0.34 * uFill);
 
-      col += (grainAt(vUv * 540.0) - 0.5) * 0.022;
+      /* THE CANOPY: two layers of leaf round the edge of the glass, the
+         far one hazed and backlit, the near one dark. They sway, a
+         little, on their own time — never on the breath. A superellipse
+         rather than a circle so a portrait frame gets leaves down both
+         sides and not only in its corners. */
+      vec2 q = (vUv - 0.5) * 2.0;
+      float m = pow(pow(abs(q.x), 4.0) + pow(abs(q.y), 4.0), 0.25);
+      vec2 sway = vec2(sin(uTime * 0.31 + lp.y * 5.0), cos(uTime * 0.27 + lp.x * 6.0)) * 0.006;
+      float n1 = fbm((lp + sway) * 15.0) + 0.22 * (vnoise((lp + sway) * 70.0) - 0.5);
+      float n2 = fbm((lp + sway * 2.2) * 9.0 + 31.0) + 0.20 * (vnoise((lp + sway * 2.2) * 48.0) - 0.5);
+      float far  = smoothstep(0.88, 0.905, m + (n1 - 0.5) * 0.36);
+      float near = smoothstep(0.955, 0.975, m + (n2 - 0.5) * 0.44);
+      /* the far leaves let the sky through: a leaf against a bright sky
+         is lit from behind */
+      vec3 farCol = mix(vec3(0.20, 0.42, 0.29), col, 0.20) * (0.70 + 0.60 * n1);
+      col = mix(col, farCol, far * 0.92);
+      vec3 nearCol = vec3(0.07, 0.17, 0.13) * (0.7 + 0.7 * n2);
+      col = mix(col, nearCol, near);
+
+      col += (grainAt(vUv * 540.0) - 0.5) * 0.018;
       gl_FragColor = vec4(col, 1.0);
     }
   `
@@ -369,17 +417,18 @@ function flockGeometry(){
 
 const flockMat = posterMat(THREE, {
   uniforms:{
-    uRamp, uTime, uRH, uRV, uCentre, uOrbit, uHaze,
-    uBody:{ value:C(BIRD.body) }, uLit:{ value:C(BIRD.lit) },
-    uFar:{ value:C(BIRD.far) },
+    uRamp, uTime, uRH, uRV, uCentre, uOrbit, uHaze, uPull, uCamR, uCamU, uFill,
+    uTeal:{ value:C(BIRD.teal) }, uPlum:{ value:C(BIRD.plum) },
+    uGold:{ value:C(BIRD.gold) }, uFar:{ value:C(BIRD.far) },
     uShellIn:{ value: SHELL_IN }
   },
   side: THREE.DoubleSide, prelude: PRE,
   vertex:`
     attribute float aBird; attribute vec4 aRnd; attribute float aPhase;
     uniform float uTime, uRH, uRV, uOrbit, uShellIn;
-    uniform vec3 uCentre;
-    varying float vDist; varying float vEdge; varying float vFace;
+    uniform vec3 uCentre, uCamR, uCamU;
+    uniform vec2 uPull;
+    varying float vDist; varying float vEdge; varying float vFace; varying vec2 vTint;
 
     void main(){
       /* five independent numbers, baked (see birdSeeds above) */
@@ -419,6 +468,14 @@ const flockMat = posterMat(THREE, {
               + sin(uTime * 0.13 - off.y * 0.04) * 0.09;
       off *= 1.0 + w;
 
+      /* YOU HAVE THE CONTROL, and this is the line that says so. The
+         flock is symmetric about its heart — and then every bird is
+         drawn a little towards the finger, each by its own amount, so
+         the side nearest the reader is the denser side. Different
+         amounts, not one: a single shift would MOVE the flock, and a
+         flock that follows a finger is a cursor. This leans. */
+      off += (uCamR * uPull.x + uCamU * uPull.y) * uRH * (0.08 + 0.62 * h2 * h3);
+
       vec3 at = uCentre + off;
 
       /* the heading is the tangent to its own orbit, squashed the same
@@ -434,6 +491,7 @@ const flockMat = posterMat(THREE, {
       vec3 p = at + fwd * position.x + rgt * position.y + upv * (position.z * flap);
 
       vEdge = h1 * h4;                     // which shell it is on
+      vTint = vec2(h3, h2);
       vFace = dot(normalize(fwd), normalize(vec3(0.42, 0.30, 0.86)));
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
@@ -441,18 +499,24 @@ const flockMat = posterMat(THREE, {
     }
   `,
   fragment:`
-    varying float vDist; varying float vEdge; varying float vFace;
-    uniform vec3 uBody, uLit, uFar, uHaze;
+    varying float vDist; varying float vEdge; varying float vFace; varying vec2 vTint;
+    uniform vec3 uTeal, uPlum, uGold, uFar, uHaze;
+    uniform float uFill;
     void main(){
-      /* A BIRD AGAINST A BRIGHT SKY IS A SILHOUETTE, so there is no
-         lighting here (§4.2 rule 1) — only the two dark steps of the
-         ramp, picked by which way the bird is pointing. A bird turning
-         through the light shows its underside for a moment, and two
-         values is all that takes. */
-      vec3 col = mix(uBody, uLit, aastep(0.34, vFace));
+      /* each bird has its own place on the sheen between teal and plum,
+         and about one in seven is catching the low light */
+      vec3 base = mix(uTeal, uPlum, smoothstep(0.15, 0.85, vTint.x));
+      base = mix(base, uGold, step(0.86, vTint.y) * 0.85);
+      /* which way it is pointing decides how much of that shows: a bird
+         turning through the light flashes, and the flock shimmers */
+      float lit = smoothstep(-0.2, 0.7, vFace);
+      vec3 col = base * (0.55 + 0.85 * lit);
+      /* gathered, the whole flock warms a little — it is nearer the
+         glow at its heart */
+      col = mix(col, col * vec3(1.25, 1.05, 0.85), uFill * 0.45);
       /* and the far side of the flock goes to haze, which is what
          makes a flat shell read as a volume */
-      col = mix(col, uFar, smoothstep(26.0, 56.0, vDist) * 0.55);
+      col = mix(col, uFar, smoothstep(26.0, 56.0, vDist) * 0.5);
       gl_FragColor = vec4(mix(col, uHaze, fogAmount(vDist)), 1.0);
     }
   `
@@ -462,19 +526,25 @@ flock.frustumCulled = false;
 scene.add(flock);
 
 /* ==================================================================
-   3. THE CONTROL — reach up the glass and the flock gathers
+   3. THE CONTROL — the distance from the heart of the flock
    ==================================================================
-   The same three-state pursuit the rest of the book uses, and it is
-   three-state for the reason the Shepherd's harness proved: a
-   protocol with holds has three things a reader can be doing, a
-   binary control has two, and the hold phases are then unflyable by
-   construction. One touch sets a place, the flock goes to that shape,
-   and a hold is leaving your finger where it is.
+   The first control was a reach UP the glass between two bars: higher
+   gathered, lower opened. It worked and it had nothing to do with the
+   motion — the flock does not go up, it goes IN. The author's
+   correction, 12 November 2026: "we want the control over the behavior
+   to be intuitive to the motion itself ... click radially from the
+   center — closer to the center they compress, farther away they swarm
+   out ... with a slight concentration towards your pointer to make it
+   clear YOU have the control."
 
-   THE RATE CAP IS UNTOUCHED. The pursuit computes a direction and
-   feeds it through the kit's capped integration, so reaching to the
-   top of the glass is worth exactly one inhale's gathering and no
-   more. Breathing twice as fast still buys half the shape.
+   So the touch is a place, and what is read from it is how far it is
+   from the heart. Near, and the flock draws in to it; far, and it
+   opens out towards you. A hold is still leaving your finger where it
+   is, so the three-state argument the Shepherd's harness made stands.
+
+   THE RATE CAP IS UNTOUCHED. The distance sets a TARGET and the kit's
+   capped integration walks to it, so touching the centre is worth
+   exactly one inhale's gathering and no more.
    ================================================================== */
 const touches = new Map();
 let reachAt = null;
@@ -485,7 +555,7 @@ function readTouches(){
   const el = elReach;
   const put = e => {
     e.preventDefault();
-    touches.set(e.pointerId, e.clientY / Math.max(1, window.innerHeight));
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     readTouches();
   };
   const drop = e => { touches.delete(e.pointerId); readTouches(); };
@@ -497,8 +567,26 @@ function readTouches(){
   window.addEventListener('blur', () => { touches.clear(); readTouches(); });
 })();
 
-const REACH_TOP = 0.12, REACH_BOT = 0.88;
-const reachFill = y => clamp01((REACH_BOT - y) / (REACH_BOT - REACH_TOP));
+/* The heart is the middle of the glass: the lens is bolted down and
+   aimed between the flock's two altitudes, so the middle of the frame
+   IS the place the flock gathers to. Not the flock's own projected
+   centre — that moves with the shape, and a control measured from a
+   point the control moves is a feedback loop. */
+const frameW = () => size.W || window.innerWidth || 1;
+const frameH = () => size.H || window.innerHeight || 1;
+/* inside rIn is fully gathered — a thumb has a width; rOut is fully
+   open, and it is set by the NARROW side so the whole range is in reach
+   on a portrait phone */
+const rIn  = () => 22;
+const rOut = () => Math.min(frameW() * 0.47, frameH() * 0.32);
+function radial(p){
+  const dx = p.x - frameW() / 2, dy = p.y - frameH() / 2;
+  const r = Math.hypot(dx, dy), out = clamp01((r - rIn()) / (rOut() - rIn()));
+  const k = r > 1e-3 ? clamp01(r / rOut()) / r : 0;
+  /* fill; and the lean, in screen axes with y UP */
+  return { fill: 1 - out, px: dx * k, py: -dy * k };
+}
+const reachFill = p => radial(p).fill;
 
 /* how hard it leans towards your finger, per second */
 const PURSUE_K = 14;
@@ -533,6 +621,29 @@ const loop = clock((dt, now, running) => {
   const st = B.at(t);
   const ph = st.p;
   const sched = B.value(t);
+
+  /* --- THE LENS DOES NOT MOVE. Not a tracker, not an ease, not a
+     drift: it is bolted to the ground and aimed at a fixed point
+     between the two altitudes, so the flock's lift is the flock going
+     up the frame. Lantern Current's camera rode the thing its breath
+     moved; this one cannot. --- */
+  camera.position.set(CAMV.x, CAMV.y, CAMV.z);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(CAMV.ax, CAMV.ay, CAMV.az);
+  ARRIVE.apply(camera, now);
+  camera.updateMatrixWorld();
+  uCamR.value.setFromMatrixColumn(camera.matrixWorld, 0);
+  uCamU.value.setFromMatrixColumn(camera.matrixWorld, 1);
+
+  /* --- the lean towards the finger, eased so a touch landing does not
+     snap five hundred birds sideways. Eased both ways and towards a
+     fixed place, not a "next occurrence", so it cannot run away. --- */
+  {
+    const want = reachAt !== null ? radial(reachAt) : { px: 0, py: 0 };
+    const e = 1 - Math.exp(-dt * 3.2);
+    uPull.value.x += (want.px - uPull.value.x) * e;
+    uPull.value.y += (want.py - uPull.value.y) * e;
+  }
 
   /* --- THE SHAPE. The schedule says what it should be; the reader's
      finger overrides it; the body spring softens whichever is in
@@ -570,30 +681,14 @@ const loop = clock((dt, now, running) => {
      pattern apart once a breath */
   uOrbit.value += omegaAt(gather) * dt;
 
-  /* --- THE LENS DOES NOT MOVE. Not a tracker, not an ease, not a
-     drift: it is bolted to the ground and aimed at a fixed point
-     between the two altitudes, so the flock's lift is the flock going
-     up the frame. Lantern Current's camera rode the thing its breath
-     moved; this one cannot. --- */
-  camera.position.set(CAMV.x, CAMV.y, CAMV.z);
-  camera.up.set(0, 1, 0);
-  camera.lookAt(CAMV.ax, CAMV.ay, CAMV.az);
-  ARRIVE.apply(camera, now);
-
-  /* --- the invitation, projected from the flock itself --- */
+  /* --- the invitation: one ring about the heart, drawing in --- */
   const reachWanted = started && ph.k !== 'hold';
   const rInv = REACH_INVITE.step(dt, { wanted: reachWanted, taken: reachAt !== null });
   vTmp.copy(uCentre.value).project(camera);
-  const sy = (-vTmp.y * 0.5 + 0.5) * size.H;
-  const spread = Math.max(60, size.H * 0.18);
-  elMUp.style.top = (sy - spread).toFixed(1) + 'px';
-  elMDn.style.top = (sy + spread).toFixed(1) + 'px';
-  for(const el of [elMUp, elMDn]){
-    el.style.setProperty('--invite', rInv.invite.toFixed(3));
-    el.style.setProperty('--held',   rInv.held.toFixed(3));
-    el.style.setProperty('--after',  rInv.after.toFixed(3));
-    el.style.setProperty('--asking', rInv.asking ? '1' : '0');
-  }
+  uHeart.value.set(vTmp.x * 0.5 + 0.5, vTmp.y * 0.5 + 0.5);
+  elRing.style.setProperty('--d', (rOut() * 2).toFixed(0) + 'px');
+  elRing.style.setProperty('--invite', rInv.invite.toFixed(3));
+  elRing.style.setProperty('--asking', rInv.asking ? '1' : '0');
 
   /* --- THE CUE IS ONE WORD (§2.4b). The scene carries the rest, and
      here it carries it loudly: the flock balls up, lifts and starts
@@ -655,10 +750,12 @@ const api = window.__murmuration = {
   ack: () => picked.read(),
   scene, camera, THREE,
   pump(dt, n){ return loop.pump(dt, n); },
-  reach(y){ if(y === null || y === undefined){ touches.clear(); }
-            else { touches.clear(); touches.set(-1, y); }
+  /** touch the glass at (x, y) as FRACTIONS of the frame, or null to let go */
+  reach(x, y){ touches.clear();
+            if(x !== null && x !== undefined) touches.set(-1, { x: x * frameW(), y: (y === undefined ? 0.5 : y) * frameH() });
             readTouches(); forceHold = false;
-            return { reachAt, targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3) }; },
+            return { reachAt, targetFill: reachAt === null ? null : +reachFill(reachAt).toFixed(3),
+                     rIn: rIn(), rOut: +rOut().toFixed(1) }; },
   hold(which, down){ if(which === 'up') forceUp = !!down; else forceDown = !!down;
                      forceHold = forceUp || forceDown; return { forceUp, forceDown }; },
   seek(v){ t = v; },
@@ -675,7 +772,7 @@ const api = window.__murmuration = {
              radius:+radiusAt(SHAPE.value).toFixed(2),
              alt:+uCentre.value.y.toFixed(2),
              orbit:+uOrbit.value.toFixed(2),
-             reachAt: reachAt === null ? null : +reachAt.toFixed(3),
+             reachAt, pull:[+uPull.value.x.toFixed(3), +uPull.value.y.toFixed(3)],
              touches: touches.size, inviteLearned: REACH_INVITE.learned };
   },
   /** THE CLAIM, MEASURED ON WHAT IS DRAWN rather than predicted.
@@ -838,7 +935,10 @@ const api = window.__murmuration = {
        mean by flying the cue. */
     const steps = Math.round(60 * inhale);
     for(let k = 0; k < steps; k++){
-      api.reach(REACH_BOT - (REACH_BOT - REACH_TOP) * clamp01(normOf(B.value(t))));
+      /* the finger at the DISTANCE the schedule's shape is worth,
+         straight down from the heart (so the lean it adds is along the
+         frame's long axis, where there is room for it) */
+      api.reach(0.5, 0.5 + (rIn() + (1 - clamp01(normOf(B.value(t)))) * (rOut() - rIn())) / frameH());
       loop.pump(1 / 60, 1);
       const b = bird(), e = bottom();
       birdMax = Math.max(birdMax, Math.hypot(b[0]-prevB[0], b[1]-prevB[1]) * 60);

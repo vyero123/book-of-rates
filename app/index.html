@@ -230,6 +230,10 @@
     box-shadow:0 0 0 1px rgba(42,28,16,.34), 3px 4px 0 rgba(42,28,16,.15)}
   a.plate .pic canvas,a.plate .pic svg{display:block;width:100%;height:100%}
   a.plate .cap{margin:8px 2px 0;font:400 15px/1.2 ui-serif,Georgia,serif;color:#2A1C10}
+  /* the one word under a title that says where a chapter sits between
+     being led and leading: see the note at freeDiveHTML */
+  a.plate .cap small{display:block;margin-top:3px;font:500 9.5px/1.2 ui-sans-serif,sans-serif;
+    letter-spacing:.16em;text-transform:uppercase;color:rgba(42,28,16,.55)}
   a.plate.locked{opacity:.55}
   a.plate.locked .pic{background:rgba(42,28,16,.07);display:grid;place-items:center;
     box-shadow:0 0 0 1px rgba(42,28,16,.22)}
@@ -700,7 +704,7 @@ const pearlDiverHTML = `<a class="plate" href="pearl-diver.html">
         <circle cx="45" cy="13" r="1.1" fill="#DFF3EC" opacity=".6"/>
       </svg>
     </div>
-    <div class="cap">Pearl Diver</div>
+    <div class="cap">Pearl Diver<small>the same water, guided</small></div>
   </a>`;
 
 /* Long Air, the second 3-D chapter, in exactly the same idiom.
@@ -822,7 +826,16 @@ const murmurHTML = `<a class="plate" href="murmuration.html">
 /* THE FREE DIVE — 12 November 2026. The first reader-led chapter
    (design doc 1.7) and the first lit one (4.2b). A NEW chapter beside
    Pearl Diver, not a replacement for it: the old one keeps its
-   schedule and its idiom, so the two can be compared on the same page. */
+   schedule and its idiom, so the two can be compared on the same page.
+
+   NOT COMPETING IDEAS — A PROGRESSION. The author, 12 November 2026:
+   "I consider it as rate dimension progression — from guided to free,
+   rather than competing ideas these are complementary progressions.
+   Sometimes you want more structure, sometimes you want more freedom,
+   and this lets you choose from either." So the two plates say so, in
+   one word each, and the Free Dive now has Pearl Diver's sunny side:
+   the same water, the same evening above it, and the only difference
+   is who sets the rate. */
 const freeDiveHTML = `<a class="plate" href="free-dive.html">
     <div class="pic">
       <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
@@ -854,7 +867,7 @@ const freeDiveHTML = `<a class="plate" href="free-dive.html">
         </g>
       </svg>
     </div>
-    <div class="cap">The Free Dive</div>
+    <div class="cap">The Free Dive<small>the same water, free</small></div>
   </a>`;
 
 /* LANTERN CURRENT WAS HERE, and was withdrawn on 7 November 2026.

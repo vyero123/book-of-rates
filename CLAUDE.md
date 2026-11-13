@@ -454,6 +454,44 @@ The whole of the Free Dive, `lead.js`, `light.js`, `solid.js`, the one-riser ram
 Diver's water change are in the working copy only. Diff against a fresh clone before trusting
 any of it: verified on 12 November as 16 files, +2971/-13, gate passing.
 
+## Guided and free are one progression — 13 November 2026
+
+The author, after seeing the Free Dive: *"I consider it as rate dimension progression — from
+guided to free, rather than competing ideas these are complementary progressions. Sometimes
+you want more structure, sometimes you want more freedom, and this lets you choose from
+either."* This CHANGES the LOE note's reading of Pearl Diver and the Free Dive as two things
+"built beside each other so they can be compared": they are a pair, and the contents says so
+in one word under each title. Expect the same pairing to be wanted elsewhere — a guided
+chapter and its free counterpart — before assuming a conversion REPLACES anything.
+
+**The Free Dive has the sunny side now.** At the surface the lens comes up with her and
+stops two centimetres under the waterline, so it sees both worlds: sky and her head above
+the horizon on the glass, body and sea below. The sky opens as a ring running out from her
+head (`overUnder` in `OVER_GLSL`, shared by the backdrop, the surface and the shafts so they
+cannot disagree about where the waterline is). The lens never goes ABOVE the water — that
+would need a surface drawn from above, which does not exist. And the horizon rides the
+swell on `WORLD.phase`: the superstructure as a waterline going up and down against a glass
+that does not move, which is a far better candidate for "legible" than a swell of brightness.
+
+**The Murmuration's control is the distance from the heart.** The author: *"we want the
+control over the behavior to be intuitive to the motion itself"* — the flock goes IN, so the
+control is how far from the centre you touch, not how far up. Near gathers, far opens, and
+every bird is drawn towards the finger by ITS OWN amount, so the flock leans rather than
+follows (one shared shift would make it a cursor). The centre is the middle of the glass,
+NOT the flock's projected centre: that moves with the shape, and a control measured from a
+point it moves is a feedback loop. Still the kit's capped pursuit underneath; the schedule
+and `murmuration-breath.js` are untouched, so `regress.mjs` did not move.
+
+**And it has colour and something holding still.** Dusk sky as a gradient, slow cloud, a
+glow at the flock's heart that tightens as it gathers, teal-plum-gold birds — and a ring of
+leaves round the edge of the glass, looking up through a clearing. The canopy is the fixed
+reference the 7 November diagnosis said the chapter lacked; it was added for the look and
+it answers the diagnosis by accident. The roost may no longer be needed. Ask before building.
+
+Looked at locally at 375x812 with the pane hidden (pumped frames, `toDataURL` peek). **Not
+seen in real-time motion, not on a phone.** Cost not re-measured: the Murmuration's sky is
+now about ten noise evaluations a pixel where it was a gradient.
+
 ## LEVEL OF EFFORT FOR THE §1.7 / §4.2b CONVERSION — 12 November 2026
 
 Asked for by the author before any conversion starts. Full working in

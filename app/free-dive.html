@@ -234,12 +234,87 @@ const U = {
   uRes:       { value: new THREE.Vector2(1, 1) },
   uFocus:     { value: new THREE.Vector2(0, 0) },
   uHaste:     { value: 0 },
+  /* THE SUNNY SIDE. How far the lens has come up to the waterline
+     (0 under, 1 at it); where the horizon and her head are on the glass
+     (NDC); and where the low sun stands in the sky above. */
+  uAbove:     { value: 0 },
+  uHorizon:   { value: 2 },
+  uHead:      { value: new THREE.Vector2(0, 0) },
+  uSunny:     { value: new THREE.Vector3(-0.085, 0.105, -1).normalize() },
   ...shadow.uniforms
 };
 onFit(() => {
   const pr = renderer.getPixelRatio();
   U.uRes.value.set(size.W * pr, size.H * pr);
 });
+
+/* ------------------------------------------------------------------
+   THE SUNNY SIDE — the world above, and how the picture gets there
+   ------------------------------------------------------------------
+   Pearl Diver has two worlds: the dark sea, and the sunset above it
+   where the inhale happens. The Free Dive was built with only the
+   first — its lens never left the water — and the author named what
+   that lost: "the inverted world, the sunny side."
+
+   So when she comes up, the lens comes up WITH her and stops exactly
+   at the waterline. A lens at the surface sees both worlds at once:
+   everything above the water is above the horizon on the glass and
+   everything below it is below. Her head and the evening are in the
+   top of the frame, her body and the sea in the rest. That is §1.6a
+   drawn rather than asserted — the breath is taken in the half of the
+   picture that has air in it.
+
+   And the way in is the transition the author asked for: the sky
+   OPENS, as a ring running out across the glass from where her head
+   breaks the surface, with light on its rim.
+
+   One chunk, used by the water behind everything, by the surface and
+   by the shafts, so the three cannot disagree about where the
+   waterline is. The fetches in it are outside every branch.
+   ------------------------------------------------------------------ */
+const OVER_GLSL = `
+  uniform float uAbove, uHorizon;
+  uniform vec2 uHead;
+  uniform vec3 uSunny;
+
+  /* the waterline on the glass: the horizon, lapping */
+  float waterlineY(float sx){
+    return uHorizon + 0.010 * sin(sx * 7.0 + uTime * 1.1) + 0.005 * sin(sx * 19.0 - uTime * 1.9);
+  }
+
+  /* The evening. Gold on the horizon, rose over it, blue above that; a
+     low sun with its glow; and a deck of cloud, plum underneath and lit
+     where it faces the sun. Linear light, graded by toDisplay like
+     everything else here. */
+  vec3 sunnySky(vec3 d){
+    float e = max(d.y, 0.0);
+    vec3 col = mix(vec3(0.95, 0.52, 0.20), vec3(0.80, 0.30, 0.20), smoothstep(0.0, 0.09, e));
+    col = mix(col, vec3(0.42, 0.22, 0.36), smoothstep(0.05, 0.19, e));
+    col = mix(col, vec3(0.09, 0.17, 0.42), smoothstep(0.13, 0.36, e));
+    float sn = max(dot(normalize(vec3(d.x, e, d.z)), uSunny), 0.0);
+    col += vec3(1.0, 0.50, 0.16) * pow(sn, 24.0) * 0.8;
+    col += vec3(1.0, 0.78, 0.42) * pow(sn, 220.0) * 1.8;
+    col += vec3(1.0, 0.95, 0.80) * smoothstep(0.99905, 0.99935, sn) * 6.0;
+    vec2 cu = d.xz / (e + 0.06) * 0.035 + vec2(uTime * 0.0015, 0.0);
+    float c = texture2D(uNoise, cu).r * 0.65 + texture2D(uNoise, cu * 2.7).g * 0.35;
+    float cl = smoothstep(0.44, 0.60, c) * smoothstep(0.012, 0.07, e);
+    vec3 cc = mix(vec3(0.20, 0.09, 0.19), vec3(1.0, 0.56, 0.26), pow(sn, 8.0) * 0.85 + 0.10);
+    return mix(col, cc, cl * 0.88);
+  }
+
+  /* col is whatever the sea would have drawn; d is the line of sight;
+     s is the place on the glass, -1..1 */
+  vec3 overUnder(vec3 col, vec3 d, vec2 s){
+    float up = smoothstep(-0.004, 0.004, s.y - waterlineY(s.x));
+    float len = length((s - uHead) * vec2(uRes.x / uRes.y, 1.0));
+    float R = uAbove * uAbove * 2.9;
+    float open = (1.0 - smoothstep(R - 0.12, R + 0.02, len)) * smoothstep(0.0, 0.08, uAbove);
+    float rim = exp(-pow((len - R) / 0.05, 2.0)) * 4.0 * uAbove * (1.0 - uAbove);
+    vec3 sky = sunnySky(d);
+    col = mix(col, sky, open * up);
+    return col + vec3(1.0, 0.92, 0.75) * rim * up * 0.9;
+  }
+`;
 
 /* What every lit surface in the sea shares. Light arrives from the sun
    having lost colour to the water above it (red first), is netted by
@@ -249,7 +324,7 @@ onFit(() => {
    about what the water is doing. */
 const SEA_GLSL = LIGHT_GLSL + SHADOW_GLSL + PERIPH_GLSL + CAUSTIC_GLSL + `
   uniform vec3 uAbsorb, uWaterHi, uWaterLo;
-  uniform float uFogK, uTime, uPulse;
+  uniform float uFogK, uTime, uPulse, uAbove;
   uniform sampler2D uNoise;
 
   vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }
@@ -284,7 +359,11 @@ const SEA_GLSL = LIGHT_GLSL + SHADOW_GLSL + PERIPH_GLSL + CAUSTIC_GLSL + `
     float dist = length(P - cameraPosition);
     float f = 1.0 - exp(-uFogK * max(dist - 8.0, 0.0));
     f = mix(clamp(f * 1.5 + 0.16, 0.0, 1.0), f, keep);
-    return mix(col, waterAt(mix(P.y, cameraPosition.y, 0.5)), f);
+    /* with the lens at the waterline, what is above the water is seen
+       through air, and gets the evening on it instead */
+    float air = uAbove * smoothstep(-0.03, 0.10, P.y);
+    col = mix(col, col * vec3(1.45, 1.05, 0.80) + vec3(0.10, 0.045, 0.015), air);
+    return mix(col, waterAt(mix(P.y, cameraPosition.y, 0.5)), f * (1.0 - air));
   }
 `;
 const WORLD_VERT = WORLD_VERT_GLSL;
@@ -309,7 +388,7 @@ scene.add(screenQuad(THREE, {
   uniforms: { ...U, ...camU },
   prelude: LIGHT_GLSL + PERIPH_GLSL + `
     uniform vec3 uWaterHi, uWaterLo; uniform sampler2D uNoise; uniform float uTime, uPulse;
-    vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }`,
+    vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }` + OVER_GLSL,
   fragment:`
     varying vec2 vUv;
     uniform vec3 uRight, uUp, uFwd; uniform float uTan, uAspect, uCamY;
@@ -327,6 +406,7 @@ scene.add(screenQuad(THREE, {
          smooth field: eight bits cannot hold this gradient without
          banding, and the bands would read as layers in the water */
       col += (texture2D(uNoise, gl_FragCoord.xy / 128.0).a - 0.5) * 0.012;
+      col = overUnder(col, d, s);
       gl_FragColor = vec4(toDisplay(col), 1.0);
     }
   `
@@ -599,7 +679,7 @@ const uBreak = { value: new THREE.Vector3(0, 0, 0) };
     prelude: LIGHT_GLSL + PERIPH_GLSL + `
       uniform vec3 uWaterHi, uWaterLo, uSky, uBreak; uniform sampler2D uNoise;
       uniform float uTime, uPulse, uFogK;
-      vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }`,
+      vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }` + OVER_GLSL,
     vertex:`varying vec3 vWorld;
       void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWorld = wp.xyz;
                    gl_Position = projectionMatrix * viewMatrix * wp; }`,
@@ -630,10 +710,13 @@ const uBreak = { value: new THREE.Vector3(0, 0, 0) };
            she is */
         float rd = length(p - uBreak.xy);
         col += vec3(0.50, 0.72, 0.68) * uBreak.z * exp(-rd * 0.5)
-               * (0.45 + 0.55 * sin(rd * 6.5 - uTime * 3.0));
+               * (0.45 + 0.55 * sin(rd * 6.5 - uTime * 3.0)) * (1.0 - uAbove);
         float dist = length(vWorld - cameraPosition);
         float f = 1.0 - exp(-uFogK * 0.9 * max(dist - 8.0, 0.0));
         col = mix(col, waterAt(-0.6) * 1.15, f * 0.9);
+        /* and as the lens reaches it, the surface stops being a ceiling
+           and becomes the line between two worlds */
+        col = overUnder(col, V, gl_FragCoord.xy / uRes * 2.0 - 1.0);
         gl_FragColor = vec4(toDisplay(col), 1.0);
       }
     `
@@ -783,7 +866,7 @@ const shaftU = { ...U, uVP:{ value:new THREE.Vector2(0, 5) }, uAspect: camU.uAsp
 const shafts = screenQuad(THREE, {
   uniforms: shaftU, order: 14, transparent: true, blending: THREE.AdditiveBlending,
   prelude: PERIPH_GLSL + `uniform sampler2D uNoise; uniform float uTime, uPulse, uAspect, uCamY;
-    uniform vec2 uVP; uniform vec3 uWaterHi;`,
+    uniform vec2 uVP; uniform vec3 uWaterHi;` + OVER_GLSL,
   fragment:`
     varying vec2 vUv;
     void main(){
@@ -797,6 +880,14 @@ const shafts = screenQuad(THREE, {
       /* strongest near the top of the frame and near the surface */
       float fall = (0.25 + 0.75 * vUv.y) * exp(uCamY * 0.085);
       vec3 col = (uWaterHi + vec3(0.25, 0.22, 0.12)) * ray * fall * (0.16 + 0.14 * uPulse);
+      /* shafts are a thing of the water: none in the sky. And the
+         MENISCUS — the bright lip of the surface where it meets the
+         glass, with the light it gathers just underneath. */
+      vec2 sN = vUv * 2.0 - 1.0;
+      float wl = sN.y - waterlineY(sN.x);
+      col *= 1.0 - uAbove * smoothstep(-0.004, 0.004, wl);
+      col += (vec3(1.0, 0.93, 0.80) * exp(-pow(wl / 0.0045, 2.0)) * 0.85
+            + (uWaterHi + vec3(0.30, 0.20, 0.08)) * exp(min(wl, 0.0) / 0.07) * step(wl, 0.0) * 0.30) * uAbove;
       gl_FragColor = vec4(col, 1.0);
     }
   `
@@ -921,7 +1012,9 @@ const PEARL = newPearl();
 const LEAD = leader();
 const WORLD = superstructure();
 const INVITE = invite({ cycles: 1 });
-const camX = tracker(0, 2.2), camY = tracker(camYFor(Y_FLOAT), 3.0), tilt = tracker(1, 2.0);
+/* how close under the surface the lens stops: two centimetres */
+const SURF_Y = -0.02;
+const camX = tracker(0, 2.2), camY = tracker(SURF_Y, 3.0), tilt = tracker(1, 2.0);
 const carryT = tracker(0, 5), vHand = new THREE.Vector3();
 const reachT = tracker(0, 6), openT = tracker(0.12, 5), hasteT = tracker(0, 0.9);
 let t = 0, started = false, kick = 0, faceX = 1, breath = 0;
@@ -993,17 +1086,40 @@ const loop = clock((dt, now, running) => {
   camX.w = 2.2 + 3.0 * haste; camY.w = 3.0 + 4.0 * haste;
   const lean = PEARL.carrying || PEARL.deliver > 0 ? 0 : 0.22;
   camX.step(dt, clamp(BODY.x + (site.x - BODY.x) * lean, X_MIN + 1.5, X_MAX - 1.5));
-  camY.step(dt, camYFor(BODY.y));
+  /* THE RISE. Over the last few metres the lens leaves its place in the
+     water and comes up to the waterline with her — and stops AT it,
+     never above: a lens above the water would be looking down on a
+     surface this chapter has only ever drawn from underneath. */
+  const rise = smoothstep(-3.4, -0.7, BODY.y);
+  camY.step(dt, camYFor(BODY.y) * (1 - rise) + SURF_Y * rise);
   tilt.step(dt, smoothstep(-5.0, -0.5, BODY.y));
-  camera.position.set(camX.value, camY.value, CAM_BACK);
+  const lensY = Math.min(camY.value, SURF_Y);
+  const above = smoothstep(-1.7, -0.10, lensY);
+  U.uAbove.value = above;
+  camera.position.set(camX.value, lensY, CAM_BACK);
   camera.up.set(0, 1, 0);
-  camera.lookAt(camX.value, camY.value - 0.3 + 2.4 * tilt.value, 0);
+  /* under water it tips up to make the surface a ceiling; at the
+     waterline it looks a little DOWN, so the horizon sits two fifths of
+     the way down the glass with her head just over it. And the horizon
+     rides the swell — the world's own rhythm, as the one thing in the
+     frame that goes up and down against a glass that does not. */
+  const swell = 0.20 * Math.sin(WORLD.phase * Math.PI * 2) * above;
+  camera.lookAt(camX.value, lensY - 0.3 + 2.4 * tilt.value * (1 - above) - 0.95 * above + swell, 0);
   ARRIVE.apply(camera, now);
+  if(camera.position.y > SURF_Y) camera.position.y = SURF_Y;
   camera.updateMatrixWorld();
   camU.uRight.value.setFromMatrixColumn(camera.matrixWorld, 0);
   camU.uUp.value.setFromMatrixColumn(camera.matrixWorld, 1);
   camU.uFwd.value.setFromMatrixColumn(camera.matrixWorld, 2).negate();
   camU.uCamY.value = camera.position.y;
+  /* where the horizon and her head are on the glass */
+  {
+    const f = camU.uFwd.value, fl = Math.hypot(f.x, f.z) || 1;
+    vTmp.set(camera.position.x + f.x / fl * 4000, camera.position.y, camera.position.z + f.z / fl * 4000).project(camera);
+    U.uHorizon.value = vTmp.y;
+    vTmp.set(BODY.x + ax * HEAD_REACH, head, 0).project(camera);
+    U.uHead.value.set(vTmp.x, vTmp.y);
+  }
   /* where the sun's rays converge on screen */
   vTmp.copy(camera.position).addScaledVector(SUN, 500).project(camera);
   shaftU.uVP.value.set(vTmp.x, vTmp.y);
@@ -1156,6 +1272,8 @@ window.__freeDive = {
               behindDeg:+(phaseGap(LEAD.phase, WORLD.phase) * 360).toFixed(1), pulse:+U.uPulse.value.toFixed(3) },
       haste:+U.uHaste.value.toFixed(3),
       cam:{ x:+camera.position.x.toFixed(2), y:+camera.position.y.toFixed(2) },
+      above:+U.uAbove.value.toFixed(3), horizon:+U.uHorizon.value.toFixed(3),
+      headNdc:[+U.uHead.value.x.toFixed(3), +U.uHead.value.y.toFixed(3)],
       focusPx:[+U.uFocus.value.x.toFixed(0), +U.uFocus.value.y.toFixed(0)],
       bubbles: bubs.filter(b => b.live).length, casters: shadow.casters
     };
