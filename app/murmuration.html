@@ -873,6 +873,11 @@ const api = window.__murmuration = {
 };
 
 const exits = wireExits();
+/* The loop has to be STARTED. This chapter never did: it only ever ran
+   because clock() restarts on visibilitychange, and the inspection pane
+   hides and shows between tool calls. On a phone, opened and left
+   visible, it drew a flat sky and the cue and nothing else. */
+loop.start();
 void exits; void SESSION_CAP; void AIRSPEED;
 void ALT_SPREAD; void ALT_GATHER; void atOf; void clamp; void resize;
 }

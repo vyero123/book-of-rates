@@ -20,3 +20,6 @@ desktop.ini
 node_modules/
 dist/
 .netlify/
+
+# --- local machine logs ---
+tools/autopush.log

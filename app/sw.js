@@ -7,12 +7,13 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v22';
+const CACHE = 'bor-v23';
 const SHELL = [
   './', './index.html', './journey.html',
   './pearl-diver.html', './deep-light.html',  // the old address, a forwarding stub
   './long-air.html', './bamboo-rain.html', './shepherd.html',
   './murmuration.html',
+  './free-dive.html',
   './lantern-current.html',   // withdrawn 7 Nov 2026; a forwarding stub
   './manifest.webmanifest', './icon.svg',
   './js/protocols.js', './js/engine.js', './js/audio.js', './js/art.js',
@@ -28,7 +29,9 @@ const SHELL = [
   // and each chapter's own protocol table
   './js/deep-light-breath.js', './js/long-air-breath.js',
   './js/bamboo-rain-breath.js', './js/shepherd-breath.js',
-  './js/murmuration-breath.js'
+  './js/murmuration-breath.js',
+  // the reader-led spine and the lighting kit (12 Nov 2026)
+  './js/lead.js', './js/light.js', './js/solid.js', './js/free-dive-breath.js', './js/follow.js'
 ];
 
 self.addEventListener('install', e => {

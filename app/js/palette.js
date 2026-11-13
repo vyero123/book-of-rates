@@ -187,17 +187,55 @@ export const RAMP_GLSL = `
  *  Requires AA_GLSL. Declares `uniform vec3 uRamp[6]` exactly once —
  *  do NOT include both this and RAMP_GLSL in one shader.
  */
+/* ONE RISER, NOT FIVE — 12 November 2026.
+ *
+ * This was a five-iteration loop: a smoothstep and a vec3 mix for every
+ * boundary in the ramp, on every fragment, three times over on Long
+ * Air's ridge — about half that shader's whole smoothstep budget, spent
+ * choosing between six colours.
+ *
+ * It was never necessary, and the reason is in the function's own clamp:
+ * `w` is at most 0.5, and the risers sit at the integers, one unit
+ * apart. So a fragment at `s` can be inside the transition band of AT
+ * MOST ONE riser — the nearest integer, k = floor(s + 0.5). Every riser
+ * below k has already saturated to 1 and every riser above it is still
+ * exactly 0, which means the old loop's answer was always
+ * mix(uRamp[k-1], uRamp[k], smoothstep(k-w, k+w, s)) and the other four
+ * iterations were multiplying by one or by nothing.
+ *
+ * The ends: for s < 0.5, k clamps to 1 and the smoothstep is 0 (s is
+ * below 1 - w), giving uRamp[0]. For s >= 5.5, k clamps to 5 and the
+ * smoothstep is 1, giving uRamp[5]. Same colours as the loop at every s;
+ * tools/lead.mjs sweeps the two against each other in JS to keep it so.
+ *
+ * Dynamic indexing of a uniform array is GLSL ES 3.00, which is the only
+ * context this kit ever gets (see the fwidth note above).
+ */
 export const RAMP_AA_GLSL = RAMP_GLSL + `
   vec3 rampPickAA(float x){
     float s = clamp(x, 0.0, 0.999) * 6.0;
     float w = clamp(fwidth(s) * 0.6, 0.0015, 0.5);
-    vec3 c = uRamp[0];
-    for(int i = 1; i < 6; i++){
-      c = mix(c, uRamp[i], smoothstep(float(i) - w, float(i) + w, s));
-    }
-    return c;
+    float k = clamp(floor(s + 0.5), 1.0, 5.0);
+    int i = int(k);
+    return mix(uRamp[i - 1], uRamp[i], smoothstep(k - w, k + w, s));
   }
 `;
+
+/** The two ramp lookups as plain arithmetic, so a harness can prove the
+ *  one-riser form returns what the five-riser loop did. Scalars stand in
+ *  for colours: ramp entry i is the number i. */
+export const rampLoopRef = (s, w) => {
+  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  let c = 0;
+  for(let i = 1; i < 6; i++){ const t = sm(i - w, i + w, s); c = c + (i - c) * t; }
+  return c;
+};
+export const rampOneRiser = (s, w) => {
+  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const k = Math.min(5, Math.max(1, Math.floor(s + 0.5)));
+  const t = sm(k - w, k + w, s);
+  return (k - 1) + t;
+};
 
 /** CLAMPED DEPTH FOG, and the clamp is the point.
  *

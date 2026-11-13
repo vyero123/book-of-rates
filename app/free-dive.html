@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Book of Rates — The Free Dive (3-D)</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#06242E;
+    font-family:ui-sans-serif,-apple-system,"Avenir Next",Segoe UI,sans-serif}
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+
+  #stop{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:30;
+    appearance:none;border:0;border-radius:999px;padding:11px 18px 11px 15px;
+    display:flex;align-items:center;gap:8px;
+    background:rgba(6,36,46,.5);backdrop-filter:blur(6px);
+    color:#F2E3C8;font:600 13px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    box-shadow:0 0 0 1.5px rgba(242,227,200,.4)}
+  #stop i{width:11px;height:11px;background:#E8725A;display:block;border-radius:2px}
+
+  /* THE METER. Frames a second, the median frame time, the worst second
+     of the last ten, and how long the session has run — because the
+     question nobody has been able to answer from a desktop is what this
+     costs on the reader's own phone AFTER FIVE MINUTES in a warm hand.
+     Tap it to hide it; tap the corner to bring it back. */
+  #fps{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:30;
+    font:500 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
+    color:rgba(242,227,200,.78);background:rgba(6,36,46,.5);border-radius:6px;
+    padding:5px 8px;white-space:pre;pointer-events:auto;cursor:pointer;user-select:none}
+  #fps.off{opacity:0;pointer-events:none}
+  #fpsdot{position:fixed;top:max(14px,calc(env(safe-area-inset-top) + 2px));left:12px;z-index:29;
+    width:26px;height:26px;border-radius:50%;display:none}
+  #fpsdot.on{display:block}
+
+  #reach{position:fixed;inset:0;z-index:25;touch-action:none;user-select:none;
+    -webkit-user-select:none;background:transparent}
+
+  /* THE ONE MARK, and it is not an instruction: a ring round her that
+     breathes until the glass has been touched, and then never again
+     (§1.6b — a prompt that keeps prompting is a mild way of requiring). */
+  #ring{position:fixed;left:0;top:0;z-index:26;pointer-events:none;
+    width:92px;height:92px;margin:-46px 0 0 -46px;border-radius:50%;
+    box-shadow:0 0 0 1.5px rgba(242,227,200,.85), 0 0 18px rgba(242,227,200,.35);
+    opacity:calc(var(--invite,0) * 0.85);
+    transform:scale(calc(0.82 + var(--invite,0) * 0.22))}
+  @media (prefers-reduced-motion: reduce){
+    #ring{opacity:calc(var(--asking,0) * 0.5);transform:none}
+  }
+
+  .sheet{position:fixed;inset:0;z-index:40;display:none;place-items:center;
+    background:rgba(4,24,31,.9);backdrop-filter:blur(3px);text-align:center;padding:28px;
+    overflow-y:auto}
+  .sheet.on{display:grid}
+  .sheet h2{margin:0 0 10px;font:300 23px/1.3 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.06em}
+  .sheet button{appearance:none;border:0;border-radius:999px;padding:13px 22px;margin-top:8px;
+    background:#F2E3C8;color:#06242E;font:600 12px/1.3 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    display:block;width:100%;max-width:320px}
+  .sheet a.link{background:transparent;color:rgba(242,227,200,.6);
+    font:400 11px/1.3 ui-sans-serif,sans-serif;letter-spacing:.08em;
+    text-decoration:underline;padding:8px;margin-top:14px;display:block;text-align:center}
+
+  #fallback{position:fixed;inset:0;z-index:50;display:none;place-items:center;padding:34px;
+    text-align:center;background:linear-gradient(#2E9AA0 0%,#14596A 40%,#06242E 100%)}
+  #fallback.on{display:grid}
+  #fallback h2{margin:0 0 12px;font:300 24px/1.25 ui-serif,Georgia,serif;color:#F2E3C8;letter-spacing:.05em}
+  #fallback p{margin:0 0 10px;font:400 13px/1.65 ui-sans-serif,sans-serif;
+    color:rgba(242,227,200,.84);max-width:300px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<button id="stop" aria-label="Stop the session"><i></i>STOP</button>
+<div id="fpsdot" aria-hidden="true"></div>
+<div id="fps" role="status" title="Tap to hide">—</div>
+
+<div id="reach" aria-label="Touch the water and the diver swims to your finger: down, up or to the side. Let go and she drifts up."></div>
+<div id="ring" aria-hidden="true"></div>
+
+<div id="halt" class="sheet"><div>
+  <h2>Stopped</h2>
+  <button id="resume">RESUME</button>
+  <a class="link" href="./#contents">Back to the book</a>
+</div></div>
+
+<div id="fallback"><div>
+  <h2>The Free Dive needs WebGL</h2>
+  <p id="fbwhy">This page draws a 3-D scene, and this browser could not give it a WebGL context.</p>
+  <p><a class="link" href="./#contents" style="color:inherit">Back to the book</a></p>
+</div></div>
+
+<script type="module">
+/* ============================================================
+   BOOK OF RATES — THE FREE DIVE
+   12 November 2026. The first chapter built on two things at once:
+
+   §1.7, HUMAN-LED MOTION. There is no schedule in this chapter. No
+   protocol, no phases, no cue, no clock that the scene obeys. It
+   opens in stillness — a diver floating at the surface — and nothing
+   happens until the reader touches the water. Then she goes where
+   the finger is: down, up, sideways, whenever. The rate is whatever
+   they make it.
+
+   The app's half of that bargain is the SUPERSTRUCTURE
+   (js/lead.js): the reader's own rhythm is measured from their
+   dives, and the WORLD keeps a second rhythm coupled to it — the
+   light breathing through the water, the kelp leaning in the surge,
+   the oyster's glow — tuned a fraction slower than theirs and
+   standing a fraction behind. Nothing says so. It is simply what the
+   sea is doing, and falling in with it is a slower breath.
+
+   And when they hurry, the picture SIMPLIFIES from the edges in:
+   fewer octaves of light, less grain, thicker water away from her,
+   and the lens holds her tighter. The centre stays steady. That is
+   js/light.js's periphery, and it makes the frame cheaper exactly
+   when it is moving fastest.
+
+   LIGHT. This is also the first chapter with a lighting model: one
+   sun vector, hemisphere ambient, per-fragment normals on every
+   surface, a real shadow map, and textures. The old idiom's hard
+   rules are withdrawn (design doc §4.2b); what is kept is its
+   habits — few hues, a designed value structure, emptiness, weather
+   carrying the mood.
+
+   THE GOAL is the old chapter's, without its timetable: go down and
+   get the pearl. It takes four seconds at the oyster. Leave half way
+   and the shell stays half open. Nothing is counted.
+
+   §1.6a HOLDS CONTINUOUSLY, by construction: every term that reads
+   as breathing in is multiplied by inhaleAt(headY), which is exactly
+   zero under water. tools/lead.mjs sweeps and flies it.
+
+   SILENT: no AudioContext, no media. Sound for a reader-led chapter
+   is its own piece of work (the music is on a clock) and is not
+   attempted here.
+   ============================================================ */
+
+import { requireScroll } from './js/scroll.js';
+import { leader, superstructure, phaseGap } from './js/lead.js';
+import { swim, inhaleAt, headY, bedAt, bedY, floorY, pearlStep, newPearl, siteAt, depthFrac,
+         camYFor, CAM_BACK, Y_FLOAT, V_MAX, PICK_REACH, HEAD_REACH,
+         X_MIN, X_MAX } from './js/free-dive-breath.js';
+import { LIGHT_GLSL, WORLD_VERT_GLSL, SHADOW_GLSL, PERIPH_GLSL, shadowRig, depthMat,
+         noiseTexture, litMat } from './js/light.js';
+import { icosphere, addBlob } from './js/solid.js';
+import { CAUSTIC_GLSL } from './js/palette.js';
+import { builder, screenQuad, linkReport } from './js/mesh.js';
+import { boot, stage, clock, contextGuard, enter, soloReport } from './js/stage.js';
+import { tracker } from './js/follow.js';
+import { arrival } from './js/arrival.js';
+import { invite } from './js/invite.js';
+import { wireExits } from './js/bookframe.js';
+
+const ARRIVE = arrival({ dist: 6 });
+const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
+
+/* THE PALETTE. One hue family — the water's — and one warm accent that
+   belongs to the things she is there for. This is what survives of the
+   old §4.2: not a rule about how many values an object may have, but a
+   decision about what the picture is made of. Light does the modelling
+   now; these do the designing. */
+const SEA = {
+  hi:0x38A9AC, lo:0x05222C,           // the water, near the light and far from it
+  sky:0xDFF3EE,                       // what comes through the window
+  sand:0xDCCBA6, sandLo:0x9C8F78,
+  rock:0x73807A, rockLo:0x3F4A4C,
+  coralA:0xE8725A, coralB:0xF2B38A, coralC:0xC9547A,
+  kelpLo:0x2F4A2A, kelpHi:0x8EA24A,
+  suit:0x1B2838, skin:0xE2B38E, fin:0xF2E3C8, band:0xE8725A,
+  shell:0x8A7C6C, nacre:0xEDE2D2, pearl:0xFFF7EA, glow:0xFFE9B8
+};
+
+const $ = id => document.getElementById(id);
+const elFps = $('fps'), elFpsDot = $('fpsdot'), elHalt = $('halt'), elFall = $('fallback');
+const elReach = $('reach'), elRing = $('ring');
+
+function fallback(why){
+  if(why) $('fbwhy').textContent = why;
+  elFall.classList.add('on');
+  elReach.style.display = elRing.style.display = 'none';
+  elFps.classList.add('off');
+}
+
+boot({ cdn:CDN, fallback, start });
+
+/* ============================================================ */
+function start(THREE){
+
+const canvas = $('c');
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const C = h => new THREE.Color(h);          // sRGB hex in, LINEAR out
+const lin = h => { const c = C(h); return [c.r, c.g, c.b]; };
+
+const { renderer, scene, camera, size, resize, onFit } = stage(THREE, {
+  canvas, clear: SEA.lo, fov: a => a < 0.75 ? 50 : 40, near: 0.3, far: 170
+});
+
+/* ------------------------------------------------------------------
+   THE LIGHT, ONCE, FOR EVERYTHING
+   ------------------------------------------------------------------
+   The sun is IN FRONT of the lens and high: 62 degrees up, a little to
+   the left, on the far side of her. Three things follow from that one
+   vector and none of them had to be decided separately — the shafts
+   fan down out of the top of the frame, everything between her and
+   the light has a lit rim, and shadows fall TOWARDS the reader, onto
+   the sand in front of her where they can be seen.
+   ------------------------------------------------------------------ */
+const SUN = new THREE.Vector3(-0.30, 1.0, -0.42).normalize();
+const shadow = shadowRig(THREE, {
+  renderer, sunDir: SUN, centre: new THREE.Vector3(0, -9, -2.5), half: 22, size: 2048
+});
+const NOISE = noiseTexture(THREE);
+
+const U = {
+  uSunDir:    { value: SUN },
+  uSunCol:    { value: new THREE.Vector3(2.5, 2.35, 2.0) },
+  uAmbSky:    { value: new THREE.Vector3(0.10, 0.30, 0.33) },
+  uAmbGround: { value: new THREE.Vector3(0.012, 0.055, 0.075) },
+  /* per metre, and red goes first. NOT the physical figure for red,
+     which is nearer 0.35 and turns a coral at ten metres the colour of
+     the mud beside it. This is the one place the picture is graded
+     rather than computed: the warm things are what she is there for,
+     and they keep a third of their warmth at the bottom. */
+  uAbsorb:    { value: new THREE.Vector3(0.13, 0.050, 0.036) },
+  uWaterHi:   { value: C(SEA.hi) },
+  uWaterLo:   { value: C(SEA.lo) },
+  uFogK:      { value: 0.045 },
+  uTime:      { value: 0 },
+  uPulse:     { value: 0.5 },          // the world's own breath, 0..1
+  uNoise:     { value: NOISE },
+  uRes:       { value: new THREE.Vector2(1, 1) },
+  uFocus:     { value: new THREE.Vector2(0, 0) },
+  uHaste:     { value: 0 },
+  ...shadow.uniforms
+};
+onFit(() => {
+  const pr = renderer.getPixelRatio();
+  U.uRes.value.set(size.W * pr, size.H * pr);
+});
+
+/* What every lit surface in the sea shares. Light arrives from the sun
+   having lost colour to the water above it (red first), is netted by
+   the caustic the surface throws, is blocked by whatever the shadow map
+   says is in the way, and is then seen through more water on its way to
+   the lens. Four terms, one function, so no two surfaces can disagree
+   about what the water is doing. */
+const SEA_GLSL = LIGHT_GLSL + SHADOW_GLSL + PERIPH_GLSL + CAUSTIC_GLSL + `
+  uniform vec3 uAbsorb, uWaterHi, uWaterLo;
+  uniform float uFogK, uTime, uPulse;
+  uniform sampler2D uNoise;
+
+  vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }
+  vec3 sunAt(vec3 P){ return uSunCol * exp(-uAbsorb * max(0.0, -P.y)); }
+
+  /* THE CAUSTIC, and the first thing the periphery takes. One octave is
+     always paid for — it is the broad breathing of the light. The other
+     two are the filaments, and they are only evaluated where the reader
+     is looking: the branch is per fragment, and what it skips is eight
+     sines. */
+  float causticLight(vec3 P, float keep){
+    vec2 cp = (P.xz - uSunDir.xz * (P.y / uSunDir.y)) * 0.52;
+    float c = causticField(cp, uTime, 1);
+    if(keep > 0.03) c = mix(c, causticField(cp, uTime, 3), smoothstep(0.03, 0.6, keep));
+    return c * c * c;
+  }
+
+  vec3 seaShade(vec3 albedo, vec3 N, vec3 P, float sh, float keep){
+    float depth = max(0.0, -P.y);
+    vec3 through = exp(-uAbsorb * depth);
+    float dif = sunDiffuse(N, 0.4);
+    float up = clamp(N.y * 0.8 + 0.45, 0.0, 1.0);
+    float ca = causticLight(P, keep) * exp(-depth * 0.075) * up;
+    float sun = dif * mix(1.0, sh, 0.85) * (0.55 + ca * (2.3 + 1.3 * uPulse));
+    return albedo * (skyAmbient(N) * mix(vec3(1.0), through, 0.7) + uSunCol * through * sun);
+  }
+
+  /* The water between the surface and the lens. In the periphery of a
+     hurried reader it is simply thicker — which is what "fuzzy" is,
+     under water, without blurring anything. */
+  vec3 seaFog(vec3 col, vec3 P, float keep){
+    float dist = length(P - cameraPosition);
+    float f = 1.0 - exp(-uFogK * max(dist - 8.0, 0.0));
+    f = mix(clamp(f * 1.5 + 0.16, 0.0, 1.0), f, keep);
+    return mix(col, waterAt(mix(P.y, cameraPosition.y, 0.5)), f);
+  }
+`;
+const WORLD_VERT = WORLD_VERT_GLSL;
+
+/* ------------------------------------------------------------------
+   1. THE WATER BEHIND EVERYTHING
+   ------------------------------------------------------------------
+   Not a gradient laid down the screen: the colour of the water along
+   each pixel's own line of sight, so it brightens when the lens tips
+   up towards the light and deepens when it looks down, by itself.
+   ------------------------------------------------------------------ */
+const camU = {
+  uRight:{ value:new THREE.Vector3(1,0,0) }, uUp:{ value:new THREE.Vector3(0,1,0) },
+  uFwd:{ value:new THREE.Vector3(0,0,-1) }, uTan:{ value: 0.4 }, uAspect:{ value: 1 },
+  uCamY:{ value: -3 }
+};
+onFit(() => {
+  camU.uAspect.value = camera.aspect;
+  camU.uTan.value = Math.tan(camera.fov * Math.PI / 360);
+});
+scene.add(screenQuad(THREE, {
+  uniforms: { ...U, ...camU },
+  prelude: LIGHT_GLSL + PERIPH_GLSL + `
+    uniform vec3 uWaterHi, uWaterLo; uniform sampler2D uNoise; uniform float uTime, uPulse;
+    vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }`,
+  fragment:`
+    varying vec2 vUv;
+    uniform vec3 uRight, uUp, uFwd; uniform float uTan, uAspect, uCamY;
+    void main(){
+      vec2 s = vUv * 2.0 - 1.0;
+      vec3 d = normalize(uFwd + uRight * (s.x * uTan * uAspect) + uUp * (s.y * uTan));
+      /* how deep is the water this ray is looking through, on average */
+      vec3 col = waterAt(uCamY + d.y * 11.0);
+      /* towards the sun it glows: the forward scatter that makes the
+         side of the sea the light is on visibly the lit side */
+      float toSun = max(dot(d, uSunDir), 0.0);
+      col += uWaterHi * (pow(toSun, 3.0) * 0.55 + pow(toSun, 14.0) * 0.9)
+             * exp(uCamY * 0.10) * (0.8 + 0.4 * uPulse);
+      /* a little grain, for the only reason grain is ever needed on a
+         smooth field: eight bits cannot hold this gradient without
+         banding, and the bands would read as layers in the water */
+      col += (texture2D(uNoise, gl_FragCoord.xy / 128.0).a - 0.5) * 0.012;
+      gl_FragColor = vec4(toDisplay(col), 1.0);
+    }
+  `
+}));
+
+/* ------------------------------------------------------------------
+   2. THE SEABED — a heightfield with its own gradient for a normal
+   ------------------------------------------------------------------ */
+const bedU = { ...U, uSandHi:{ value:C(SEA.sand) }, uSandLo:{ value:C(SEA.sandLo) } };
+(function(){
+  const b = builder(THREE, { normal: 3 });
+  const X0 = -36, X1 = 36, Z0 = -54, Z1 = 14, STEP = 0.5;
+  const nx = Math.round((X1 - X0) / STEP), nz = Math.round((Z1 - Z0) / STEP);
+  const e = 0.05;
+  for(let j = 0; j <= nz; j++) for(let i = 0; i <= nx; i++){
+    const x = X0 + i * STEP, z = Z0 + j * STEP;
+    const gx = (bedAt(x + e, z) - bedAt(x - e, z)) / (2 * e);
+    const gz = (bedAt(x, z + e) - bedAt(x, z - e)) / (2 * e);
+    const l = Math.hypot(gx, 1, gz);
+    b.vertex(x, bedAt(x, z), z, { normal: [-gx / l, 1 / l, -gz / l] });
+  }
+  const W = nx + 1;
+  for(let j = 0; j < nz; j++) for(let i = 0; i < nx; i++){
+    const a = j * W + i;
+    b.tri(a, a + W, a + 1); b.tri(a + 1, a + W, a + W + 1);
+  }
+  const mesh = new THREE.Mesh(b.geometry(), litMat(THREE, {
+    uniforms: bedU, vprelude: WORLD_VERT, prelude: SEA_GLSL,
+    vertex:`void main(){ worldOut(position, normal); }`,
+    fragment:`
+      varying vec3 vWorld; varying vec3 vN;
+      uniform vec3 uSandHi, uSandLo;
+      void main(){
+        vec3 N0 = normalize(vN), N = N0;
+        float keep = periphKeep();
+        /* ONE FETCH for the mottle: four octaves of noise in four
+           channels, where the flat chapters would have spent a dozen
+           sines. Broad patches of darker sediment in the hollows. */
+        vec4 n1 = texture2D(uNoise, vWorld.xz * 0.043);
+        float mott = n1.r * 0.6 + n1.g * 0.4;
+        vec3 alb = mix(uSandLo, uSandHi, smoothstep(0.28, 0.72, mott));
+        /* SAND RIPPLES, AS A NORMAL AND NOT AS A COLOUR. This is the
+           thing the old idiom could not do at all: the ripple is not
+           painted, it is a slope, so it catches the caustic on one side
+           and loses it on the other and changes as the light moves.
+           It is fine detail, so the periphery drops it first. */
+        /* (every texture fetch in this file sits OUTSIDE its branch: a
+           fetch needs screen-space derivatives to pick a mip, and inside
+           a branch that is taken for some fragments of a 2x2 block and
+           not others those derivatives are undefined — a seam of wrong
+           mips exactly along the edge of the periphery. Fetches are
+           cheap; it is the sines that the branches exist to skip.) */
+        float grain = texture2D(uNoise, vWorld.xz * 0.37).a;
+        if(keep > 0.05){
+          float nearK = smoothstep(36.0, 8.0, length(vWorld - cameraPosition));
+          float ph = vWorld.x * 5.0 + vWorld.z * 1.3 + (n1.b - 0.5) * 5.5;
+          float amt = 0.20 * keep * nearK;
+          N = normalize(N0 + vec3(cos(ph) * amt, 0.0, cos(ph) * amt * 0.26));
+          alb *= 1.0 + (grain - 0.5) * 0.24 * keep * nearK;
+        }
+        float sh = shadowAt(vWorld, N0);
+        vec3 col = seaShade(alb, N, vWorld, sh, keep);
+        gl_FragColor = vec4(toDisplay(seaFog(col, vWorld, keep)), 1.0);
+      }
+    `
+  }));
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+})();
+
+/* ------------------------------------------------------------------
+   3. THE REEF — rock and coral, one mesh, one draw, one shadow
+   ------------------------------------------------------------------
+   Every solid is an icosphere pushed out of round, scaled, leaned and
+   turned, with normals taken from the triangles it ends up with
+   (js/solid.js). Colour rides on the vertices, so forty rocks and a
+   hundred coral fingers are a single draw call and a single entry in
+   the shadow map.
+   ------------------------------------------------------------------ */
+const reefMat = litMat(THREE, {
+  uniforms: U, vprelude: WORLD_VERT + `attribute vec3 aCol; varying vec3 vCol; varying float vGloss;
+    attribute float aGloss;`,
+  prelude: SEA_GLSL,
+  vertex:`void main(){ vCol = aCol; vGloss = aGloss; worldOut(position, normal); }`,
+  fragment:`
+    varying vec3 vWorld; varying vec3 vN; varying vec3 vCol; varying float vGloss;
+    void main(){
+      vec3 N = normalize(vN);
+      float keep = periphKeep();
+      vec3 alb = vCol;
+      /* one fetch, on a plane that never changes with the normal (a
+         choice of plane per fragment is a discontinuity in the lookup
+         and would put a mip seam where the choice flips) */
+      vec4 n = texture2D(uNoise, (vWorld.xz + vWorld.yy * vec2(0.71, 0.53)) * 0.42);
+      alb *= 1.0 + ((n.b * 0.6 + n.a * 0.4) - 0.5) * 0.5 * keep;
+      float sh = shadowAt(vWorld, N);
+      vec3 col = seaShade(alb, N, vWorld, sh, keep);
+      vec3 V = normalize(cameraPosition - vWorld);
+      col += sunAt(vWorld) * sunSpecular(N, V, 36.0) * vGloss * sh;
+      gl_FragColor = vec4(toDisplay(seaFog(col, vWorld, keep)), 1.0);
+    }
+  `
+});
+(function(){
+  const b = builder(THREE, { normal: 3, aCol: 3, aGloss: 1 });
+  const ico2 = icosphere(2), ico1 = icosphere(1);
+  let s = 0x51F15E;
+  const r = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  const rockHi = lin(SEA.rock), rockLo = lin(SEA.rockLo);
+  const corals = [lin(SEA.coralA), lin(SEA.coralB), lin(SEA.coralC)];
+  const mixc = (a, c, t) => [a[0] + (c[0]-a[0])*t, a[1] + (c[1]-a[1])*t, a[2] + (c[2]-a[2])*t];
+  const rocks = [];
+  /* behind her, where the light lands; a few in front and low, where
+     the bed is already falling away from the lens */
+  for(let i = 0; i < 44; i++){
+    const front = i >= 38;
+    const x = -19 + r() * 38;
+    /* NOTHING STANDS IN THE WATER SHE SWIMS IN. A rock's nearest face
+       is kept behind z = -0.6 whatever its size, and the few in front
+       of her are small and well down the slope, because a rock between
+       the lens and the oyster is a rock in front of the pearl. */
+    const size = front ? 0.25 + r() * 0.35 : 0.35 + Math.pow(r(), 2.2) * 1.5;
+    const z = front ? 4.2 + r() * 2.4 : -(0.6 + size * 1.55) - Math.pow(r(), 1.5) * 12;
+    const tone = r();
+    const y = bedAt(x, z) + size * 0.22;
+    rocks.push({ x, y, z, size });
+    addBlob(b, ico2, {
+      at:[x, y, z], scale:[size * (0.9 + r() * 0.6), size * (0.5 + r() * 0.3), size * (0.8 + r() * 0.5)],
+      yaw: r() * 6.28, tiltZ: (r() - 0.5) * 0.5, rough: 0.42, seed: i + 1,
+      attrs: v => ({ aCol: mixc(rockLo, rockHi, clamp01(tone * 0.6 + v[1] * 0.35 + 0.2)), aGloss: 0.0 })
+    });
+  }
+  /* coral: clusters of fingers standing off the rocks */
+  for(let c = 0; c < 22; c++){
+    const host = rocks[Math.floor(r() * 38)];
+    const col = corals[c % 3], n = 5 + Math.floor(r() * 5);
+    for(let k = 0; k < n; k++){
+      const a = r() * 6.28, rad = host.size * (0.25 + r() * 0.55);
+      const x = host.x + Math.cos(a) * rad, z = host.z + Math.sin(a) * rad * 0.8;
+      const h = 0.22 + r() * 0.42, w = 0.045 + r() * 0.04;
+      const tx = (r() - 0.5) * 0.9, tz = (r() - 0.5) * 0.9;
+      const y0 = Math.max(bedAt(x, z), host.y + host.size * 0.18);
+      addBlob(b, ico1, {
+        at:[x - Math.sin(tz) * h * 0.8, y0 + h * 0.85, z + Math.sin(tx) * h * 0.8],
+        scale:[w, h, w], tiltX: tx, tiltZ: tz, rough: 0.12, seed: c * 17 + k,
+        attrs: v => ({ aCol: mixc(col, [1, 0.93, 0.82], clamp01(v[1] * 0.5 + 0.1) * 0.55), aGloss: 0.25 })
+      });
+    }
+  }
+  const mesh = new THREE.Mesh(b.geometry(), reefMat);
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  shadow.add(mesh);
+})();
+
+/* ------------------------------------------------------------------
+   4. THE KELP — and the first place the superstructure is visible
+   ------------------------------------------------------------------
+   The surge that leans every blade is the WORLD's rhythm, not time's:
+   uSway is the sine and cosine of the superstructure's own phase. So
+   the forest sways at the rate the sea has settled on — a fraction
+   slower than the reader's, a fraction behind them — and it would be
+   swaying at that rate whether or not they noticed.
+
+   The sway lives in ONE string, used by the visible material and by
+   the depth material, because a shadow computed from blades that did
+   not move would stay behind when the kelp leaned.
+   ------------------------------------------------------------------ */
+const uSway = { value: new THREE.Vector2(0, 1) };
+const KELP_VERT = `
+  attribute float aH; attribute float aSeed; attribute float aAmp;
+  uniform float uTime; uniform vec2 uSway;
+  vec3 kelpAt(vec3 p){
+    float b = aH * aH, ph = aSeed * 6.2832;
+    p.x += b * aAmp * (uSway.x * 0.95 + sin(uTime * 0.55 + ph + aH * 2.6) * 0.17);
+    p.z += b * aAmp * (uSway.y * 0.45 + cos(uTime * 0.43 + ph * 1.7 + aH * 2.1) * 0.12);
+    return p;
+  }
+`;
+(function(){
+  const b = builder(THREE, { normal: 3, aH: 1, aSeed: 1, aAmp: 1 });
+  let s = 0x7E11A;
+  const r = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  const SEG = 18;
+  const FRONT_X = [-14.5, -3.8, 3.2, 6.6, 11.5];
+  for(let i = 0; i < 36; i++){
+    const front = i >= 31;
+    /* The front blades stand between the lens and her, and the lens
+       centres on an oyster while she is at it — so a front blade within
+       about a metre of a site's x stands exactly in front of the one
+       moment the chapter is about (seen, 12 November). They are PLACED,
+       in the gaps between the sites; the random x is still drawn so the
+       rest of the forest keeps the layout it had. */
+    const xr = -18 + r() * 36;
+    const x = front ? FRONT_X[i - 31] : xr, z = front ? 3.2 + r() * 1.6 : -1.6 - Math.pow(r(), 1.3) * 10.5;
+    const y0 = bedAt(x, z) - 0.1, len = front ? 2.6 + r() * 2.2 : 3.4 + r() * 5.2, seed = r();
+    const blades = 2 + Math.floor(r() * 2);
+    for(let k = 0; k < blades; k++){
+      const yaw = (r() - 0.5) * 1.5, w0 = 0.26 + r() * 0.2, bs = seed + k * 0.19;
+      const ax = Math.cos(yaw), az = Math.sin(yaw), ox = (r() - 0.5) * 0.3, oz = (r() - 0.5) * 0.3;
+      for(let j = 0; j <= SEG; j++){
+        const h = j / SEG;
+        const w = w0 * (0.3 + 0.7 * Math.pow(Math.sin(Math.PI * Math.min(1, h * 1.08 + 0.04)), 0.55))
+                     * (1 + 0.2 * Math.sin(h * 34 + bs * 40));
+        const cx = x + ox + Math.sin(h * 3.1 + bs * 9) * 0.14 * h, cz = z + oz, cy = y0 + h * len * (0.9 + k * 0.08);
+        const at = { normal: [-az, 0.12, ax], aH: h, aSeed: bs, aAmp: len * 0.17 };
+        b.vertex(cx - ax * w * 0.5, cy, cz - az * w * 0.5, at);
+        b.vertex(cx + ax * w * 0.5, cy, cz + az * w * 0.5, at);
+      }
+      b.strip(SEG);
+    }
+  }
+  const uniforms = { ...U, uSway, uKelpLo:{ value:C(SEA.kelpLo) }, uKelpHi:{ value:C(SEA.kelpHi) } };
+  const mesh = new THREE.Mesh(b.geometry(), litMat(THREE, {
+    uniforms, side: THREE.DoubleSide,
+    vprelude: WORLD_VERT + KELP_VERT + 'varying float vH;',
+    prelude: SEA_GLSL,
+    vertex:`void main(){ vH = aH; worldOut(kelpAt(position), normal); }`,
+    fragment:`
+      varying vec3 vWorld; varying vec3 vN; varying float vH;
+      uniform vec3 uKelpLo, uKelpHi;
+      void main(){
+        vec3 N = normalize(vN); if(!gl_FrontFacing) N = -N;
+        float keep = periphKeep();
+        vec3 alb = mix(uKelpLo, uKelpHi, vH * vH);
+        float sh = shadowAt(vWorld, N);
+        vec3 col = seaShade(alb, N, vWorld, sh, keep);
+        /* A LEAF IS THIN. With the sun behind it, light comes THROUGH,
+           and the blade glows the colour of itself — the single thing
+           that most says "lit" about a kelp forest, and a term a flat
+           two-value split had no way to express. */
+        float through = max(dot(-N, uSunDir), 0.0);
+        col += uKelpHi * sunAt(vWorld) * through * mix(0.5, 1.0, sh) * 0.42;
+        gl_FragColor = vec4(toDisplay(seaFog(col, vWorld, keep)), 1.0);
+      }
+    `
+  }));
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  shadow.add(mesh, depthMat(THREE, {
+    uniforms: { uTime: U.uTime, uSway },
+    vertex: KELP_VERT + `void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(kelpAt(position), 1.0); }`
+  }));
+})();
+
+/* ------------------------------------------------------------------
+   5. THE SURFACE, FROM UNDERNEATH
+   ------------------------------------------------------------------
+   Past 48.6 degrees from the vertical, water cannot let light out and
+   the surface is a mirror of the sea below it; inside that angle it is
+   a window onto the sky. Both are here, chosen by the real angle
+   between the line of sight and the WAVE the fragment is on, so the
+   window's edge ripples because the water does.
+   ------------------------------------------------------------------ */
+/* Where she breaks the surface (x, z) and how far out her head is (the
+   same inhaleAt that gates everything else that reads as breathing in). */
+const uBreak = { value: new THREE.Vector3(0, 0, 0) };
+(function(){
+  const g = new THREE.PlaneGeometry(190, 150, 1, 1);
+  g.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(g, litMat(THREE, {
+    uniforms: { ...U, uSky:{ value:C(SEA.sky) }, uBreak }, side: THREE.DoubleSide,
+    /* Drawn FIRST and writing no depth. From below, everything in the
+       sea is in front of the surface, so nothing is lost — and the one
+       thing behind it, her head when she is up for air, is then drawn
+       over it instead of being cut off at the shoulders. §1.6a says the
+       inhale happens above the surface; a figure with no head there is
+       the one place the picture failed to show it. */
+    depthWrite: false,
+    prelude: LIGHT_GLSL + PERIPH_GLSL + `
+      uniform vec3 uWaterHi, uWaterLo, uSky, uBreak; uniform sampler2D uNoise;
+      uniform float uTime, uPulse, uFogK;
+      vec3 waterAt(float y){ return mix(uWaterLo, uWaterHi, exp(min(y, 0.0) * 0.17)); }`,
+    vertex:`varying vec3 vWorld;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWorld = wp.xyz;
+                   gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragment:`
+      varying vec3 vWorld;
+      void main(){
+        float keep = periphKeep();
+        vec3 V = normalize(vWorld - cameraPosition);           // up, towards the surface
+        vec2 p = vWorld.xz;
+        vec4 a = texture2D(uNoise, p * 0.055 + vec2(uTime * 0.011, uTime * 0.007));
+        vec2 slope = (a.gb - 0.5) * 0.62;
+        vec4 b = texture2D(uNoise, p * 0.19 - vec2(uTime * 0.016, -uTime * 0.011));
+        slope += (b.ba - 0.5) * 0.40 * keep;
+        slope *= 0.7 + 0.5 * uPulse;                            // the swell is the world's breath
+        vec3 Nw = normalize(vec3(slope.x, 1.0, slope.y));
+        float c = clamp(dot(V, Nw), 0.0, 1.0);
+        float window = smoothstep(0.640, 0.705, c);            // cos 48.6 = 0.661
+        /* the sky through it, and the sun as the bright knot it is
+           when seen through moving water */
+        float sun = pow(max(dot(normalize(V + Nw * 0.4), uSunDir), 0.0), 18.0);
+        vec3 sky = uSky * (1.1 + 3.2 * sun);
+        /* the mirror: the sea below, bent by the same wave, with the
+           crests picking up light */
+        vec3 mir = waterAt(-1.5 + (a.r - 0.5) * 7.0) * (0.85 + 0.9 * smoothstep(0.55, 0.9, a.g + slope.x));
+        vec3 col = mix(mir, sky, window);
+        /* rings running out from where her head is through the surface:
+           the thing that says she is AT it, and it is there only while
+           she is */
+        float rd = length(p - uBreak.xy);
+        col += vec3(0.50, 0.72, 0.68) * uBreak.z * exp(-rd * 0.5)
+               * (0.45 + 0.55 * sin(rd * 6.5 - uTime * 3.0));
+        float dist = length(vWorld - cameraPosition);
+        float f = 1.0 - exp(-uFogK * 0.9 * max(dist - 8.0, 0.0));
+        col = mix(col, waterAt(-0.6) * 1.15, f * 0.9);
+        gl_FragColor = vec4(toDisplay(col), 1.0);
+      }
+    `
+  }));
+  mesh.position.set(0, 0, -40);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -10;
+  scene.add(mesh);
+})();
+
+/* ------------------------------------------------------------------
+   6. THE DIVER — a lit figure, seen in profile
+   ------------------------------------------------------------------
+   Thirteen stretched spheres under one material. She is an original
+   figure and a generic one: a freediver in a dark suit with pale fins,
+   no costume and no face. What is new is that she is ROUND — the
+   sphere's own normals, carried correctly through each part's stretch
+   by normalMatrix — and that she has a rim: with the sun on the far
+   side of her, the edge of every limb catches it.
+   ------------------------------------------------------------------ */
+const figMat = hex => litMat(THREE, {
+  uniforms: { ...U, uCol:{ value:C(hex) } },
+  vprelude: WORLD_VERT, prelude: SEA_GLSL,
+  vertex:`void main(){ worldOut(position, normal); }`,
+  fragment:`
+    varying vec3 vWorld; varying vec3 vN; uniform vec3 uCol;
+    void main(){
+      vec3 N = normalize(vN), V = normalize(cameraPosition - vWorld);
+      float keep = periphKeep();
+      float sh = shadowAt(vWorld, N);
+      vec3 col = seaShade(uCol, N, vWorld, sh, 1.0);
+      float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+      float back = clamp(dot(N, uSunDir) * 0.5 + 0.6, 0.0, 1.0);
+      col += (sunAt(vWorld) * 0.22 + waterAt(vWorld.y) * 0.55) * rim * back;
+      gl_FragColor = vec4(toDisplay(seaFog(col, vWorld, keep)), 1.0);
+    }
+  `
+});
+const ball = new THREE.SphereGeometry(1, 20, 14);
+const M = { suit: figMat(SEA.suit), skin: figMat(SEA.skin), fin: figMat(SEA.fin), band: figMat(SEA.band) };
+const diver = new THREE.Group();
+function limb(mat, sx, sy, sz, px, py, pz, parent = diver){
+  const m = new THREE.Mesh(ball, mat);
+  m.scale.set(sx, sy, sz); m.position.set(px, py, pz);
+  parent.add(m); shadow.add(m);
+  return m;
+}
+/* local axes: +Y is towards her head, X is belly-to-back (she is seen
+   in profile), Z is across the shoulders, towards and away from us */
+const chest = limb(M.suit, 0.135, 0.29, 0.175, 0.0, 0.13, 0);
+limb(M.suit, 0.125, 0.17, 0.155, 0.0, -0.17, 0);
+limb(M.band, 0.132, 0.035, 0.168, 0.0, -0.04, 0);
+limb(M.skin, 0.105, 0.125, 0.105, 0.012, 0.535, 0);
+limb(M.suit, 0.112, 0.105, 0.112, -0.012, 0.565, 0);          // the hood, set back
+const pivots = {}, hands = {};
+for(const [name, z] of [['armNear', 0.185], ['armFar', -0.185]]){
+  const p = new THREE.Group(); p.position.set(0, 0.36, z); diver.add(p); pivots[name] = p;
+  limb(M.suit, 0.05, 0.27, 0.05, 0, -0.25, 0, p);
+  hands[name] = limb(M.skin, 0.045, 0.06, 0.04, 0, -0.54, 0, p);
+}
+for(const [name, z] of [['legNear', 0.08], ['legFar', -0.08]]){
+  const p = new THREE.Group(); p.position.set(0, -0.3, z); diver.add(p); pivots[name] = p;
+  limb(M.suit, 0.07, 0.42, 0.07, 0, -0.4, 0, p);
+  limb(M.fin, 0.035, 0.26, 0.10, 0.02, -1.0, 0, p);
+}
+scene.add(diver);
+
+/* ------------------------------------------------------------------
+   7. THE OYSTER, THE PEARL, AND THEIR LIGHT
+   ------------------------------------------------------------------ */
+const oyster = new THREE.Group();
+const shellMat = figMat(SEA.shell), nacreMat = figMat(SEA.nacre);
+limb(shellMat, 0.44, 0.13, 0.36, 0, 0.09, 0, oyster);
+limb(nacreMat, 0.36, 0.05, 0.29, 0, 0.17, 0, oyster);
+const lid = new THREE.Group(); lid.position.set(0, 0.16, -0.30); oyster.add(lid);
+limb(shellMat, 0.44, 0.12, 0.36, 0, 0.06, 0.30, lid);
+limb(nacreMat, 0.36, 0.045, 0.29, 0, 0.0, 0.30, lid);
+scene.add(oyster);
+
+const uGlow = { value: 0.5 };
+const pearl = new THREE.Mesh(ball, litMat(THREE, {
+  uniforms: { ...U, uCol:{ value:C(SEA.pearl) }, uGlow },
+  vprelude: WORLD_VERT, prelude: SEA_GLSL,
+  vertex:`void main(){ worldOut(position, normal); }`,
+  fragment:`
+    varying vec3 vWorld; varying vec3 vN; uniform vec3 uCol; uniform float uGlow;
+    void main(){
+      vec3 N = normalize(vN), V = normalize(cameraPosition - vWorld);
+      vec3 col = seaShade(uCol, N, vWorld, 1.0, 1.0);
+      col += uSunCol * sunSpecular(N, V, 70.0) * 0.5;
+      /* it is lit, and it is also a little of its own light: nacre
+         scatters, and this is the thing in the picture she came for */
+      col += uCol * (0.35 + 0.9 * uGlow) * (0.6 + 0.4 * pow(1.0 - max(dot(N, V), 0.0), 2.0));
+      gl_FragColor = vec4(toDisplay(seaFog(col, vWorld, 1.0)), 1.0);
+    }
+  `
+}));
+pearl.scale.setScalar(0.085);
+scene.add(pearl);
+
+/* The halo round the pearl and the column of light above the oyster.
+   Additive, drawn after everything, and both of them breathe with the
+   world: this is the OFFER (§1.7) at its most direct — the thing she
+   is going towards is itself keeping the slower rhythm. */
+function glowMesh(w, h, fragment){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), litMat(THREE, {
+    uniforms: { ...U, uGlow, uTint:{ value:C(SEA.glow) }, uAmt:{ value: 1 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    prelude: `uniform vec3 uTint; uniform float uGlow, uAmt, uTime, uPulse; uniform sampler2D uNoise;`,
+    vertex:`varying vec2 vUv; varying float vY;
+      void main(){ vUv = uv; vec4 wp = modelMatrix * vec4(position, 1.0); vY = wp.y;
+                   gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragment
+  }));
+  m.renderOrder = 12; m.frustumCulled = false;
+  scene.add(m);
+  return m;
+}
+const halo = glowMesh(2.6, 2.6, `
+  varying vec2 vUv;
+  void main(){
+    float r = length(vUv - 0.5) * 2.0;
+    float g = exp(-r * r * 5.5) * 0.55 + exp(-r * r * 40.0) * 0.5;
+    gl_FragColor = vec4(uTint * g * uAmt * (0.45 + 0.75 * uGlow), 1.0);
+  }`);
+const beam = glowMesh(1.5, 1, `
+  varying vec2 vUv; varying float vY;
+  void main(){
+    float x = (vUv.x - 0.5) * 2.0;
+    float across = exp(-x * x * 9.0);
+    float ends = smoothstep(0.0, 0.10, vUv.y) * (1.0 - smoothstep(0.55, 1.0, vUv.y));
+    /* motes rising in it: the same noise, scrolled upward */
+    float mote = texture2D(uNoise, vec2(vUv.x * 0.22 + 0.3, vY * 0.09 - uTime * 0.02)).a;
+    float g = across * ends * (0.30 + 0.9 * smoothstep(0.55, 0.85, mote));
+    gl_FragColor = vec4(uTint * g * uAmt * (0.10 + 0.14 * uPulse), 1.0);
+  }`);
+
+/* ------------------------------------------------------------------
+   8. SHAFTS, SNOW AND BUBBLES
+   ------------------------------------------------------------------ */
+/* The shafts are one full-frame additive pass. Parallel rays converge
+   on the projection of the sun's direction, so the pattern is a
+   function of ANGLE about that point — which is all a god-ray is. The
+   vanishing point is computed from the same SUN vector as everything
+   else, so the shafts lean the way the shadows fall. */
+const shaftU = { ...U, uVP:{ value:new THREE.Vector2(0, 5) }, uAspect: camU.uAspect, uCamY: camU.uCamY };
+const shafts = screenQuad(THREE, {
+  uniforms: shaftU, order: 14, transparent: true, blending: THREE.AdditiveBlending,
+  prelude: PERIPH_GLSL + `uniform sampler2D uNoise; uniform float uTime, uPulse, uAspect, uCamY;
+    uniform vec2 uVP; uniform vec3 uWaterHi;`,
+  fragment:`
+    varying vec2 vUv;
+    void main(){
+      float keep = periphKeep();
+      vec2 d = ((vUv * 2.0 - 1.0) - uVP) * vec2(uAspect, 1.0);
+      float ang = atan(d.x, -d.y);
+      float broad = texture2D(uNoise, vec2(ang * 2.6 + uTime * 0.004, 0.13 + uTime * 0.0017)).g;
+      float ray = smoothstep(0.42, 0.78, broad);
+      float fine = texture2D(uNoise, vec2(ang * 7.0 - uTime * 0.006, 0.61)).b;
+      ray *= mix(1.0, 0.45 + 1.1 * fine, keep);
+      /* strongest near the top of the frame and near the surface */
+      float fall = (0.25 + 0.75 * vUv.y) * exp(uCamY * 0.085);
+      vec3 col = (uWaterHi + vec3(0.25, 0.22, 0.12)) * ray * fall * (0.16 + 0.14 * uPulse);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+scene.add(shafts);
+
+const uPx = { value: 800 };
+onFit(() => { uPx.value = size.H * renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360)); });
+
+/* marine snow: the thing that does not move with her. Three hundred
+   motes hanging in the water are what make a descent read as a descent
+   — the fixed reference the Murmuration did not have. */
+(function(){
+  const N = 340, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  let s = 0xBEE5;
+  const r = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  for(let i = 0; i < N; i++){
+    pos[i*3] = -17 + r() * 34; pos[i*3+1] = -r() * 15; pos[i*3+2] = -9 + r() * 16; seed[i] = r();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  const pts = new THREE.Points(g, litMat(THREE, {
+    uniforms: { ...U, uPx }, transparent: true, depthWrite: false,
+    prelude: PERIPH_GLSL + 'uniform vec3 uWaterHi;',
+    vertex:`attribute float aSeed; uniform float uTime, uPx; varying float vA;
+      void main(){
+        vec3 p = position;
+        p.y = -mod(-p.y + uTime * (0.05 + aSeed * 0.07), 15.0);
+        p.x += sin(uTime * 0.21 + aSeed * 40.0) * 0.25;
+        vec4 mv = viewMatrix * vec4(p, 1.0);
+        gl_PointSize = clamp((0.018 + aSeed * 0.03) * uPx / -mv.z, 1.0, 9.0);
+        vA = (0.25 + 0.5 * aSeed) * exp(p.y * 0.07) * smoothstep(1.0, 3.0, -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragment:`varying float vA;
+      void main(){
+        float r = length(gl_PointCoord - 0.5) * 2.0;
+        float keep = periphKeep();
+        gl_FragColor = vec4(uWaterHi * 1.6 + 0.35, (1.0 - smoothstep(0.3, 1.0, r)) * vA * (0.35 + 0.65 * keep));
+      }`
+  }));
+  pts.frustumCulled = false; pts.renderOrder = 10;
+  scene.add(pts);
+})();
+
+/* bubbles: the only breath that is ever drawn under water, and it goes
+   UP (§1.6a) */
+const BUB = 44;
+const bubPos = new Float32Array(BUB * 3), bubSize = new Float32Array(BUB);
+const bubs = Array.from({ length: BUB }, () => ({ live:false, x:0, y:0, z:0, v:1, w:0, r:0 }));
+const bubGeo = new THREE.BufferGeometry();
+bubGeo.setAttribute('position', new THREE.BufferAttribute(bubPos, 3).setUsage(THREE.DynamicDrawUsage));
+bubGeo.setAttribute('aSize', new THREE.BufferAttribute(bubSize, 1).setUsage(THREE.DynamicDrawUsage));
+const bubMesh = new THREE.Points(bubGeo, litMat(THREE, {
+  uniforms: { ...U, uPx }, transparent: true, depthWrite: false,
+  prelude: 'uniform vec3 uWaterHi;',
+  vertex:`attribute float aSize; uniform float uPx;
+    void main(){ vec4 mv = viewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * uPx / -mv.z; gl_Position = projectionMatrix * mv; }`,
+  fragment:`void main(){
+      vec2 q = (gl_PointCoord - 0.5) * 2.0; float r = length(q);
+      if(r > 1.0) discard;
+      float rim = smoothstep(0.55, 0.95, r) * (1.0 - smoothstep(0.95, 1.0, r));
+      float glint = exp(-dot(q - vec2(-0.35, -0.4), q - vec2(-0.35, -0.4)) * 9.0);
+      gl_FragColor = vec4(uWaterHi * 1.3 + 0.5, rim * 0.6 + glint * 0.8 + 0.06);
+    }`
+}));
+bubMesh.frustumCulled = false; bubMesh.renderOrder = 11;
+scene.add(bubMesh);
+let bubCursor = 0, bubDebt = 0;
+
+/* ==================================================================
+   9. THE CONTROL — her, and nothing else
+   ==================================================================
+   One finger is a place in the water. She swims to it. There is no
+   second state, no mode and no phase: down is down, up is up, still is
+   still, and letting go is drifting up.
+
+   The finger is kept as a place ON THE GLASS and turned into a place
+   in the water every frame, through the lens as it is that frame. So
+   a finger held below her keeps meaning "further down" as the lens
+   follows her — the whole water column is reachable from a thumb that
+   barely moves.
+   ================================================================== */
+const touches = new Map();
+let finger = null;                      // {x, y} in NDC, or null
+let forced = null;                      // a world target from the inspection hook
+let forceHaste = null;                  // and a haste, likewise
+function readTouches(){ finger = touches.size === 1 ? [...touches.values()][0] : null; }
+(function(){
+  const put = e => {
+    e.preventDefault();
+    touches.set(e.pointerId, { x: e.clientX / Math.max(1, window.innerWidth) * 2 - 1,
+                               y: -(e.clientY / Math.max(1, window.innerHeight) * 2 - 1) });
+    readTouches();
+  };
+  const drop = e => { touches.delete(e.pointerId); readTouches(); };
+  elReach.addEventListener('pointerdown', put);
+  elReach.addEventListener('pointermove', e => { if(touches.has(e.pointerId)) put(e); });
+  elReach.addEventListener('pointerup', drop);
+  elReach.addEventListener('pointercancel', drop);
+  elReach.addEventListener('pointerleave', drop);
+  window.addEventListener('blur', () => { touches.clear(); readTouches(); });
+})();
+
+const vTmp = new THREE.Vector3(), vDir = new THREE.Vector3();
+/** Where on the plane she swims in (z = 0) is this point of the glass? */
+function worldAt(ndc){
+  vTmp.set(ndc.x, ndc.y, 0.5).unproject(camera);
+  vDir.copy(vTmp).sub(camera.position);
+  if(Math.abs(vDir.z) < 1e-6) return null;
+  const k = -camera.position.z / vDir.z;
+  if(k <= 0) return null;
+  return { x: camera.position.x + vDir.x * k, y: camera.position.y + vDir.y * k };
+}
+
+/* ---------- state ---------- */
+const BODY = { x: 0, y: Y_FLOAT, vx: 0, vy: 0 };
+const AXIS = { x: 0, y: 1 };            // her smoothed heading; (0,1) is upright
+const PEARL = newPearl();
+const LEAD = leader();
+const WORLD = superstructure();
+const INVITE = invite({ cycles: 1 });
+const camX = tracker(0, 2.2), camY = tracker(camYFor(Y_FLOAT), 3.0), tilt = tracker(1, 2.0);
+const carryT = tracker(0, 5), vHand = new THREE.Vector3();
+const reachT = tracker(0, 6), openT = tracker(0.12, 5), hasteT = tracker(0, 0.9);
+let t = 0, started = false, kick = 0, faceX = 1, breath = 0;
+
+/* ---------- the meter ---------- */
+const meter = (function(){
+  const buf = [], secs = [];
+  let acc = 0, n = 0, lastSec = performance.now(), prev = performance.now(), ran = 0;
+  elFps.addEventListener('click', () => { elFps.classList.add('off'); elFpsDot.classList.add('on'); });
+  elFpsDot.addEventListener('click', () => { elFps.classList.remove('off'); elFpsDot.classList.remove('on'); });
+  return function(now, idle){
+    const d = now - prev; prev = now;
+    if(!idle && d > 0 && d < 500){ buf.push(d); if(buf.length > 240) buf.shift(); acc += d; n++; ran += d; }
+    if(now - lastSec >= 1000){
+      const fpsNow = n ? 1000 / (acc / n) : 0;
+      secs.push(fpsNow); if(secs.length > 10) secs.shift();
+      const sorted = buf.slice().sort((a, b) => a - b), med = sorted.length ? sorted[sorted.length >> 1] : 0;
+      const m = Math.floor(ran / 60000), s = Math.floor(ran / 1000) % 60;
+      elFps.textContent = idle ? 'paused'
+        : fpsNow.toFixed(0) + ' fps   ' + med.toFixed(1) + ' ms\n'
+          + 'low ' + Math.min(...secs).toFixed(0) + '   ' + m + ':' + String(s).padStart(2, '0')
+          + '\n' + size.W + '×' + size.H + ' @' + renderer.getPixelRatio().toFixed(2);
+      acc = 0; n = 0; lastSec = now;
+    }
+  };
+})();
+
+const loop = clock((dt, now, running) => {
+  if(!running){ meter(now, true); return; }
+  if(started) t += dt;
+  U.uTime.value = t;
+
+  /* --- HER. The finger, turned into a place in the water through the
+     lens as it stands, and the body swimming to it. --- */
+  const target = !started ? null : forced ? forced : finger ? worldAt(finger) : null;
+  swim(BODY, target, dt);
+  const speed = Math.hypot(BODY.vx, BODY.vy);
+
+  /* her heading follows her velocity; at rest she comes upright. A
+     smoothed VECTOR, not a smoothed angle: an angle has a seam at pi
+     and a body turning through it would spin the long way round. */
+  const wantX = speed > 0.3 ? BODY.vx / speed : 0, wantY = speed > 0.3 ? BODY.vy / speed : 1;
+  const ea = 1 - Math.exp(-dt * (speed > 0.3 ? 5.5 : 2.2));
+  AXIS.x += (wantX - AXIS.x) * ea; AXIS.y += (wantY - AXIS.y) * ea;
+  const al = Math.hypot(AXIS.x, AXIS.y);
+  const ax = al > 1e-3 ? AXIS.x / al : 0, ay = al > 1e-3 ? AXIS.y / al : 1;
+  const head = headY(BODY.y, ay);
+  /* §1.6a: the ONLY source of anything that reads as breathing in */
+  const air = inhaleAt(head);
+
+  /* --- THE READER'S RHYTHM, and the world's answer to it --- */
+  if(started){ LEAD.step(dt, depthFrac(BODY.y)); WORLD.step(dt, LEAD); }
+  /* phase 0 is the surface, so the world's light is fullest when its
+     own cycle is "up": the offer is to be breathing in when it is */
+  const pulse = 1 - WORLD.wave;
+  U.uPulse.value = pulse;
+  uSway.value.set(WORLD.sin, WORLD.cos);
+  const haste = hasteT.step(dt, forceHaste === null ? LEAD.haste : forceHaste);
+  U.uHaste.value = clamp01(haste);
+
+  /* --- THE PEARL --- */
+  if(started) pearlStep(PEARL, BODY, head, dt);
+  const site = siteAt(PEARL.site);
+
+  /* --- THE LENS. It follows part of her fall and never all of it, it
+     leans a little towards the oyster so its light is in frame, and it
+     tips up when she is near the top so the surface is a ceiling rather
+     than a line. Hurried, it holds her tighter: "centre locked". --- */
+  camX.w = 2.2 + 3.0 * haste; camY.w = 3.0 + 4.0 * haste;
+  const lean = PEARL.carrying || PEARL.deliver > 0 ? 0 : 0.22;
+  camX.step(dt, clamp(BODY.x + (site.x - BODY.x) * lean, X_MIN + 1.5, X_MAX - 1.5));
+  camY.step(dt, camYFor(BODY.y));
+  tilt.step(dt, smoothstep(-5.0, -0.5, BODY.y));
+  camera.position.set(camX.value, camY.value, CAM_BACK);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(camX.value, camY.value - 0.3 + 2.4 * tilt.value, 0);
+  ARRIVE.apply(camera, now);
+  camera.updateMatrixWorld();
+  camU.uRight.value.setFromMatrixColumn(camera.matrixWorld, 0);
+  camU.uUp.value.setFromMatrixColumn(camera.matrixWorld, 1);
+  camU.uFwd.value.setFromMatrixColumn(camera.matrixWorld, 2).negate();
+  camU.uCamY.value = camera.position.y;
+  /* where the sun's rays converge on screen */
+  vTmp.copy(camera.position).addScaledVector(SUN, 500).project(camera);
+  shaftU.uVP.value.set(vTmp.x, vTmp.y);
+
+  /* --- HER POSE --- */
+  breath += dt * (0.5 + pulse * 0.2);
+  /* the lift on the swell and the chest filling: both times `air`,
+     which is zero the instant her head is under */
+  const lift = air * (0.05 * Math.sin(WORLD.phase * Math.PI * 2 - Math.PI / 2) + 0.05);
+  diver.position.set(BODY.x, BODY.y + lift, 0);
+  uBreak.value.set(BODY.x, 0, air);
+  if(Math.abs(BODY.vx) > 0.35) faceX = BODY.vx > 0 ? 1 : -1;
+  diver.rotation.set(0, faceX > 0 ? 0 : Math.PI, 0);
+  /* rotation.z about the lens axis; the y-flip mirrors x, so the sign
+     of the lean flips with it */
+  diver.rotation.z = (Math.atan2(ay, ax) - Math.PI / 2) * (faceX > 0 ? 1 : -1);
+  chest.scale.set(0.135 * (1 + 0.10 * air * pulse), 0.29, 0.175 * (1 + 0.07 * air * pulse));
+  kick += dt * (1.6 + speed * 3.4);
+  const kAmp = 0.10 + 0.34 * clamp01(speed / V_MAX);
+  pivots.legNear.rotation.z =  Math.sin(kick) * kAmp;
+  pivots.legFar.rotation.z  = -Math.sin(kick) * kAmp;
+  /* arms: streamlined ahead when she is moving, sculling at the
+     surface, and one of them reaching for the shell when she is at it */
+  const stream = smoothstep(0.5, 1.8, speed);
+  const scull = air * (1 - stream);
+  const rest = 0.25 + stream * (Math.PI - 0.35);
+  const atShell = PEARL.at && !PEARL.carrying ? 1 : 0;
+  reachT.step(dt, atShell);
+  let reachAng = rest;
+  {
+    /* the angle from her shoulder to the pearl, IN HER OWN FRAME: undo
+       the turn to face (which mirrors x), then undo the lean. An arm at
+       angle a points along (sin a, -cos a), so a = atan2(x, -y). */
+    const wx = (site.x - (BODY.x + 0.36 * ax)) * faceX;
+    const wy = (site.bed + 0.27) - (BODY.y + 0.36 * ay);
+    const c = Math.cos(-diver.rotation.z), s = Math.sin(-diver.rotation.z);
+    reachAng = Math.atan2(wx * c - wy * s, -(wx * s + wy * c));
+  }
+  pivots.armNear.rotation.z = rest + (reachAng - rest) * reachT.value + scull * Math.sin(breath * 2.1) * 0.5 + scull * 0.9;
+  /* carrying, the far arm holds it out ahead of her whatever else she
+     is doing */
+  carryT.step(dt, PEARL.carrying && PEARL.deliver === 0 ? 1 : 0);
+  const farFree = rest - scull * Math.sin(breath * 2.1) * 0.5 + scull * 0.9;
+  pivots.armFar.rotation.z = farFree + (2.25 - farFree) * carryT.value;
+  diver.updateMatrixWorld(true);
+  hands.armFar.getWorldPosition(vHand);
+
+  /* --- THE OYSTER AND THE PEARL --- */
+  oyster.position.set(site.x, site.bed - 0.02, 0);
+  const open = PEARL.carrying || PEARL.deliver > 0 ? 1 : 0.10 + 0.05 * pulse + 0.85 * smoothstep(0, 1, PEARL.progress);
+  lid.rotation.x = -openT.step(dt, open) * 1.05;
+  let px, py, glow, haloAmt, beamAmt;
+  if(PEARL.deliver > 0){
+    /* let go into the light */
+    const k = PEARL.deliver;
+    px = vHand.x; py = vHand.y + k * 1.5;
+    glow = 1 + 2.5 * Math.sin(k * Math.PI); haloAmt = (1 - k) * 2.2; beamAmt = 0;
+    pearl.scale.setScalar(0.085 * (1 - k * k));
+  } else if(PEARL.carrying){
+    px = vHand.x; py = vHand.y - 0.02;
+    glow = 1.0; haloAmt = 1.0; beamAmt = 0;
+    pearl.scale.setScalar(0.085);
+  } else {
+    px = site.x; py = site.bed + 0.27;
+    glow = 0.25 + 0.35 * pulse + 0.8 * PEARL.progress;
+    haloAmt = 0.35 + 0.35 * pulse + 0.9 * PEARL.progress; beamAmt = 1;
+    pearl.scale.setScalar(0.085);
+  }
+  pearl.position.set(px, py, 0.02);
+  uGlow.value = glow;
+  halo.position.set(px, py, 0.25); halo.material.uniforms.uAmt.value = haloAmt;
+  const beamTop = -0.8, beamH = beamTop - site.bed;
+  beam.scale.set(1, beamH, 1);
+  beam.position.set(site.x, site.bed + beamH / 2, -0.15);
+  beam.material.uniforms.uAmt.value = beamAmt;
+
+  /* --- BUBBLES: only from a head that is under water --- */
+  const hx = BODY.x + ax * HEAD_REACH * 0.85, hy = BODY.y + ay * HEAD_REACH * 0.85;
+  if(started && air === 0 && hy < -0.3){
+    bubDebt += dt * (2.2 + 5.0 * clamp01(speed / V_MAX));
+    while(bubDebt >= 1){
+      bubDebt -= 1;
+      const b = bubs[bubCursor]; bubCursor = (bubCursor + 1) % BUB;
+      b.live = true; b.x = hx + (Math.random() - 0.5) * 0.12; b.y = hy; b.z = 0.12 + Math.random() * 0.1;
+      b.v = 0.8 + Math.random() * 0.7; b.w = Math.random() * 6.28; b.r = 0.02 + Math.random() * 0.035;
+    }
+  }
+  for(let i = 0; i < BUB; i++){
+    const b = bubs[i];
+    if(b.live){
+      b.y += b.v * dt; b.w += dt * 5; b.x += Math.sin(b.w) * 0.12 * dt; b.r *= 1 + 0.25 * dt;
+      if(b.y > -0.05) b.live = false;
+    }
+    bubPos[i*3] = b.x; bubPos[i*3+1] = b.y; bubPos[i*3+2] = b.z;
+    bubSize[i] = b.live ? b.r * 2 : 0;
+  }
+  bubGeo.attributes.position.needsUpdate = bubGeo.attributes.aSize.needsUpdate = true;
+
+  /* --- THE FOCUS: where she is on the glass, for the periphery --- */
+  vTmp.set(BODY.x, BODY.y, 0).project(camera);
+  U.uFocus.value.set((vTmp.x * 0.5 + 0.5) * U.uRes.value.x, (vTmp.y * 0.5 + 0.5) * U.uRes.value.y);
+
+  /* --- the ring, until the glass has been touched once --- */
+  const inv = INVITE.step(dt, { wanted: started, taken: finger !== null });
+  elRing.style.left = ((vTmp.x * 0.5 + 0.5) * size.W).toFixed(1) + 'px';
+  elRing.style.top  = ((-vTmp.y * 0.5 + 0.5) * size.H).toFixed(1) + 'px';
+  elRing.style.setProperty('--invite', inv.invite.toFixed(3));
+  elRing.style.setProperty('--asking', inv.asking ? '1' : '0');
+
+  shadow.render(scene);
+  renderer.render(scene, camera);
+  meter(now, false);
+});
+
+/* ---------- in and out ---------- */
+function begin(){
+  started = true; t = 0;
+  ARRIVE.start();
+  loop.resync();
+}
+$('stop').addEventListener('click', () => { loop.running = false; elHalt.classList.add('on'); });
+$('resume').addEventListener('click', () => { elHalt.classList.remove('on'); loop.running = true; });
+
+enter(requireScroll, begin);
+
+contextGuard(canvas, {
+  onLost(){ loop.stop(); },
+  onRestored(){ resize(); loop.resync(); loop.start(); }
+});
+
+/* ---------- inspection hook ---------- */
+window.__freeDive = {
+  scene, camera, THREE,
+  begin, pump(dt, n){ return loop.pump(dt, n); },
+  /** steer by a place in the WATER (metres), or null to let go */
+  go(x, y){ forced = (x === null || x === undefined) ? null : { x, y }; return forced; },
+  /** steer by a place on the GLASS (-1..1), or null */
+  touch(x, y){ touches.clear(); if(x !== null && x !== undefined) touches.set(-1, { x, y }); readTouches(); return finger; },
+  now(){
+    return {
+      t:+t.toFixed(2), started,
+      body:{ x:+BODY.x.toFixed(2), y:+BODY.y.toFixed(2), speed:+Math.hypot(BODY.vx, BODY.vy).toFixed(2) },
+      headY:+headY(BODY.y, AXIS.y / (Math.hypot(AXIS.x, AXIS.y) || 1)).toFixed(2),
+      inhale:+inhaleAt(headY(BODY.y, AXIS.y / (Math.hypot(AXIS.x, AXIS.y) || 1))).toFixed(3),
+      pearl:{ site:PEARL.site, x:siteAt(PEARL.site).x, progress:+PEARL.progress.toFixed(3),
+              carrying:PEARL.carrying, deliver:+PEARL.deliver.toFixed(2), at:!!PEARL.at },
+      reader:{ period:LEAD.period === null ? null : +LEAD.period.toFixed(2), measured:LEAD.measured,
+               phase:+LEAD.phase.toFixed(3), turns:LEAD.turns, haste:+LEAD.haste.toFixed(3) },
+      world:{ period:+WORLD.period.toFixed(2), phase:+WORLD.phase.toFixed(3),
+              behindDeg:+(phaseGap(LEAD.phase, WORLD.phase) * 360).toFixed(1), pulse:+U.uPulse.value.toFixed(3) },
+      haste:+U.uHaste.value.toFixed(3),
+      cam:{ x:+camera.position.x.toFixed(2), y:+camera.position.y.toFixed(2) },
+      focusPx:[+U.uFocus.value.x.toFixed(0), +U.uFocus.value.y.toFixed(0)],
+      bubbles: bubs.filter(b => b.live).length, casters: shadow.casters
+    };
+  },
+  /** pin the haste (0..1) to look at the periphery, or null to give it back to the reader */
+  haste(v){ forceHaste = (v === null || v === undefined) ? null : v; if(forceHaste !== null) hasteT.set(forceHaste); return forceHaste; },
+  links(){ return linkReport(renderer, scene, camera); },
+  solo(){ return soloReport(); },
+  bench(n){
+    const gl = renderer.getContext();
+    shadow.render(scene); renderer.render(scene, camera); gl.finish();
+    const a = performance.now();
+    for(let i = 0; i < n; i++){ shadow.render(scene); renderer.render(scene, camera); }
+    gl.finish();
+    const withShadow = (performance.now() - a) / n;
+    const b = performance.now();
+    for(let i = 0; i < n; i++) renderer.render(scene, camera);
+    gl.finish();
+    return { msPerFrame: withShadow, msMainPassOnly: (performance.now() - b) / n, n,
+             drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles };
+  }
+};
+
+const exits = wireExits();
+/* The loop has to be STARTED. Written blind, this chapter had every
+   other call on it — resync, stop, pump — and not this one, so it
+   compiled, linked, passed the dry run (which pumps) and drew nothing. */
+loop.start();
+void exits; void bedY; void floorY; void PICK_REACH;
+}
+</script>
+</body>
+</html>

@@ -363,6 +363,173 @@ their own phone at the start and end of a session is the only way to get the num
 
 Full working, and the two other questions it came from, in `docs/2026-11-12-analysis.md`.
 
+## The hard idiom rules are withdrawn; light is allowed — 12 November 2026
+
+Design doc **§4.2b**, on the author's instruction, the same day as §1.7. §4.2's seven rules
+and §4.2a's "does not license" list are no longer constraints. The author's reason is the one
+to keep: **"having rules that aren't attached to purpose means the rules lose meaning with
+iterations."** So the look is restated as seven PURPOSES, each with a test: reads at a glance
+(squint), designed value structure (desaturate), few hues with the mood in the air (name the
+colour in one word), depth you can feel (cover the figure), every visible edge a decision,
+ONE structure (does anything disagree about where the light is), original work (§4.1, not
+withdrawn). **Light models; the palette designs.**
+
+Permitted now: a lighting model, normals everywhere, a light vector, shadow maps, gradients,
+specular, translucency, textures, any number of values. Not touched: §1.6a, §1.6b, §1.7, §2,
+§4.1. **The old chapters are not being converted** unless asked.
+
+I recommended AGAINST this in the morning (analysis §2.6) and was overruled; §5.1 of
+`docs/2026-11-12-analysis.md` says where the recommendation was wrong. Short version: I
+treated hand-assigned value as something lighting would destroy, when lighting only takes
+over the modelling and leaves the design where it was.
+
+## The kit grew a spine and a light — 12 November 2026
+
+- **`js/lead.js`** — `leader()` measures the reader's rhythm from one 0..1 scalar by
+  HYSTERETIC TURNING POINTS, never a derivative; `superstructure()` is a coupled oscillator
+  that prefers to be 8% slower and, locked, stands asin(detune/K) behind the reader. Pure
+  arithmetic. The reader's phase is taken from POSITION between their last two extremes,
+  not from time — a reader who pauses half way up is half way up, not advancing.
+- **`js/light.js`** — one sun, hemisphere ambient, a shadow rig (REGISTERED casters, FIXED
+  frustum, normal-offset bias), `noiseTexture`, `gradeTexture`, and the periphery for §1.7.
+  The periphery DROPS TERMS and never dissolves a surface. **Texture fetches stay OUTSIDE
+  branches** (a fetch needs derivatives; inside a per-fragment branch they are undefined and
+  the result is a mip seam along the edge of the branch); the branches skip sines.
+- **`js/solid.js`** — icospheres with shared vertices; normals from the triangles AS THEY END
+  UP. A displaced `SphereGeometry` opens along its seam.
+- **`rampPickAA` is one riser now**, not five, and is proved equal to the loop. If the clamp
+  on `w` is ever raised past 0.5 the equivalence breaks; the harness has that as its negative
+  control.
+- **`tools/lead.mjs`** is in the gate (4e). **`tools/dryrun.mjs`** is not: it runs a page's
+  real module against real three with the renderer stubbed and compiles every shader with
+  glslang. Needs `npm i three@0.186.1 @webgpu/glslang` in a scratch directory.
+  Two instrument faults met while building it: the glslang module object is a thenable that
+  resolves to ITSELF, so `await` on it never returns (use `.then`, delete `.then`, resolve);
+  and `require.resolve('three')` lands on the CJS build, whose namespace has no named exports.
+
+## THE PUSH IS REFUSED BY THE SANDBOX, TWICE NOW — 12 November 2026
+
+Two consecutive sessions have had `git push` refused by the environment, after the gate
+passed: *"only git clone, git fetch and plain downloads from GitHub work here, not git push,
+other uploads or Git LFS."* HTTP 403. `git clone` and `git fetch` DO work, so the diff half
+of `push.sh` is fine and the verification half is what fails.
+
+**This is not worked around.** No curl, no wget, no alternative host. `docs/HOW-TO-PUSH.md`
+has the commands for the author to run on their own machine, and
+`docs/PENDING-COMMIT-MESSAGE.txt` is the message.
+
+### THE MOUNT'S `.git` HAS NEVER FETCHED, AND THAT BROKE THE HAND ROUTE
+
+The author ran the hand sequence and **git rejected the push, correctly.** The diagnosis is
+worth more than the incident:
+
+**`.git` in this folder was cloned at `fe25379` and has not fetched since — it is ~180
+commits behind `origin/main`.** Everything from the Shepherd's progress rebuild onwards is
+missing from its history, though the *files* on disk are current, because sessions write
+files here directly. So a hand commit lands with `fe25379` as its parent and pushing it is a
+non-fast-forward that would discard four months of history.
+
+**`push.sh` HIDES THIS, and that is structural rather than accidental.** It rsyncs the
+working files into a clone it makes itself and never reads the mount's `.git` except to
+lift the remote URL out of `.git/config` as a text file. That is exactly what makes a push
+verifiable — and it is why nobody has noticed for months. **Checking that the mount's FILES
+match the remote does not check that its GIT METADATA does**, and I made precisely that
+error: I diffed against a fresh clone, found the files right, and handed over a sequence
+that depended on something I had not looked at.
+
+The fix, which also cures the staleness permanently, is `git fetch origin` then
+`git reset --mixed origin/main` — index and HEAD move, **no file on disk is touched** — and
+only then `git checkout -- 04-breath-loops.html` (that file is tracked at the root, is not
+in this working copy, and `git add -A` would otherwise commit its deletion as a side
+effect; the restore has to come after the reset or the index does not know the file).
+
+**And the sequence was TESTED this time, not reasoned about.** A sandbox clone was put in
+the mount's exact state, the author's commands were replayed to reproduce the rejection, then
+the fix was run: parent `413909d`, a true fast-forward, tree identical to the mount, gate
+passing. Prove the instrument, then hand it over — the same rule this file already states
+about measurement applies to instructions given to the author.
+
+**Until that push lands, nothing from 12 November is deployed and nothing can be looked at.**
+The whole of the Free Dive, `lead.js`, `light.js`, `solid.js`, the one-riser ramp and Pearl
+Diver's water change are in the working copy only. Diff against a fresh clone before trusting
+any of it: verified on 12 November as 16 files, +2971/-13, gate passing.
+
+## LEVEL OF EFFORT FOR THE §1.7 / §4.2b CONVERSION — 12 November 2026
+
+Asked for by the author before any conversion starts. Full working in
+`docs/2026-11-12-loe.md`. **It is not a batch job: ~11–15 sessions, one at a time.**
+
+The four things worth carrying even if that file is never read again:
+
+1. **Reader-led is the cheap half.** Long Air, the Shepherd and the Murmuration already read
+   an identical continuous `reachAt`. And for the two travelling chapters the reader's rate
+   can enter as FORWARD SPEED against a world whose period is fixed in *distance* — so
+   `superstructure().period` drives speed and the baked geometry survives untouched. That is
+   also §1.7's "the offering is in the environment", for free: the gates arrive 8% late.
+2. **Lit is the dear half, and normals are why.** `terrainY` interpolates Long Air's
+   cross-section with a quintic ease that has ZERO SLOPE AT EVERY KNOT. Correct unlit —
+   it cannot overshoot. Under a light every column is a rib. Fixing it changes the
+   silhouette and reopens the sagitta bar and the column budget.
+3. **Lighting re-opens every continuity bar in the repo.** The Shepherd note already says an
+   unlit surface hides its own facets and that what shows a row boundary is the ground-sky
+   EDGE. Those bars were derived against a silhouette criterion; a shading criterion is a
+   different number. Per chapter, as each converts.
+4. **The anti-aliasing leftovers mostly dissolve** — hard risers are what needed AA and
+   §4.2b permits gradients — but **lighting Long Air FORCES the `scrollGlsl` fix**, because
+   its stretched quad is currently masked only by a cross-section that barely varies along z.
+
+Recommended first: **the Murmuration with its roost**, because it is the only chapter broken
+by its own diagnosis, has no terrain to disturb, and is the cheapest honest test of whether
+the superstructure is LEGIBLE — the one question the whole of §1.7 rests on. Long Air last.
+**Pearl Diver: recommend not converting at all** — the Free Dive is already the reader-led lit
+water chapter and was built beside it so the two could be compared.
+
+## The Free Dive has been looked at — 12 November 2026, late
+
+`app/free-dive.html`: the first reader-led chapter and the first lit one. A new chapter
+beside Pearl Diver, not a replacement. No schedule: she goes where the finger is, the pearl
+takes four seconds at the oyster and is kept if she leaves, nothing is counted. Silent.
+
+Looked at LOCALLY, on the author's machine, at 375x812, before any push. Not yet on a phone.
+
+**IT DREW NOTHING, AND SO DID THE MURMURATION, FOR THE SAME REASON.** Neither page ever
+called `loop.start()`. `clock()` restarts on `visibilitychange`, and the inspection pane hides
+and shows between tool calls, so every session that ever measured the Murmuration started
+its loop by accident. Opened and left visible — a phone — it is a flat sky and the cue. That
+was live when the reader said "just doesn't work"; the legibility diagnosis may still be
+right, but it was made about a chapter the reader may never have seen move. The dry run
+missed it because it PUMPS. The tell is the one this file already gives: frames firing (62 a
+second) with the chapter's own clock stuck at 0. Both fixed. Every other clock chapter had it.
+
+**What was seen:** all 28 materials link; exposure reads (teal water, lit sand, caustics);
+the dive, the rest at the oyster, the carry with the pearl held up and the release all pose
+correctly — no sign errors; 77,626 triangles / 28 draw calls, as predicted offline.
+
+**Three things looking found, fixed the same night:**
+
+- **The shadow was a staircase.** One nearest-filtered comparison per tap, on sand where a
+  texel is a dozen pixels. Each tap now blends four COMPARISONS (never depths) by position,
+  and the map is 2048. In `js/light.js`, so every later lit chapter inherits it.
+- **A front kelp blade stood in front of the oyster.** Front blades are PLACED now
+  (`FRONT_X`), in the gaps between the sites, because the lens centres on a site exactly when
+  she is at it. The random x is still drawn so the back forest keeps its layout.
+- **At the surface she had no head.** Her head is above the waterline and the surface hid
+  it — the one moment §1.6a is about, shown as a torso. The surface now draws first and
+  writes no depth (from below, everything else is in front of it), and rings run out from
+  where she breaks it, scaled by the same `inhaleAt` that gates everything else.
+
+**STILL OPEN: is the superstructure legible?** Held still, the light is clearly brighter at
+one end of the world's cycle than the other, and kelp and rock hold still as a reference, so
+it passes the test the Murmuration failed. But idle it is a 20-second swell of brightness,
+and from stills it may read as cloud passing rather than as the water answering. Needs the
+author's eyes, in motion. Also open: the meter on the reader's phone at 0 and at 5 minutes.
+
+**Instrument notes.** While the pane is hidden, rAF does not fire (drive with `pump`) and a
+screenshot can come back as a magnified top-left crop of the frame. `toDataURL` in the same
+task as a `pump`, shown in an `<img>`, gets the whole frame. And the gate needs two things on
+this Windows machine: a real `python3` on PATH (the default is the Store stub) and
+`PYTHONUTF8=1`.
+
 ## Other standing constraints for this project
 
 - **One session at a time in this folder. `push.sh` rsyncs the ENTIRE mount.**

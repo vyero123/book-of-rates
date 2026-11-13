@@ -146,6 +146,26 @@ else
   say "  ok    motion continuous: no animated scalar steps on either clock"
 fi
 
+# --- 4e. the reader-led spine ---
+# Design doc 1.7: the reader sets the rate. A chapter built on that has
+# no schedule to fly, so regress.mjs's "on-pace play never touches a
+# surface" cannot cover it — that is a promise about a reader conforming
+# to OUR rate. tools/lead.mjs checks the other kind of thing: properties
+# over a FAMILY of reader behaviours. The phase estimator against traces
+# with known periods (and a tremor it must refuse to call a rhythm); the
+# superstructure locking, standing behind, and NOT locking when it
+# should not; 1.6a as a continuous invariant, swept over every state and
+# flown for a thousand seconds of a random reader; and the one-riser
+# ramp against the five-riser loop it replaced. Every section carries a
+# case that is required to fail.
+if ! node "$ROOT/tools/lead.mjs" > /dev/null 2>&1; then
+  say "  FAIL  the reader-led spine"
+  node "$ROOT/tools/lead.mjs" 2>&1 | grep -E "FAIL" | head -10
+  FAIL=1
+else
+  say "  ok    reader-led spine: estimator, coupling, 1.6a invariant, ramp"
+fi
+
 # --- 4d. the back button must stay sensible ---
 # The reader hit a real bug here on 6 November: every exit assigned
 # location.href, which PUSHES a history entry, so Back from the

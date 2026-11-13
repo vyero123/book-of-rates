@@ -1,0 +1,26 @@
+The Free Dive: the first reader-led chapter, and the kit that carries it
+
+The reader sets the rate (design doc 1.7). js/lead.js measures their rhythm
+from hysteretic turning points and couples a superstructure that prefers to
+run 8% slower; js/light.js is one sun, hemisphere ambient, a shadow rig and
+the haste-driven periphery; js/solid.js is icospheres with correct normals.
+js/palette.js's rampPickAA is one riser instead of five, proved equal to the
+loop it replaced. Pearl Diver's water shader computes only the visible side.
+
+app/free-dive.html is a new chapter beside Pearl Diver, not a replacement:
+no schedule, no cue, silent, lit. The diver goes where the finger is, the
+pearl takes four seconds at the oyster and progress is kept if she leaves.
+
+tools/lead.mjs enters the gate as step 4e. tools/dryrun.mjs is not in the
+gate: it runs a page's real module against real three with the renderer
+stubbed and compiles every shader through glslang.
+
+Docs: 4.2b withdraws the hard idiom rules and restates the look as seven
+purposes; analysis section 5.
+
+NOT YET RENDERED. This chapter has been executed in Node and shader-compiled
+and never looked at. CLAUDE.md says so.
+
+Also in this commit: docs/2026-11-12-loe.md, the effort estimate for converting
+the old chapters to 1.7 and 4.2b, and docs/HOW-TO-PUSH.md, which records why
+this folder's .git could not push it. Neither is code.

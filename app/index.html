@@ -819,6 +819,44 @@ const murmurHTML = `<a class="plate" href="murmuration.html">
     <div class="cap">The Murmuration</div>
   </a>`;
 
+/* THE FREE DIVE — 12 November 2026. The first reader-led chapter
+   (design doc 1.7) and the first lit one (4.2b). A NEW chapter beside
+   Pearl Diver, not a replacement for it: the old one keeps its
+   schedule and its idiom, so the two can be compared on the same page. */
+const freeDiveHTML = `<a class="plate" href="free-dive.html">
+    <div class="pic">
+      <svg class="dl" viewBox="0 0 96 66" aria-hidden="true">
+        <defs>
+          <linearGradient id="fdW" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#48B5B4"/><stop offset=".45" stop-color="#17697A"/>
+            <stop offset="1" stop-color="#05222C"/>
+          </linearGradient>
+          <radialGradient id="fdG" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="#FFE9B8" stop-opacity=".95"/>
+            <stop offset="1" stop-color="#FFE9B8" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="96" height="66" fill="url(#fdW)"/>
+        <g fill="#DFF3EE" opacity=".16">
+          <path d="M22 0L30 0L20 66L6 66Z"/><path d="M44 0L50 0L46 66L36 66Z"/>
+          <path d="M66 0L76 0L80 66L64 66Z"/>
+        </g>
+        <path d="M0 58Q20 50 40 56T96 52V66H0Z" fill="#9C8F78"/>
+        <path d="M0 61Q24 55 48 60T96 57V66H0Z" fill="#DCCBA6" opacity=".55"/>
+        <rect x="61" y="18" width="3" height="36" fill="url(#fdG)" opacity=".5"/>
+        <circle cx="62.5" cy="53" r="7" fill="url(#fdG)"/>
+        <circle cx="62.5" cy="53" r="1.5" fill="#FFF7EA"/>
+        <g transform="translate(40 30) rotate(128)">
+          <ellipse cx="0" cy="0" rx="2.4" ry="6" fill="#1B2838"/>
+          <circle cx="0" cy="7.4" r="2" fill="#E2B38E"/>
+          <path d="M-1.2 -5L-2.2 -14L-.4 -14Z M1.2 -5L.4 -14L2.2 -14Z" fill="#1B2838"/>
+          <path d="M-2.4 -14L-3 -18L0 -18L-.2 -14Z M.2 -14L0 -18L3 -18L2.4 -14Z" fill="#F2E3C8"/>
+        </g>
+      </svg>
+    </div>
+    <div class="cap">The Free Dive</div>
+  </a>`;
+
 /* LANTERN CURRENT WAS HERE, and was withdrawn on 7 November 2026.
    Its plate is gone from the contents; lantern-current.html is a
    forwarding stub and the archive carries it as a withdrawn chapter.
@@ -892,7 +930,7 @@ if(leadIdx > 0) taken.unshift(taken.splice(leadIdx, 1)[0]);
    The link-wiring guard below derives its expectation from the page's
    own content, so a new plate is covered by it automatically rather
    than needing a number bumped. */
-const three = taken.concat([bambooHTML, shepherdHTML, murmurHTML]);
+const three = taken.concat([bambooHTML, shepherdHTML, murmurHTML, freeDiveHTML]);
 
 const head  = label => `<div class="ct"><span>${label}</span><i></i></div>`;
 const grid  = plates => `<div class="plates">${plates.join('')}</div>`;

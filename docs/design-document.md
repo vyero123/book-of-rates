@@ -1095,6 +1095,100 @@ complaint. **Stated plainly so it can be answered: this amendment keeps the flat
 lineless, stepped look and removes the artefacts of implementing it cheaply. If the look
 itself is the problem, say so and §4.2 gets rewritten rather than annotated.**
 
+### 4.2b The hard rules are withdrawn — what the look is FOR
+
+*Added 12 November 2026, on the author's instruction. It supersedes §4.2's seven rules and
+§4.2a's "what it does not license" as CONSTRAINTS. Both are left standing above, as this
+document's method requires, because they are the history of the look and most of what follows
+is distilled from them. What changes is their status: they were rules, and they are now
+reasons.*
+
+The author's words:
+
+> Let's not let old design constraints limit our ability to create better things. I'm not
+> sure why the idiom's postulates were chosen even after reading it — **having rules that
+> aren't attached to purpose means the rules lose meaning with iterations.** Our design style
+> that originally wanted to mimic Samurai Jack has been skewed, so let's just scrap the hard
+> rules and capture the essence in more holistic terms without such rigid constraints on our
+> visualization structure. **More structure is generally better, as long as the pieces work
+> well together.**
+
+That diagnosis is correct, and the document itself is the evidence. §4.2 says *what* — no
+outlines, two to four values, bands not gradients — and gives a source for each (a show, a
+painter's quote) but never a *purpose*. So every time a rule met a case it did not fit, the
+only options were to obey it at a cost nobody could weigh (the Murmuration's sky as six slabs)
+or to annotate an exception (§4.2a; "sixteen and eight"). Five weeks of that left a list of
+rules and a list of exceptions and nothing that said which was which.
+
+So the look is restated here as **purposes**. Each one says what it is for and how to tell
+whether a picture has it. None of them says how many values a surface may have.
+
+**1. The picture should read at a glance, with the eyes half-focused.**
+*Why:* this is a breathing app. The reader is attending to their body, not to the screen, and
+a good many of them will be looking through it rather than at it. *So:* big shapes, a clear
+figure, one thing happening. *The test:* squint, or shrink the frame to a thumbnail — is it
+still obvious where she is and which way is up? This is what "extreme negative space" and
+"tiny figure" were reaching for. Emptiness is still the main compositional tool; it is no
+longer compulsory.
+
+**2. Value structure is designed, not left to fall out.**
+*Why:* the squint test is a test of values. A lighting model will happily produce a frame in
+which everything is the same mid-grey, correctly. *So:* decide where the light and dark of the
+frame are — the palette, the exposure, the fog, where the sun is — and let the lighting model
+the forms inside that decision. *The test:* desaturate it. This is what "two to four values
+per object" was protecting, and it is the one piece of the old idiom whose loss was actually
+measured: when Deep Light derived value from depth, "the frame goes flat; every object reads
+as the same object at a different distance." **Light now models. The palette still designs.**
+
+**3. Few hues, and the mood is in the air.**
+*Why:* a chapter is a state, and colour and weather carry state without a word of copy
+(§4.4) — which matters more now that there is no instructional text anywhere in the app.
+*So:* one dominant hue family for a scene, one accent reserved for the thing that matters,
+and the sky, the water or the weather as the loudest thing in it. *The test:* name the
+scene's colour in one word. The realistic solution — green grass, blue sky — is still
+usually the wrong one, because it is nobody's decision.
+
+**4. Depth is something the reader can feel.**
+*Why:* every chapter's motion is motion through space, and the Murmuration and Lantern
+Current both failed for want of anything to measure that motion against. *So:* layers,
+atmosphere between them, and things in the frame that do not move with the figure.
+*The test:* cover the figure — can you still tell how far away things are? "Four to six
+bands" was one way of doing this. Fog, shadow, parallax, falling motes and light shafts are
+others, and they may be used together.
+
+**5. Every edge the reader can see is a decision.**
+*Why:* §4.2a's finding, which survives intact: an aliased edge, a faceted terminator, a band
+that crawls, a seam where two things meet badly — these are not style, they are defects, and
+the eye goes to them. *So:* hard edges where a form really ends, soft ones where light really
+falls off, and nothing in between that arrived by accident. A gradient is allowed. A stair is
+not.
+
+**6. Structure is welcome as long as it is ONE structure.**
+*Why:* the author's own condition — "as long as the pieces work well together." *So:* one sun,
+one shadow, one fog, one exposure curve, shared by every surface in a scene (`app/js/light.js`
+is this, as code). *The test:* does anything in the frame disagree with anything else about
+where the light is? Long Air's sun was deleted because it disagreed with its own shadow; with
+a single light vector that class of fault cannot be built.
+
+**7. Original work, in an idiom, never a copy.**
+§4.1 is not a style rule and is not withdrawn. No existing characters, frames or set-pieces.
+The look began as mid-century cartoon modern with a ukiyo-e influence and has since become
+its own thing; that drift is now simply acknowledged. Figures stay generic.
+
+**What is explicitly permitted now, that was not:** a lighting model; normals on every
+surface; a light direction; shadow maps; continuous shading and real gradients; soft
+terminators; specular; translucency; texture sampling; any number of values on an object.
+
+**What this does not license.** Realism for its own sake (purpose 3). Detail that fails the
+squint test (purpose 1). A second lighting rig beside the first (purpose 6). And nothing here
+touches §1.6a, §1.6b, §1.7, §2 or §4.1.
+
+**The old chapters are not wrong and are not being converted.** Pearl Diver, Long Air, Bamboo
+Rain, the Shepherd and the Murmuration were built to the old rules and satisfy the new
+purposes about as well as they did the day before. The first chapter built to this section is
+**The Free Dive**, and it is deliberately a new chapter beside Pearl Diver rather than a
+replacement for it, so the two looks can be compared on the same subject.
+
 ### 4.3 Palettes per emotional theme
 
 All hex values are derived for this project from descriptions and reference, not lifted from

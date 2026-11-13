@@ -105,9 +105,12 @@ export async function boot({ cdn, fallback, start }){
    Renderer, scene, camera, and the fit
    ------------------------------------------------------------------ */
 
-/** No shadow maps, no postprocessing, no tone mapping, no stencil. The
- *  look is flat unlit colour by design (§4.2 rule 1), so every one of
- *  those is cost with nothing to show for it.
+/** No BUILT-IN shadow maps, no postprocessing, no tone mapping, no
+ *  stencil. That was written when the look was flat unlit colour by rule
+ *  (§4.2 rule 1). The rule was withdrawn on 12 November 2026 (§4.2b) and
+ *  lit chapters exist — but they bring their own light, their own shadow
+ *  rig and their own display curve from js/light.js rather than turning
+ *  three's on, so this renderer is still the right one for both kinds.
  *
  *  `fov` may be a function of aspect: the chapters want a wider lens on a
  *  tall phone than on a landscape tablet, and the project is mobile-first
