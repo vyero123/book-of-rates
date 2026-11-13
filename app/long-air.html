@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="color-scheme" content="light">
-<title>Book of Rates — Chapter four: Long Air (3-D)</title>
+<title>Book of Rates — Chapter four: Long Air</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#173A44;
@@ -2786,11 +2786,44 @@ let inDown = false, outDown = false;
    pointercancel for an id that was never down must not take the count
    negative, and on a phone that happens. */
 const touches = new Map();
+/* HOW MUCH OF IT IS THE READER'S — the book's chapters are degrees of
+   freedom (see the contents), and this page is the same scene at three
+   of them, chosen by `?d=`:
+     0  guided. Nothing to touch; it keeps the cue.
+     1  one touch. Press anywhere and it goes up, let go and it comes
+        down. WHERE is not read at all, only whether and for how long.
+     2  one line (the default). The height of the touch.
+   At d=1 a press is a LEVEL, not a rate: it says where the thing is
+   GOING and the capped pursuit walks there, so a hold is keeping the
+   finger down, or keeping it up. That is the difference from the
+   hold-to-climb the Shepherd's harness condemned, which was a rate. */
+const DOF = (() => {
+  const v = new URLSearchParams(location.search).get('d');
+  return v === '0' ? 0 : v === '1' ? 1 : 2;
+})();
+if(DOF === 0) elReach.style.display = 'none';
+if(DOF !== 2) elMUp.style.display = elMDn.style.display = 'none';
+if(DOF === 1) elReach.setAttribute('aria-label', 'Press anywhere and it goes up; let go and it comes down');
+/* at d=1, an open hand is an answer for one breath; after that it goes
+   back to the cue rather than waiting at the bottom for ever */
+let pressedOnce = false, letGoAt = -1e9;
+const dofTarget = (sched, reachTarget) =>
+  DOF === 0 ? sched
+  : DOF === 1 ? (reachAt !== null ? 1 : pressedOnce && t - letGoAt < B.cycle ? 0 : sched)
+  : (reachAt !== null ? reachTarget() : sched);
+const dofPace = self =>
+  DOF === 0 ? 1
+  : DOF === 1 ? (reachAt !== null || (pressedOnce && t - letGoAt < B.cycle) ? 1 : self)
+  : (reachAt !== null ? 1 : self);
+
 /** 0..1 down the screen, or null when the reader is not steering. */
 let reachAt = null;
 
 function readTouches(){
+  const was = reachAt;
   reachAt = touches.size === 1 ? [...touches.values()][0] : null;
+  if(reachAt !== null) pressedOnce = true;
+  if(was !== null && reachAt === null) letGoAt = t;
 }
 (function(){
   const el = elReach;
@@ -2995,13 +3028,13 @@ const loop = clock((dt, now, running) => {
      drive the chapter the old way as well as the new one. */
   const schedFill = clamp01(normOf(sched));
   if(started && !forceHold){
-    const target = reachAt !== null ? reachFill(reachAt) : schedFill;
+    const target = dofTarget(schedFill, () => reachFill(reachAt));
     const gap = target - KITE.fill;
     inDown  = gap >  DEAD;
     outDown = gap < -DEAD;
     // flying itself is slower than being flown: a beat behind, never
     // dropped out of the sky, never as good as a hand
-    const pace = reachAt !== null ? 1 : SELF_FLY;
+    const pace = dofPace(SELF_FLY);
     const cap = (inDown ? RATE.fillPerSec : outDown ? RATE.emptyPerSec : 0) * pace * dt;
     if(cap > 0){
       // PROPORTIONAL, saturating at the cap. The proportional part is

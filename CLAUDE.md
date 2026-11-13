@@ -568,6 +568,27 @@ Seen locally at 375x812 in stepped stills: at rest, held, pouring with two bowls
 (the bench returned nonsense with the pane hidden). The contents plate still shows the OLD
 storm's thumbnail.
 
+## The untouched rates, done cheaply — 13 November 2026
+
+The author asked for the rates not yet touched to be reworked "as efficiently as possible
+because I'm on usage credits ... minimal expense for maximal result". So this was NOT a
+redesign of each, and should not be described as one. What was done, and it was the same
+ten lines in each because the Shepherd and Long Air share the Murmuration's capped pursuit:
+
+    Long Air   d=0 watch · d=1 press to climb · (default) the height of the touch
+    Shepherd   d=0 watch · d=1 press to climb · (default) the height of the touch
+
+`dofTarget` / `dofPace` beside `reachAt` in each page. So every rate except Pearl Diver now
+exists in Chapters 0, 1 and 2, and Pearl Diver's 1D-3D sibling is the Free Dive. Also: the
+"(3-D)" came off four page titles, the Shepherd's `aria-label` described a control it has
+not had since 6 November and now describes the one it has, and Bamboo Rain's contents plate
+shows the water-tipper.
+
+**Not done, and each is real work:** Pearl Diver is unchanged. Long Air and the Shepherd are
+still schedule-led underneath (a cue word, a protocol sheet) — they have fewer or more
+degrees of freedom, not the reader-led rebuild Bamboo Rain got. Nothing here was seen in
+motion; the checks were the hooks (press reaches 0.99, release 0.01, watch tracks the cue).
+
 ## LEVEL OF EFFORT FOR THE §1.7 / §4.2b CONVERSION — 12 November 2026
 
 Asked for by the author before any conversion starts. Full working in
