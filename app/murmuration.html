@@ -546,10 +546,37 @@ scene.add(flock);
    capped integration walks to it, so touching the centre is worth
    exactly one inhale's gathering and no more.
    ================================================================== */
+/* HOW MUCH OF IT IS THE READER'S — the book's chapters are degrees of
+   freedom (see the contents), and this page is the same flock at three
+   of them, chosen by `?d=`:
+     0  guided. Nothing to touch; the flock keeps the cue.
+     1  one touch. Press anywhere and it gathers, let go and it opens.
+        WHERE is not read at all, only whether and for how long.
+     2  one line (the default). The distance from the heart.
+   A level, not a rate, at d=1 too: pressing sets where the flock is
+   GOING and the capped pursuit walks there, so a hold is keeping the
+   finger down, or keeping it up. That is why a binary control can fly
+   a protocol with holds here when it could not on the Shepherd's hill. */
+const DOF = (() => {
+  const v = new URLSearchParams(location.search).get('d');
+  return v === '0' ? 0 : v === '1' ? 1 : 2;
+})();
+if(DOF === 0){ elReach.style.display = 'none'; elRing.style.display = 'none'; }
+elReach.setAttribute('aria-label', DOF === 1
+  ? 'Press anywhere and the flock gathers; let go and it opens'
+  : 'Touch near the centre and the flock gathers; touch further out and it opens towards you');
+
 const touches = new Map();
 let reachAt = null;
+/* at d=1, when the glass was last let go of: an open hand is an answer
+   for one breath, and after that the flock goes back to the cue rather
+   than waiting open for ever */
+let pressedOnce = false, letGoAt = -1e9;
 function readTouches(){
+  const was = reachAt;
   reachAt = touches.size === 1 ? [...touches.values()][0] : null;
+  if(reachAt !== null) pressedOnce = true;
+  if(was !== null && reachAt === null) letGoAt = t;
 }
 (function(){
   const el = elReach;
@@ -639,7 +666,8 @@ const loop = clock((dt, now, running) => {
      snap five hundred birds sideways. Eased both ways and towards a
      fixed place, not a "next occurrence", so it cannot run away. --- */
   {
-    const want = reachAt !== null ? radial(reachAt) : { px: 0, py: 0 };
+    /* only where the place is being read: at d=1 a press has no "where" */
+    const want = reachAt !== null && DOF === 2 ? radial(reachAt) : { px: 0, py: 0 };
     const e = 1 - Math.exp(-dt * 3.2);
     uPull.value.x += (want.px - uPull.value.x) * e;
     uPull.value.y += (want.py - uPull.value.y) * e;
@@ -650,10 +678,20 @@ const loop = clock((dt, now, running) => {
      charge. One integrator, and this is it. --- */
   if(started && !forceHold){
     const schedFill = clamp01(normOf(sched));
-    const target = reachAt !== null ? reachFill(reachAt) : schedFill;
+    let target, pace;
+    if(DOF === 0){
+      /* guided: the cue, at the cue's own pace */
+      target = schedFill; pace = 1;
+    } else if(DOF === 1){
+      if(reachAt !== null){ target = 1; pace = 1; }
+      else if(pressedOnce && t - letGoAt < B.cycle){ target = 0; pace = 1; }
+      else { target = schedFill; pace = SELF_WALK; }
+    } else {
+      target = reachAt !== null ? reachFill(reachAt) : schedFill;
+      pace = reachAt !== null ? 1 : SELF_WALK;
+    }
     const gap = target - SHAPE.fill;
     const up = gap > 0.012, down = gap < -0.012;
-    const pace = reachAt !== null ? 1 : SELF_WALK;
     const cap = (up ? RATE.fillPerSec : down ? RATE.emptyPerSec : 0) * pace * dt;
     if(cap > 0){
       let move = gap * PURSUE_K * dt;
@@ -772,7 +810,7 @@ const api = window.__murmuration = {
              radius:+radiusAt(SHAPE.value).toFixed(2),
              alt:+uCentre.value.y.toFixed(2),
              orbit:+uOrbit.value.toFixed(2),
-             reachAt, pull:[+uPull.value.x.toFixed(3), +uPull.value.y.toFixed(3)],
+             dof: DOF, reachAt, pull:[+uPull.value.x.toFixed(3), +uPull.value.y.toFixed(3)],
              touches: touches.size, inviteLearned: REACH_INVITE.learned };
   },
   /** THE CLAIM, MEASURED ON WHAT IS DRAWN rather than predicted.

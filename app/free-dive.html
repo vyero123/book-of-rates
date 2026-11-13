@@ -288,17 +288,17 @@ const OVER_GLSL = `
      everything else here. */
   vec3 sunnySky(vec3 d){
     float e = max(d.y, 0.0);
-    vec3 col = mix(vec3(0.95, 0.52, 0.20), vec3(0.80, 0.30, 0.20), smoothstep(0.0, 0.09, e));
-    col = mix(col, vec3(0.42, 0.22, 0.36), smoothstep(0.05, 0.19, e));
-    col = mix(col, vec3(0.09, 0.17, 0.42), smoothstep(0.13, 0.36, e));
+    vec3 col = mix(vec3(1.10, 0.40, 0.045), vec3(0.86, 0.19, 0.035), smoothstep(0.0, 0.10, e));
+    col = mix(col, vec3(0.42, 0.075, 0.10), smoothstep(0.07, 0.24, e));
+    col = mix(col, vec3(0.085, 0.045, 0.19), smoothstep(0.20, 0.42, e));
     float sn = max(dot(normalize(vec3(d.x, e, d.z)), uSunny), 0.0);
-    col += vec3(1.0, 0.50, 0.16) * pow(sn, 24.0) * 0.8;
-    col += vec3(1.0, 0.78, 0.42) * pow(sn, 220.0) * 1.8;
-    col += vec3(1.0, 0.95, 0.80) * smoothstep(0.99905, 0.99935, sn) * 6.0;
+    col += vec3(1.0, 0.36, 0.05) * pow(sn, 18.0) * 0.95;
+    col += vec3(1.0, 0.62, 0.20) * pow(sn, 200.0) * 2.0;
+    col += vec3(1.0, 0.86, 0.55) * smoothstep(0.99905, 0.99935, sn) * 7.0;
     vec2 cu = d.xz / (e + 0.06) * 0.035 + vec2(uTime * 0.0015, 0.0);
     float c = texture2D(uNoise, cu).r * 0.65 + texture2D(uNoise, cu * 2.7).g * 0.35;
     float cl = smoothstep(0.44, 0.60, c) * smoothstep(0.012, 0.07, e);
-    vec3 cc = mix(vec3(0.20, 0.09, 0.19), vec3(1.0, 0.56, 0.26), pow(sn, 8.0) * 0.85 + 0.10);
+    vec3 cc = mix(vec3(0.13, 0.035, 0.10), vec3(1.0, 0.40, 0.08), pow(sn, 6.0) * 0.9 + 0.10);
     return mix(col, cc, cl * 0.88);
   }
 
@@ -362,7 +362,7 @@ const SEA_GLSL = LIGHT_GLSL + SHADOW_GLSL + PERIPH_GLSL + CAUSTIC_GLSL + `
     /* with the lens at the waterline, what is above the water is seen
        through air, and gets the evening on it instead */
     float air = uAbove * smoothstep(-0.03, 0.10, P.y);
-    col = mix(col, col * vec3(1.45, 1.05, 0.80) + vec3(0.10, 0.045, 0.015), air);
+    col = mix(col, col * vec3(1.6, 0.95, 0.62) + vec3(0.13, 0.04, 0.008), air);
     return mix(col, waterAt(mix(P.y, cameraPosition.y, 0.5)), f * (1.0 - air));
   }
 `;
@@ -886,7 +886,7 @@ const shafts = screenQuad(THREE, {
       vec2 sN = vUv * 2.0 - 1.0;
       float wl = sN.y - waterlineY(sN.x);
       col *= 1.0 - uAbove * smoothstep(-0.004, 0.004, wl);
-      col += (vec3(1.0, 0.93, 0.80) * exp(-pow(wl / 0.0045, 2.0)) * 0.85
+      col += (vec3(1.0, 0.80, 0.52) * exp(-pow(wl / 0.0045, 2.0)) * 0.85
             + (uWaterHi + vec3(0.30, 0.20, 0.08)) * exp(min(wl, 0.0) / 0.07) * step(wl, 0.0) * 0.30) * uAbove;
       gl_FragColor = vec4(col, 1.0);
     }
@@ -1012,6 +1012,10 @@ const PEARL = newPearl();
 const LEAD = leader();
 const WORLD = superstructure();
 const INVITE = invite({ cycles: 1 });
+const DOF = (() => {
+  const v = new URLSearchParams(location.search).get('d');
+  return v === '1' ? 1 : v === '2' ? 2 : 3;
+})();
 /* how close under the surface the lens stops: two centimetres */
 const SURF_Y = -0.02;
 const camX = tracker(0, 2.2), camY = tracker(SURF_Y, 3.0), tilt = tracker(1, 2.0);
@@ -1049,7 +1053,25 @@ const loop = clock((dt, now, running) => {
 
   /* --- HER. The finger, turned into a place in the water through the
      lens as it stands, and the body swimming to it. --- */
-  const target = !started ? null : forced ? forced : finger ? worldAt(finger) : null;
+  /* HOW MUCH OF IT IS HERS TO BE TOLD — the book's chapters are degrees
+     of freedom, and this page is the same dive at three of them (`?d=`):
+       3  the whole glass (the default): she goes where the finger is.
+       2  one line: only the DEPTH of the touch is read; she keeps to the
+          water above the oyster that is awake.
+       1  one touch: press anywhere and she dives to the oyster, let go
+          and she rises. Where is not read at all.
+     The inhale is still decided by where her head is and by nothing
+     else, so §1.6a does not care which of these it is. */
+  let target = null;
+  if(started){
+    if(forced) target = forced;
+    else if(finger){
+      const want = worldAt(finger), here = siteAt(PEARL.site);
+      target = DOF === 3 ? want
+             : DOF === 2 ? { x: here.x, y: want.y }
+             :             { x: here.x, y: -99 };
+    }
+  }
   swim(BODY, target, dt);
   const speed = Math.hypot(BODY.vx, BODY.vy);
 
@@ -1260,7 +1282,7 @@ window.__freeDive = {
   touch(x, y){ touches.clear(); if(x !== null && x !== undefined) touches.set(-1, { x, y }); readTouches(); return finger; },
   now(){
     return {
-      t:+t.toFixed(2), started,
+      t:+t.toFixed(2), started, dof: DOF,
       body:{ x:+BODY.x.toFixed(2), y:+BODY.y.toFixed(2), speed:+Math.hypot(BODY.vx, BODY.vy).toFixed(2) },
       headY:+headY(BODY.y, AXIS.y / (Math.hypot(AXIS.x, AXIS.y) || 1)).toFixed(2),
       inhale:+inhaleAt(headY(BODY.y, AXIS.y / (Math.hypot(AXIS.x, AXIS.y) || 1))).toFixed(3),

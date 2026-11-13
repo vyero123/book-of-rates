@@ -492,6 +492,43 @@ Looked at locally at 375x812 with the pane hidden (pumped frames, `toDataURL` pe
 seen in real-time motion, not on a phone.** Cost not re-measured: the Murmuration's sky is
 now about ten noise evaluations a pixel where it was a gradient.
 
+## THE BOOK IS ORGANISED BY DEGREES OF FREEDOM — 13 November 2026
+
+The author's table of contents, and it supersedes "in three dimensions / flat" as the way
+into the book:
+
+> Chapter 0 will be 0D, Chapter 1 will be 1D, Chapter 2 will be 2D, and Chapter 3 will be
+> 3D. The Ds are degrees of freedom. 0 is guided and no control, 1 degree of freedom means
+> all you can do is click anywhere on the screen — duration is a parameter. 2D will be
+> clicking in a single dimension, e.g. radial; 3D will be clicking in 2D.
+
+So the count is what the reader contributes: nothing; WHEN; when and HOW FAR along one line;
+when and WHERE. **"3D" no longer means the pictures have depth** — do not use it that way in
+anything the reader sees. (Page titles still say "(3-D)"; not yet changed.)
+
+**How it is built.** `#contents` is the table of contents and `#ch0..#ch3` / `#chf` are a
+chapter's menu, each its own history entry: cover, contents, chapter, rate. A rate can appear
+in more than one chapter — the same scene with more or less of it handed over — and where a
+page takes `?d=` it is the same page with its control narrowed:
+
+    Murmuration   d=0 watch · d=1 press to gather · (default) radial
+    Free Dive     d=1 press to dive · d=2 depth only · (default) the whole glass
+
+Everything else sits in the chapter its existing control belongs to (Pearl Diver 0; Bamboo
+Rain 1; Long Air and the Shepherd 2). **Only versions that exist are listed.** The author
+asked for "updated versions of the rest of the rates in this format"; Long Air, the Shepherd,
+Bamboo Rain and Pearl Diver have NOT been given other degrees yet. A binary press works as a
+LEVEL under the capped pursuit (press = where it is going), which is why d=1 can fly holds
+when the Shepherd's hold-to-climb could not — that is the pattern to reuse.
+
+**Back from a rate broke the menu, and the cause was the page cache.** A phone does not load
+the menu on Back, it RESTORES it as it was left — mid-exit: `falling` on the list (everything
+faded, pointer events off), the loop stopped, canvases released, WebGL disposed. `pageshow`
+with `persisted` now clears the fade and reloads; the hash keeps the menu. Proved with a
+synthetic persisted pageshow and a real round trip in the pane; **the pane did not use the
+page cache on that trip (navigation type `back_forward`), so the real restore path is
+unproved until the reader's phone has done it.**
+
 ## LEVEL OF EFFORT FOR THE §1.7 / §4.2b CONVERSION — 12 November 2026
 
 Asked for by the author before any conversion starts. Full working in

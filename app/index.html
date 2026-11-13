@@ -223,6 +223,31 @@
      gone rather than left behind as a workaround for a layout that no
      longer exists. */
   .plates{display:block;margin:0}
+
+  /* THE TABLE OF CONTENTS — four chapters, by DEGREES OF FREEDOM.
+     It is the screen before the menu: choose how much of the rate is
+     yours, and then choose a rate. */
+  #contents[data-view="toc"] #menu{display:none}
+  #contents[data-view="menu"] #toc{display:none}
+  a.chap{display:flex;align-items:center;gap:13px;margin:0 0 9px;padding:13px 12px 13px 11px;
+    text-decoration:none;color:#2A1C10;border-radius:4px;
+    background:rgba(42,28,16,.045);box-shadow:inset 0 0 0 1px rgba(42,28,16,.16)}
+  a.chap:active{background:rgba(42,28,16,.10)}
+  a.chap .dof{flex:0 0 46px;width:46px;height:46px}
+  a.chap .tx{flex:1;min-width:0}
+  a.chap .k{display:block;font:500 8px/1 ui-sans-serif,sans-serif;letter-spacing:.28em;
+    text-transform:uppercase;color:rgba(42,28,16,.55)}
+  a.chap .t{display:block;margin:5px 0 4px;font:400 19px/1.1 ui-serif,Georgia,serif}
+  a.chap .l{display:block;font:400 11.5px/1.4 ui-sans-serif,sans-serif;color:rgba(42,28,16,.72)}
+  a.chap .n{flex:0 0 auto;font:500 9px/1 ui-sans-serif,sans-serif;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(42,28,16,.5)}
+  a.chap.quiet{background:transparent;box-shadow:none;padding-top:6px;padding-bottom:6px;margin-top:14px}
+  a.chap.quiet .t{font-size:15px;margin:0}
+  #tocBack{display:inline-block;margin:14px 0 0;padding:6px 10px 6px 0;text-decoration:none;
+    font:500 9.5px/1 ui-sans-serif,sans-serif;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(42,28,16,.62)}
+  #list section[hidden]{display:none}
+  #list .lede{margin:2px 0 12px;font:400 12px/1.5 ui-sans-serif,sans-serif;color:rgba(42,28,16,.74)}
   a.plate{display:block;text-decoration:none;color:inherit;margin:0 0 17px}
   a.plate:last-child{margin-bottom:0}
   a.plate .pic{position:relative;aspect-ratio:96/66;border-radius:1px;overflow:hidden;
@@ -406,8 +431,11 @@
       <div><span class="of">The Book of</span><h1>Rates</h1></div>
     </header>
 
-    <div class="ct"><span>Contents</span><i></i></div>
-    <div id="list"></div>
+    <div id="toc"></div>
+    <div id="menu">
+      <a id="tocBack" href="#contents">&#8249; Contents</a>
+      <div id="list"></div>
+    </div>
 
     <div class="tail">
       <button id="optBtn">Options</button>
@@ -504,7 +532,14 @@ $('faceFront').insertAdjacentHTML('afterbegin', toolHTML());
 coverWrap.classList.add('ready');
 mountPageFrame($('contents'));
 
-const returning = location.hash === '#contents';
+/* WHICH SCREEN OF THE OPEN BOOK. `#contents` is the table of contents;
+   `#ch0`..`#ch3` (and `#chf`, the flat first edition) are a chapter's
+   menu. Each is its own history entry, so the stack reads cover,
+   contents, chapter, rate — and Back from a rate lands on the menu it
+   was chosen from. */
+const chOf = () => { const m = /^#ch([0-3f])$/.exec(location.hash); return m ? m[1] : null; };
+const inBook = () => location.hash === '#contents' || chOf() !== null;
+const returning = inBook();
 let opened = false;
 /* ==================================================================
    THE COVER AND THE CONTENTS ARE TWO HISTORY ENTRIES
@@ -523,10 +558,19 @@ let opened = false;
 
    showCover/showContents exist because a popstate is not a page load:
    the classes have to be put back by hand. */
+function applyView(){
+  const ch = chOf(), el = $('contents');
+  const was = el.dataset.view + ':' + el.dataset.ch;
+  el.dataset.view = ch === null ? 'toc' : 'menu';
+  el.dataset.ch = ch === null ? '' : ch;
+  for(const sec of el.querySelectorAll('#list section')) sec.hidden = sec.dataset.ch !== ch;
+  if(was !== el.dataset.view + ':' + el.dataset.ch) el.scrollTop = 0;
+}
 function showContents(){
   opened = true;
   coverWrap.classList.add('gone');
   $('contents').classList.add('on');
+  applyView();
 }
 function showCover(){
   opened = false;
@@ -534,8 +578,33 @@ function showCover(){
   coverWrap.classList.remove('gone', 'bor-open');
   $('contents').classList.remove('on');
 }
-addEventListener('popstate', () => {
-  if (location.hash === '#contents') showContents(); else showCover();
+const route = () => { if (inBook()) showContents(); else showCover(); };
+addEventListener('popstate', route);
+addEventListener('hashchange', route);
+
+/* ==================================================================
+   BACK FROM A RATE BROKE THE MENU — 13 November 2026
+   ==================================================================
+   The reader, on the phone: Back from a rate came to a menu that was
+   blank or dead. The cause is that the phone does not LOAD this page
+   on Back, it RESTORES it, exactly as it was left — and it was left
+   mid-exit. Choosing a plate adds `falling` (which fades everything
+   but the plate and takes pointer events off the whole list) and then
+   tears the page down: the loop stopped, every canvas released, the
+   WebGL background disposed. All of that is still true of the restored
+   page, and nothing ever undid it, because no code runs on a restore
+   except this event.
+
+   A page that has been torn down is not worth repairing in place. So
+   the faded state is cleared at once, for the frame the reader sees,
+   and the page is loaded again — the hash is kept, so it comes back on
+   the same menu. `persisted` is false on a real load, so this cannot
+   loop. */
+addEventListener('pageshow', e => {
+  if (!e.persisted) return;
+  $('contents').classList.remove('falling');
+  for (const a of document.querySelectorAll('a.plate.chosen')) a.classList.remove('chosen');
+  location.reload();
 });
 
 function openBook(){
@@ -551,6 +620,7 @@ function openBook(){
   $('board').style.transition = `transform ${ms}ms cubic-bezier(.33,0,.2,1)`;
   coverWrap.classList.add('bor-open');
   $('contents').classList.add('on');
+  applyView();
   setTimeout(() => {
     coverWrap.classList.add('gone');
     // cover → page turn → the scroll → the book. The scroll is disclosure,
@@ -568,6 +638,7 @@ if (returning){
   opened = true;
   coverWrap.classList.add('gone');
   $('contents').classList.add('on');
+  /* applyView() runs once the list exists, further down */
   PREF.coverSeen = true; save();
   // the scroll is still shown if it has never been seen. Skipping the
   // cover is a convenience; skipping the disclosure is not on the table,
@@ -943,14 +1014,120 @@ if(leadIdx > 0) taken.unshift(taken.splice(leadIdx, 1)[0]);
    The link-wiring guard below derives its expectation from the page's
    own content, so a new plate is covered by it automatically rather
    than needing a number bumped. */
-const three = taken.concat([bambooHTML, shepherdHTML, murmurHTML, freeDiveHTML]);
+void taken;
+
+/* ==================================================================
+   CHAPTERS BY DEGREES OF FREEDOM — 13 November 2026
+   ==================================================================
+   The author's table of contents: "Chapter 0 will be 0D, Chapter 1
+   will be 1D, Chapter 2 will be 2D, and Chapter 3 will be 3D. The Ds
+   are degrees of freedom. 0 is guided and no control, 1 degree of
+   freedom means all you can do is click anywhere on the screen —
+   duration is a parameter. 2D will be clicking in a single dimension,
+   e.g. radial; 3D will be clicking in 2D."
+
+   So the count is of what the reader contributes: nothing; WHEN; when
+   and HOW FAR along one line; when and WHERE on the glass. It follows
+   from the 12 November framing that guided and free are one
+   progression rather than rival ideas — this is that progression,
+   given four steps and made the way into the book.
+
+   A RATE CAN APPEAR IN MORE THAN ONE CHAPTER, and that is the point:
+   the same scene with more or less of it handed over. Where a page
+   takes `?d=`, it is the same page with its control narrowed. Only the
+   versions that exist are listed; nothing here is a placeholder.
+
+   The "3-D" in the old section head meant the pictures have depth. It
+   is not used any more: "3D" now means three degrees of freedom, and
+   two meanings for one label in one menu is one too many. The flat
+   first edition keeps its own row. */
+const variant = (html, href, note) => html
+  .replace(/href="[^"]*"/, `href="${href}"`)
+  .replace(/<div class="cap">([^<]*)(?:<small>[^<]*<\/small>)?<\/div>/,
+           (m, name) => `<div class="cap">${name}<small>${note}</small></div>`);
+
+const DOF_ICON = [
+  /* 0: nothing to touch — the breath alone */
+  `<circle cx="23" cy="23" r="15" fill="none" stroke="#2A1C10" stroke-width="1.2" opacity=".35"/>
+   <circle cx="23" cy="23" r="9" fill="none" stroke="#2A1C10" stroke-width="1.2" opacity=".6"/>`,
+  /* 1: a press, anywhere */
+  `<circle cx="23" cy="23" r="15" fill="none" stroke="#2A1C10" stroke-width="1.2" opacity=".35"/>
+   <circle cx="23" cy="23" r="5.5" fill="#B5482A"/>`,
+  /* 2: a place along one line */
+  `<line x1="23" y1="6" x2="23" y2="40" stroke="#2A1C10" stroke-width="1.2" opacity=".55"/>
+   <path d="M19 10L23 5L27 10M19 36L23 41L27 36" fill="none" stroke="#2A1C10" stroke-width="1.2" opacity=".55"/>
+   <circle cx="23" cy="17" r="5.5" fill="#B5482A"/>`,
+  /* 3: a place on the glass */
+  `<rect x="7" y="7" width="32" height="32" rx="3" fill="none" stroke="#2A1C10" stroke-width="1.2" opacity=".55"/>
+   <path d="M23 11V35M11 23H35" stroke="#2A1C10" stroke-width="1" opacity=".25"/>
+   <circle cx="29" cy="17" r="5.5" fill="#B5482A"/>`
+];
+
+const CHAPTERS = [
+  { ch:'0', title:'Guided', line:'Nothing to do but breathe. The picture leads and you follow it.',
+    plates:[ variant(pearlDiverHTML, 'pearl-diver.html', 'the same water, guided'),
+             variant(murmurHTML, 'murmuration.html?d=0', 'watch the flock') ] },
+  { ch:'1', title:'One touch', line:'Press anywhere on the glass, and let go. How long is the only thing you choose.',
+    plates:[ variant(bambooHTML, 'bamboo-rain.html', 'press and hold'),
+             variant(murmurHTML, 'murmuration.html?d=1', 'press to gather'),
+             variant(freeDiveHTML, 'free-dive.html?d=1', 'press to dive') ] },
+  { ch:'2', title:'One line', line:'Touch along a single line \u2014 up and down, or in and out. How far is yours as well.',
+    plates:[ variant(longAirHTML, 'long-air.html', 'up and down'),
+             variant(shepherdHTML, 'shepherd.html', 'up and down'),
+             variant(murmurHTML, 'murmuration.html', 'in and out'),
+             variant(freeDiveHTML, 'free-dive.html?d=2', 'depth only') ] },
+  { ch:'3', title:'The whole glass', line:'Touch anywhere. Where you go is yours, and so is when.',
+    plates:[ variant(freeDiveHTML, 'free-dive.html', 'the same water, free') ] }
+];
 
 const head  = label => `<div class="ct"><span>${label}</span><i></i></div>`;
 const grid  = plates => `<div class="plates">${plates.join('')}</div>`;
+const count = n => n === 1 ? '1 rate' : n + ' rates';
+
+$('toc').innerHTML = head('Contents') + CHAPTERS.map((c, i) =>
+  `<a class="chap" href="#ch${c.ch}" data-ch="${c.ch}">
+     <svg class="dof" viewBox="0 0 46 46" aria-hidden="true">${DOF_ICON[i]}</svg>
+     <span class="tx"><span class="k">Chapter ${c.ch} \u00b7 ${c.ch}D</span>
+       <span class="t">${c.title}</span><span class="l">${c.line}</span></span>
+     <span class="n">${count(c.plates.length)}</span>
+   </a>`).join('') +
+  `<a class="chap quiet" href="#chf" data-ch="f">
+     <span class="tx"><span class="k">First edition</span><span class="t">The flat chapters</span></span>
+     <span class="n">${count(flat.length)}</span>
+   </a>`;
+
 $('list').innerHTML =
-  head('In three dimensions') + grid(three) +
-  head('Flat') + grid(flat.concat(SHOW_LOCKED ? [lockedHTML] : [])) +
-  (SHOW_LOCKED ? lockedWhy : '');
+  CHAPTERS.map(c =>
+    `<section data-ch="${c.ch}" hidden>` +
+      head(`Chapter ${c.ch} \u00b7 ${c.ch}D \u00b7 ${c.title}`) +
+      `<p class="lede">${c.line}</p>` + grid(c.plates) +
+    `</section>`).join('') +
+  `<section data-ch="f" hidden>` +
+    head('First edition \u00b7 flat') + grid(flat.concat(SHOW_LOCKED ? [lockedHTML] : [])) +
+    (SHOW_LOCKED ? lockedWhy : '') +
+  `</section>`;
+
+/* A CHAPTER ROW PUSHES ITS OWN ENTRY, and says in the entry's state
+   that it was reached from the contents — so the menu's "Contents"
+   link can go BACK to it rather than stacking a second copy on top.
+   A menu reached some other way (a reload, a link from a rate) has no
+   contents under it, and the link replaces instead. */
+for(const a of $('toc').querySelectorAll('a.chap')){
+  a.addEventListener('click', e => {
+    if(e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    try { history.pushState({ bor:'chapter', via:'toc' }, '', '#ch' + a.dataset.ch); }
+    catch(err){ location.hash = '#ch' + a.dataset.ch; }
+    applyView();
+  });
+}
+$('tocBack').addEventListener('click', e => {
+  e.preventDefault();
+  if(history.state && history.state.via === 'toc'){ history.back(); return; }
+  try { history.replaceState({ bor:'contents' }, '', '#contents'); } catch(err){ location.hash = '#contents'; }
+  applyView();
+});
+applyView();
 /* CHOOSING A CHAPTER FALLS INTO IT. Wired after the list exists, and
    the count is CHECKED rather than assumed: a link that silently did
    not get wired is the same class of fault as a shader that silently
