@@ -1016,6 +1016,7 @@ const DOF = (() => {
   const v = new URLSearchParams(location.search).get('d');
   return v === '1' ? 1 : v === '2' ? 2 : 3;
 })();
+let rising = false, waitLift = false, fingerWas = false;
 /* how close under the surface the lens stops: two centimetres */
 const SURF_Y = -0.02;
 const camX = tracker(0, 2.2), camY = tracker(SURF_Y, 3.0), tilt = tracker(1, 2.0);
@@ -1062,9 +1063,25 @@ const loop = clock((dt, now, running) => {
           and she rises. Where is not read at all.
      The inhale is still decided by where her head is and by nothing
      else, so §1.6a does not care which of these it is. */
+  /* ONE TOUCH, ON THE WAY UP. The author, 17 November: she "goes back up
+     too slowly without a way to engage it — pressing on the way up
+     shouldn't bring the diver back down." So letting go is a decision:
+     she SWIMS up, at her own full pace rather than drifting on her
+     buoyancy, and a press on the way up does not turn her round. Once
+     she is up, a finger still on the glass has to lift and press again
+     before she dives — a breath at the surface is never skipped by a
+     hand that was already down. */
+  if(DOF === 1){
+    if(fingerWas && !finger && BODY.y < Y_FLOAT - 0.5) rising = true;
+    if(rising && BODY.y > Y_FLOAT - 0.12){ rising = false; if(finger) waitLift = true; }
+    if(waitLift && !finger) waitLift = false;
+    fingerWas = !!finger;
+  }
   let target = null;
   if(started){
     if(forced) target = forced;
+    else if(DOF === 1 && rising) target = { x: siteAt(PEARL.site).x, y: Y_FLOAT };
+    else if(DOF === 1 && waitLift) target = null;
     else if(finger){
       const want = worldAt(finger), here = siteAt(PEARL.site);
       target = DOF === 3 ? want

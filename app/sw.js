@@ -7,7 +7,7 @@
  * its own class of bug. A breathing app must work with no network, but
  * not at the cost of being unable to ship a correction.
  */
-const CACHE = 'bor-v27';
+const CACHE = 'bor-v28';
 const SHELL = [
   './', './index.html', './journey.html',
   './pearl-diver.html', './deep-light.html',  // the old address, a forwarding stub
@@ -32,7 +32,7 @@ const SHELL = [
   './js/murmuration-breath.js',
   // the reader-led spine and the lighting kit (12 Nov 2026)
   './js/lead.js', './js/light.js', './js/solid.js', './js/free-dive-breath.js', './js/follow.js',
-  './js/sozu-breath.js'
+  './js/sozu-breath.js', './js/paint.js', './js/finish.js'
 ];
 
 self.addEventListener('install', e => {

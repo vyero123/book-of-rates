@@ -286,6 +286,7 @@ import { boot, stage, clock, contextGuard, fps, choice, enter , flashMeter, solo
 import { arrival } from './js/arrival.js';
 import { invite } from './js/invite.js';
 import { wireExits } from './js/bookframe.js';
+import { finisher } from './js/finish.js';
 
 /* FALLING IN. The lens starts back and rushes to its place over
    700 ms when the chapter begins. Built from this chapter's own
@@ -485,7 +486,9 @@ scene.add(screenQuad(THREE, {
     float disc(float d, float r){ return 1.0 - aastep(r, d); }
     void main(){
       float h = vUv.y - uHorizon;
-      vec3 col = mix(uSkyLow, uSkyHigh, posteriseAA(h / 0.95, 5.0));
+      /* a gradient now, not five steps (17 November, the quality pass):
+         the steps were the idiom's, and the idiom is withdrawn (4.2b) */
+      vec3 col = mix(uSkyLow, uSkyHigh, smoothstep(-0.02, 0.95, h));
 
       /* ==============================================================
          THE SUN IS LOW, AND ITS HEIGHT IS DERIVED
@@ -552,7 +555,7 @@ scene.add(screenQuad(THREE, {
          and the low angle — the two things worth keeping — survive in
          the wash and in the lighting of the lobes.
          ============================================================== */
-      float glow = posteriseAA(1.0 - clamp(sd / 0.52, 0.0, 1.0), 3.0);
+      float glow = pow(1.0 - clamp(sd / 0.62, 0.0, 1.0), 1.7);
       col = mix(col, uHalo2, glow * 0.26 * aastep(-0.02, h));
       col = mix(col, uHalo,  glow * glow * 0.22 * aastep(-0.02, h));
 
@@ -1484,22 +1487,33 @@ const gateMatFor = kind => posterMat(THREE, {
         vec2 wp = vec2(vX, vY) * 0.21
                 + windDir() * (uTime * 0.09 * windGust(uFill))
                 + vec2(vSeed * 13.0, vSeed * 7.0);
+        /* SOFT, 17 November. The author: the white clouds "still look
+           funny and blocky". They were three HARD value steps on a
+           slab with a cut outline — which is cloud drawn as card. Now
+           the form is continuous: each lobe is lit on the side that
+           faces the light (from the wool's own slope), the body cools
+           gradually into the mass, and the outline is feathered, so
+           the edge is vapour rather than a cut. */
         float lobe = wool(wp);
-        float round_ = aastep(0.0, wool(wp + vec2(0.17, 0.12)) - lobe);
-        /* depth under the outline, softened by the wool so the bands
-           are ragged at their edges like a cloud and not like a
-           contour map */
-        float dep = max(0.0, vBelow) + (lobe - 0.5) * 1.1;
+        float lobe2 = wool(wp * 2.3 + vec2(5.1, 2.7));
+        float gxl = wool(wp + vec2(0.07, 0.0)) - lobe;
+        float gyl = wool(wp + vec2(0.0, 0.07)) - lobe;
+        float litLobe = clamp(0.5 + (-gxl * 0.8 + gyl) * 8.0, 0.0, 1.0);
+        float dep = max(0.0, vBelow) + (lobe - 0.5) * 1.6 + (lobe2 - 0.5) * 0.6;
+        float mass = smoothstep(0.6, 6.0, dep);
+        float base = smoothstep(4.5, 10.0, dep);
         col = uBody;
+        col = mix(col, uCool, mass * 0.42 * (1.0 - 0.45 * litLobe));
+        col = mix(col, uBase, base * 0.35);
         /* the light is on the -x side, which is where the hill's own
            spine split and the sky's warm wash both put it */
-        col = mix(col, uWarm, clamp(0.5 - vX * 0.055, 0.0, 1.0) * 0.75 * round_);
-        /* three hard steps down into the mass, resolved to a pixel */
-        col = mix(col, uCool, aastep(2.2, dep) * 0.55);
-        col = mix(col, uBase, aastep(6.0, dep) * 0.70);
+        col = mix(col, uWarm, clamp(0.55 - vX * 0.05, 0.0, 1.0) * 0.7 * litLobe * (1.0 - 0.6 * mass));
         /* the rim: the light gets under the edge of a cloud, and the
            edge is the thing the reader aims at */
-        col = mix(col, uBody, (1.0 - aastep(0.55, dep)) * 0.85);
+        col = mix(col, uBody, (1.0 - smoothstep(0.0, 1.4, dep)) * 0.6);
+        /* and the outline is vapour */
+        alpha *= smoothstep(-0.25, 0.45, vBelow + (lobe - 0.5) * 0.9);
+        if(alpha < 0.012) discard;
       }
       col *= 1.0 + (chipAt(vec2(floor(vY * 1.4), floor(vSeed * 29.0))) - 0.5)
                    * 0.08 * (1.0 - uIsCloud);
@@ -1651,7 +1665,7 @@ const treeMat = posterMat(THREE, {
    ------------------------------------------------------------------ */
 function cloudGeometry(clouds){
   const b = builder(THREE, { aU:1, aSide:1, aRate:1, aPh:1, aAmp:1,
-                             aBaseZ:1, aLipY:1, aSeed:1 });
+                             aBaseZ:1, aLipY:1, aSeed:1, aCrownY:1 });
   const N = CLOUD.CLOUD_COLS, ST = CLOUD.CLOUD_STATIONS;
   for(const c of clouds){
     const zHalf = c.halfW * CLOUD.CLOUD_Z_FRAC;
@@ -1678,7 +1692,7 @@ function cloudGeometry(clouds){
         const mid = (yU + yC) * 0.5;
         b.vertex(c.x + u * c.halfW * sc, mid + (yU - mid) * sc, z,
           { aU:u, aSide:-1, aRate:c.rate, aPh:c.phase, aAmp:CLOUD.CLOUD_BILLOW * c.puff * sc,
-            aBaseZ:c.zb, aLipY:yU, aSeed:seed });
+            aBaseZ:c.zb, aLipY:yU, aSeed:seed, aCrownY:yC });
       }
       for(let k = N - 1; k >= 0; k--){
         const u = -1 + (k / (N - 1)) * 2;
@@ -1687,7 +1701,7 @@ function cloudGeometry(clouds){
         const mid = (yU + yC) * 0.5;
         b.vertex(c.x + u * c.halfW * sc, mid + (yC - mid) * sc, z,
           { aU:u, aSide:1, aRate:c.rate, aPh:c.phase, aAmp:CLOUD.CLOUD_BILLOW * c.puff * 1.3 * sc,
-            aBaseZ:c.zb, aLipY:yU, aSeed:seed });
+            aBaseZ:c.zb, aLipY:yU, aSeed:seed, aCrownY:yC });
       }
     }
     const ring = N * 2;
@@ -1711,11 +1725,13 @@ const cloudMat = posterMat(THREE, {
   prelude: PRE + NEAR_FADE + WIND_GLSL,
   vertex: SCROLL_WHOLE_GLSL + `
     attribute float aU; attribute float aSide; attribute float aRate;
-    attribute float aPh; attribute float aAmp; attribute float aLipY;
+    attribute float aPh; attribute float aAmp; attribute float aLipY; attribute float aCrownY;
+    varying float vCrown;
     attribute float aSeed;
     uniform float uTime;
     varying float vU; varying float vSide; varying float vDist;
     varying float vBelow; varying float vX; varying float vY; varying float vSeed;
+    varying vec3 vW;
     void main(){
       vec3 p = position;
       /* THE BILLOW. Non-negative and bounded by aAmp, with the phase
@@ -1728,15 +1744,19 @@ const cloudMat = posterMat(THREE, {
       p = scrolledWhole(p);
       vU = aU; vSide = aSide; vSeed = aSeed;
       vBelow = aLipY - position.y;
+      vCrown = aCrownY - position.y;
       vX = position.x; vY = p.y;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       vDist = -mv.z;
+      vW = (modelMatrix * vec4(p, 1.0)).xyz;
       gl_Position = projectionMatrix * mv;
     }
   `,
   fragment:`
     varying float vU; varying float vSide; varying float vDist;
     varying float vBelow; varying float vX; varying float vY; varying float vSeed;
+    varying float vCrown;
+    varying vec3 vW;
     uniform vec3 uWarm, uBody, uCool, uBase;
     uniform float uTime, uFill, uInCloud, uNearFade;
     float wool(vec2 p){
@@ -1759,16 +1779,47 @@ const cloudMat = posterMat(THREE, {
               + windDir() * (uTime * 0.09 * windGust(uFill))
               + vec2(vSeed * 13.0, vSeed * 7.0);
       float lobe = wool(wp);
-      float round_ = aastep(0.0, wool(wp + vec2(0.17, 0.12)) - lobe);
-      /* the value steps are in depth under the cloud's OWN underside,
-         so the bands follow the cauliflower instead of running across
-         it (the lesson from the banks) */
-      float dep = max(0.0, vBelow) + (lobe - 0.5) * 1.1;
+      float lobe2 = wool(wp * 2.3 + vec2(5.1, 2.7));
+      /* SOFT, 17 November — "the white clouds still look funny and
+         blocky". They were three hard value steps on a body whose
+         outline is a cut: card, not vapour. Now the body is lit by
+         its own surface (a normal from the triangles as drawn), cools
+         gradually towards its underside, and its OUTLINE IS FEATHERED
+         by how edge-on the surface is to the lens: at the silhouette
+         the surface turns away, and there the cloud thins to nothing.
+         The wool breaks that edge up so it is not a clean curve. */
+      vec3 Nf = normalize(cross(dFdx(vW), dFdy(vW)));
+      vec3 Vv = normalize(cameraPosition - vW);
+      if(dot(Nf, Vv) < 0.0) Nf = -Nf;
+      float facing = dot(Nf, Vv);
+      float sunLit = clamp(dot(Nf, normalize(vec3(-0.55, 0.75, 0.35))) * 0.5 + 0.5, 0.0, 1.0);
+      float dep = max(0.0, vBelow) + (lobe - 0.5) * 1.6 + (lobe2 - 0.5) * 0.6;
+      float under = 1.0 - smoothstep(-0.2, 0.75, Nf.y + (lobe - 0.5) * 0.5);
       vec3 col = uBody;
-      col = mix(col, uWarm, clamp(0.5 - vX * 0.012, 0.0, 1.0) * 0.75 * round_);
-      col = mix(col, uCool, aastep(2.2, dep) * 0.55);
-      col = mix(col, uBase, aastep(6.0, dep) * 0.70);
-      col = mix(col, uBody, (1.0 - aastep(0.55, dep)) * 0.85);
+      col = mix(col, uCool, (0.30 * (1.0 - sunLit) + 0.45 * under) * (0.8 + 0.4 * lobe2));
+      col = mix(col, uBase, smoothstep(2.0, 8.0, dep) * 0.35);
+      col = mix(col, uWarm, sunLit * sunLit * 0.55 * clamp(0.6 - vX * 0.012, 0.0, 1.0));
+      alpha *= smoothstep(0.06, 0.42, facing + (lobe - 0.5) * 0.30 + (lobe2 - 0.5) * 0.12);
+      /* HEAPED, NOT SWEPT. The outline the geometry can carry is held to
+         a curvature bar (the sampler, 1.5 px) and at that bar a 60 m
+         cloud is a slab with a gently rolling top — the "blocky" the
+         author named. So the heaping is done here, where it costs no
+         knots: the crown is eaten into by billows several metres deep,
+         and the ends round off the same way. The base stays flat and
+         nearly crisp, because a cumulus base is. */
+      vec2 hp = vec2(vX, vY) * (0.16 / ${MAG_V.toFixed(4)}) + vec2(vSeed * 31.0, vSeed * 17.0)
+              + windDir() * (uTime * 0.05);
+      float heap = wool(hp) * 0.65 + wool(hp * 2.2 + 3.7) * 0.35;
+      float fromCrown = vCrown / ${MAG_V.toFixed(4)};
+      float fromEnd = (1.0 - abs(vU)) * 26.0;
+      float fromBase = -vBelow / ${MAG_V.toFixed(4)};
+      alpha *= smoothstep(-0.4, 1.4, fromCrown - 7.0 * (1.0 - heap));
+      alpha *= smoothstep(-0.4, 1.4, fromEnd - 6.0 * (1.0 - heap));
+      alpha *= smoothstep(-0.3, 0.6, fromBase - 0.7 * (1.0 - heap));
+      /* and a heap's own shadow: the hollows between billows are cooler */
+      col = mix(col, uCool, (1.0 - heap) * smoothstep(0.0, 9.0, fromCrown) * 0.0
+                          + (1.0 - smoothstep(0.0, 7.0, fromCrown - 7.0 * (1.0 - heap))) * 0.22);
+      if(alpha < 0.012) discard;
       /* a cloud is water in air and takes little of the haze: it IS
          the haze, locally */
       gl_FragColor = vec4(mix(col, uFog, fogAmount(vDist) * 0.25), alpha);
@@ -2982,6 +3033,9 @@ const cHaze = C(AIR.haze), cMid = C(R.at(MID));
 
 const fpsTick = fps({ el: elFps, dot: elFpsDot, renderer, size });
 
+const vKeep = new THREE.Vector3();
+const FINISH = finisher(THREE, { renderer, threshold: 0.70, shafts: 0.55, bloom: 0.32 });
+const PLAIN = new URLSearchParams(location.search).has('plain');
 const loop = clock((dt, now, running) => {
   if(!running){ fpsTick(now, true); return; }
   if(started) t += dt;
@@ -3323,6 +3377,31 @@ const loop = clock((dt, now, running) => {
   camera.position.set(kiteX * 0.3, L.camY, back);
   camera.up.set(0, 1, 0);
   camera.lookAt(kiteX * 0.3, L.lookY, -22);
+  /* THE FRAME-KEEPER, 17 November. The author: the glider "vanishes on
+     the way down and is almost out of screen on the way up". Measured:
+     the lens trails the glider by twelve metres, so on every climb it
+     sat at the top edge of the glass (NDC +1.03) and on every dive it
+     went off the bottom (-1.20). The lens stays what it was — smooth
+     and a little behind, so the climb is still seen as a climb — and
+     on top of it, only when the glider is near an edge, it TURNS just
+     enough to hold it. A soft limit: nothing at all inside the band,
+     and the correction grows from zero with zero slope outside it, so
+     there is no kink to see. Computed from the un-kept pose every
+     frame, so it is not a loop and cannot run away. */
+  {
+    camera.updateMatrixWorld();
+    vKeep.set(kiteX, kiteY, 0).project(camera);
+    const hi = 0.40, lo = -0.36;
+    const ex = vKeep.y > hi ? vKeep.y - hi : vKeep.y < lo ? vKeep.y - lo : 0;
+    if(ex !== 0){
+      const c = Math.sign(ex) * ex * ex / (Math.abs(ex) + 0.08);
+      const tf = Math.tan(camera.fov * Math.PI / 360);
+      const dTh = Math.atan(vKeep.y * tf) - Math.atan((vKeep.y - c) * tf);
+      const D = back + 22;
+      const th0 = Math.atan2(L.lookY - L.camY, D);
+      camera.lookAt(kiteX * 0.3, L.camY + D * Math.tan(th0 + dTh), -22);
+    }
+  }
   /* The arrival displacement goes HERE: after the chapter has set the
      pose, and before anything below reads camera.position, so the
      uniforms see the camera that actually renders. */
@@ -3391,7 +3470,11 @@ const loop = clock((dt, now, running) => {
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
 
-  renderer.render(scene, camera);
+  /* THE FINISH (js/finish.js): light spills — shafts from the light's
+     place in the sky, a glow round what is bright, highlights rolled
+     off, a grade, the corners. `?plain` shows the frame without it. */
+  FINISH.sun.set(0.30, uHorizon.value + 0.343);
+  if(PLAIN) renderer.render(scene, camera); else FINISH.render(scene, camera, dt);
   fpsTick(now, false);
 });
 

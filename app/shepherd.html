@@ -159,6 +159,7 @@ import { boot, stage, clock, contextGuard, fps, choice, enter, soloReport,
 import { arrival } from './js/arrival.js';
 import { invite } from './js/invite.js';
 import { wireExits } from './js/bookframe.js';
+import { painter } from './js/paint.js';
 
 const ARRIVE = arrival({ dist: 9 });
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js';
@@ -1006,6 +1007,8 @@ function poseAt(i, d, lateral, stride){
   U.uStride.value[i] = stride;
 }
 
+const PAINT = painter(THREE, { renderer, scale: 0.5, radius: 4, stroke: 12 });
+const PLAIN = new URLSearchParams(location.search).has('plain');
 const loop = clock((dt, now, running) => {
   if(!running){ fpsTick(now, true); return; }
   if(started) t += dt;
@@ -1138,9 +1141,16 @@ const loop = clock((dt, now, running) => {
   const cue = B.cue(t);
   if(cue.label !== elPhase.textContent) elPhase.textContent = cue.label;
 
-  renderer.render(scene, camera);
+  /* PAINTED. The author, 17 November: "change its style to painted,
+     with a lot of paint smears making the image instead of triangles —
+     a fundamentally different feel." The scene is built and lit as it
+     always was and then repainted by js/paint.js: dabs, then strokes
+     that follow the form, bristles and canvas. `?plain` shows it as it
+     was. */
+  if(PLAIN) renderer.render(scene, camera); else PAINT.render(scene, camera, dt);
   fpsTick(now, false);
 });
+
 
 /* ---------- the protocol choice ---------- */
 const picked = choice({ key:'bor.shepherd.protocol.v1', valid: validChoice });

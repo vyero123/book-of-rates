@@ -589,6 +589,38 @@ still schedule-led underneath (a cue word, a protocol sheet) — they have fewer
 degrees of freedom, not the reader-led rebuild Bamboo Rain got. Nothing here was seen in
 motion; the checks were the hooks (press reaches 0.99, release 0.01, watch tracks the cue).
 
+## The reader's list of 17 November — what changed and the one lesson
+
+- **Murmuration was backwards.** Inhale now OPENS the flock and exhale gathers it
+  (`gather = 1 - SHAPE.value`; far from the centre is the breath in). `d=1` is "press to open".
+- **Free Dive `d=1`:** letting go is a decision — she SWIMS up at full pace, a press on the way
+  up does nothing, and a finger still down at the surface must lift before she dives again.
+- **Bamboo Rain `?d=0`** is guided: the garden tips its own bamboo (4.5 s lift, the pour's own
+  length, 0.8 s rest). Listed in Chapter 0.
+- **The Shepherd walked behind the hill on the climb.** The 7 November sightline check used
+  a lens with no lag; the real lens trails him by up to 4 m. Raising the lens 3 → 6.5 m fixed
+  it (+0.14 m clearance to his shins). **Reshaping the ground near the path also fixed it and
+  broke the hill's 2 px continuity bar by 7x** — a steep roll-off near the path is curvature
+  the columns cannot hold. Prefer moving the lens to bending a measured surface.
+- **The Shepherd is PAINTED** (`js/paint.js`): scene at half res → Kuwahara dabs → strokes
+  along the form, marks with their own load of paint, bristles, canvas. **A flat field has
+  nothing to smear**, so the painter has to PUT the paint in (per-mark value and warm/cool
+  jitter, ragged sampling). And a stroke frame that rotates freely draws its marks in rings
+  that read as wood grain: in flat areas the strokes are laid nearly level. `?plain` = old look.
+- **Long Air's glider left the frame** (NDC +1.03 on every climb, −1.20 on every dive — the
+  lens trails it by 12 m). A frame-keeper turns the lens only when the glider nears an edge,
+  computed from the un-kept pose so it is not a loop: now −0.43 … +0.47.
+- **Long Air's clouds were card.** The geometric outline is held to a curvature bar, so a
+  60 m cloud can only be a slab with a rolling top. The heaping is done in the FRAGMENT stage:
+  `aCrownY` baked into the cloud geometry, billows eat the crown and ends by alpha, facing
+  feathers the silhouette, the body is lit from a derivative normal. Gate banks got soft
+  shading but keep their outline (the lip is aimed at).
+- **Long Air has a finish pass** (`js/finish.js`): quarter-res light layer (bright-pass glow +
+  shafts walking to the light), grade, vignette, grain. **A highlight shoulder that starts
+  below 1.0 turns white cloud grey** — it rolls off only what added light pushed past white.
+
+Gate passes. Seen in stepped stills only; cost of the two post passes not measured on a phone.
+
 ## LEVEL OF EFFORT FOR THE §1.7 / §4.2b CONVERSION — 12 November 2026
 
 Asked for by the author before any conversion starts. Full working in

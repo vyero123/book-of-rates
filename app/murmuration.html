@@ -563,8 +563,8 @@ const DOF = (() => {
 })();
 if(DOF === 0){ elReach.style.display = 'none'; elRing.style.display = 'none'; }
 elReach.setAttribute('aria-label', DOF === 1
-  ? 'Press anywhere and the flock gathers; let go and it opens'
-  : 'Touch near the centre and the flock gathers; touch further out and it opens towards you');
+  ? 'Press anywhere and the flock opens out; let go and it gathers in'
+  : 'Touch further out and the flock opens towards you; touch near the centre and it gathers');
 
 const touches = new Map();
 let reachAt = null;
@@ -611,7 +611,9 @@ function radial(p){
   const r = Math.hypot(dx, dy), out = clamp01((r - rIn()) / (rOut() - rIn()));
   const k = r > 1e-3 ? clamp01(r / rOut()) / r : 0;
   /* fill; and the lean, in screen axes with y UP */
-  return { fill: 1 - out, px: dx * k, py: -dy * k };
+  /* far out is the breath IN: the author, 17 November, "inhaling should
+     expand, exhaling contract the swarm" */
+  return { fill: out, px: dx * k, py: -dy * k };
 }
 const reachFill = p => radial(p).fill;
 
@@ -703,8 +705,12 @@ const loop = clock((dt, now, running) => {
   } else {
     SHAPE.drive(dt, forceUp, forceDown);
   }
-  const gather = SHAPE.value;
-  uFill.value = SHAPE.fill;
+  /* THE BREATH OPENS THE FLOCK. `fill` is the breath (in = 1) and the
+     flock's own geometry is written in terms of how GATHERED it is, so
+     the one is the other turned over. The author, 17 November: the
+     first version had it backwards — a lung fills and gets bigger. */
+  const gather = 1 - SHAPE.value;
+  uFill.value = 1 - SHAPE.fill;
   uTime.value = t;
 
   /* --- AND THE FLOCK IS A FUNCTION OF IT. Radius, altitude and the
@@ -976,7 +982,7 @@ const api = window.__murmuration = {
       /* the finger at the DISTANCE the schedule's shape is worth,
          straight down from the heart (so the lean it adds is along the
          frame's long axis, where there is room for it) */
-      api.reach(0.5, 0.5 + (rIn() + (1 - clamp01(normOf(B.value(t)))) * (rOut() - rIn())) / frameH());
+      api.reach(0.5, 0.5 + (rIn() + clamp01(normOf(B.value(t))) * (rOut() - rIn())) / frameH());
       loop.pump(1 / 60, 1);
       const b = bird(), e = bottom();
       birdMax = Math.max(birdMax, Math.hypot(b[0]-prevB[0], b[1]-prevB[1]) * 60);

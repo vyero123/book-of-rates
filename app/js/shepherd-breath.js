@@ -553,7 +553,13 @@ export const STRIP_AHEAD  = 184.0;
 export const STRIP_LEN = STRIP_BEHIND + STRIP_AHEAD + TERRAIN_PERIOD + 6;
 
 export const CAM_SIDE = 22.0;   // metres off the path
-export const CAM_UP   = 3.0;    // metres above the ground beneath it
+/* 6.5, from 3, on 17 November: on the climb the lens trails him by up
+   to four metres and from three metres up the slope between stood into
+   the line of sight, so he walked BEHIND the hill (the author). From
+   6.5 the worst clearance to his shins over three hills is +0.14 m at a
+   four-metre lag. Reshaping the ground instead broke the hill's 2 px
+   bar by a factor of seven; raising the lens costs nothing there. */
+export const CAM_UP   = 6.5;    // metres above the ground beneath it
 export const CAM_BACK = 3.5;    // abeam the middle of the line
 export const CAM_W    = 1.1;    // how slowly it takes up his pace
 

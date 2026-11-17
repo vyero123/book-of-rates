@@ -548,6 +548,18 @@ let finger = false, forced = null;
   window.addEventListener('keyup',   e => { if(e.code === 'Space'){ touches.delete('key'); finger = touches.size > 0; } });
 })();
 
+/* HOW MUCH OF IT IS THE READER'S (`?d=`). The default is one touch.
+   d=0 is GUIDED, on the author's request (17 November): the garden
+   tips its own bamboo and the reader breathes with it. It lifts for
+   GUIDE_IN, the pour runs out at the pour's own pace, a beat of rest,
+   again — about eleven seconds a breath, in four and a half, out six. */
+const DOF = new URLSearchParams(location.search).get('d') === '0' ? 0 : 1;
+const GUIDE_IN = 4.5, GUIDE_REST = 0.8;
+let guidePress = false, guideT = 0, guideRest = GUIDE_REST * 0.5;
+if(DOF === 0){
+  elReach.style.display = 'none';
+  elReach.setAttribute('aria-label', 'The bamboo lifts, fills and pours on its own; breathe in as it fills and out as it pours');
+}
 const S = newSozu();
 const LEAD = leader();
 /* nobody leading, the grove takes eleven and a half seconds: the rate
@@ -585,7 +597,12 @@ const loop = clock((dt, now, running) => {
   U.uTime.value += dt;
 
   /* --- THE BAMBOO --- */
-  const pressed = started && (forced !== null ? forced : finger);
+  let pressed;
+  if(DOF === 0 && started && forced === null){
+    if(guidePress){ guideT += dt; if(guideT >= GUIDE_IN){ guidePress = false; guideRest = 0; } }
+    else if(!S.pouring && S.flow === 0){ guideRest += dt; if(guideRest >= GUIDE_REST){ guidePress = true; guideT = 0; } }
+    pressed = guidePress;
+  } else pressed = started && (forced !== null ? forced : finger);
   if(pressed) pressedOnce = true;
   step(S, pressed, dt);
 
@@ -614,7 +631,7 @@ const loop = clock((dt, now, running) => {
   U.uOffer.value = offerOf(S);
 
   /* --- the ring on the tail, until the glass has been pressed once --- */
-  const inv = INVITE.step(dt, { wanted: started, taken: pressedOnce });
+  const inv = INVITE.step(dt, { wanted: started && DOF === 1, taken: pressedOnce });
   const W = size.W || window.innerWidth || 1, H = size.H || window.innerHeight || 1;
   const tx = 0.030 + Math.cos(S.angle) * 0.112, ty = 0.585 - Math.sin(S.angle) * 0.112;
   elRing.style.left = ((tx / camera.aspect + 0.5) * W).toFixed(1) + 'px';
